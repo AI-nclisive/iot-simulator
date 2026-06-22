@@ -1,119 +1,136 @@
 # UI Screen Specifications
 
-This file describes what each screen must support.
+## Purpose
 
-Readable rule: each screen has the same short structure:
+`UI_SCREEN_SPECS.md` defines the screen-level requirements for the Web UI.
 
-- stage;
-- user goal;
-- main UI;
-- required states;
-- done when.
+This file explains what each page, flow surface, or shared UI surface must show,
+what actions it must support, and what states it must handle.
 
-Use this file with `DESIGN.md` and `UI_TASKS.md`.
+## Surface Types
 
-## Quick Index
+- `Page`: a full route inside the app shell.
+- `Flow`: a guided multi-step or focused execution surface.
+- `Shared surface`: a panel, modal, or reusable UI surface that appears in
+  multiple places.
 
-Common rules:
+## Cross-Surface Contract
 
-- Common Screen Rules
-- Shared Mode Permissions
+Every page inside the workspace should inherit the same structural rules:
 
-P0 screens:
+- top bar with project and mode context;
+- left navigation for main product sections;
+- central work area for the current task;
+- persistent runtime visibility through a side panel or bottom panel.
 
-- Project Entry
-- Project Overview
-- Data Sources List
-- Create Data Source Wizard
-- Scan Real Source
-- Recording Flow
-- Replay Flow
-- Data Source Detail
-- Evidence List
-- Evidence Detail
-- Credential Handling
+Every surface that shows mutable or runtime-sensitive content should account for:
 
-P1 screens:
+- loading;
+- empty state where relevant;
+- validation problems where relevant;
+- permission-restricted state where relevant;
+- stale or reconnecting live state where relevant;
+- partial failure where relevant;
+- full failure where relevant.
 
-- Login
-- Deterministic Run Settings
-- Full Schema Editor
-- Recordings & Samples
-- Settings
-- Admin UI
-- Automated Runs Visibility
-- Retention / Cleanup
-- Notifications
+Shared-mode surfaces must reflect the current role in the UI before action where
+practical. Sensitive material such as credentials, secrets, private keys, and
+PKI material must never appear in activity, evidence, summaries, or export
+surfaces.
 
-P2 screens:
+## Surface Map
 
-- Scenario Builder
-- Scenario Run View
-- Activity / Audit View
+Use this block as a quick index to the surfaces described below.
 
-## Common Screen Rules
+### Pages
 
-Every screen must follow these rules:
+- `Login`:
+  enter shared mode.
+- `Project Entry`:
+  choose a workspace.
+- `Project Overview`:
+  see team and runtime state.
+- `Data Sources List`:
+  browse and operate sources.
+- `Data Source Detail`:
+  inspect one source in depth.
+- `Recordings & Samples`:
+  manage reusable captured data.
+- `Scenarios Workspace`:
+  browse saved scenarios and create new ones.
+- `Scenario Run View`:
+  observe one running scenario.
+- `Evidence List`:
+  find captured evidence.
+- `Evidence Detail`:
+  review one evidence artifact.
+- `Activity View`:
+  inspect user and automation history.
+- `Settings`:
+  manage project and environment settings.
+- `Admin UI`:
+  manage shared access.
 
-- Use the same app shell: top bar, left navigation, main content, runtime panel.
-- Show deployment mode clearly: trusted local or shared team.
-- Treat login/password as P1 shared-mode behavior.
-- Show runtime state with last updated time where relevant.
-- Show initiator/owner for runs, scenarios, edits, and evidence.
-- Show progress for long-running work.
-- Explain errors in user terms.
-- Use tables for dense operational lists.
-- Keep controls keyboard reachable and focus visible.
-- Never use color as the only status signal.
-- Keep locked objects readable but not editable for other users.
-- Keep live preview and captured timelines visually distinct.
-- Keep runtime events and user activity/audit labeled separately.
-- Show artifact version compatibility before import/export commit.
-- Never expose secrets, credentials, private keys, or PKI material.
-- Keep browser UI usable on Linux, Windows, and macOS.
+### Flows
 
-## Shared Mode Permissions
+- `Create Data Source Wizard`:
+  create a source through one guided entry.
+- `Scan Real Source`:
+  discover structure from a real endpoint.
+- `Full Schema Editor`:
+  fully edit a schema.
+- `Recording Flow`:
+  capture real behavior.
+- `Replay Flow`:
+  replay saved behavior through a source.
+- `Scenario Builder`:
+  build a scenario.
 
-This matrix applies after shared-mode authentication is introduced.
+### Shared Surfaces
 
-Trusted local mode can expose full-control behavior.
+- `Deterministic Run Settings`:
+  configure repeatable behavior.
+- `Runtime Context Panel`:
+  keep live runtime visible everywhere.
+- `Automated Run Visibility`:
+  show automation-run presence across pages.
+- `Credential Handling`:
+  safely collect and display connection secrets.
+- `Retention & Cleanup`:
+  manage large or old artifacts safely.
+- `Notifications`:
+  deliver transient and persistent feedback.
 
-Admin:
-
-- view projects and runtime state;
-- start and stop data-sources;
-- create, edit, duplicate, and delete data-sources;
-- create and edit schemas;
-- import and export projects, recordings, samples, and evidence;
-- run and stop scenarios;
-- manage users, roles, and settings;
-- view activity/audit.
-
-User:
-
-- view projects and runtime state;
-- view schemas, recordings, samples, scenarios, evidence, runtime events, and
-  user activity;
-- start stopped data-sources;
-- cannot stop, edit, delete, import, export, run scenarios, or manage users.
-
-## Screen Specs
+## Access And Entry
 
 ### Login
 
-Stage: P1
+Type: `Page`
 
-User goal: enter a shared simulator environment.
+Primary purpose:
 
-Main UI:
+- enter a shared simulator environment.
 
-- environment name;
+Entry points:
+
+- initial entry when shared authentication is enabled;
+- session expiration;
+- explicit sign-out return.
+
+Must show:
+
+- environment or server name;
 - login field;
 - password field;
-- sign in action;
-- server/authentication error area.
+- sign-in action;
+- authentication error area.
 
-Required states:
+Primary actions:
+
+- sign in;
+- retry after failure.
+
+Key states:
 
 - empty;
 - loading;
@@ -121,406 +138,346 @@ Required states:
 - server unavailable;
 - session expired.
 
-Done when:
+Shared behavior:
 
-- trusted local mode can skip this screen;
-- shared mode blocks project content until authentication;
-- errors are clear;
-- keyboard sign-in works;
-- layout can later support OAuth2/OIDC/provider metadata.
+- this surface is skipped in trusted local mode;
+- the layout should remain compatible with future provider-based identity.
+
+Complete when:
+
+- shared mode blocks workspace content until authentication succeeds;
+- errors are clear and recoverable;
+- keyboard-only sign-in works.
 
 ### Project Entry
 
-Stage: P0
+Type: `Page`
 
-User goal: choose where to work.
+Primary purpose:
 
-Main UI:
+- choose the project to work in.
+
+Entry points:
+
+- initial local entry;
+- first screen after shared login;
+- explicit return from inside a project.
+
+Must show:
 
 - project list;
-- create project;
-- import project;
-- active/running status;
-- recent activity.
+- project status or recent activity summary;
+- create action;
+- import action;
+- open action.
 
-Required states:
+Primary actions:
+
+- open project;
+- create project;
+- import project.
+
+Key states:
 
 - no projects;
 - loading;
-- import progress;
+- import in progress;
 - import failed;
 - project unavailable.
 
-Done when:
+Shared behavior:
 
-- local users or signed-in shared users can see projects and running status;
-- create/import is Admin-only in shared mode;
-- empty state offers create/open/import;
-- project lifecycle can be added without changing the entry model.
+- all users can see all projects;
+- in shared mode, create and import actions are Admin-only.
+
+Complete when:
+
+- users can choose a project without ambiguity;
+- recent project activity helps orient the next action;
+- the empty state points clearly toward starting work.
+
+## Workspace Pages
 
 ### Project Overview
 
-Stage: P0
+Type: `Page`
 
-User goal: understand project state immediately.
+Primary purpose:
 
-Main UI:
+- give an immediate operational summary of the current project.
 
-- project health and global state;
+Entry points:
+
+- default landing page after project selection;
+- return point from deeper surfaces.
+
+Must show:
+
+- project status summary;
 - primary actions;
 - active runs;
-- alerts;
-- data-source summary;
-- connected clients summary;
-- runtime panel;
-- recent activity.
+- health or warning highlights;
+- recent runtime activity;
+- recent evidence;
+- who initiated recent meaningful actions.
 
-Required states:
+Primary actions:
+
+- create source;
+- open a source;
+- start allowed sources;
+- open evidence;
+- drill into recent issues.
+
+Key states:
 
 - empty;
 - ready;
-- running;
+- active runtime;
 - warning;
 - error;
-- stale data.
+- stale live data.
 
-Done when:
+Shared behavior:
 
-- users can answer what exists, what is running, who started it, who is connected,
-  and what is unhealthy;
-- Admin can use full actions in shared mode;
-- User can view and start stopped data-sources only.
+- Admin gets full available operational actions;
+- User can observe and start stopped data-sources only.
+
+Complete when:
+
+- a user can tell what is running, what changed, who touched it, and where to
+  go next in a few seconds.
 
 ### Data Sources List
 
-Stage: P0
+Type: `Page`
 
-User goal: view or manage simulated sources.
+Primary purpose:
 
-Main UI:
+- browse, filter, and operate all sources in the project.
 
-- filters;
+Entry points:
+
+- main navigation;
+- drill-in from Overview.
+
+Must show:
+
 - dense source table;
-- runtime summary;
+- protocol and endpoint summary;
+- current status;
+- connected-client summary where available;
+- health summary;
+- initiator or last-operator context where relevant;
 - row actions.
 
-Required states:
+Primary actions:
+
+- filter and search;
+- create source;
+- open detail;
+- start source;
+- stop source;
+- duplicate source;
+- delete source.
+
+Key states:
 
 - empty;
 - loading;
-- running;
-- error;
-- locked;
-- large list.
+- running items;
+- locked item;
+- error on one or more rows;
+- large result set.
 
-Done when:
+Shared behavior:
 
-- each row shows protocol, status, endpoint, clients, initiator, and health;
-- User can start only in shared mode;
-- Admin can create, start, stop, duplicate, edit, and remove.
+- User can open detail and start stopped sources only;
+- Admin can use full row actions.
 
-### Create Data Source Wizard
+Complete when:
 
-Stage: P0
-
-User goal: create a source through one extensible flow.
-
-Main UI:
-
-- protocol step;
-- source basis step;
-- structure step;
-- behavior step;
-- endpoint/name step;
-- review step.
-
-Required states:
-
-- validation error;
-- connection test;
-- partial scan;
-- incompatible sample;
-- review ready.
-
-Done when:
-
-- OPC UA, Modbus TCP, and future protocols fit the same wizard;
-- Scan real source is recommended but not the only path;
-- back/next/cancel preserve input;
-- shared-mode User cannot open the wizard except through a permission explanation.
-
-### Scan Real Source
-
-Stage: P0
-
-User goal: capture structure from a real device.
-
-Main UI:
-
-- masked connection form;
-- test connection;
-- scan progress;
-- schema preview;
-- create source action.
-
-Required states:
-
-- unreachable;
-- authentication failure;
-- partial scan;
-- large schema;
-- unknown data type;
-- stale scan result.
-
-Done when:
-
-- real endpoint and simulated endpoint are clearly distinct;
-- retry does not lose entered connection details;
-- partial scan is usable with warnings when appropriate.
-
-### Recording Flow
-
-Stage: P0
-
-User goal: capture real behavior over time.
-
-Main UI:
-
-- source summary;
-- start/stop controls;
-- duration;
-- value count;
-- timeline preview;
-- save metadata.
-
-Required states:
-
-- ready;
-- recording;
-- no values;
-- disconnected;
-- partial save;
-- save ready.
-
-Done when:
-
-- duration, value count, and last received value are visible;
-- useful partial recordings can be saved with a warning;
-- recording and live preview are not described as the same thing.
-
-### Replay Flow
-
-Stage: P0
-
-User goal: replay recorded/sample data through a simulated source.
-
-Main UI:
-
-- recording/sample selector;
-- target source;
-- compatibility check;
-- progress;
-- clients;
-- events.
-
-Required states:
-
-- no clients;
-- target already running;
-- replay running;
-- complete;
-- failed.
-
-Done when:
-
-- replacement impact is clear before replay starts;
-- target compatibility is shown;
-- replay can feed evidence.
-
-### Deterministic Run Settings
-
-Stage: P1
-
-User goal: repeat replay or generated behavior predictably.
-
-Main UI:
-
-- deterministic toggle;
-- seed or preset;
-- timing mode;
-- replay behavior;
-- repeat-run summary.
-
-Required states:
-
-- off;
-- enabled;
-- invalid seed;
-- incompatible target;
-- completed.
-
-Done when:
-
-- replay/synthetic value content, ordering, and timing setup can be repeated;
-- evidence records deterministic settings;
-- UI explains that connected client delivery timing can still vary.
+- the table supports rapid scanning and repeated daily use;
+- row-level runtime state is obvious without opening each source.
 
 ### Data Source Detail
 
-Stage: P0/P1
+Type: `Page`
 
-User goal: inspect and operate one source.
+Primary purpose:
 
-Main UI:
+- inspect one source deeply while keeping runtime state visible.
 
-- Overview tab;
-- Schema tab;
-- Values tab;
-- Clients tab;
-- Events tab;
-- Settings tab.
+Entry points:
 
-Required states:
+- Data Sources list;
+- Overview alerts or runtime links;
+- evidence and activity drill-ins.
+
+Must show:
+
+- source identity and status header;
+- endpoint summary;
+- tabs or segmented sections for Overview, Schema, Values, Clients, Events, and
+  Settings;
+- active runtime context that stays visible while switching tabs.
+
+Primary actions:
+
+- start source;
+- stop source;
+- open schema editor;
+- start recording;
+- configure replay;
+- inspect clients and events.
+
+Key states:
 
 - stopped;
 - running;
 - error;
-- stale;
-- locked;
-- read-only.
+- stale live state;
+- read-only;
+- locked by another edit session.
 
-Done when:
+Shared behavior:
 
-- source state, endpoint, health, and active behavior stay visible;
-- tabs can grow from P0 into P1 without changing navigation.
+- User can inspect all tabs and start a stopped source;
+- Admin can use mutation and configuration actions.
 
-### Full Schema Editor
+Complete when:
 
-Stage: P1
-
-User goal: edit any editable part of a schema.
-
-Main UI:
-
-- toolbar;
-- schema tree/table;
-- details panel;
-- validation summary;
-- unsaved changes indicator.
-
-Required states:
-
-- empty;
-- loading;
-- invalid;
-- running-source warning;
-- dependency warning;
-- locked.
-
-Done when:
-
-- Admin can edit identifiers, types, values, metadata, and read/write behavior
-  where supported;
-- User sees read-only mode in shared mode;
-- dependency impact is shown before save.
+- the user can stay oriented to runtime state while moving between tabs;
+- configuration and observation do not blur together.
 
 ### Recordings & Samples
 
-Stage: P1
+Type: `Page`
 
-User goal: view or manage reusable data.
+Primary purpose:
 
-Main UI:
+- manage reusable captured data for replay and comparison.
 
-- list;
-- filters;
-- import;
-- export;
+Entry points:
+
+- main navigation;
+- source detail after recording completion;
+- replay setup drill-in.
+
+Must show:
+
+- list with filters;
+- source association;
+- capture origin;
+- preview area;
+- import action;
+- export action;
+- assign-to-replay action.
+
+Primary actions:
+
+- filter;
 - preview;
-- assign to replay.
+- import prepared data;
+- export allowed artifacts;
+- assign artifact to replay.
 
-Required states:
+Key states:
 
 - empty;
 - loading;
 - import validation;
-- incompatible file;
-- newer unsupported version;
+- incompatible artifact;
+- unsupported newer version;
 - no results.
 
-Done when:
+Shared behavior:
 
-- Admin can import prepared files and preview before save;
-- version/format is validated before commit;
-- User sees read-only mode in shared mode.
+- User sees a read-only management surface;
+- Admin can import, export, and assign.
 
-### Scenario Builder
+Complete when:
 
-Stage: P2
+- reusable data is easy to browse and attach back into runtime work;
+- artifact compatibility is clear before commit.
 
-User goal: build a repeatable test flow.
+### Scenarios Workspace
 
-Main UI:
+Type: `Page`
 
-- ordered step list;
-- step details panel;
-- validation panel;
-- save/run actions.
+Primary purpose:
 
-Required states:
+- browse saved scenarios and start creating or opening one.
 
-- draft;
-- invalid;
-- ready;
-- locked.
+Entry points:
 
-Done when:
+- main navigation;
+- drill-in from Overview or activity.
 
-- run is disabled until validation passes;
-- faults, waits, replay, synthetic, start/stop, and marker steps fit one model.
+Must show:
 
-### Scenario Run View
+- scenario list;
+- scenario status summary;
+- last run summary where available;
+- create action;
+- open action.
 
-Stage: P2
+Primary actions:
 
-User goal: observe an active scenario.
+- create scenario;
+- open scenario;
+- duplicate scenario;
+- run scenario;
+- stop scenario.
 
-Main UI:
+Key states:
 
-- run summary;
-- step timeline;
-- sources;
-- clients;
-- faults;
-- events;
-- evidence state.
+- empty;
+- loading;
+- no results;
+- locked scenario;
+- run in progress.
 
-Required states:
+Shared behavior:
 
-- running;
-- stopped;
-- failed;
-- completed;
-- stale.
+- User can view saved scenarios only;
+- Admin can create, edit, run, and stop scenarios.
 
-Done when:
+Complete when:
 
-- current step, initiator, faults, clients, events, and evidence state are visible.
+- the scenarios area has a clear landing surface instead of dropping the user
+  directly into a builder with no context.
 
 ### Evidence List
 
-Stage: P0
+Type: `Page`
 
-User goal: find captured evidence.
+Primary purpose:
 
-Main UI:
+- find and filter captured evidence artifacts.
+
+Entry points:
+
+- main navigation;
+- Overview recent evidence;
+- runtime completion links.
+
+Must show:
 
 - evidence table;
-- filters;
 - status;
+- run origin;
+- initiator;
+- source or scenario context;
 - export state.
 
-Required states:
+Primary actions:
+
+- filter;
+- open evidence;
+- export allowed evidence.
+
+Key states:
 
 - empty;
 - capturing;
@@ -529,27 +486,46 @@ Required states:
 - export failed;
 - no results.
 
-Done when:
+Shared behavior:
 
-- users can find runs by initiator, project, scenario, and status;
-- export is Admin-only in shared mode.
+- all users can inspect evidence;
+- export actions are Admin-only in shared mode.
+
+Complete when:
+
+- users can quickly find evidence by source, run, initiator, or status.
 
 ### Evidence Detail
 
-Stage: P0
+Type: `Page`
 
-User goal: review and export what happened.
+Primary purpose:
 
-Main UI:
+- review one evidence artifact and understand what happened.
+
+Entry points:
+
+- Evidence list;
+- Overview evidence links;
+- runtime completion links.
+
+Must show:
 
 - summary;
-- captured timeline;
+- run origin;
+- initiator;
+- captured timeline or event summary;
 - clients;
-- faults/errors;
-- deterministic settings when relevant;
-- export options.
+- faults or errors where relevant;
+- export options;
+- completeness state.
 
-Required states:
+Primary actions:
+
+- export allowed formats;
+- move to related source or run context.
+
+Key states:
 
 - capturing;
 - ready;
@@ -557,51 +533,133 @@ Required states:
 - export failed;
 - large evidence.
 
-Done when:
+Shared behavior:
 
-- Report, Full bundle, and Value timeline CSV are clear;
-- missing or partial sections are explained;
-- secrets and private keys are excluded.
+- all users can inspect;
+- Admin can export and perform cleanup actions where allowed.
+
+Complete when:
+
+- it is obvious what the evidence represents, whether it is complete, and how
+  it relates back to the originating work.
+
+### Activity View
+
+Type: `Page`
+
+Primary purpose:
+
+- inspect user and automation activity over time.
+
+Entry points:
+
+- main navigation;
+- drill-in from Overview or Admin.
+
+Must show:
+
+- filters;
+- actor;
+- action;
+- object;
+- project context;
+- time;
+- links back to related objects.
+
+Primary actions:
+
+- filter;
+- open related object.
+
+Key states:
+
+- empty;
+- loading;
+- filtered;
+- stale.
+
+Shared behavior:
+
+- this is a read-only surface for shared visibility;
+- runtime events remain separate from user activity and are not merged into one
+  undifferentiated stream.
+
+Complete when:
+
+- users can answer who did what, when, and to which object without confusion
+  between runtime and audit history.
 
 ### Settings
 
-Stage: P1
+Type: `Page`
 
-User goal: manage project/environment settings.
+Primary purpose:
 
-Main UI:
+- manage project-level and environment-level settings.
 
-- project details;
-- import/export project;
-- defaults;
-- environment info.
+Entry points:
 
-Required states:
+- main navigation;
+- project administration actions.
+
+Must show:
+
+- project settings area;
+- environment settings area;
+- import and export entry points where relevant;
+- defaults and metadata.
+
+Primary actions:
+
+- edit allowed settings;
+- save;
+- export project;
+- import project where permitted.
+
+Key states:
 
 - loading;
 - saved;
 - validation error;
 - permission denied.
 
-Done when:
+Shared behavior:
 
-- project settings and environment settings are separated;
-- mutation is Admin-only in shared mode.
+- User sees configuration but cannot mutate;
+- Admin can change settings within allowed scope.
+
+Complete when:
+
+- project settings and wider environment settings are clearly separated;
+- risky changes do not hide inside generic forms.
 
 ### Admin UI
 
-Stage: P1
+Type: `Page`
 
-User goal: manage shared access.
+Primary purpose:
 
-Main UI:
+- manage shared access and role assignment.
 
-- users/known identities list;
-- role assignment;
+Entry points:
+
+- main navigation in shared environments.
+
+Must show:
+
+- users or known identities list;
+- current role;
 - status;
-- last activity.
+- recent activity hint;
+- role change controls.
 
-Required states:
+Primary actions:
+
+- filter users;
+- change role;
+- review status.
+
+Key states:
 
 - empty;
 - loading;
@@ -609,50 +667,476 @@ Required states:
 - role changed;
 - permission denied.
 
-Done when:
+Shared behavior:
 
-- Admin can manage access and roles;
-- product-owned password management is not assumed.
+- Admin-only surface;
+- the UI must not assume product-owned password lifecycle management if identity
+  moves to external providers later.
 
-### Activity / Audit View
+Complete when:
 
-Stage: P2
+- access management is understandable without exposing identity-system internals.
 
-User goal: inspect team and automation history.
+## Guided Flows And Editors
 
-Main UI:
+### Create Data Source Wizard
 
-- filters;
-- event list;
-- linked objects.
+Type: `Flow`
 
-Required states:
+Primary purpose:
 
-- empty;
+- create a source through one extensible guided flow.
+
+Entry points:
+
+- Overview primary action;
+- Data Sources page primary action.
+
+Must show:
+
+- protocol selection;
+- source-basis selection;
+- setup step;
+- schema step;
+- runtime-behavior step;
+- review step.
+
+Primary actions:
+
+- next;
+- back;
+- cancel;
+- create;
+- test details where relevant.
+
+Key states:
+
+- validation error;
+- connection test result;
+- partial discovery warning;
+- incompatible import input;
+- review-ready.
+
+Shared behavior:
+
+- User cannot enter this flow for mutation in shared mode;
+- permission denial should be explained clearly rather than failing late.
+
+Complete when:
+
+- the same wizard model can support current and future protocols without turning
+  into unrelated per-protocol flows;
+- progress and remaining work stay obvious.
+
+### Scan Real Source
+
+Type: `Flow`
+
+Primary purpose:
+
+- discover structure from a real endpoint.
+
+Entry points:
+
+- scan branch inside the creation wizard.
+
+Must show:
+
+- secure connection form;
+- connection test result;
+- scan progress;
+- discovery summary;
+- schema preview;
+- continue action into review.
+
+Primary actions:
+
+- test connection;
+- start scan;
+- retry;
+- accept discovered structure.
+
+Key states:
+
+- unreachable endpoint;
+- authentication failure;
+- partial scan;
+- large schema;
+- unknown data type;
+- stale scan result.
+
+Shared behavior:
+
+- credential entry obeys shared credential-handling rules;
+- entered secrets must never leak into summaries or activity.
+
+Complete when:
+
+- users can clearly tell what real endpoint was scanned, what was found, and
+  what still needs review before source creation.
+
+### Full Schema Editor
+
+Type: `Flow`
+
+Primary purpose:
+
+- give full manual control over an existing schema.
+
+Entry points:
+
+- Data Source Detail;
+- manual-schema branch after creation;
+- dependency or validation drill-in.
+
+Must show:
+
+- editing toolbar;
+- structure tree or table;
+- details panel;
+- validation summary;
+- unsaved-change indicator.
+
+Primary actions:
+
+- edit structure;
+- edit field details;
+- save;
+- discard;
+- inspect validation and dependencies.
+
+Key states:
+
 - loading;
-- filtered;
-- stale.
+- empty;
+- invalid;
+- running-source warning;
+- dependency warning;
+- locked by another user.
 
-Done when:
+Shared behavior:
 
-- shared users can filter user/automation activity by actor, action, object,
-  project, and time;
-- runtime events and user activity stay labeled separately.
+- User sees a read-only editor surface in shared mode;
+- Admin can edit with shared-concurrency protection.
 
-### Automated Runs Visibility
+Complete when:
 
-Stage: P1
+- this surface feels like a real editor instead of a narrow form patch;
+- the user can understand impact before saving.
 
-User goal: understand automated test activity.
+### Recording Flow
 
-Main UI:
+Type: `Flow`
 
-- automation initiator;
-- source;
-- run status;
+Primary purpose:
+
+- capture real behavior over time.
+
+Entry points:
+
+- Data Source Detail;
+- scan or setup continuation where recording is the next promoted step.
+
+Must show:
+
+- source summary;
+- recording state;
+- start and stop controls;
+- duration;
+- value count;
+- last-received hint;
+- save result metadata.
+
+Primary actions:
+
+- start recording;
+- stop recording;
+- save result;
+- discard failed or unwanted capture.
+
+Key states:
+
+- ready;
+- recording;
+- no values yet;
+- disconnected;
+- partial save;
+- save-ready.
+
+Shared behavior:
+
+- visible authorship matters because recording produces reusable team artifacts;
+- shared-mode permissions follow source-operation rules.
+
+Complete when:
+
+- the user can tell whether capture is active, useful, partial, or ready to
+  become a reusable artifact.
+
+### Replay Flow
+
+Type: `Flow`
+
+Primary purpose:
+
+- replay a recording or sample through a simulated source.
+
+Entry points:
+
+- Data Source Detail;
+- Recordings & Samples;
+- follow-up action after recording save.
+
+Must show:
+
+- recording or sample selector;
+- target source;
+- compatibility summary;
+- run progress;
+- client activity;
+- runtime events;
+- evidence destination or result.
+
+Primary actions:
+
+- choose artifact;
+- configure replay;
+- start replay;
+- stop replay.
+
+Key states:
+
+- no target available;
+- target already active;
+- no clients;
+- replay running;
+- completed;
+- failed.
+
+Shared behavior:
+
+- User can observe but not configure replay in shared mode;
+- Admin can set up and execute replay actions.
+
+Complete when:
+
+- replay feels like a direct continuation of recording instead of a disconnected
+  feature;
+- users can see compatibility and impact before they start.
+
+### Deterministic Run Settings
+
+Type: `Shared surface`
+
+Primary purpose:
+
+- configure repeatable replay or generated behavior.
+
+Entry points:
+
+- replay setup;
+- synthetic setup;
+- scenario configuration.
+
+Must show:
+
+- deterministic toggle;
+- seed or repeatability preset;
+- ordering or timing mode;
+- concise explanation of repeatability scope.
+
+Primary actions:
+
+- enable or disable deterministic behavior;
+- enter settings;
+- confirm settings.
+
+Key states:
+
+- off;
+- enabled;
+- invalid seed;
+- incompatible setup.
+
+Shared behavior:
+
+- settings should be inspectable in evidence or run summary after use;
+- the UI must not promise client delivery timing guarantees the system does not
+  guarantee.
+
+Complete when:
+
+- users can understand what repeatability means in product terms, not backend
+  terms.
+
+### Scenario Builder
+
+Type: `Flow`
+
+Primary purpose:
+
+- build a structured scenario from supported steps.
+
+Entry points:
+
+- Scenarios Workspace;
+- duplicate-scenario action.
+
+Must show:
+
+- ordered step list;
+- step details panel;
+- validation summary;
+- save action;
+- run action.
+
+Primary actions:
+
+- add step;
+- edit step;
+- reorder step;
+- save scenario;
+- run scenario.
+
+Key states:
+
+- draft;
+- invalid;
+- ready;
+- locked.
+
+Shared behavior:
+
+- User can inspect but not edit or run in shared mode;
+- Admin can edit and execute scenarios.
+
+Complete when:
+
+- supported step types fit one consistent builder model;
+- users understand why a scenario is or is not runnable.
+
+### Scenario Run View
+
+Type: `Page`
+
+Primary purpose:
+
+- observe one active or completed scenario run.
+
+Entry points:
+
+- Scenarios Workspace;
+- activity drill-in;
+- runtime links.
+
+Must show:
+
+- run summary;
+- current step;
+- ordered step timeline;
+- sources involved;
+- faults where relevant;
+- clients;
+- events;
 - evidence state.
 
-Required states:
+Primary actions:
+
+- stop run where permitted;
+- open related source;
+- open evidence.
+
+Key states:
+
+- queued;
+- running;
+- stopped;
+- failed;
+- completed;
+- stale.
+
+Shared behavior:
+
+- all users can inspect scenario run state;
+- stop action is restricted by permissions.
+
+Complete when:
+
+- a user can tell what the scenario is doing right now and what happened
+  immediately before.
+
+## Shared Surfaces
+
+### Runtime Context Panel
+
+Type: `Shared surface`
+
+Primary purpose:
+
+- keep live runtime visible across the workspace.
+
+Entry points:
+
+- persistent shell surface from all main pages.
+
+Must show:
+
+- active runs;
+- recent runtime events;
+- health warnings;
+- stale or reconnecting state;
+- quick links back to affected objects.
+
+Primary actions:
+
+- open related object;
+- expand or collapse panel;
+- inspect recent runtime details.
+
+Key states:
+
+- no active runtime;
+- active;
+- warning;
+- stale.
+
+Shared behavior:
+
+- authorship and initiator context should appear where meaningful;
+- this panel shows runtime history, not audit history.
+
+Complete when:
+
+- users do not lose live operational awareness while working elsewhere.
+
+### Automated Run Visibility
+
+Type: `Shared surface`
+
+Primary purpose:
+
+- make automation-driven runs visible anywhere equivalent manual runs are shown.
+
+Entry points:
+
+- Overview;
+- runtime surfaces;
+- evidence surfaces;
+- activity surfaces.
+
+Must show:
+
+- automation initiator label;
+- run state;
+- related source or scenario;
+- evidence state.
+
+Primary actions:
+
+- open related object;
+- open evidence.
+
+Key states:
 
 - queued;
 - running;
@@ -660,24 +1144,42 @@ Required states:
 - completed;
 - stopped.
 
-Done when:
+Shared behavior:
 
-- automated runs are visible wherever equivalent manual runs are visible.
+- automated work should never look like anonymous manual activity.
+
+Complete when:
+
+- automation activity is first-class and traceable across the product.
 
 ### Credential Handling
 
-Stage: P0/P1
+Type: `Shared surface`
 
-User goal: connect to real sources safely.
+Primary purpose:
 
-Main UI:
+- safely collect and display connection-sensitive fields.
 
-- masked fields;
-- saved/session-only indicator;
+Entry points:
+
+- scan flow;
+- manual source setup;
+- settings where credentials are relevant.
+
+Must show:
+
+- masked sensitive fields;
+- saved or session-only state where supported;
 - clear action;
-- permission/auth errors.
+- validation or permission errors.
 
-Required states:
+Primary actions:
+
+- enter sensitive value;
+- clear value;
+- confirm use.
+
+Key states:
 
 - missing;
 - invalid;
@@ -685,26 +1187,44 @@ Required states:
 - session-only;
 - permission failure.
 
-Done when:
+Shared behavior:
 
-- secrets, credentials, private keys, and PKI material never appear in summaries,
-  activity, evidence, imports, or exports.
+- sensitive values must never leak into summaries, evidence, activity, or
+  exports.
 
-### Retention / Cleanup
+Complete when:
 
-Stage: P1
+- users can safely provide required secrets without ambiguity about visibility
+  or persistence.
 
-User goal: manage large reusable artifacts.
+### Retention & Cleanup
 
-Main UI:
+Type: `Shared surface`
+
+Primary purpose:
+
+- manage large, old, or unused artifacts safely.
+
+Entry points:
+
+- Settings;
+- evidence and artifact management surfaces.
+
+Must show:
 
 - size;
 - age;
-- last used;
-- cleanup/archive action;
-- dependency warnings.
+- last-used signal where available;
+- dependency warning;
+- cleanup or archive action.
 
-Required states:
+Primary actions:
+
+- cleanup;
+- archive where supported;
+- review dependencies.
+
+Key states:
 
 - normal;
 - large;
@@ -712,24 +1232,41 @@ Required states:
 - dependency warning;
 - cleanup failed.
 
-Done when:
+Shared behavior:
 
-- users understand storage impact and deletion dependencies.
+- destructive cleanup requires explicit confirmation;
+- shared impact should be visible before commit.
+
+Complete when:
+
+- users can understand storage impact and deletion risk before acting.
 
 ### Notifications
 
-Stage: P1
+Type: `Shared surface`
 
-User goal: understand transient and persistent issues.
+Primary purpose:
 
-Main UI:
+- deliver transient and persistent feedback consistently.
 
-- inline alert;
-- toast;
-- persistent banner;
-- confirmation dialog.
+Entry points:
 
-Required states:
+- any screen or flow that creates, mutates, runs, imports, exports, or fails.
+
+Must show:
+
+- inline alerts;
+- success toasts;
+- persistent banners;
+- confirmation dialogs.
+
+Primary actions:
+
+- dismiss non-blocking feedback;
+- confirm risky action;
+- navigate to related detail where relevant.
+
+Key states:
 
 - success;
 - warning;
@@ -737,6 +1274,13 @@ Required states:
 - reconnecting;
 - stale.
 
-Done when:
+Shared behavior:
 
-- blocking and non-blocking feedback are visually distinct.
+- blocking and non-blocking feedback must be visually distinct;
+- shared-impact warnings should persist until the user can reasonably act on
+  them.
+
+Complete when:
+
+- users can tell what happened, what still needs attention, and whether action
+  is required immediately.

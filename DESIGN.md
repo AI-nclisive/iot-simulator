@@ -1,598 +1,515 @@
 # IoT Data Source Simulator UI Design
 
-This file defines the product-level UI direction.
+## Purpose
 
-For implementation details, use:
+`DESIGN.md` describes how the Web UI should behave.
 
-- `UI_PLAN.md` for staged planning and coverage.
-- `UI_SCREEN_SPECS.md` for screen requirements.
-- `UI_TASKS.md` for development tasks.
+It exists to define:
 
-## Quick Index
+- the structure of the workspace;
+- the main user flows;
+- the interaction rules that must stay consistent across screens;
+- the shared-work behavior that makes the product understandable in daily use.
 
-- Product direction
-- Delivery model
-- Architecture alignment
-- Usage modes and roles
-- Primary users
-- Information architecture
-- Core UX principles
-- Main product flows
-- Screen-level direction
-- Interaction rules
-- Edge and failure states
-- Visual direction
-- Accessibility
-- Current decisions
-- Open questions
+## Document Ownership
 
-## 1. Product Direction
+- `SPEC.md` owns product capabilities and boundaries.
+- `ARCHITECTURE.md` owns technical constraints and system rules.
+- `STACK.md` owns approved technologies.
+- `UI_PLAN.md` owns staged delivery order.
+- `UI_SCREEN_SPECS.md` owns screen-by-screen requirements.
+- `UI_TASKS.md` owns implementation tasks.
+- `DESIGN.md` owns UI structure, flow, and interaction behavior.
 
-The UI is an operational workbench for realistic industrial data-source
-simulation.
+## Scope
 
-The main product flow is:
+This file should describe:
 
-1. Scan real source.
-2. Record real behavior.
-3. Replay through a simulated source.
-4. Observe runtime behavior.
-5. Export evidence.
+- how users enter and move through the product;
+- how the main workflow is presented;
+- how editing, runtime, and history are separated in the UI;
+- how shared usage changes behavior;
+- how the interface handles state, feedback, and risk.
 
-The interface should feel practical, calm, and work-focused. It is not a landing
-page, marketing dashboard, or decorative demo.
+This file should not repeat:
 
-## 2. Delivery Model
+- capability lists;
+- implementation status;
+- stage planning;
+- screen inventory details;
+- technical implementation detail.
 
-This is a full product delivered in stages.
+## Product UX Model
 
-P0: first usable release slice.
+The interface is an operational workspace for simulator setup, runtime
+observation, and reproducible evidence.
 
-- trusted local mode;
-- no required login;
-- OPC UA and Modbus TCP;
-- Scan -> Record -> Replay;
-- live values;
-- evidence export;
-- baseline accessibility and edge states.
+It should feel:
 
-P1: production-usable breadth.
+- calm;
+- precise;
+- efficient;
+- trustworthy;
+- oriented toward repeated use, not one-time exploration.
 
-- shared login/password;
-- Admin/User shared-mode roles;
-- manual schemas;
-- synthetic data;
-- deterministic replay/synthetic settings;
-- import/export;
-- recordings/samples management;
-- clients, health, events;
-- automated run visibility;
-- retention;
-- responsive/browser/platform baseline.
+The product must present one clear primary story:
 
-P2: advanced shared workflows.
+`Scan real source -> Record -> Replay`
 
-- custom scenarios;
-- faults;
-- activity/audit history;
-- advanced shared editing workflows;
-- future identity provider and expanded-role compatibility.
+That path should be visually and structurally favored because it explains why
+this simulator is valuable.
 
-## 3. Architecture Alignment
+Manual schema creation, prepared-file input, and synthetic generation remain
+first-class options, but they should appear as alternative setup paths inside
+the same product structure rather than as separate mini-products.
 
-The UI must align with `ARCHITECTURE.md` without exposing implementation details.
+## Workspace Structure
 
-UI implications:
+The UI should behave like a stable workspace.
 
-- The Web UI talks to the backend only through public API surfaces.
-- Users see product concepts, not worker, database, IPC, or storage concepts.
-- Schema, values, recordings, samples, replay, scenarios, faults, and evidence
-  use the protocol-neutral product model.
-- Protocol-specific fields appear only in protocol configuration and schema
-  details.
-- Live values are an operational preview and can become stale/reconnecting.
-- Recordings and evidence are captured timelines, not the same thing as live
-  preview.
-- Runtime events and user activity/audit are separate histories.
-- Import/export artifacts show version compatibility and fail safely when newer
-  than the product supports.
-- Secrets, credentials, private keys, and PKI material never appear in summaries,
-  activity, evidence, imports, or exports.
-- Shared sign-in UI must remain compatible with OAuth2/OIDC-backed identity.
-- Current shared roles are Admin/User, but role UI must not block later
-  viewer/operator/editor/admin expansion.
-- Browser UI should behave consistently on Linux, Windows, and macOS.
-- Frontend must stay within the approved stack in `STACK.md`.
+### Global Layout
 
-## 4. Usage Modes
+- top bar for persistent context;
+- left navigation for main sections;
+- central work area for the current task;
+- persistent runtime context panel as a side panel or bottom drawer.
 
-### Trusted Local Mode
+### Top Bar
 
-Purpose: fast local development, debugging, and reproduction.
+The top bar carries the context that should stay visible everywhere:
 
-Behavior:
+- current project;
+- local or shared mode indicator;
+- signed-in user or local-mode status;
+- global runtime status;
+- direct access to recent evidence.
 
-- login can be disabled;
-- user lands on project entry or project overview;
-- local full-control behavior can be exposed;
-- shared-role friction should be avoided.
+### Navigation Model
 
-### Shared Team Mode
+The main navigation should group the product by user intent:
 
-Purpose: team-level QA, regression, support, and release validation.
-
-P1 introduces:
-
-- login/password;
-- user identity;
-- Admin/User role enforcement;
-- visible run/edit/export initiators.
-
-Shared-mode User:
-
-- can see all projects;
-- can observe projects, data-sources, schemas, recordings, samples, scenarios,
-  evidence, runtime events, and activity;
-- can start stopped data-sources;
-- cannot stop, edit, delete, import, export, run scenarios, or manage users.
-
-Shared-mode Admin:
-
-- can create, edit, start, stop, delete, import, export, and administer.
-
-## 5. Primary Users
-
-QA engineer:
-
-- reproduce bugs;
-- run regression flows;
-- simulate faults;
-- export evidence.
-
-Edge Device developer:
-
-- create data-sources;
-- inspect live values;
-- debug clients and runtime events;
-- verify protocol endpoint behavior.
-
-Support or field engineer:
-
-- import projects or prepared data;
-- replay real behavior;
-- collect evidence for handoff.
-
-Shared environment operator:
-
-- see who is running what;
-- avoid disrupting other users;
-- operate shared projects safely.
-
-## 6. Information Architecture
-
-Global layout:
-
-- top bar with project, environment, global status, evidence shortcut, user/local
-  mode area;
-- left navigation;
-- main content;
-- collapsible runtime panel.
-
-Navigation:
-
-- Project Entry;
 - Overview;
 - Data Sources;
 - Recordings & Samples;
 - Scenarios;
 - Evidence;
+- Activity;
 - Settings;
-- Admin;
-- Activity / Audit.
+- Admin.
 
-Runtime panel:
+Navigation labels should use product language only. The UI should never expose
+backend or architecture concepts as primary navigation.
 
+### Overview As Command Surface
+
+`Overview` is the operational starting point inside a project.
+
+It should answer five questions immediately:
+
+- what is running;
+- what changed recently;
+- who started or changed it;
+- where there is risk or attention needed;
+- what evidence exists from recent work.
+
+`Overview` is not a decorative dashboard. It is the team command surface.
+
+### Persistent Runtime Context
+
+Live runtime context should remain reachable from anywhere in the product.
+
+Users should not lose visibility into:
+
+- active runs;
 - recent runtime events;
-- health alerts;
-- active faults;
-- connected clients summary;
-- stale/reconnecting state.
-
-Runtime state should never disappear completely.
-
-## 7. Core UX Principles
-
-Make runtime state obvious:
-
-- running/stopped;
-- enabled/disabled;
-- connected clients;
-- active replay/scenario;
-- active faults;
-- health/errors;
-- latest value updates.
+- health or connection warnings;
+- stale or reconnecting live state;
+- quick links back to the affected object or evidence.
 
-Separate configuration from execution:
+## Entry Flow
 
-- configured sources;
-- active runs;
-- saved scenarios;
-- historical evidence.
+The entry experience should be short and orienting.
 
-Use domain language:
+### Local Entry
 
-- project;
-- data-source;
-- schema;
-- recording;
-- sample;
-- replay;
-- scenario;
-- fault;
-- evidence.
+In trusted local usage, users should get into work quickly:
 
-Avoid vague labels such as resource, asset, entity, or job.
+- open the product;
+- select a project or reopen the last active one;
+- land in `Overview` or the last active workspace surface.
 
-Prefer guided creation:
+### Shared Entry
 
-- data-source creation;
-- real-source scan;
-- manual schema definition;
-- scenario creation;
-- evidence export.
+In shared usage, the entry flow adds accountability:
 
-Design for repeated use:
+- authenticate;
+- enter the project workspace;
+- immediately see who is signed in and what the current shared activity looks
+  like.
 
-- start project;
-- stop all;
-- run selected sources;
-- replay last recording;
-- export latest evidence.
+The shift from local to shared mode should change permissions and authorship
+visibility, but it should not force users to relearn the whole product layout.
 
-Design for failure:
+## Core Flow
 
-- external connections can fail;
-- scans can be partial;
-- recordings can be empty or interrupted;
-- imports can be incompatible;
-- live updates can become stale;
-- exports can fail.
+The primary UX path is:
 
-## 8. Main Product Flows
+`Project -> Data Source -> Scan -> Review Schema -> Record -> Replay -> Observe -> Evidence`
 
-### Scan Real Source -> Record -> Replay
+This flow should be obvious in empty states, action hierarchy, and detail-page
+next steps.
 
-Stage: P0
+### Project To Source
 
-Flow:
+Users enter a project first. A project is the workspace boundary that groups the
+simulator setup and its reusable artifacts.
 
-1. Open app.
-2. Sign in only if shared mode requires it.
-3. Select or create project.
-4. Create data-source.
-5. Choose protocol.
-6. Choose Scan real source.
-7. Enter connection details.
-8. Test connection.
-9. Scan structure.
-10. Review schema.
-11. Create simulated source.
-12. Record real data.
-13. Save recording/sample.
-14. Assign replay.
-15. Start simulated source.
-16. Observe values, clients, runtime events.
-17. Export evidence.
+From the project, the next promoted action is to create or inspect a
+data-source.
 
-UI must make clear:
+### Source Creation Model
 
-- real endpoint vs simulated endpoint;
-- scan progress and warnings;
-- recording duration and value count;
-- replay target compatibility;
-- connected clients;
-- captured evidence state.
+Source creation should begin from one unified entry point rather than separate
+tools per protocol or per origin type.
 
-### Manual Or Synthetic Source
+The first choice is the protocol.
 
-Stage: P1
+The second choice is the source basis:
 
-Purpose: work when real devices are unavailable, sensitive, incomplete, or when
-deterministic boundary data is needed.
+- scan a real source;
+- create from manual schema;
+- import or upload prepared data;
+- create from synthetic setup.
 
-UI must support:
+This keeps future protocol growth manageable while preserving one mental model
+for source creation.
 
-- manual schema editor entry point;
-- synthetic pattern/range/update settings;
-- deterministic settings;
-- validation before save/run.
+### Wizard Structure
 
-### Deterministic Runs
+Creation should use one extensible wizard with stable step framing:
 
-Stage: P1
+1. choose protocol;
+2. choose source basis;
+3. enter connection, import, or setup details;
+4. inspect and refine schema;
+5. configure runtime behavior;
+6. review and create.
 
-Purpose: repeat replay or generated behavior for regression.
+The wizard should stay simple on the surface:
 
-UI must show:
+- each step has one job;
+- branching happens inside stable steps, not through completely different flows;
+- protocol-specific inputs appear only where needed;
+- validation is inline and early;
+- users can see where they are and what remains.
 
-- deterministic on/off state;
-- seed or repeatability preset;
-- timing mode;
-- replay speed or loop behavior when relevant;
-- repeat-run summary;
-- note that client delivery timing can still vary.
+### Scan Path
 
-Evidence must record deterministic settings.
+The scan path is the most important creation branch and should be visually
+recommended.
 
-### Scenarios And Faults
+That flow should make four things clear:
 
-Stage: P2
+- which real endpoint is being read;
+- whether the connection is valid;
+- what was discovered;
+- what still needs review before creation.
 
-Scenario builder approach:
+Scan results should move naturally into schema review, not into a dead-end
+summary.
 
-- structured ordered step list;
-- details panel per step;
-- validation panel;
-- no complex visual canvas.
+### Schema Review And Editing
 
-Supported step types:
+Creation and editing are different modes and should feel different.
 
-- start data-source;
-- stop data-source;
-- replay recording/sample;
-- generate synthetic values;
-- apply fault;
-- clear fault;
-- wait;
-- mark event.
+Inside the wizard, schema work is guided and review-oriented.
 
-Fault UI must show:
+Outside the wizard, the schema editor is a full editing surface for deliberate
+manual control.
 
-- target;
-- timing;
-- parameters;
-- clear behavior;
-- affected sources/clients.
+The full editor must support:
 
-## 9. Screen-Level Direction
+- structural edits at any depth;
+- protocol-relevant field settings;
+- bulk navigation and inspection;
+- clear unsaved-change handling;
+- safe behavior under shared editing constraints.
 
-Project Overview:
+The user should always know whether they are:
 
-- command center for project state;
-- answers what exists, what is running, who started it, who is connected, what is
-  unhealthy, and what recently happened.
+- reviewing discovered structure;
+- making local edits before create;
+- editing an already saved schema.
 
-Data Sources:
+### Record Path
 
-- dense table;
-- visible status, protocol, endpoint, clients, initiator, health;
-- Admin actions visible in shared mode;
-- User can start only.
+Once a source exists, the next natural action is to capture real behavior.
 
-Create Data Source Wizard:
+The UI should make recording feel like a runtime action with a clear result:
 
-- one wizard for all protocols;
-- protocol-specific fields inside shared steps;
-- Scan real source is visually recommended;
-- other source bases remain first-class.
+- the user starts recording from a source context;
+- the UI shows that recording is active;
+- when recording completes, the result becomes a reusable artifact rather than a
+  transient success message.
 
-Data Source Detail:
+### Replay Path
 
-- Overview, Schema, Values, Clients, Events, Settings tabs;
-- state, endpoint, health, and active behavior remain visible.
+Replay should feel like a direct continuation of recording, not a separate part
+of the product that users must rediscover.
 
-Schema Editor:
+From a saved recording or sample, the user should be able to:
 
-- full editor for editable schema parts;
-- split layout with tree/table and details panel;
-- validation and dependency impact before save;
-- read-only mode for locked or unauthorized users.
+- attach it to a source;
+- configure replay behavior;
+- start runtime;
+- observe the result immediately.
 
-Recordings & Samples:
+### Observe Path
 
-- list, preview, import, export, assign to replay;
-- version/format validation before import commit;
-- timeline preview and warnings.
+Observation must clearly separate current runtime from saved history.
 
-Evidence:
+The interface should distinguish:
 
-- automatic capture for every run;
-- explicit export action;
-- Report, Full bundle, Value timeline CSV;
-- partial/large/failed states explained;
-- no secrets or private keys.
+- current live values;
+- current runtime state;
+- saved recordings and samples;
+- exported evidence.
 
-Admin:
+These surfaces may be related, but they must not look interchangeable.
 
-- users/known identities;
-- role assignment;
-- status and last activity;
-- no assumption that product-owned password management exists.
+### Evidence Path
 
-Activity / Audit:
+Evidence should feel like the natural output of simulator work.
 
-- separate from runtime events;
-- filter by actor, action, object, project, and time.
+The product should let users move into evidence from:
 
-## 10. Interaction Rules
+- the active run context;
+- the source detail surface;
+- recent activity on `Overview`.
 
-Long-running actions:
+Evidence must keep origin visible:
 
-- show current state;
-- show initiator;
-- show elapsed time;
-- show latest successful step;
-- show whether retry is safe.
+- what run it came from;
+- who initiated that run;
+- whether the evidence is complete, partial, or failed.
 
-Destructive/disruptive actions require confirmation:
+## Alternative Flows
 
-- stop all;
-- stop another user's run;
-- delete source/recording/sample/scenario/evidence;
-- overwrite or replace content during import;
-- change schema identifiers used by dependencies.
+The product also needs strong non-scan paths.
 
-Confirmation text must explain:
+These should be presented as alternate branches of the same model, not as
+secondary or hidden tools.
 
-- affected object;
-- connected clients;
-- active runs;
-- dependent recordings/samples/scenarios/evidence;
-- whether action can be undone.
+### Manual Setup
 
-Concurrent editing:
+Manual setup is for cases where the user wants to define structure directly.
 
-- use automatic edit locks;
-- first editor gets the lock;
-- other users see read-only view;
-- lock owner is visible;
-- Admin can release stale locks;
-- warn before leaving with unsaved changes.
+The UI should keep this path short:
 
-Tables:
+- choose protocol;
+- define structure;
+- configure runtime;
+- save and run when ready.
 
-- search;
-- filters;
-- sorting;
-- visible active filters;
-- row actions;
-- pagination or virtualization for large lists;
-- helpful no-results state.
+### Prepared Data Input
 
-Notifications:
+Prepared-file input is for cases where the user already has reusable material
+and wants to bring it into the simulator without rescanning.
 
-- inline alerts for fixable local issues;
-- toasts for non-blocking success/background completion;
-- persistent banners for stale data or reconnecting;
-- dialogs for destructive/disruptive decisions.
+The UI should treat this as a structured import flow, not as a raw file dump.
 
-## 11. Edge And Failure States
+Users should always see:
 
-Login/session:
+- what kind of artifact is being loaded;
+- whether it is compatible;
+- what will become available after import;
+- what is intentionally excluded for safety.
 
-- invalid credentials;
-- expired session;
-- role changed during session;
-- server unavailable.
+### Synthetic Setup
 
-Real-source scan:
+Synthetic setup should feel deliberate and test-oriented.
 
-- unreachable source;
-- auth failure;
-- partial scan;
-- unknown type;
-- duplicate identifiers;
-- very large schema;
-- stale scan result.
+This branch should emphasize:
 
-Recording/import/replay:
+- pattern definition;
+- repeatability;
+- explicit control rather than realism by default.
 
-- disconnect during recording;
-- no values;
-- very large recording;
-- unsupported file;
-- newer-than-supported artifact version;
-- timestamp/time zone inconsistency;
-- no connected clients;
-- replay target already running.
+## Shared Workspace Behavior
 
-Schema editing:
+The shared experience must be understandable at a glance.
 
-- running source warning;
-- dependency warnings;
-- invalid edits;
-- bulk edits;
-- locked object;
-- object deleted while viewed.
+### Role-Aware UI
 
-Runtime/observability:
+The interface reacts to system role, not to job title.
 
-- another user changes runtime state;
-- client disconnects;
-- fault affects values/connectivity;
-- event stream reconnects;
-- health unknown.
+Role handling should be visible in action surfaces:
 
-Evidence/export:
+- users can see the same shared workspace structure;
+- available actions change based on permissions;
+- unavailable actions should not create confusion about what is happening.
 
-- capture still active;
-- capture failed while run continues;
-- export failed;
-- no clients;
-- large evidence;
-- partial data.
+The UI should prefer preventing invalid actions before submit instead of relying
+on failure messages after the fact.
 
-## 12. Visual Direction
+### Authorship
 
-The UI should be dense but readable.
+Shared activity needs visible authorship.
 
-Use:
+The interface should surface who initiated:
 
-- calm operational layout;
-- restrained colors;
-- high-contrast runtime states;
-- clear tables and timelines;
-- strong empty states;
-- consistent icons for run, stop, edit, duplicate, export, warning, health.
+- a run;
+- a recording;
+- an evidence export;
+- an edit session;
+- a disruptive or destructive action.
 
-Avoid:
+This information should appear in context, not only in a separate audit page.
 
-- marketing-style hero screens;
-- oversized decorative cards for operational data;
-- hidden hover-only critical actions;
-- color-only status;
-- unnecessary visual noise.
+### Concurrent Editing
 
-Color meaning:
+Shared editing must protect against silent overwrite.
 
-- green: running/healthy;
-- red: error/failure;
-- amber: warning/fault;
-- blue/neutral: informational active work;
-- gray: disabled/inactive.
+The UI should make the current state obvious:
 
-## 13. Accessibility
+- editable;
+- read-only because of role;
+- read-only because another user is editing;
+- stale because the underlying object changed.
 
-Baseline: WCAG 2.2 AA.
+When conflicts happen, the interface should provide a clear next step rather
+than a generic failure:
 
-Requirements:
+- reload;
+- review changes later;
+- return to a safe read-only state.
 
-- keyboard reachable controls;
-- visible focus;
-- accessible names for tables/forms/dialogs/tabs/tree views;
-- status changes announced without unstable focus movement;
-- errors identify problem and recovery action;
-- sufficient contrast;
-- destructive confirmations understandable by screen reader users.
+### Destructive Actions
 
-## 14. Current Decisions
+Destructive or disruptive actions always require confirmation.
 
-- Product UI is mode-aware: trusted local and shared team.
-- P0 can run without login in trusted local mode.
-- P1 introduces shared login/password.
-- Shared mode uses Admin/User initially.
-- Shared User can observe and start data-sources only.
-- Main flow is Scan real source -> Record -> Replay.
-- Initial protocols are OPC UA and Modbus TCP.
-- Data-source creation uses one protocol-extensible wizard.
-- Schema tab includes a full schema editor.
-- Evidence capture is automatic for every run.
-- Evidence export is explicit.
-- Import/export artifacts are version-aware.
-- Runtime events and user activity/audit are distinct.
-- Secrets/private keys/PKI material are never exposed in summaries or exports.
-- Automated runs appear in runtime, activity, and evidence surfaces.
-- Product is desktop-first, tablet-usable, and phone-limited unless expanded.
+Confirmation should explain:
 
-## 15. Open Questions
+- what object is affected;
+- whether shared work may be interrupted;
+- whether connected devices or users may notice the change;
+- whether the action can be undone.
 
-No blocking UI design questions remain.
+## Interaction Rules
 
-Non-blocking refinements can happen during implementation:
+The interface should keep configuration, runtime, and history visually separate.
 
-- exact protocol field labels;
-- exact validation copy;
-- exact evidence file naming;
-- exact deterministic setting labels;
-- exact retention thresholds;
-- exact responsive breakpoints.
+### Configuration Versus Runtime
+
+Users should never need to guess whether they are:
+
+- changing saved setup;
+- observing a running source;
+- inspecting historical output.
+
+Action placement, labels, and screen structure should reinforce that difference.
+
+### Live Values Versus Captured Artifacts
+
+Live values are operational and potentially stale.
+
+Recordings, samples, and evidence are persisted artifacts tied to time and
+origin.
+
+The UI should label these categories clearly and avoid mixing them inside one
+undifferentiated panel.
+
+### Long-Running Operations
+
+Scanning, importing, recording, replay preparation, and evidence assembly should
+show durable progress state.
+
+Users should always know:
+
+- what is happening;
+- who started it;
+- whether it is still in progress;
+- whether it is safe to leave the page;
+- where the result will appear.
+
+### Failure Handling
+
+The UI should assume partial failure is normal in this domain.
+
+Important screens should account for:
+
+- loading;
+- empty state;
+- validation problems;
+- permission restrictions;
+- reconnecting or stale live state;
+- partial failure;
+- full failure.
+
+Failures should point users toward recovery, not just report that something went
+wrong.
+
+### Imports And Exports
+
+Import and export flows should communicate trust and compatibility clearly.
+
+The UI must show:
+
+- artifact type;
+- version compatibility;
+- expected result after completion;
+- omitted sensitive material where relevant.
+
+The interface must never suggest that secrets, credentials, or private keys are
+included in exported artifacts.
+
+## Visual Direction
+
+The product should look like an industrial operations tool, not a marketing site
+and not a generic analytics dashboard.
+
+The visual system should favor:
+
+- strong hierarchy;
+- compact but readable density;
+- stable alignment;
+- clear status contrast;
+- low decorative noise;
+- restrained motion used for orientation.
+
+Runtime status, warnings, editability, and authorship should be visible quickly
+without forcing users to scan dense prose.
+
+## Accessibility
+
+Accessibility is a baseline requirement.
+
+The interface should support:
+
+- full keyboard navigation;
+- visible focus states;
+- screen-reader-safe names for actions, dialogs, tabs, and status;
+- contrast that preserves status readability;
+- status meaning that does not depend only on color;
+- responsive behavior that keeps operational surfaces readable.
+
+Complex tables, editors, and live panels need the same accessibility care as
+forms and dialogs.
+
+## Stable UX Decisions
+
+These design decisions are fixed unless the product direction changes:
+
+- the interface is one workspace, not a set of disconnected tools;
+- `Scan real source -> Record -> Replay` is the primary UX path;
+- manual, prepared-file, and synthetic paths remain first-class alternatives;
+- source creation uses one extensible wizard model;
+- schema editing is a full editor, not a limited patch form;
+- `Overview` is the shared operational command surface;
+- shared usage must preserve authorship, concurrency awareness, and explicit
+  confirmation for risky actions;
+- the UI is role-aware, but behavior must not depend on job title.
+
+## Open Questions
+
+No cross-product UI questions are currently blocking this design document.

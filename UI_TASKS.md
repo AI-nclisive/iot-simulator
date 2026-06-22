@@ -1,450 +1,634 @@
 # UI Task Breakdown
 
-This file turns the UI design into implementation-ready work.
-
-Readable rule: tasks are grouped by delivery stage first, then by area. Each task
-has an ID, dependency hint, expected output, and done condition.
-
-## Priority Model
-
-P0: required for the first usable release slice.
-
-P1: required for production-usable breadth after P0.
-
-P2: advanced shared/team workflows or later enhancements.
-
-## Quick Index
-
-P0:
-
-- Foundation
-- Project And Runtime Foundation
-- Primary Scan -> Record -> Replay Flow
-- Data Source Detail
-- Evidence
-- P0 Review
-
-P1:
-
-- Shared Access And Project Lifecycle
-- Operational Breadth
-- Creation And Reuse
-- Admin, Retention, And Review
-
-P2:
-
-- Activity And Identity
-- Scenarios And Faults
-- Build Order
-
-## P0 - First Usable Release Slice
-
-### Foundation
-
-- `UI-001` Define app shell
-  - Depends on: none.
-  - Output: top bar, side nav, runtime panel pattern.
-  - Done when: project context, navigation, user/local mode area, and runtime
-    state are visible.
-
-- `UI-002` Define shared UI states
-  - Depends on: `UI-001`.
-  - Output: status, health, stale, locked, loading, empty, and error patterns.
-  - Done when: states are reusable and never rely on color alone.
-
-- `UI-003` Define table pattern
-  - Depends on: `UI-001`.
-  - Output: table behavior pattern.
-  - Done when: search, filter, sort, row actions, no-results state, and active
-    filters are supported.
-
-- `UI-004` Define confirmation pattern
-  - Depends on: `UI-001`.
-  - Output: destructive/disruptive confirmation pattern.
-  - Done when: impact and affected objects are clear before confirmation.
-
-- `UI-006` Define shared-mode role pattern
-  - Depends on: `UI-001`.
-  - Output: Admin/User permission behavior.
-  - Done when: shared-mode User can observe and start data-sources only, all
-    other shared-mode mutations are Admin-only, and trusted local can expose
-    full-control behavior.
-
-- `UI-007` Define deployment mode behavior
-  - Depends on: `UI-001`, `UI-006`.
-  - Output: trusted local and shared team mode rules.
-  - Done when: P0 trusted local can skip login and P1 shared mode can introduce
-    auth and Admin/User permissions without redesign.
-
-### Project And Runtime Foundation
-
-- `UI-011` Design project entry
-  - Depends on: `UI-001`, `UI-003`, `UI-006`.
-  - Output: project list/create/import entry screen.
-  - Done when: local users or signed-in shared users can see projects, running
-    status, and recent activity; create/import is Admin-only in shared mode.
-
-- `UI-020` Design Project Overview
-  - Depends on: `UI-001`, `UI-002`, `UI-003`, `UI-006`.
-  - Output: overview screen spec/mock.
-  - Done when: running state, initiator, clients, alerts, activity, and
-    role-aware actions are visible.
-
-- `UI-021` Design Data Sources List
-  - Depends on: `UI-003`, `UI-004`, `UI-006`.
-  - Output: data-sources list.
-  - Done when: each row shows status, endpoint, clients, health, initiator, and
-    User can start only.
-
-- `UI-022` Design runtime panel
-  - Depends on: `UI-001`, `UI-002`.
-  - Output: runtime panel pattern.
-  - Done when: recent runtime events, clients, faults, health, and stale state
-    are visible.
-
-### Primary Scan -> Record -> Replay Flow
-
-- `UI-030` Design Create Data Source wizard shell
-  - Depends on: `UI-001`, `UI-002`, `UI-006`.
-  - Output: wizard stepper and shared behavior.
-  - Done when: back/next/cancel/review preserve input and validation; wizard is
-    Admin-only in shared mode.
-
-- `UI-031` Design protocol selection step
-  - Depends on: `UI-030`.
-  - Output: protocol selection step.
-  - Done when: OPC UA, Modbus TCP, and future protocol availability fit one
-    shared pattern.
-
-- `UI-032` Design source basis step
-  - Depends on: `UI-030`.
-  - Output: source basis step.
-  - Done when: Scan real source is recommended, while recording/sample, manual,
-    and synthetic paths remain clear and first-class.
-
-- `UI-033` Design scan real source branch
-  - Depends on: `UI-030`.
-  - Output: connection, test, scan, and review flow.
-  - Done when: retry, partial scan, large schema, and unknown type states are
-    handled.
-
-- `UI-034` Design recording flow
-  - Depends on: `UI-033`.
-  - Output: recording interaction.
-  - Done when: duration, value count, disconnect, no-values, and partial-save
-    states are clear.
-
-- `UI-035` Design replay flow
-  - Depends on: `UI-034`.
-  - Output: replay interaction.
-  - Done when: target compatibility, no clients, target already running, replay
-    progress, and completion/failure states are clear.
-
-- `UI-039` Define OPC UA and Modbus field baseline
-  - Depends on: `UI-031`.
-  - Output: protocol field baseline.
-  - Done when: connection and schema fields for OPC UA and Modbus are represented
-    consistently.
-
-- `UI-039A` Design real-source credentials UI
-  - Depends on: `UI-033`, `UI-039`.
-  - Output: credential field behavior.
-  - Done when: secrets are masked and storage/session-only status is clear.
-
-### Data Source Detail
-
-- `UI-040` Design Data Source Detail shell
-  - Depends on: `UI-021`.
-  - Output: tabbed detail screen.
-  - Done when: Overview, Schema, Values, Clients, Events, and Settings are
-    available.
-
-- `UI-041` Design source overview tab
-  - Depends on: `UI-040`.
-  - Output: source overview tab.
-  - Done when: state, endpoint, health, active behavior, faults, and primary
-    actions are visible.
-
-- `UI-044` Design values tab
-  - Depends on: `UI-040`.
-  - Output: values tab.
-  - Done when: live values, mode, timestamps, stale state, and allowed overrides
-    are clear.
-
-- `UI-047` Design settings tab
-  - Depends on: `UI-040`.
-  - Output: settings tab.
-  - Done when: name, endpoint, startup behavior, protocol settings, and
-    validation are represented.
-
-- `UI-054` Design assign-to-replay action
-  - Depends on: `UI-034`, `UI-035`.
-  - Output: assign replay flow.
-  - Done when: target compatibility and replacement impact are shown.
-
-### Evidence
-
-- `UI-070` Design evidence list
-  - Depends on: `UI-003`, `UI-006`.
-  - Output: evidence list.
-  - Done when: runs are searchable by initiator, project, scenario, and status;
-    export is Admin-only in shared mode.
-
-- `UI-071` Design evidence detail
-  - Depends on: `UI-070`.
-  - Output: evidence detail.
-  - Done when: summary, timeline, clients, faults/errors, partial states, and
-    captured data are visible.
-
-- `UI-072` Design evidence export dialog
-  - Depends on: `UI-071`.
-  - Output: export dialog.
-  - Done when: Report, Full bundle, and Value timeline CSV are explained, and
-    secrets/private keys are excluded.
-
-- `UI-073` Design export failure recovery
-  - Depends on: `UI-072`.
-  - Output: export error/retry states.
-  - Done when: failed export can be retried with a clear reason.
-
-### P0 Review
-
-- `UI-090` Define visual system baseline
-  - Depends on: `UI-001`, `UI-002`, `UI-003`, `UI-004`.
-  - Output: style guide.
-  - Done when: approved stack usage, status colors, badges, typography, spacing,
-    forms, tables, and dialogs are defined.
-
-- `UI-091` Accessibility review
-  - Depends on: `UI-001`, `UI-002`, `UI-090`.
-  - Output: accessibility checklist.
-  - Done when: keyboard, focus, labels, status messages, and contrast are checked.
-
-- `UI-092` Edge-state review
-  - Depends on: `UI-001`, `UI-002`, `UI-090`.
-  - Output: edge-case checklist.
-  - Done when: empty, loading, error, stale, locked, partial, and permission
-    states are covered.
-
-## P1 - Production-Usable Breadth
-
-### Shared Access And Project Lifecycle
-
-- `UI-005` Define edit lock pattern
-  - Depends on: `UI-001`.
-  - Output: locked/read-only behavior.
-  - Done when: lock owner is visible and Admin stale unlock is defined.
-
-- `UI-010` Design login screen
-  - Depends on: `UI-001`, `UI-007`.
-  - Output: P1 shared-mode login screen.
-  - Done when: loading, invalid credentials, server unavailable, and session
-    expired states are handled.
-
-- `UI-012` Design project import dialog
-  - Depends on: `UI-004`, `UI-011`.
-  - Output: import flow.
-  - Done when: progress, failure, overwrite impact, and version compatibility are
-    visible.
-
-- `UI-013` Design project lifecycle actions
-  - Depends on: `UI-004`, `UI-006`, `UI-011`.
-  - Output: rename, duplicate, archive, delete behavior.
-  - Done when: archive is the safe default and delete explains active-run and
-    dependency impact.
-
-- `UI-014` Design project export dialog
-  - Depends on: `UI-006`, `UI-011`.
-  - Output: export flow.
-  - Done when: scope, completion, failure, and secret exclusion are clear.
-
-### Operational Breadth
-
-- `UI-025` Design automated run visibility
-  - Depends on: `UI-020`, `UI-022`.
-  - Output: automation indicators.
-  - Done when: automated runs show initiator/source and appear in runtime,
-    activity, and evidence surfaces.
-
-- `UI-045` Design clients tab
-  - Depends on: `UI-040`.
-  - Output: clients tab.
-  - Done when: connected clients and session state are visible.
-
-- `UI-046` Design events tab
-  - Depends on: `UI-040`, `UI-022`.
-  - Output: runtime events view.
-  - Done when: start/stop/connect/replay/fault/error events are filterable.
-
-### Creation And Reuse
-
-- `UI-036` Design manual source branch
-  - Depends on: `UI-030`.
-  - Output: manual creation path.
-  - Done when: schema editor entry point and required-schema validation are clear.
-
-- `UI-037` Design synthetic source branch
-  - Depends on: `UI-030`.
-  - Output: synthetic setup path.
-  - Done when: pattern, range, update, and deterministic options are represented.
-
-- `UI-038` Design recording/sample branch
-  - Depends on: `UI-030`.
-  - Output: existing data selector.
-  - Done when: compatibility and timeline preview are visible.
-
-- `UI-042` Design full schema editor
-  - Depends on: `UI-040`, `UI-005`.
-  - Output: schema editor.
-  - Done when: tree/table, details panel, validation, unsaved changes, and locks
-    are represented.
-
-- `UI-043` Design schema dependency warnings
-  - Depends on: `UI-042`, `UI-004`.
-  - Output: dependency warning behavior.
-  - Done when: impact is shown for used identifiers, items, and type changes.
-
-- `UI-050` Design Recordings & Samples list
-  - Depends on: `UI-003`.
-  - Output: reusable data list.
-  - Done when: name, source, type, origin, duration, tags, and last used are
-    visible.
-
-- `UI-051` Design recording/sample import
-  - Depends on: `UI-050`.
-  - Output: import flow.
-  - Done when: version/format validation, mapping, preview, unsupported file, and
-    newer-than-supported file states are handled safely.
-
-- `UI-052` Design recording/sample preview
-  - Depends on: `UI-050`.
-  - Output: timeline preview.
-  - Done when: timeline, value count, and warnings are visible.
-
-- `UI-053` Design recording/sample export
-  - Depends on: `UI-006`, `UI-050`.
-  - Output: export action/dialog.
-  - Done when: Admin can export reusable data independently from project export.
-
-- `UI-055` Design deterministic run settings
-  - Depends on: `UI-035`, `UI-037`.
-  - Output: deterministic replay/synthetic controls.
-  - Done when: seed/preset, timing mode, replay behavior, repeat-run summary,
-    evidence traceability, and client-delivery caveat are represented.
-
-### Admin, Retention, And Review
-
-- `UI-074` Design evidence/recording retention UI
-  - Depends on: `UI-050`, `UI-070`.
-  - Output: cleanup/archive behavior.
-  - Done when: size, age, last used, dependency impact, and cleanup failure states
-    are visible.
-
-- `UI-080` Design settings screen
-  - Depends on: `UI-001`, `UI-006`.
-  - Output: settings screen.
-  - Done when: project settings and environment info are separated and mutation
-    is Admin-only in shared mode.
-
-- `UI-081` Design Admin users list
-  - Depends on: `UI-001`, `UI-003`, `UI-006`.
-  - Output: Admin users/access screen.
-  - Done when: Admin sees users, roles, status, and last activity.
-
-- `UI-082` Design access/user management flows
-  - Depends on: `UI-081`.
-  - Output: user/access form.
-  - Done when: known identity, name, role, status validation, and save states are
-    clear; product-owned password management is not assumed.
-
-- `UI-083` Design role change behavior
-  - Depends on: `UI-081`.
-  - Output: role-change interaction.
-  - Done when: role changes are confirmed and visible in activity.
-
-- `UI-093` Prototype review
-  - Depends on: `UI-020`, `UI-030`, `UI-040`.
-  - Output: clickable prototype or walkthrough.
-  - Done when: primary workflows can be reviewed end to end.
-
-- `UI-094` Define responsive/browser/platform baseline
-  - Depends on: `UI-001`, `UI-090`.
-  - Output: responsive and platform support decision.
-  - Done when: desktop-first, tablet usable, phone limitations, and Linux/Windows/macOS
-    browser behavior are considered.
-
-- `UI-095` Define notification pattern
-  - Depends on: `UI-001`, `UI-002`.
-  - Output: toast/banner/inline alert rules.
-  - Done when: success, warning, error, stale, and reconnecting feedback are
-    consistent.
+## Purpose
+
+`UI_TASKS.md` turns the UI documentation into implementation work.
+
+This file is for planning, assignment, and tracking. It keeps the UI work in one
+task register without repeating the full design or screen descriptions.
+
+## How To Read This File
+
+Each task keeps the same compact structure:
+
+- checkbox:
+  current completion state;
+- `ID`:
+  stable reference for discussion and tracking;
+- `Goal`:
+  what this task is trying to produce;
+- `Surface`:
+  the page, flow, or shared surface it belongs to;
+- `Work includes`:
+  what should be designed or built inside this task;
+- `Depends`:
+  what should be in place first;
+- `Done when`:
+  the short acceptance target for the task.
+
+Order rule:
+
+- tasks are listed in recommended implementation order inside each stage;
+- task `ID` is a stable reference only and does not define sequence;
+- within one stage, the file should be readable from top to bottom as a build
+  queue.
+
+Task input rule:
+
+- if `Surface` matches a named page, flow, or shared surface, read the section
+  with the same name in `UI_SCREEN_SPECS.md` before starting;
+- if `Surface` is a cross-surface pattern or review task, read the relevant
+  sections in `DESIGN.md` plus `Cross-Surface Contract` in
+  `UI_SCREEN_SPECS.md`;
+- a task should be assignable without needing hidden assumptions from unrelated
+  tasks.
+
+## Stage Map
+
+| Stage | Goal | Main workstreams |
+| --- | --- | --- |
+| `P0` | Core workspace and primary product flow | Shell, project workspace, scan -> record -> replay, source detail, evidence, baseline review |
+| `P1` | Shared usage, reuse, and operational breadth | Login, project lifecycle, schema editing, recordings/samples, deterministic controls, admin/settings, retention, notifications |
+| `P2` | Advanced shared workflows | Activity history, identity expansion, scenarios, faults |
+
+## P0 - Core Workspace And Primary Flow
+
+### Wave 1 - Shell And Shared Patterns
+
+Read first:
+
+- `DESIGN.md`: `Workspace Structure`, `Shared Workspace Behavior`,
+  `Interaction Rules`
+- `UI_SCREEN_SPECS.md`: `Cross-Surface Contract`
+
+Parallel execution:
+
+1. Start `UI-001` first.
+2. After `UI-001`, run `UI-002`, `UI-003`, `UI-004`, and `UI-006` in parallel.
+3. After `UI-006`, run `UI-007`.
+
+- [ ] `UI-001` App shell
+  Goal: define the base workspace frame that every main page will live inside.
+  Surface: workspace shell
+  Work includes: top bar layout, left navigation layout, runtime context panel
+  placement, project context area, local/shared mode indicator, main content
+  container behavior, and the rules for how this shell stays consistent across
+  pages.
+  Depends: none
+  Done when: top bar, left navigation, runtime context area, project context,
+  and local/shared mode area are stable across pages.
+
+- [ ] `UI-002` Shared UI states
+  Surface: cross-surface pattern
+  Depends: `UI-001`
+  Done when: loading, empty, error, stale, locked, warning, and status patterns
+  are reusable and do not rely on color alone.
+
+- [ ] `UI-003` Table pattern
+  Surface: cross-surface pattern
+  Depends: `UI-001`
+  Done when: search, filter, sort, active filters, row actions, and no-results
+  states are defined for dense operational tables.
+
+- [ ] `UI-004` Confirmation pattern
+  Surface: cross-surface pattern
+  Depends: `UI-001`
+  Done when: destructive and disruptive confirmations clearly explain impact,
+  affected objects, and reversibility.
+
+- [ ] `UI-006` Role-aware UI pattern
+  Surface: cross-surface pattern
+  Depends: `UI-001`
+  Done when: Admin and User behavior is clear in shared mode, and trusted local
+  mode can expose full control without redesign.
+
+- [ ] `UI-007` Local vs shared mode behavior
+  Surface: cross-surface pattern
+  Depends: `UI-001`, `UI-006`
+  Done when: local entry can skip login and shared mode can add authentication
+  and permissions without changing the product structure.
+
+### Wave 2 - Project Workspace
+
+Read first:
+
+- `DESIGN.md`: `Workspace Structure`, `Entry Flow`, `Core Flow`
+- `UI_SCREEN_SPECS.md`: `Project Entry`, `Project Overview`,
+  `Data Sources List`, `Runtime Context Panel`
+
+Parallel execution:
+
+1. After Wave 1, run `UI-011`, `UI-021`, and `UI-022` in parallel.
+2. After `UI-011` and `UI-022`, run `UI-020`.
+
+- [ ] `UI-011` Project Entry
+  Surface: `Project Entry`
+  Depends: `UI-001`, `UI-003`, `UI-006`
+  Done when: users can open a project quickly, see recent activity, and shared
+  mode keeps create/import actions Admin-only.
+
+- [ ] `UI-022` Runtime Context Panel
+  Surface: `Runtime Context Panel`
+  Depends: `UI-001`, `UI-002`
+  Done when: active runs, recent runtime events, health warnings, and stale
+  state stay visible from anywhere in the workspace.
+
+- [ ] `UI-020` Project Overview
+  Surface: `Project Overview`
+  Depends: `UI-001`, `UI-002`, `UI-003`, `UI-006`
+  Done when: the page answers what is running, who initiated it, what changed,
+  what needs attention, and where recent evidence lives.
+
+- [ ] `UI-021` Data Sources List
+  Surface: `Data Sources List`
+  Depends: `UI-003`, `UI-004`, `UI-006`
+  Done when: each row exposes protocol, endpoint, status, health, client
+  context, and role-aware row actions.
+
+### Wave 3 - Source Creation And Primary Flow
+
+Read first:
+
+- `DESIGN.md`: `Core Flow`, `Source Creation Model`, `Wizard Structure`,
+  `Scan Path`, `Record Path`, `Replay Path`
+- `UI_SCREEN_SPECS.md`: `Create Data Source Wizard`, `Scan Real Source`,
+  `Recording Flow`, `Replay Flow`, `Credential Handling`
+
+Parallel execution:
+
+1. Start `UI-030` first.
+2. After `UI-030`, run `UI-031` and `UI-032` in parallel.
+3. After `UI-031`, run `UI-039`.
+4. After `UI-032`, run `UI-033`.
+5. After `UI-033`, run `UI-034`.
+6. After `UI-034`, run `UI-035`.
+7. After `UI-033` and `UI-039`, run `UI-039A`.
+
+- [ ] `UI-030` Create Data Source wizard shell
+  Surface: `Create Data Source Wizard`
+  Depends: `UI-001`, `UI-002`, `UI-006`
+  Done when: one guided flow supports create, back, next, cancel, and review
+  without losing user input.
+
+- [ ] `UI-031` Protocol selection step
+  Surface: `Create Data Source Wizard`
+  Depends: `UI-030`
+  Done when: current and future protocols fit one stable selection pattern.
+
+- [ ] `UI-039` OPC UA and Modbus field baseline
+  Surface: source creation protocol fields
+  Depends: `UI-031`
+  Done when: initial protocol-specific fields are represented consistently
+  inside the shared wizard model.
+
+- [ ] `UI-032` Source basis step
+  Surface: `Create Data Source Wizard`
+  Depends: `UI-030`
+  Done when: scan is the promoted path, while manual, prepared-data, and
+  synthetic paths remain clear and first-class.
+
+- [ ] `UI-033` Scan branch
+  Surface: `Scan Real Source`
+  Depends: `UI-030`
+  Done when: connection test, scan progress, retry, partial discovery, large
+  schema, and unknown-type states are handled clearly.
+
+- [ ] `UI-034` Recording flow
+  Surface: `Recording Flow`
+  Depends: `UI-033`
+  Done when: recording state, duration, value count, disconnects, no-values, and
+  partial-save states are understandable.
+
+- [ ] `UI-035` Replay flow
+  Surface: `Replay Flow`
+  Depends: `UI-034`
+  Done when: target compatibility, active-target impact, no-client state,
+  replay progress, and completion or failure states are clear.
+
+- [ ] `UI-039A` Real-source credential handling
+  Surface: `Credential Handling`
+  Depends: `UI-033`, `UI-039`
+  Done when: sensitive fields are masked, persistence behavior is visible, and
+  secret values never leak into summaries or exports.
+
+### Wave 4 - Source Detail
+
+Read first:
+
+- `DESIGN.md`: `Observe Path`, `Interaction Rules`
+- `UI_SCREEN_SPECS.md`: `Data Source Detail`
+
+Parallel execution:
+
+1. Start `UI-040` first.
+2. After `UI-040`, run `UI-041`, `UI-044`, and `UI-047` in parallel.
+3. After `UI-035`, run `UI-054`.
+
+- [ ] `UI-040` Data Source Detail shell
+  Surface: `Data Source Detail`
+  Depends: `UI-021`
+  Done when: Overview, Schema, Values, Clients, Events, and Settings are
+  available inside one stable detail surface.
+
+- [ ] `UI-041` Source overview tab
+  Surface: `Data Source Detail`
+  Depends: `UI-040`
+  Done when: state, endpoint, health, active behavior, and primary actions are
+  visible without leaving the detail page.
+
+- [ ] `UI-044` Values tab
+  Surface: `Data Source Detail`
+  Depends: `UI-040`
+  Done when: live values, timestamps, current mode, and stale state are clearly
+  separated from captured artifacts.
+
+- [ ] `UI-047` Settings tab
+  Surface: `Data Source Detail`
+  Depends: `UI-040`
+  Done when: source-level configuration, validation, and safe editing boundaries
+  are represented cleanly.
+
+- [ ] `UI-054` Assign-to-replay action
+  Surface: `Replay Flow`
+  Depends: `UI-034`, `UI-035`
+  Done when: assigning a recording or sample back to a source shows
+  compatibility and replacement impact before runtime starts.
+
+### Wave 5 - Evidence
+
+Read first:
+
+- `DESIGN.md`: `Evidence Path`, `Interaction Rules`
+- `UI_SCREEN_SPECS.md`: `Evidence List`, `Evidence Detail`
+
+Parallel execution:
+
+1. Start `UI-070` first.
+2. After `UI-070`, run `UI-071`.
+3. After `UI-071`, run `UI-072`.
+4. After `UI-072`, run `UI-073`.
+
+- [ ] `UI-070` Evidence List
+  Surface: `Evidence List`
+  Depends: `UI-003`, `UI-006`
+  Done when: users can find evidence by source, initiator, project, scenario,
+  and state; export remains role-aware.
+
+- [ ] `UI-071` Evidence Detail
+  Surface: `Evidence Detail`
+  Depends: `UI-070`
+  Done when: summary, timeline, clients, faults or errors, and partial states
+  explain what happened and how complete the artifact is.
+
+- [ ] `UI-072` Evidence export dialog
+  Surface: `Evidence Detail`
+  Depends: `UI-071`
+  Done when: export formats, artifact scope, and secret exclusion are explicit.
+
+- [ ] `UI-073` Evidence export failure recovery
+  Surface: `Evidence Detail`
+  Depends: `UI-072`
+  Done when: export failure states support retry with a clear reason and next
+  action.
+
+### Wave 6 - P0 Review
+
+Read first:
+
+- `DESIGN.md`: `Visual Direction`, `Accessibility`
+- `UI_SCREEN_SPECS.md`: `Cross-Surface Contract`
+
+Parallel execution:
+
+1. Start `UI-090` first.
+2. After `UI-090`, run `UI-091` and `UI-092` in parallel.
+
+- [ ] `UI-090` Visual system baseline
+  Surface: cross-surface pattern
+  Depends: `UI-001`, `UI-002`, `UI-003`, `UI-004`
+  Done when: typography, spacing, forms, tables, dialogs, status treatment, and
+  shared component rules are defined for the approved stack.
+
+- [ ] `UI-091` Accessibility review
+  Surface: cross-surface review
+  Depends: `UI-001`, `UI-002`, `UI-090`
+  Done when: keyboard flow, focus visibility, labels, status messaging, and
+  contrast are checked on the core P0 path.
+
+- [ ] `UI-092` Edge-state review
+  Surface: cross-surface review
+  Depends: `UI-001`, `UI-002`, `UI-090`
+  Done when: empty, loading, locked, permission, stale, partial, and error
+  states are covered across the primary flow.
+
+## P1 - Shared Usage, Reuse, And Operational Breadth
+
+### Wave 1 - Access, Locks, And Project Lifecycle
+
+Read first:
+
+- `DESIGN.md`: `Entry Flow`, `Shared Workspace Behavior`,
+  `Imports And Exports`
+- `UI_SCREEN_SPECS.md`: `Login`, `Project Entry`, `Settings`
+
+Parallel execution:
+
+1. After P0 shell completion, run `UI-005` and `UI-010` in parallel.
+2. After `UI-011` plus the required shared patterns, run `UI-012`, `UI-013`,
+   and `UI-014` in parallel.
+
+- [ ] `UI-005` Edit-lock pattern
+  Surface: cross-surface pattern
+  Depends: `UI-001`
+  Done when: lock ownership, read-only mode, and stale-lock recovery are defined
+  for shared editing.
+
+- [ ] `UI-010` Login screen
+  Surface: `Login`
+  Depends: `UI-001`, `UI-007`
+  Done when: loading, invalid credentials, server failure, and session-expired
+  states work cleanly in shared mode.
+
+- [ ] `UI-012` Project import flow
+  Surface: `Project Entry` / `Settings`
+  Depends: `UI-004`, `UI-011`
+  Done when: progress, failure, overwrite impact, and version compatibility are
+  visible before import is committed.
+
+- [ ] `UI-013` Project lifecycle actions
+  Surface: `Project Entry` / `Settings`
+  Depends: `UI-004`, `UI-006`, `UI-011`
+  Done when: rename, duplicate, archive, and delete flows are clear and expose
+  shared impact before destructive changes.
+
+- [ ] `UI-014` Project export flow
+  Surface: `Settings`
+  Depends: `UI-006`, `UI-011`
+  Done when: export scope, completion state, failure state, and secret exclusion
+  are visible.
+
+### Wave 2 - Operational Breadth
+
+Read first:
+
+- `DESIGN.md`: `Observe Path`, `Shared Workspace Behavior`
+- `UI_SCREEN_SPECS.md`: `Data Source Detail`, `Automated Run Visibility`
+
+Parallel execution:
+
+1. After the required P0 detail and runtime tasks, run `UI-025`, `UI-045`, and
+   `UI-046` in parallel.
+
+- [ ] `UI-025` Automated run visibility
+  Surface: `Automated Run Visibility`
+  Depends: `UI-020`, `UI-022`
+  Done when: automation-driven runs are clearly labeled and visible in the same
+  places as equivalent manual runs.
+
+- [ ] `UI-045` Clients tab
+  Surface: `Data Source Detail`
+  Depends: `UI-040`
+  Done when: connected-client state and connection lifecycle are easy to inspect.
+
+- [ ] `UI-046` Events tab
+  Surface: `Data Source Detail`
+  Depends: `UI-040`, `UI-022`
+  Done when: runtime events are filterable and remain distinct from user
+  activity history.
+
+### Wave 3 - Creation, Editing, And Reuse
+
+Read first:
+
+- `DESIGN.md`: `Alternative Flows`, `Schema Review And Editing`,
+  `Imports And Exports`
+- `UI_SCREEN_SPECS.md`: `Create Data Source Wizard`, `Full Schema Editor`,
+  `Recordings & Samples`, `Deterministic Run Settings`
+
+Parallel execution:
+
+1. After `UI-030`, run `UI-036`, `UI-037`, and `UI-038` in parallel.
+2. After `UI-040` and `UI-005`, run `UI-042`.
+3. After `UI-042`, run `UI-043`.
+4. After `UI-003`, run `UI-050`.
+5. After `UI-050`, run `UI-051`, `UI-052`, and `UI-053` in parallel.
+6. After `UI-035` and `UI-037`, run `UI-055`.
+
+- [ ] `UI-036` Manual source branch
+  Surface: `Create Data Source Wizard`
+  Depends: `UI-030`
+  Done when: manual structure creation has a clear branch and a clean handoff
+  into the full schema editor where needed.
+
+- [ ] `UI-037` Synthetic source branch
+  Surface: `Create Data Source Wizard`
+  Depends: `UI-030`
+  Done when: pattern, range, update behavior, and repeatability controls are
+  represented in one coherent path.
+
+- [ ] `UI-038` Prepared-data branch
+  Surface: `Create Data Source Wizard`
+  Depends: `UI-030`
+  Done when: prepared recording or sample input shows compatibility and preview
+  before creation.
+
+- [ ] `UI-042` Full Schema Editor
+  Surface: `Full Schema Editor`
+  Depends: `UI-040`, `UI-005`
+  Done when: structure tree or table, details panel, validation, unsaved
+  changes, and shared-edit protection work together as one editor surface.
+
+- [ ] `UI-043` Schema dependency warnings
+  Surface: `Full Schema Editor`
+  Depends: `UI-042`, `UI-004`
+  Done when: identifier, type, and dependency impact is visible before save.
+
+- [ ] `UI-050` Recordings & Samples list
+  Surface: `Recordings & Samples`
+  Depends: `UI-003`
+  Done when: reusable artifacts are easy to browse by name, source, type,
+  origin, duration, tags, and last use.
+
+- [ ] `UI-051` Recording and sample import
+  Surface: `Recordings & Samples`
+  Depends: `UI-050`
+  Done when: validation, preview, unsupported artifact handling, and
+  newer-than-supported protection are safe and understandable.
+
+- [ ] `UI-052` Recording and sample preview
+  Surface: `Recordings & Samples`
+  Depends: `UI-050`
+  Done when: timeline preview, value count, and warnings help the user judge
+  fitness for replay.
+
+- [ ] `UI-053` Recording and sample export
+  Surface: `Recordings & Samples`
+  Depends: `UI-006`, `UI-050`
+  Done when: reusable artifacts can be exported with clear scope and role-aware
+  permissions.
+
+- [ ] `UI-055` Deterministic run settings
+  Surface: `Deterministic Run Settings`
+  Depends: `UI-035`, `UI-037`
+  Done when: seed or preset, ordering or timing mode, repeatability scope, and
+  evidence traceability are clearly represented.
+
+### Wave 4 - Settings, Admin, And Feedback
+
+Read first:
+
+- `DESIGN.md`: `Shared Workspace Behavior`, `Failure Handling`,
+  `Visual Direction`
+- `UI_SCREEN_SPECS.md`: `Settings`, `Admin UI`, `Retention & Cleanup`,
+  `Notifications`
+
+Parallel execution:
+
+1. After the required P0 and P1 foundations, run `UI-080`, `UI-081`, `UI-094`,
+   and `UI-095` in parallel.
+2. After `UI-081`, run `UI-082` and `UI-083` in parallel.
+3. After `UI-050` and `UI-070`, run `UI-074`.
+4. After `UI-020`, `UI-030`, and `UI-040`, run `UI-093`.
+
+- [ ] `UI-074` Retention and cleanup UI
+  Surface: `Retention & Cleanup`
+  Depends: `UI-050`, `UI-070`
+  Done when: size, age, last use, dependency impact, and cleanup-failure states
+  are visible before destructive cleanup.
+
+- [ ] `UI-080` Settings page
+  Surface: `Settings`
+  Depends: `UI-001`, `UI-006`
+  Done when: project settings and environment settings are separated and
+  mutation remains role-aware.
+
+- [ ] `UI-081` Admin users list
+  Surface: `Admin UI`
+  Depends: `UI-001`, `UI-003`, `UI-006`
+  Done when: the Admin surface clearly shows users, roles, status, and recent
+  activity hints.
+
+- [ ] `UI-082` Access management flows
+  Surface: `Admin UI`
+  Depends: `UI-081`
+  Done when: role assignment, status validation, and save states are clear
+  without assuming product-owned password lifecycle management.
+
+- [ ] `UI-083` Role-change behavior
+  Surface: `Admin UI`
+  Depends: `UI-081`
+  Done when: role changes are confirmed and traceable in shared activity.
+
+- [ ] `UI-093` End-to-end prototype review
+  Surface: cross-surface review
+  Depends: `UI-020`, `UI-030`, `UI-040`
+  Done when: the team can walk through the primary path end to end and identify
+  friction before implementation expands.
+
+- [ ] `UI-094` Responsive and platform baseline
+  Surface: cross-surface review
+  Depends: `UI-001`, `UI-090`
+  Done when: desktop-first behavior, tablet tolerance, phone limits, and
+  browser consistency across Linux, Windows, and macOS are explicitly decided.
+
+- [ ] `UI-095` Notification pattern
+  Surface: `Notifications`
+  Depends: `UI-001`, `UI-002`
+  Done when: success, warning, error, stale, reconnecting, and shared-impact
+  feedback are visually and behaviorally consistent.
 
 ## P2 - Advanced Shared Workflows
 
-### Activity And Identity
+### Wave 1 - Activity And Identity
 
-- `UI-023` Design team activity feed
-  - Depends on: `UI-001`.
-  - Output: activity feed component.
-  - Done when: user, action, object, timestamp, and link target are visible.
+Read first:
 
-- `UI-024` Design activity/audit history view
-  - Depends on: `UI-003`, `UI-023`.
-  - Output: filterable history view.
-  - Done when: users can filter by actor, object, action type, project, and time
-    range.
+- `DESIGN.md`: `Shared Workspace Behavior`
+- `UI_SCREEN_SPECS.md`: `Activity View`, `Login`, `Admin UI`
 
-- `UI-084` Design identity provider and expanded-role compatibility
-  - Depends on: `UI-010`, `UI-081`.
-  - Output: future compatibility rules.
-  - Done when: login, user menu, and role display can support provider metadata
-    and viewer/operator/editor/admin without redesign.
+Parallel execution:
 
-### Scenarios And Faults
+1. After the required shared-mode foundations, run `UI-023` and `UI-084` in
+   parallel.
+2. After `UI-023`, run `UI-024`.
 
-- `UI-060` Design scenarios list
-  - Depends on: `UI-003`, `UI-006`.
-  - Output: scenario list.
-  - Done when: state, last run, owner/editor, and role-aware actions are visible.
+- [ ] `UI-023` Team activity feed
+  Surface: `Project Overview`
+  Depends: `UI-001`
+  Done when: actor, action, object, time, and drill-in target are visible in a
+  compact team activity surface.
 
-- `UI-061` Design scenario builder shell
-  - Depends on: `UI-005`, `UI-006`, `UI-060`.
-  - Output: scenario builder shell.
-  - Done when: Admin-only editor has step list, details panel, and validation
-    panel.
+- [ ] `UI-024` Activity history view
+  Surface: `Activity View`
+  Depends: `UI-003`, `UI-023`
+  Done when: users can filter history by actor, action, object, project, and
+  time without mixing audit and runtime streams.
 
-- `UI-062` Design scenario step editor
-  - Depends on: `UI-061`.
-  - Output: step editor.
-  - Done when: start, stop, replay, synthetic, fault, wait, and mark-event steps
-    are supported.
+- [ ] `UI-084` Identity-provider and expanded-role compatibility
+  Surface: `Login` / `Admin UI`
+  Depends: `UI-010`, `UI-081`
+  Done when: login and role display can grow into provider metadata and a larger
+  shared-role model without a UI redesign.
 
-- `UI-063` Design fault configuration
-  - Depends on: `UI-062`.
-  - Output: fault setup.
-  - Done when: target, timing, parameters, and clear behavior are visible.
+### Wave 2 - Scenarios And Faults
 
-- `UI-064` Design scenario validation
-  - Depends on: `UI-061`.
-  - Output: validation behavior.
-  - Done when: run is disabled until errors are resolved with clear reasons.
+Read first:
 
-- `UI-065` Design scenario run view
-  - Depends on: `UI-022`, `UI-061`.
-  - Output: scenario run screen.
-  - Done when: current step, initiator, clients, faults, events, and evidence
-    state are visible.
+- `DESIGN.md`: `Alternative Flows`, `Shared Workspace Behavior`
+- `UI_SCREEN_SPECS.md`: `Scenarios Workspace`, `Scenario Builder`,
+  `Scenario Run View`
 
-## Build Order
+Parallel execution:
 
-Recommended order:
+1. Start `UI-060` first.
+2. After `UI-060`, run `UI-061`.
+3. After `UI-061`, run `UI-062`, `UI-064`, and `UI-065` in parallel.
+4. After `UI-062`, run `UI-063`.
 
-1. Complete all P0 foundation tasks.
-2. Complete P0 project/runtime screens.
-3. Complete P0 Scan -> Record -> Replay.
-4. Complete P0 evidence and review tasks.
-5. Move to P1 shared access, reuse, admin, deterministic settings, and platform
-   polish.
-6. Move to P2 scenarios, faults, audit, and identity expansion.
+- [ ] `UI-060` Scenarios Workspace
+  Surface: `Scenarios Workspace`
+  Depends: `UI-003`, `UI-006`
+  Done when: saved scenarios show state, last run, owner or editor context, and
+  role-aware actions from one landing page.
 
-Do not start P1 or P2 work if it blocks the P0 Scan -> Record -> Replay slice.
+- [ ] `UI-061` Scenario builder shell
+  Surface: `Scenario Builder`
+  Depends: `UI-005`, `UI-006`, `UI-060`
+  Done when: the builder provides step list, details panel, validation, and
+  save/run structure inside one coherent editing surface.
+
+- [ ] `UI-062` Scenario step editor
+  Surface: `Scenario Builder`
+  Depends: `UI-061`
+  Done when: start, stop, replay, synthetic, fault, wait, and marker steps fit
+  the same step-editing model.
+
+- [ ] `UI-063` Fault configuration
+  Surface: `Scenario Builder`
+  Depends: `UI-062`
+  Done when: target, timing, parameters, and clear behavior are understandable
+  before the fault is added.
+
+- [ ] `UI-064` Scenario validation
+  Surface: `Scenario Builder`
+  Depends: `UI-061`
+  Done when: run is blocked until validation passes, and the reason is obvious.
+
+- [ ] `UI-065` Scenario Run View
+  Surface: `Scenario Run View`
+  Depends: `UI-022`, `UI-061`
+  Done when: current step, initiator, involved sources, faults, clients, events,
+  and evidence state are visible during the run.
+
+## Recommended Sequence
+
+1. Complete the P0 shell and shared-pattern tasks first.
+2. Finish the P0 workspace pages so project navigation and runtime visibility are stable.
+3. Build the primary `scan -> record -> replay` flow end to end.
+4. Finish source detail and evidence so the core workflow closes cleanly.
+5. Add P1 shared access, reuse flows, full editing, and operational breadth.
+6. Add P1 admin, settings, retention, notifications, and platform review.
+7. Move to P2 activity, identity expansion, scenarios, and faults.
+
+The task order above already follows this sequence. The section is kept only as
+the short executive summary.
