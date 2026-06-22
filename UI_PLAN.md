@@ -1,217 +1,268 @@
-# MVP UI Design Plan
+# UI Design Plan
 
-This document explains how the UI design work should be organized for the IoT Data Source Simulator MVP.
+This file is the readable planning layer for the IoT Data Source Simulator UI.
 
-Detailed UI decisions live in `DESIGN.md`.
+Use it to explain the UI direction to the team, understand delivery order, and see
+how the design maps back to `SPEC.md`, `ARCHITECTURE.md`, and `STACK.md`.
 
-Development handoff artifacts:
+Detailed files:
 
-| File | Purpose |
-|---|---|
-| `DESIGN.md` | Product-level UI decisions and UX principles |
-| `UI_SCREEN_SPECS.md` | Screen-level requirements, states, and acceptance criteria |
-| `UI_TASKS.md` | Implementation-ready UI task breakdown |
+- `DESIGN.md` - product-level UI decisions and UX rules.
+- `UI_SCREEN_SPECS.md` - screen-by-screen requirements.
+- `UI_TASKS.md` - implementation-ready UI work breakdown.
 
-## 1. Why This Plan Exists
+## 1. Product Summary
 
-| Goal | Why It Matters |
-|---|---|
-| Align the team | Everyone understands the same MVP, users, and workflows |
-| Control MVP scope | The team can see what is included now and what waits |
-| Reduce redesign | Core flows, states, and edge cases are decided before mockups |
-| Guide implementation | Engineers can see expected screens, states, and interaction rules |
-| Support presentation | Product direction is easy to explain to stakeholders |
+The UI is a mode-aware operational workbench for building, running, observing, and
+reusing simulated industrial data sources.
 
-## 2. Product Goal
+Core product story:
 
-| Topic | Decision |
-|---|---|
-| Product type | Shared operational Web UI |
-| Primary value | Capture real industrial device behavior and replay it safely |
-| MVP story | Scan real source -> Record -> Replay -> Observe -> Export evidence |
-| Usage context | QA, development, support, and shared team debugging |
-| UI character | Practical workbench, not a marketing dashboard |
+1. Scan real source.
+2. Record real behavior.
+3. Replay through a simulated source.
+4. Observe runtime state.
+5. Export evidence.
 
-## 3. Users And Access
+The product is delivered in stages. `P0`, `P1`, and `P2` describe delivery order,
+not product ambition.
 
-| User / Role | What They Need From UI |
-|---|---|
-| QA engineer | Reproduce bugs, run scenarios, simulate faults, export evidence |
-| Edge Device developer | Create sources, inspect live values, debug clients and events |
-| Support / field engineer | Import projects/data, replay real behavior, collect handoff evidence |
-| Admin | Manage users, roles, and environment-level settings |
-| User | Work with all projects, sources, recordings, scenarios, and evidence |
+## 2. Delivery Stages
 
-Access decisions:
+### P0 - First Usable Release Slice
 
-| Decision | MVP Choice |
-|---|---|
-| Login | Required |
-| Roles | Admin and User |
-| Project visibility | All signed-in Users see all projects |
-| Collaboration | Automatic edit locks |
-| Locked object behavior | Other users see read-only view |
+Goal: make the core simulator workflow usable without waiting for the full shared
+team feature set.
 
-## 4. MVP Workflows
+Included:
 
-These are the workflows the UI must make understandable and reliable.
+- trusted local mode without required login;
+- app shell, navigation, runtime panel, shared UI states;
+- project entry and project overview;
+- OPC UA and Modbus TCP data-source creation;
+- protocol-extensible Create Data Source wizard;
+- primary Scan -> Record -> Replay flow;
+- data-source list and detail;
+- live values and runtime state;
+- evidence list, detail, export, and export failure recovery;
+- baseline accessibility, edge states, visual system, and role-aware patterns.
 
-| Priority | Workflow | Purpose |
-|---|---|---|
-| High | Scan real source -> Record -> Replay | Main product differentiator |
-| High | Create manual data-source | Work when real devices are unavailable |
-| High | Generate synthetic data | Create deterministic test and boundary data |
-| High | Import recording/sample | Use prepared data files |
-| High | Observe runtime state | Understand what is running, connected, unhealthy, or stale |
-| High | Export evidence | Preserve what happened during a run |
-| High | Manage project lifecycle | Rename, duplicate, archive, delete, import, export |
-| High | Show automated runs | Make automated test activity visible in runtime/evidence UI |
-| Medium | Build scenario | Combine replay, synthetic data, timing, and faults |
-| Medium | Admin user management | Support production-usable shared environment |
-| Medium | Clean up large artifacts | Manage retention for evidence, recordings, and samples |
+P0 success test:
 
-## 5. Information Architecture
+- A user can create or open a project, create an OPC UA or Modbus data-source,
+  scan a real source, record data, replay it, observe values, and export evidence.
 
-| Area | Purpose |
-|---|---|
-| Project Entry | Select, create, or import project |
-| Project Overview | Main command center for runtime state |
-| Data Sources | Create, run, edit, and observe simulated sources |
-| Recordings & Samples | Manage reusable real or prepared data |
-| Scenarios | Build and run repeatable test flows |
-| Evidence | Review and export captured run evidence |
-| Settings | Project and environment settings |
-| Admin | User and role management |
-| Activity / Audit | Filter team and automation history |
+### P1 - Production-Usable Breadth
 
-## 6. Screen Inventory
+Goal: make the product practical for shared teams and broader reuse.
 
-| Screen / Flow | Design Status | Next Output |
-|---|---|---|
-| Login | Baseline spec ready | Mockup / implementation |
-| Project Entry | Baseline spec ready | Mockup / implementation |
-| Project Overview | Baseline spec ready | Mockup / implementation |
-| Create Data Source Wizard | Baseline spec ready | Mockup / implementation |
-| Scan Real Source Flow | Baseline spec ready | Mockup / implementation |
-| Recording Flow | Baseline spec ready | Mockup / implementation |
-| Replay Flow | Baseline spec ready | Mockup / implementation |
-| Data Source Detail | Baseline spec ready | Mockup / implementation |
-| Full Schema Editor | Baseline spec ready | Mockup / implementation |
-| Recordings & Samples | Baseline spec ready | Mockup / implementation |
-| Scenario Builder | Baseline spec ready | Mockup / implementation |
-| Scenario Run View | Baseline spec ready | Mockup / implementation |
-| Evidence List / Detail | Baseline spec ready | Mockup / implementation |
-| Evidence Export Dialog | Baseline spec ready | Mockup / implementation |
-| Admin UI | Baseline spec ready | Mockup / implementation |
-| Activity / Audit View | Baseline spec ready | Mockup / implementation |
-| Project Lifecycle Actions | Baseline spec ready | Mockup / implementation |
-| Credentials Handling | Baseline spec ready | Mockup / implementation |
-| Retention / Cleanup | Baseline spec ready | Mockup / implementation |
+Included:
 
-## 7. Design Milestones
+- shared login/password flow;
+- Admin/User shared-mode behavior;
+- user and access management;
+- edit-safety pattern;
+- multiple data-sources;
+- manual schema creation;
+- synthetic data generation;
+- deterministic replay/synthetic settings;
+- project import/export and lifecycle actions;
+- recordings/samples list, import, preview, export;
+- connected clients, health, and runtime events;
+- automated run visibility;
+- retention/cleanup entry points;
+- responsive/browser/platform baseline for Linux, Windows, and macOS.
 
-| Milestone | Goal | Screens / Flows |
-|---|---|---|
-| 1. Operational Foundation | Make shared runtime state understandable | Project Overview, Data Sources List, runtime panel, activity indicators |
-| 2. Primary Product Flow | Design the main Scan -> Record -> Replay path | Create wizard, scan, record, replay, evidence capture |
-| 3. Editing And Reuse | Make schemas and reusable data manageable | Schema editor, recordings/samples, import/export, edit locks |
-| 4. Scenarios And Faults | Support repeatable test flows | Scenario builder, scenario run view, fault configuration |
-| 5. Evidence And Admin | Complete team-ready workflows | Evidence detail/export, Admin users, role-aware UI |
-| 6. Operational Governance | Make shared usage safe over time | Activity/audit, automated runs, credentials, retention, cleanup |
-| 7. Visual System | Make screens consistent and buildable | Status badges, tables, forms, dialogs, spacing, typography |
+P1 success test:
 
-## 8. Definition Of Done For A Screen Spec
+- A team can use the shared environment with login, Admin/User behavior, reusable
+  data, project lifecycle actions, automated run visibility, and operational
+  history without confusing local and shared modes.
 
-A screen is ready for mockup or implementation when these are defined:
+### P2 - Advanced Shared Workflows
 
-| Required Item | Done |
-|---|---|
-| User goal | [ ] |
-| Primary actions | [ ] |
-| Secondary actions | [ ] |
-| Main layout | [ ] |
-| Data shown | [ ] |
-| Empty state | [ ] |
-| Loading state | [ ] |
-| Error state | [ ] |
-| Permission/role behavior | [ ] |
-| Concurrent editing behavior, if relevant | [ ] |
-| Runtime/stale-data behavior, if relevant | [ ] |
-| Destructive confirmations, if relevant | [ ] |
-| Accessibility notes | [ ] |
+Goal: add deeper collaboration, richer test flows, and expanded access models.
 
-## 9. Cross-Screen UI Rules
+Included:
 
-| Rule | Applies To |
-|---|---|
-| Runtime state must be visible | Overview, Data Sources, Scenario Run, Evidence |
-| Initiator/owner must be visible | Runs, scenarios, edits, evidence |
-| Long-running actions show progress | Scan, record, import, export, replay |
-| Errors explain recovery | All screens |
-| Empty states offer next action | All list and setup screens |
-| Destructive actions explain impact | Stop, delete, overwrite, import |
-| Credentials are never exposed | Real source scan, summaries, evidence, exports |
-| Automated runs are visible | Overview, runtime panel, evidence, activity |
-| Artifact size/age is visible where useful | Recordings, samples, evidence |
-| Large lists support search/filter/sort | Sources, schemas, recordings, events, evidence |
-| Color is not the only status signal | All status indicators |
-| Keyboard and focus behavior are designed | All interactive screens |
+- custom scenario builder;
+- scenario run view;
+- fault configuration;
+- full activity/audit view;
+- advanced shared editing workflows;
+- identity provider and expanded-role compatibility;
+- future viewer/operator/editor/admin role expansion.
 
-## 10. Recommended Next Step
+P2 success test:
 
-| Step | Why |
-|---|---|
-| Start UI-001 to UI-005 from `UI_TASKS.md` | Foundation patterns reduce rework across all screens |
-| Then UI-010 to UI-023 | Login, project entry, overview, data sources, runtime panel |
-| Then UI-030 to UI-047 | Primary Scan -> Record -> Replay and deep data-source work |
-| Include UI-013, UI-014, UI-024, UI-025, UI-039A, UI-074, UI-094, UI-095 before frontend freeze | These close project lifecycle, audit, automation, credentials, retention, responsive, and notification gaps |
+- A team can build and operate richer repeatable scenarios, inspect audit history,
+  and grow beyond the current Admin/User role model without redesigning the UI.
 
-## 11. Current Design Decisions
+## 3. Product Decisions
 
-| Topic | Decision |
-|---|---|
-| UI model | Shared Web UI |
-| Auth | Login/password required |
-| Roles | Admin and User |
-| Project access | All Users see all projects |
-| Main flow | Scan real source -> Record -> Replay |
-| Data-source creation | One protocol-extensible wizard |
-| MVP protocols | OPC UA and Modbus TCP |
-| Schema editing | Full editor |
-| Evidence capture | Automatic for every run |
-| Evidence export | Report, Full bundle, Value timeline CSV |
-| Recordings/samples | Import/export independently |
-| Concurrent editing | Automatic edit locks |
-| Accessibility | WCAG 2.2 AA baseline |
-| Project lifecycle | Create, rename, duplicate, archive, delete, import, export |
-| Automated runs | Visible in runtime, activity, and evidence surfaces |
-| Credentials | Masked and never exposed in summaries/evidence/exports |
-| Retention | Size, age, last-used, dependency impact, cleanup entry points |
+Current decisions:
 
-## 12. Handoff Readiness
+- UI model: one Web UI for trusted local and shared team modes.
+- P0 auth: trusted local mode can run without login.
+- P1 auth: shared team mode introduces login/password.
+- Current shared roles: Admin and User.
+- Shared User permissions: observe everything and start data-sources only.
+- Shared Admin permissions: create, edit, start, stop, delete, import, export,
+  and administer.
+- Project visibility: all signed-in shared users can see all projects.
+- Main flow: Scan real source -> Record -> Replay.
+- Initial protocols: OPC UA and Modbus TCP.
+- Data-source creation: one wizard that can support future protocols.
+- Schema editing: full editor for every editable part of the schema.
+- Evidence capture: automatic for every run; export is explicit.
+- Evidence export: Report, Full bundle, Value timeline CSV.
+- Shared editing: automatic locks/read-only state, not manual checkout.
+- Accessibility baseline: WCAG 2.2 AA.
+- Frontend stack: React, TypeScript, Vite, React Router, TanStack Query/Table,
+  Zustand, Radix UI, Tailwind.
 
-| Area | Status | Notes |
-|---|---|---|
-| Product scope | Ready | Aligned with `SPEC.md` capabilities at MVP UI level |
-| Information architecture | Ready | Main sections and navigation model defined |
-| Screen inventory | Ready | All MVP screens have baseline specs |
-| Implementation tasks | Ready | `UI_TASKS.md` provides IDs, priorities, dependencies, outputs, acceptance criteria |
-| Edge cases | Ready | Failure, stale, locked, partial, import/export, credential, retention cases covered |
-| Accessibility baseline | Ready | WCAG 2.2 AA baseline defined |
-| Visual design | Ready for first pass | Needs concrete component styling during UI implementation |
-| Protocol details | Ready for first pass | OPC UA/Modbus field baseline defined; exact field behavior can be refined per implementation |
-| Prototype/mockups | Not required before task kickoff | Can be produced from `UI_SCREEN_SPECS.md` if team wants visual review first |
+## 4. Information Architecture
 
-## 13. Non-Blocking Follow-Ups
+Primary areas:
 
-These should not block the first UI development pass, but should be refined while implementing relevant tasks.
+- Project Entry - choose, create, or import a project.
+- Project Overview - command center for project state.
+- Data Sources - create, run, edit, and observe simulated sources.
+- Recordings & Samples - manage reusable real or prepared data.
+- Scenarios - build and run repeatable test flows.
+- Evidence - review and export captured run evidence.
+- Settings - project and environment settings.
+- Admin - user and role management.
+- Activity / Audit - team and automation history.
 
-| Follow-Up | Related Tasks |
-|---|---|
-| Exact OPC UA and Modbus field labels and validation copy | UI-039, UI-039A |
-| Exact error and empty-state text | UI-002, UI-091, UI-092 |
-| Exact table density and column order | UI-003, UI-020, UI-021, UI-050, UI-070 |
-| Exact responsive breakpoints | UI-094 |
-| Exact evidence export file naming | UI-072 |
-| Exact retention thresholds and cleanup policy | UI-074 |
-| Optional contextual help/glossary behavior | UI-090, UI-091 |
+## 5. Main Workflows
+
+### Scan Real Source -> Record -> Replay
+
+Stage: P0
+
+Why it matters:
+
+- This is the product differentiator.
+- It turns real industrial behavior into reusable simulator assets.
+
+UI must make clear:
+
+- real endpoint vs simulated endpoint;
+- scan progress and partial scan warnings;
+- recording duration and value count;
+- replay target compatibility;
+- active clients and live values;
+- evidence availability.
+
+### Manual Or Synthetic Source
+
+Stage: P1
+
+UI must make clear:
+
+- manual schema entry point;
+- synthetic pattern/range/update settings;
+- deterministic settings where relevant;
+- validation before save/run.
+
+### Shared Team Operation
+
+Stage: P1/P2
+
+UI must make clear:
+
+- who started a run;
+- who edited or exported something;
+- which actions are Admin-only;
+- which object is locked and by whom;
+- whether activity is runtime behavior or user audit history.
+
+## 6. Cross-Screen Rules
+
+These rules apply everywhere:
+
+- Runtime state must be visible on operational screens.
+- Long-running actions show progress, elapsed time, and safe retry/cancel state.
+- Errors explain the cause and the next action in user terms.
+- Empty states point to the next useful action.
+- Destructive actions explain impact before confirmation.
+- Credentials, secrets, private keys, and PKI material are never shown in
+  summaries, activity, evidence, imports, or exports.
+- Import/export artifacts are version-aware; unsupported newer versions fail
+  safely before commit.
+- Live values are an operational preview; recordings and evidence are captured
+  timelines.
+- Runtime events and user activity/audit are separate histories.
+- Tables support search, filter, sort, no-results state, and visible active
+  filters.
+- Color is never the only status signal.
+- Keyboard and focus behavior are designed for every interactive screen.
+
+## 7. Contract Coverage
+
+Covered against `SPEC.md`:
+
+- Data sources: OPC UA, Modbus TCP, on-demand management, real-source scan,
+  project save/reuse/import/export/lifecycle.
+- Recordings, samples, replay: record real data, replay, import/export reusable
+  data, deterministic replay/synthetic settings.
+- Scenarios and faults: planned as P2 with structured builder and run view.
+- Observability and evidence: live values, clients, health, runtime events,
+  evidence export.
+- UI/control: Web UI plus automated run visibility.
+- Local/shared usage: trusted local P0, shared team P1.
+- Login/access: no-login local P0, shared login P1, expanded identity/roles P2.
+
+Covered against `ARCHITECTURE.md`:
+
+- Web UI uses product concepts, not worker/database/IPC concepts.
+- UI stays protocol-neutral except protocol-specific configuration fields.
+- Live preview and captured timelines are visually distinct.
+- Runtime events and user activity/audit are distinct.
+- Import/export artifacts are version-aware.
+- Secrets and private keys are excluded from user-visible summaries and exports.
+- OAuth2/OIDC and expanded roles remain future-compatible.
+- Approved frontend stack is respected.
+
+## 8. Ready For Development
+
+Ready:
+
+- product UI scope;
+- delivery stages;
+- information architecture;
+- screen inventory;
+- primary workflows;
+- role behavior;
+- edge-state categories;
+- architecture alignment;
+- implementation task breakdown.
+
+Needs refinement during implementation:
+
+- exact OPC UA and Modbus labels;
+- exact validation and error copy;
+- exact table column order;
+- exact responsive breakpoints;
+- exact evidence file naming;
+- exact artifact version compatibility copy;
+- exact deterministic setting labels;
+- exact retention thresholds.
+
+## 9. Recommended Next Step
+
+Start with P0 tasks from `UI_TASKS.md`.
+
+Build order:
+
+1. Foundation patterns.
+2. Project entry and overview.
+3. Data-source list/detail.
+4. Create Data Source wizard.
+5. Scan -> Record -> Replay.
+6. Evidence.
+7. Visual/accessibility/edge-state pass.
+
+Do not start P1 or P2 work if it blocks completion of the P0 Scan -> Record ->
+Replay slice.
