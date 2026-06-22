@@ -1,5 +1,20 @@
 # Agent Rules
 
+## Project Documents
+
+Read the document that owns a topic before acting on it, and keep each fact in
+one place — do not restate content that lives in another file.
+
+- `SPEC.md` — source of truth for product capabilities (what users can and cannot
+  do). See "Working With SPEC.md".
+- `ARCHITECTURE.md` — high-level system map and binding architectural constraints.
+  Do not change without explicit user approval; propose changes first.
+- `STACK.md` — approved technology stack. No new dependency without explicit approval.
+- `DESIGN.md` — MVP Web UI design: screens, flows, and interaction patterns.
+- `UI_PLAN.md` / `UI_SCREEN_SPECS.md` / `UI_TASKS.md` — UI design plan, per-screen
+  specifications, and task breakdown.
+- `MEMORY.md` — project glossary and durable notes. See "Working With MEMORY.md".
+
 ## Working With MEMORY.md
 
 Always read `MEMORY.md` before working in this project.
