@@ -10,9 +10,12 @@ history.
 - j2mod — Modbus TCP server/slave (Apache 2.0).
 - PostgreSQL + TimescaleDB; Flyway migrations; PostgreSQL JDBC + jOOQ (typed SQL,
   no heavy ORM).
-- Workers: lean JVMs (protocol SDK + IPC layer only, no Spring); GraalVM
-  native-image is the approved path to cut startup/heap and ship a self-contained
-  local build.
+- Workers: lean JVMs — protocol SDK + IPC layer only, no Spring. Workers are
+  long-lived, so optimize for per-process memory, sustained throughput, and small
+  runtime surface rather than startup time. Default runtime is the plain JVM,
+  optionally with AppCDS; self-contained local builds use jlink/jpackage. GraalVM
+  native-image is optional per workload and must be validated for throughput before
+  adoption, especially on the hot recording path.
 
 ## Frontend
 - React + TypeScript + Vite + React Router + TanStack Query/Table + Zustand +
