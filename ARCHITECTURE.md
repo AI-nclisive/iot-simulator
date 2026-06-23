@@ -80,8 +80,7 @@ and runtime modules must not depend on UI-facing modules.
 - Two deployment modes from one build: trusted local (single user, auth optional)
   and shared team (multi-user, authenticated). Runs on Linux, Windows, and macOS.
 - Shared mode authenticates via external identity providers (OAuth2/OIDC) and
-  authorizes by role (viewer, operator, editor, admin); the API layer enforces
-  authorization.
+  authorizes by roles (admin, user); the API layer enforces authorization.
 - Shared edits use optimistic concurrency — no silent overwrites; other users see
   a read-only view while an item is being edited.
 - Secrets and PKI material come from env vars / an external secret store, never
