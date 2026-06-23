@@ -16,10 +16,10 @@ The backend hosts the domain modules and a runtime supervisor. The supervisor
 runs each protocol data-source as an isolated, out-of-process worker, so one
 worker crash cannot take down the backend. A single protocol-neutral schema and
 value model is the source of truth; each worker projects it onto its native
-protocol address model. Persistence is split by data shape across a relational
-store, a time-series store, and an object-storage abstraction. The core risk is a
-reliable simulator runtime — fidelity, fault isolation, determinism, and
-reproducible evidence rank above CRUD convenience.
+protocol address model. Persistence is split by data shape: a relational store
+holds entities and value timelines, with an object-storage abstraction for large
+artifacts. The core risk is a reliable simulator runtime — fidelity, fault
+isolation, determinism, and reproducible evidence rank above CRUD convenience.
 
 ## Module map
 
@@ -35,8 +35,8 @@ and runtime modules must not depend on UI-facing modules.
   resource governance; protocol-agnostic.
 - **Protocol workers** (out-of-process) — implement one worker contract; the only
   place protocol-specific code lives.
-- **Persistence & platform** — relational, time-series, and object storage;
-  identity/auth; secrets.
+- **Persistence & platform** — relational storage (entities and value timelines)
+  and object storage; identity/auth; secrets.
 
 ## Runtime model
 
@@ -62,9 +62,11 @@ and runtime modules must not depend on UI-facing modules.
   sampling); the live path is conflated/throttled for the UI.
 - Determinism is guaranteed for generated value content and scenario step
   ordering (explicit clock, seeded random) — not for client delivery timing.
-- Persistence is chosen by data shape: relational for entities, time-series for
-  value timelines (batched writes with backpressure), object storage for large
-  artifacts. No large blobs in the relational store.
+- Persistence is chosen by data shape: the relational store holds both entities and
+  value timelines. Value timelines use append-optimized tables (batched writes with
+  backpressure; time-ordered range reads for replay and evidence) — no specialized
+  time-series engine required. Object storage holds large artifacts; no large blobs
+  in the relational store.
 - Runtime events and user-activity audit are distinct, separately recorded
   streams.
 
@@ -79,6 +81,8 @@ and runtime modules must not depend on UI-facing modules.
 
 - Two deployment modes from one build: trusted local (single user, auth optional)
   and shared team (multi-user, authenticated). Runs on Linux, Windows, and macOS.
+  The database connection is externally configured, so either mode can target a
+  containerized Postgres with a mounted volume or a managed instance (e.g. RDS).
 - Shared mode authenticates via external identity providers (OAuth2/OIDC) and
   authorizes by roles (admin, user); the API layer enforces authorization.
 - Shared edits use optimistic concurrency — no silent overwrites; other users see

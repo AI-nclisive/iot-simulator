@@ -8,8 +8,11 @@ history.
 - Java LTS (21/25); Spring Boot 3.x — REST/OpenAPI via springdoc, SSE/WebSocket.
 - Eclipse Milo — OPC UA server SDK (Apache 2.0).
 - j2mod — Modbus TCP server/slave (Apache 2.0).
-- PostgreSQL + TimescaleDB; Flyway migrations; PostgreSQL JDBC + jOOQ (typed SQL,
-  no heavy ORM).
+- PostgreSQL (no required extensions); Flyway migrations; PostgreSQL JDBC + jOOQ
+  (typed SQL, no heavy ORM). The DB connection is externally configured (env-based
+  DataSource), so one build runs against a containerized Postgres with a mounted
+  volume or a managed instance (e.g. RDS / Cloud SQL) — no engine-specific features
+  assumed.
 - Workers: lean JVMs — protocol SDK + IPC layer only, no Spring. Workers are
   long-lived, so optimize for per-process memory, sustained throughput, and small
   runtime surface rather than startup time. Default runtime is the plain JVM,
@@ -32,3 +35,7 @@ history.
   certified fidelity under Apache 2.0).
 - Microservices; Kubernetes as the baseline deploy target; a second primary
   database; plaintext secrets anywhere.
+- TimescaleDB (or any required PostgreSQL extension) as a baseline dependency — it
+  is unavailable on common managed Postgres (AWS RDS/Aurora, GCP Cloud SQL) and
+  would break the external-DB-connection requirement. Revisit only if real scale
+  needs it and the target Postgres supports it (table → hypertable is reversible).
