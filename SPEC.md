@@ -367,7 +367,7 @@ ToDo
 ### Capability: Assign User Roles In Shared Environments
 
 Explanation:
-Users can be assigned roles such as viewer, operator, editor, and admin. Viewers can observe simulations and evidence, operators can run and stop simulations, editors can modify simulator projects and scenarios, and admins can manage access.
+Users can be assigned roles such as admin or user. Users can run and stop simulations, observe simulations and evidence, admins can manage access, modify simulator projects and scenarios.
 
 Priority:
 P2
