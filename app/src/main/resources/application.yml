@@ -13,6 +13,9 @@ spring:
     locations: classpath:db/migration
 
 # Deployment mode: local (auth optional) | shared (OAuth2/OIDC). D2/D6.
+# In shared mode the backend is an OAuth2/OIDC resource server: set the issuer so
+# bearer JWTs validate via JWKS (full provider support lands in IS-075):
+#   spring.security.oauth2.resourceserver.jwt.issuer-uri: https://idp.example/realms/iotsim
 iotsim:
   mode: ${IOTSIM_MODE:local}
   # Runtime controller: memory (default, no workers) | supervisor (real

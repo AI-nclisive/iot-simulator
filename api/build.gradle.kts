@@ -10,5 +10,7 @@ dependencies {
     implementation(project(":platform"))
 
     implementation(libs.spring.boot.starter.web)
+    implementation(libs.spring.boot.starter.security)
+    implementation(libs.spring.boot.starter.oauth2.resource.server)
     implementation(libs.springdoc.openapi.webmvc)
 }
