@@ -1,4 +1,4 @@
-# IoT Data Source Simulator — Backend
+# IoT Data Source Simulator
 
 Modular-monolith backend (Java 25 + Spring Boot) with out-of-process protocol
 workers. See the design docs at the repo root (`SPEC.md`, `ARCHITECTURE.md`,
@@ -42,7 +42,7 @@ The API serves under `/api/v1`; actuator health at `/actuator/health`.
 
 ## Project tracking
 
-- **Board:** [IoT Simulator Backend](https://github.com/orgs/AI-nclisive/projects/1) —
+- **Board:** [IoT Simulator](https://github.com/orgs/AI-nclisive/projects/1) —
   live status by `IS-XXX` / `Area` (Todo / In Progress / In review / Done).
 - **Task catalog:** [`backend-specs/TASKS.md`](backend-specs/TASKS.md) — the source list of `IS-XXX` task IDs.
 

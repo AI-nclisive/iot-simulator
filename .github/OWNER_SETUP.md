@@ -37,14 +37,14 @@ Test reports are surfaced by CI as a clickable "Tests" check (dorny/test-reporte
 plus a downloadable `test-reports` artifact — no GitHub Pages (dropped in #6).
 
 ## Project board (IS-103 [SDLC])
-Org project **IoT Simulator Backend** — <https://github.com/orgs/AI-nclisive/projects/1>,
+Org project **IoT Simulator** — <https://github.com/orgs/AI-nclisive/projects/1>,
 linked to the repo, with fields: single-select `Status` (Todo / In Progress / In review /
 Done), text `Task ID` (`IS-XXX`), single-select `Area` (BE / FE / SDLC). Live status lives
 here; `backend-specs/TASKS.md` stays the catalog. Created (needs the `project` token scope
 to re-create):
 ```bash
 gh auth refresh -s project,read:project
-gh project create --owner AI-nclisive --title "IoT Simulator Backend"
+gh project create --owner AI-nclisive --title "IoT Simulator"
 ```
 
 ## Labels

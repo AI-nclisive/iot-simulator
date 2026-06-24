@@ -53,7 +53,7 @@ first), same as `ARCHITECTURE.md` / `STACK.md`.
 ## Task Tracking
 
 The task catalogs and the GitHub **Project** are kept in sync — the Project (org
-Project #1, "IoT Simulator Backend":
+Project #1, "IoT Simulator":
 <https://github.com/orgs/AI-nclisive/projects/1>) is the live mirror of the
 catalogs, with **one issue per task ID**. Catalogs:
 
