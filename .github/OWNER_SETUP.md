@@ -1,6 +1,6 @@
 # Repo Owner / Admin Setup (one-time)
 
-Actions that require **admin** on `darqsatyr1c0n/iot-simulator`. They could not be
+Actions that require **admin** on `AI-nclisive/iot-simulator`. They could not be
 done from a WRITE-only account; do them once admin access is available. Run the
 `gh` commands as an admin account (`gh auth status` should show admin).
 
@@ -8,7 +8,7 @@ Done already (no admin needed): CI workflow, PR template, CONTRIBUTING, AGENTS.m
 code rules, issue forms, and 9 repo labels.
 
 ## 0. Prerequisites
-- Admin on the repo (or perform these as owner `darqsatyr1c0n`).
+- Admin on the repo (or perform these as owner `AI-nclisive`).
 - For the Project board, add the project scope to the token:
   ```bash
   gh auth refresh -s project,read:project
@@ -30,7 +30,7 @@ gh pr merge --squash --delete-branch
 ## 2. SDLC-3 — Branch protection on `master`
 Requires admin. Status check `build` = the CI job name.
 ```bash
-gh api -X PUT repos/darqsatyr1c0n/iot-simulator/branches/master/protection \
+gh api -X PUT repos/AI-nclisive/iot-simulator/branches/master/protection \
   --input - <<'JSON'
 {
   "required_status_checks": { "strict": true, "contexts": ["build"] },
@@ -48,7 +48,7 @@ exists.
 
 ## 3. Repo merge settings
 ```bash
-gh api -X PATCH repos/darqsatyr1c0n/iot-simulator \
+gh api -X PATCH repos/AI-nclisive/iot-simulator \
   -F allow_squash_merge=true \
   -F allow_merge_commit=false \
   -F allow_rebase_merge=false \
@@ -59,7 +59,7 @@ gh api -X PATCH repos/darqsatyr1c0n/iot-simulator \
 Needs the `project` token scope (step 0). Track tasks by BE-ID separately from
 `backend-specs/TASKS.md` (which stays the catalog).
 ```bash
-gh project create --owner darqsatyr1c0n --title "IoT Simulator Backend"
+gh project create --owner AI-nclisive --title "IoT Simulator Backend"
 ```
 Then in the board: add a single-select `Status` field (Todo / In progress / In
 review / Done) and a text `BE-ID` field; link issues created via the Backend task
@@ -72,7 +72,7 @@ CI publishes the full Gradle + JaCoCo HTML reports (with navigation) to the
   Branch: `gh-pages` `/ (root)` → Save.
 
 The `gh-pages` branch is created automatically by the first CI run. Reports then
-open at `https://darqsatyr1c0n.github.io/iot-simulator/pr-<n>/` (the link is also
+open at `https://ai-nclisive.github.io/iot-simulator/pr-<n>/` (the link is also
 printed in each run's job summary). Publishing is non-fatal, so it never blocks
 the build.
 

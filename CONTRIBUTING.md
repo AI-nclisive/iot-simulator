@@ -58,7 +58,7 @@ Always run this and confirm it is green before opening a PR.
 Full admin runbook: [`.github/OWNER_SETUP.md`](.github/OWNER_SETUP.md). Requires
 **admin** on the repo. Protect `master` (status check `build` = the CI job name):
 ```bash
-gh api -X PUT repos/darqsatyr1c0n/iot-simulator/branches/master/protection \
+gh api -X PUT repos/AI-nclisive/iot-simulator/branches/master/protection \
   --input - <<'JSON'
 {
   "required_status_checks": { "strict": true, "contexts": ["build"] },
