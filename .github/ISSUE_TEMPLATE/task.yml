@@ -1,14 +1,13 @@
 name: Task
 description: A task (backend, frontend, or repo/process) tracked by an IS-ID from backend-specs/TASKS.md
-title: "IS-XXX [BE] "
+title: "IS-XXX "
 labels: ["type:task"]
 body:
   - type: markdown
     attributes:
       value: |
-        Title format: **`IS-XXX [AREA] short name`** — replace `IS-XXX` with the task id and
-        set the `[AREA]` marker in the title to match the **Area** you pick below
-        (`[BE]` / `[FE]` / `[SDLC]`).
+        Title: **`IS-XXX short name`** (replace `IS-XXX` with the task id). The area is
+        captured by the **Area** field below.
   - type: input
     id: task-id
     attributes:
@@ -21,7 +20,7 @@ body:
     id: area
     attributes:
       label: Area
-      description: Project area — mirror it in the title marker ([BE] / [FE] / [SDLC]).
+      description: "Project area: BE (backend), FE (frontend) or SDLC (repo/process)."
       options:
         - BE
         - FE

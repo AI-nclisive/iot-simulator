@@ -18,7 +18,7 @@ Always run this and confirm it is green before opening a PR.
 - Every task has a project-wide ID and area marker, named **`IS-XXX [AREA] short name`** —
   `[AREA]` is `[BE]` (backend), `[FE]` (frontend) or `[SDLC]` (repo/process).
 - Catalog: `backend-specs/TASKS.md` (with a legacy `BE-*`/`SDLC-*` → `IS-XXX` crosswalk).
-- Reuse the ID everywhere: branch `feat/IS-038-...`, issue title `IS-038 [BE] short name`, PR `Implements: IS-038`.
+- Reuse the ID everywhere: branch `feat/IS-038-...`, issue `IS-038 short name` (area via the form's **Area** field), PR `Implements: IS-038`.
 
 ## Branching
 - Branch off `master`. One task per branch/PR.
