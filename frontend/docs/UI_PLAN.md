@@ -16,6 +16,9 @@ Use it to understand:
 - The product is one platform delivered in stages.
 - `Scan real source -> Record -> Replay` is the first delivery anchor.
 - Shared-team features must not distort or delay the first usable local flow.
+- P0 may include compatibility for later shared permissions and authentication,
+  but it must not introduce visible login, mode switching, or shared-first
+  shell chrome into the local-first core surfaces.
 - Later stages should extend the same UX model rather than introduce a new one.
 - Tasks inside a stage may run in parallel only when `UI_TASKS.md` says they can.
 
@@ -35,25 +38,29 @@ Goal:
 
 Focus:
 
-- workspace shell;
-- project workspace;
+- app shell;
+- project surfaces;
 - source creation wizard;
 - scan flow;
 - recording flow;
 - replay flow;
 - source detail;
 - evidence;
+- compatibility hooks that let P1 add shared login and permissions without a
+  shell redesign;
 - baseline visual, accessibility, and edge-state review.
 
 Exit gate:
 
 - the user can move end to end through
   `Project -> Data Source -> Scan -> Record -> Replay -> Observe -> Evidence`
-  without relying on shared-team features.
+  without relying on shared-team features;
+- the same shell can later accept shared login and permission enforcement
+  without changing its main project structure.
 
 Implementation entry:
 
-- start with [UI_TASKS.md](UI_TASKS.md), section `P0 - Core Workspace And Primary Flow`.
+- start with [UI_TASKS.md](UI_TASKS.md), section `P0 - Core Shell And Primary Flow`.
 
 ## P1
 
@@ -93,7 +100,7 @@ Focus:
 
 - activity history;
 - identity-provider compatibility;
-- scenarios workspace;
+- scenarios;
 - scenario builder;
 - scenario run visibility;
 - fault configuration.

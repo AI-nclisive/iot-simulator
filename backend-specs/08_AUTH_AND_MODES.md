@@ -13,19 +13,19 @@ Selected by configuration (env var / Spring profile), not by a separate build:
 
 - **Trusted local** (`MODE=local`, default): single user, **auth optional/off**.
   Requests run as an implicit principal `local` with full control. No login
-  screen (`SPEC.md` "Use Product Without Login"; `DESIGN.md` Local Entry).
+  screen (`SPEC.md` "Use Product Without Login"; `frontend/docs/DESIGN.md` Local Entry).
 - **Shared team** (`MODE=shared`): multi-user, **authenticated** via OAuth2/OIDC.
   Workspace content is blocked until authentication succeeds.
 
 Both modes run on Linux, Windows, macOS (`SPEC.md`). The same API and UI
 structure serve both; mode changes permissions and authorship visibility, not
-layout (`DESIGN.md`).
+layout (`frontend/docs/DESIGN.md`).
 
 ## Authentication (shared mode)
 
 - The backend is an **OAuth2/OIDC resource server**: it validates bearer JWTs
   (issuer, audience, signature via JWKS). It does **not** own a password
-  lifecycle (`UI_SCREEN_SPECS.md` Admin UI).
+  lifecycle (`frontend/docs/UI_SCREEN_SPECS.md` Admin UI).
 - Providers: Keycloak, AWS Cognito, Azure Entra ID (`STACK.md`). Provider config
   (issuer URI, audience, JWKS) comes from environment / external config —
   `EnvironmentSettings` holds references, not secrets.
@@ -50,11 +50,10 @@ layout (`DESIGN.md`).
 - Role↔claim mapping: a configurable claim (e.g. `roles`/`groups`) maps IdP
   groups to product roles; default mapping documented in `EnvironmentSettings`.
 
-> ⚠ Governance: `SPEC.md` now states the baseline admin/user model
+> Governance: `SPEC.md` states the baseline admin/user model
 > (`00_DECISIONS_AND_INDEX.md` D2/G3); this spec implements the agreed flexible
-> model. One sync remains: `SPEC.md` grants `user` run/stop rights broader than
-> the current `UI_SCREEN_SPECS.md` wording — the UI role docs should be aligned
-> to `SPEC.md`.
+> model. `SPEC.md`, `ARCHITECTURE.md`, and `frontend/docs/UI_SCREEN_SPECS.md` are
+> aligned on the `user` start/stop scope.
 
 ## Optimistic concurrency & shared edit safety (D4)
 
@@ -64,7 +63,7 @@ layout (`DESIGN.md`).
 - **Advisory edit lease** (`edit_leases` table, `04_…`): when a user opens an
   editor (e.g. Full Schema Editor, Scenario Builder), the backend grants a
   time-bounded lease. Others get a **read-only view** while the lease holds
-  (`DESIGN.md` Concurrent Editing; `UI_TASKS.md` UI-005). Leases expire so a
+  (`frontend/docs/DESIGN.md` Concurrent Editing; `frontend/docs/UI_TASKS.md` UI-005). Leases expire so a
   crashed/abandoned session self-recovers (stale-lock recovery).
 - The lease is advisory UX protection; the `version` check is the authoritative
   guard against lost updates.
@@ -75,7 +74,7 @@ layout (`DESIGN.md`).
   external secret store**, never from repo files (`ARCHITECTURE.md`).
 - Scan/record connection secrets are used in-memory; persistence is optional and,
   where supported, stored only via the secret store — **never** in entity rows,
-  exports, evidence, activity, or summaries (`UI_SCREEN_SPECS.md` Credential
+  exports, evidence, activity, or summaries (`frontend/docs/UI_SCREEN_SPECS.md` Credential
   Handling).
 - Exportable artifacts are built by a path that structurally excludes secrets
   (`06_ARTIFACT_FORMATS.md`).

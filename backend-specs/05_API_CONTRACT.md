@@ -2,7 +2,7 @@
 
 Status: **DRAFT — proposal for approval.** REST/OpenAPI surface plus live (SSE)
 endpoints for the backend, derived from `SPEC.md` capabilities and the UI
-surfaces in `UI_SCREEN_SPECS.md`. Conforms to `ARCHITECTURE.md` (REST + OpenAPI
+surfaces in `frontend/docs/UI_SCREEN_SPECS.md`. Conforms to `ARCHITECTURE.md` (REST + OpenAPI
 for commands/queries/test-control; SSE for live; path-based major versioning;
 API layer enforces authz) and decisions D6 (SSE-only) and D7 (`/api/v1`).
 
@@ -109,10 +109,6 @@ actions. Per `SPEC.md` (Assign User Roles): `user` may observe everything
 replay and scenario runs; `admin` additionally edits projects/data-sources/
 schemas/scenarios, imports/exports, manages retention, and manages access. The
 UI prefers preventing invalid actions before submit; the API still enforces.
-
-> Note: this `user` scope is broader than the current `UI_SCREEN_SPECS.md`
-> wording (which limits `user` to starting stopped sources). The UI role docs
-> should be synced to `SPEC.md`.
 
 ## Open questions for reviewer
 

@@ -1,0 +1,111 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  font-family: "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif;
+  background: #eef1e7;
+  color: #183028;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background-color: #eef1e7;
+  background-image:
+    linear-gradient(rgba(24, 48, 40, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(24, 48, 40, 0.035) 1px, transparent 1px),
+    linear-gradient(180deg, #f8faf4 0%, #eef1e7 100%);
+  background-size:
+    24px 24px,
+    24px 24px,
+    100% 100%;
+  background-position:
+    -1px -1px,
+    -1px -1px,
+    0 0;
+  color: #183028;
+}
+
+button,
+select,
+input {
+  font: inherit;
+}
+
+@layer components {
+  .shell-panel {
+    @apply rounded-lg border border-shell-line/90 bg-shell-panel/90 shadow-panel backdrop-blur;
+  }
+
+  .shell-muted {
+    @apply text-sm text-shell-muted;
+  }
+
+  .shell-action {
+    @apply inline-flex items-center justify-center rounded-md border border-shell-line bg-white px-3 py-2 text-sm font-medium text-shell-ink transition hover:border-shell-accent hover:text-shell-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-shell-accent/40 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .shell-action-warning {
+    @apply inline-flex items-center justify-center rounded-md border border-shell-warning/25 bg-shell-warning px-3 py-2 text-sm font-medium text-white transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-shell-warning/30 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .shell-action-danger {
+    @apply inline-flex items-center justify-center rounded-md border border-shell-danger/25 bg-shell-danger px-3 py-2 text-sm font-medium text-white transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-shell-danger/30 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .shell-field {
+    @apply min-h-[2.625rem] rounded-md border border-shell-line bg-white px-3 py-2 text-sm text-shell-ink transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-shell-accent/40;
+  }
+
+  .shell-nav-item {
+    @apply flex items-center justify-between rounded-md border border-transparent px-3 py-2 text-sm font-medium text-shell-muted transition hover:border-shell-line hover:bg-white hover:text-shell-ink;
+  }
+
+  .shell-nav-item-active {
+    @apply border-shell-line bg-white text-shell-ink shadow-sm;
+  }
+
+  .shell-nav-item-disabled {
+    @apply cursor-not-allowed border-transparent bg-transparent text-shell-muted/75 opacity-70;
+  }
+
+  .shell-nav-item-compact {
+    @apply flex h-11 items-center justify-center rounded-md border border-transparent bg-white text-sm font-semibold text-shell-muted transition hover:border-shell-line hover:text-shell-ink;
+  }
+
+  .shell-nav-item-compact-active {
+    @apply border-shell-line text-shell-ink shadow-sm;
+  }
+
+  .shell-nav-item-compact-disabled {
+    @apply cursor-not-allowed border-transparent bg-white/60 text-shell-muted/75 opacity-70;
+  }
+
+  .shell-chip {
+    @apply inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.08em];
+  }
+
+  .shell-filter-chip {
+    @apply inline-flex items-center rounded-full border border-shell-line bg-white px-3 py-1.5 text-xs font-medium text-shell-ink transition hover:border-shell-accent hover:text-shell-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-shell-accent/40;
+  }
+
+  .shell-text-action {
+    @apply inline-flex items-center justify-center rounded-md px-2 py-1 text-sm font-medium text-shell-accent transition hover:text-shell-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-shell-accent/40;
+  }
+
+  .shell-text-action-danger {
+    @apply inline-flex items-center justify-center rounded-md px-2 py-1 text-sm font-medium text-shell-danger transition hover:text-shell-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-shell-danger/30;
+  }
+}

@@ -72,7 +72,7 @@ A named reusable subset/snapshot derived from a recording or defined manually.
 A test flow (SPEC "Build Custom Scenarios").
 - Scenario: `name`, `status` (`DRAFT | READY | INVALID`), `deterministicSettings`.
 - Step `type`: `START | STOP | REPLAY | SYNTHETIC | FAULT | WAIT | MARKER`
-  (matches `UI_TASKS.md` UI-062), `order`, `targetSourceId?`, `params` (typed per
+  (matches `frontend/docs/UI_TASKS.md` UI-062), `order`, `targetSourceId?`, `params` (typed per
   step type — see `06_ARTIFACT_FORMATS.md`).
 
 ### Fault
@@ -87,7 +87,7 @@ A simulated unreliable condition (SPEC "Simulate Faults").
 A runtime execution (manual or automated).
 - `kind` (`REPLAY | SYNTHETIC | SCENARIO | RECORDING`), `trigger`
   (`MANUAL | AUTOMATED`), `initiator` (principal or automation label — automation
-  must never look anonymous, per `UI_SCREEN_SPECS.md`),
+  must never look anonymous, per `frontend/docs/UI_SCREEN_SPECS.md`),
   `state` (`QUEUED | RUNNING | STOPPED | FAILED | COMPLETED`), `startedAt`,
   `endedAt`, `sourceIds[]`, `scenarioId?`, `evidenceId?`.
 
@@ -123,7 +123,7 @@ history.
 - `ProjectSettings`: defaults, retention, metadata (project scope).
 - `EnvironmentSettings`: deployment-mode, identity provider config refs, retention
   policy, storage config (environment scope). Clearly separated in the UI
-  (`UI_SCREEN_SPECS.md` Settings).
+  (`frontend/docs/UI_SCREEN_SPECS.md` Settings).
 
 ## Notes
 

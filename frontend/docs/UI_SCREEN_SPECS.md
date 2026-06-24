@@ -16,12 +16,11 @@ what actions it must support, and what states it must handle.
 
 ## Cross-Surface Contract
 
-Every page inside the workspace should inherit the same structural rules:
+Every page inside the app shell should inherit the same structural rules:
 
-- top bar with project and mode context;
-- left navigation for main product sections;
-- central work area for the current task;
-- persistent runtime visibility through a side panel or bottom panel.
+- minimal top bar with product identity and utility entry points;
+- collapsible left project rail with project context and primary navigation;
+- central work area for the current task.
 
 Every surface that shows mutable or runtime-sensitive content should account for:
 
@@ -47,16 +46,16 @@ Use this block as a quick index to the surfaces described below.
 - `Login`:
   enter shared mode.
 - `Project Entry`:
-  choose a workspace.
+  choose a project.
 - `Project Overview`:
-  see team and runtime state.
+  see project state and next actions.
 - `Data Sources List`:
   browse and operate sources.
 - `Data Source Detail`:
   inspect one source in depth.
 - `Recordings & Samples`:
   manage reusable captured data.
-- `Scenarios Workspace`:
+- `Scenarios`:
   browse saved scenarios and create new ones.
 - `Scenario Run View`:
   observe one running scenario.
@@ -90,7 +89,7 @@ Use this block as a quick index to the surfaces described below.
 
 - `Deterministic Run Settings`:
   configure repeatable behavior.
-- `Runtime Context Panel`:
+- `Runtime Dashboard`:
   keep live runtime visible everywhere.
 - `Automated Run Visibility`:
   show automation-run presence across pages.
@@ -145,7 +144,7 @@ Shared behavior:
 
 Complete when:
 
-- shared mode blocks workspace content until authentication succeeds;
+- shared mode blocks project content until authentication succeeds;
 - errors are clear and recoverable;
 - keyboard-only sign-in works.
 
@@ -196,7 +195,7 @@ Complete when:
 - recent project activity helps orient the next action;
 - the empty state points clearly toward starting work.
 
-## Workspace Pages
+## Project Pages
 
 ### Project Overview
 
@@ -204,7 +203,7 @@ Type: `Page`
 
 Primary purpose:
 
-- give an immediate operational summary of the current project.
+- act as the default landing route for the runtime dashboard.
 
 Entry points:
 
@@ -213,27 +212,21 @@ Entry points:
 
 Must show:
 
-- project status summary;
-- primary actions;
-- active runs;
-- health or warning highlights;
-- recent runtime activity;
-- recent evidence;
-- who initiated recent meaningful actions.
+- the runtime dashboard as the main page content in the lightest version;
+- if extra content exists, it should stay minimal and support orientation only.
 
 Primary actions:
 
-- create source;
-- open a source;
-- start allowed sources;
-- open evidence;
-- drill into recent issues.
+- open data sources;
+- open recordings or samples;
+- inspect activity;
+- open evidence.
 
 Key states:
 
+- dashboard only;
 - empty;
 - ready;
-- active runtime;
 - warning;
 - error;
 - stale live data.
@@ -245,8 +238,8 @@ Shared behavior:
 
 Complete when:
 
-- a user can tell what is running, what changed, who touched it, and where to
-  go next in a few seconds.
+- landing on `Overview` feels like opening one simple dashboard rather than a
+  second page competing with the shell.
 
 ### Data Sources List
 
@@ -318,6 +311,7 @@ Must show:
 
 - source identity and status header;
 - endpoint summary;
+- parameter count and schema scale context;
 - tabs or segmented sections for Overview, Schema, Values, Clients, Events, and
   Settings;
 - active runtime context that stays visible while switching tabs.
@@ -348,7 +342,8 @@ Shared behavior:
 Complete when:
 
 - the user can stay oriented to runtime state while moving between tabs;
-- configuration and observation do not blur together.
+- configuration and observation do not blur together;
+- large parameter sets still feel navigable instead of overwhelming.
 
 ### Recordings & Samples
 
@@ -401,7 +396,7 @@ Complete when:
 - reusable data is easy to browse and attach back into runtime work;
 - artifact compatibility is clear before commit.
 
-### Scenarios Workspace
+### Scenarios
 
 Type: `Page`
 
@@ -792,7 +787,7 @@ Entry points:
 Must show:
 
 - editing toolbar;
-- structure tree or table;
+- structure tree or table built for large parameter sets;
 - details panel;
 - validation summary;
 - unsaved-change indicator.
@@ -822,7 +817,8 @@ Shared behavior:
 Complete when:
 
 - this surface feels like a real editor instead of a narrow form patch;
-- the user can understand impact before saving.
+- the user can understand impact before saving;
+- hundreds or thousands of parameters remain searchable and inspectable.
 
 ### Recording Flow
 
@@ -979,7 +975,7 @@ Primary purpose:
 
 Entry points:
 
-- Scenarios Workspace;
+- Scenarios;
 - duplicate-scenario action.
 
 Must show:
@@ -1025,7 +1021,7 @@ Primary purpose:
 
 Entry points:
 
-- Scenarios Workspace;
+- Scenarios;
 - activity drill-in;
 - runtime links.
 
@@ -1067,47 +1063,54 @@ Complete when:
 
 ## Shared Surfaces
 
-### Runtime Context Panel
+### Runtime Dashboard
 
 Type: `Shared surface`
 
 Primary purpose:
 
-- keep live runtime visible across the workspace.
+- keep live runtime visible on `Overview` without overloading deeper project
+  pages.
 
 Entry points:
 
-- persistent shell surface from all main pages.
+- `Overview`.
 
 Must show:
 
 - active runs;
-- recent runtime events;
-- health warnings;
-- stale or reconnecting state;
+- active process where relevant, such as recording, replay, or scenario;
+- source scale context, such as parameter count;
+- evidence state inside each active run;
+- initiator or author context where meaningful;
+- short run recency or time context;
+- optional pinned parameter preview instead of a full raw value dump;
 - quick links back to affected objects.
 
 Primary actions:
 
 - open related object;
-- expand or collapse panel;
-- inspect recent runtime details.
+- open run-related evidence where available.
 
 Key states:
 
 - no active runtime;
 - active;
-- warning;
-- stale.
+- partial evidence state.
 
 Shared behavior:
 
 - authorship and initiator context should appear where meaningful;
-- this panel shows runtime history, not audit history.
+- evidence state belongs to the relevant run card rather than a separate recent
+  evidence shelf;
+- this surface stays compact and readable, while deeper runtime history and
+  alerts live on dedicated detail surfaces.
 
 Complete when:
 
-- users do not lose live operational awareness while working elsewhere.
+- users can return to `Overview` and regain live operational awareness quickly;
+- users can tell whether a run represents a small stream or a very large
+  parameter set without leaving the dashboard.
 
 ### Automated Run Visibility
 

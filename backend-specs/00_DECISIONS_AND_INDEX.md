@@ -54,16 +54,16 @@ Spring."
 - **Decision:** ✅ gRPC over loopback (selected). New deps `grpc-java`/`protobuf`
   are **approved in `STACK.md`**.
 
-### D2 — Role model (⚠ doc inconsistency)
+### D2 — Role model (✅ resolved)
 
-Context: `ARCHITECTURE.md` says authz roles are **admin, user**.
-`UI_SCREEN_SPECS.md` uses **Admin/User** everywhere. `SPEC.md` "Assign User
-Roles" (P2) lists **viewer/operator/editor/admin**.
+Context: `ARCHITECTURE.md` authz roles are **admin, user**;
+`frontend/docs/UI_SCREEN_SPECS.md` uses **Admin/User**. `SPEC.md` "Assign User
+Roles" (P2) earlier listed viewer/operator/editor/admin; it has since been
+clarified to **admin/user** (viewer/operator/editor/admin = future P2 expansion).
 
 - **Recommendation:** runtime authorization model = **admin / user** (matches the
   binding constraint and the UI). Treat viewer/operator/editor/admin as a future
-  P2 product-level role expansion mapped onto the same enforcement points. This
-  inconsistency should be resolved in the governance docs by the owner.
+  P2 product-level role expansion mapped onto the same enforcement points.
 - **Decision:** ✅ Flexible permission model (selected). Internally one permission
   abstraction; externally expose **admin / user** now; expand to
   viewer/operator/editor/admin without changing enforcement points. The

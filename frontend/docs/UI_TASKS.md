@@ -47,17 +47,17 @@ Task input rule:
 
 | Stage | Goal | Main workstreams |
 | --- | --- | --- |
-| `P0` | Core workspace and primary product flow | Shell, project workspace, scan -> record -> replay, source detail, evidence, baseline review |
+| `P0` | Core shell and primary product flow | Shell, project surfaces, scan -> record -> replay, source detail, evidence, baseline review |
 | `P1` | Shared usage, reuse, and operational breadth | Login, project lifecycle, schema editing, recordings/samples, deterministic controls, admin/settings, retention, notifications |
 | `P2` | Advanced shared workflows | Activity history, identity expansion, scenarios, faults |
 
-## P0 - Core Workspace And Primary Flow
+## P0 - Core Shell And Primary Flow
 
-### Wave 1 - Shell And Shared Patterns
+### Wave 1 - Shell And Compatibility Patterns
 
 Read first:
 
-- `DESIGN.md`: `Workspace Structure`, `Shared Workspace Behavior`,
+- `DESIGN.md`: `Shell Structure`, `Shared Usage Behavior`,
   `Interaction Rules`
 - `UI_SCREEN_SPECS.md`: `Cross-Surface Contract`
 
@@ -67,79 +67,97 @@ Parallel execution:
 2. After `UI-001`, run `UI-002`, `UI-003`, `UI-004`, and `UI-006` in parallel.
 3. After `UI-006`, run `UI-007`.
 
-- [ ] `UI-001` App shell
-  Goal: define the base workspace frame that every main page will live inside.
-  Surface: workspace shell
-  Work includes: top bar layout, left navigation layout, runtime context panel
-  placement, project context area, local/shared mode indicator, main content
-  container behavior, and the rules for how this shell stays consistent across
-  pages.
-  Depends: none
-  Done when: top bar, left navigation, runtime context area, project context,
-  and local/shared mode area are stable across pages.
+Interpretation rule:
 
-- [ ] `UI-002` Shared UI states
+- this wave keeps the P0 shell compatible with later shared login and
+  permission behavior;
+- it does not introduce visible login flow, mode switching, or shared-first
+  shell controls into the local-first P0 experience.
+
+- [x] `UI-001` App shell
+  Goal: define the base shell frame that every main page will live inside.
+  Surface: app shell
+  Work includes: minimal top bar layout, collapsible left project rail,
+  project context in the left rail, main content container behavior, and the
+  rules for how this shell stays consistent across pages.
+  Depends: none
+  Done when: top bar, project rail, project context, and page structure are
+  stable across pages.
+
+- [x] `UI-002` Shared UI states
   Surface: cross-surface pattern
   Depends: `UI-001`
   Done when: loading, empty, error, stale, locked, warning, and status patterns
   are reusable and do not rely on color alone.
 
-- [ ] `UI-003` Table pattern
+- [x] `UI-003` Table pattern
   Surface: cross-surface pattern
   Depends: `UI-001`
   Done when: search, filter, sort, active filters, row actions, and no-results
   states are defined for dense operational tables.
 
-- [ ] `UI-004` Confirmation pattern
+- [x] `UI-004` Confirmation pattern
   Surface: cross-surface pattern
   Depends: `UI-001`
   Done when: destructive and disruptive confirmations clearly explain impact,
   affected objects, and reversibility.
 
-- [ ] `UI-006` Role-aware UI pattern
+- [x] `UI-006` Role-aware UI pattern
+  Goal: keep P0 action surfaces compatible with later shared permissions
+  without turning shared controls into top-level shell UI.
   Surface: cross-surface pattern
+  Work includes: action-level permission states, restricted-route treatment,
+  and rules for where shared-role differences appear when authentication is
+  added later.
   Depends: `UI-001`
-  Done when: Admin and User behavior is clear in shared mode, and trusted local
-  mode can expose full control without redesign.
+  Done when: Admin and User differences can be added to shared action surfaces
+  later without redesigning the local-first shell or page structure.
 
-- [ ] `UI-007` Local vs shared mode behavior
+- [x] `UI-007` Local vs shared mode behavior
+  Goal: preserve immediate trusted-local entry now while keeping a clean
+  insertion point for later shared authentication.
   Surface: cross-surface pattern
+  Work includes: local-first entry assumptions, shared login insertion before
+  project content, stable post-login handoff into the same project shell, and
+  permission injection points that do not require a second navigation model.
   Depends: `UI-001`, `UI-006`
-  Done when: local entry can skip login and shared mode can add authentication
-  and permissions without changing the product structure.
+  Done when: local entry stays immediate, and shared authentication plus
+  permissions can be added in P1 without changing project navigation, shell
+  layout, or page structure.
 
-### Wave 2 - Project Workspace
+### Wave 2 - Project Shell
 
 Read first:
 
-- `DESIGN.md`: `Workspace Structure`, `Entry Flow`, `Core Flow`
+- `DESIGN.md`: `Shell Structure`, `Entry Flow`, `Core Flow`
 - `UI_SCREEN_SPECS.md`: `Project Entry`, `Project Overview`,
-  `Data Sources List`, `Runtime Context Panel`
+  `Data Sources List`, `Runtime Dashboard`
 
 Parallel execution:
 
 1. After Wave 1, run `UI-011`, `UI-021`, and `UI-022` in parallel.
 2. After `UI-011` and `UI-022`, run `UI-020`.
 
-- [ ] `UI-011` Project Entry
+- [x] `UI-011` Project Entry
   Surface: `Project Entry`
   Depends: `UI-001`, `UI-003`, `UI-006`
   Done when: users can open a project quickly, see recent activity, and shared
   mode keeps create/import actions Admin-only.
 
-- [ ] `UI-022` Runtime Context Panel
-  Surface: `Runtime Context Panel`
+- [x] `UI-022` Runtime Dashboard
+  Surface: `Runtime Dashboard`
   Depends: `UI-001`, `UI-002`
-  Done when: active runs, recent runtime events, health warnings, and stale
-  state stay visible from anywhere in the workspace.
+  Done when: active runs, relevant process context, initiator context,
+  parameter-scale context, and per-run evidence state stay visible on
+  `Overview` without following the user onto every project page.
 
-- [ ] `UI-020` Project Overview
+- [x] `UI-020` Project Overview
   Surface: `Project Overview`
   Depends: `UI-001`, `UI-002`, `UI-003`, `UI-006`
-  Done when: the page answers what is running, who initiated it, what changed,
-  what needs attention, and where recent evidence lives.
+  Done when: the landing route stays minimal, serves as the runtime command
+  surface, and adds page content only when it improves orientation.
 
-- [ ] `UI-021` Data Sources List
+- [x] `UI-021` Data Sources List
   Surface: `Data Sources List`
   Depends: `UI-003`, `UI-004`, `UI-006`
   Done when: each row exposes protocol, endpoint, status, health, client
@@ -164,42 +182,42 @@ Parallel execution:
 6. After `UI-034`, run `UI-035`.
 7. After `UI-033` and `UI-039`, run `UI-039A`.
 
-- [ ] `UI-030` Create Data Source wizard shell
+- [x] `UI-030` Create Data Source wizard shell
   Surface: `Create Data Source Wizard`
   Depends: `UI-001`, `UI-002`, `UI-006`
   Done when: one guided flow supports create, back, next, cancel, and review
   without losing user input.
 
-- [ ] `UI-031` Protocol selection step
+- [x] `UI-031` Protocol selection step
   Surface: `Create Data Source Wizard`
   Depends: `UI-030`
   Done when: current and future protocols fit one stable selection pattern.
 
-- [ ] `UI-039` OPC UA and Modbus field baseline
+- [x] `UI-039` OPC UA and Modbus field baseline
   Surface: source creation protocol fields
   Depends: `UI-031`
   Done when: initial protocol-specific fields are represented consistently
   inside the shared wizard model.
 
-- [ ] `UI-032` Source basis step
+- [x] `UI-032` Source basis step
   Surface: `Create Data Source Wizard`
   Depends: `UI-030`
   Done when: scan is the promoted path, while manual, prepared-data, and
   synthetic paths remain clear and first-class.
 
-- [ ] `UI-033` Scan branch
+- [x] `UI-033` Scan branch
   Surface: `Scan Real Source`
   Depends: `UI-030`
   Done when: connection test, scan progress, retry, partial discovery, large
   schema, and unknown-type states are handled clearly.
 
-- [ ] `UI-034` Recording flow
+- [x] `UI-034` Recording flow
   Surface: `Recording Flow`
   Depends: `UI-033`
   Done when: recording state, duration, value count, disconnects, no-values, and
   partial-save states are understandable.
 
-- [ ] `UI-035` Replay flow
+- [x] `UI-035` Replay flow
   Surface: `Replay Flow`
   Depends: `UI-034`
   Done when: target compatibility, active-target impact, no-client state,
@@ -221,34 +239,39 @@ Read first:
 Parallel execution:
 
 1. Start `UI-040` first.
-2. After `UI-040`, run `UI-041`, `UI-044`, and `UI-047` in parallel.
-3. After `UI-035`, run `UI-054`.
+2. After `UI-040`, prioritize `UI-044` first because large parameter sets are
+   the core detail-surface requirement.
+3. After `UI-044` starts, run `UI-041` and `UI-047` in parallel where team
+   capacity allows.
+4. After `UI-035`, run `UI-054`.
 
-- [ ] `UI-040` Data Source Detail shell
+- [x] `UI-040` Data Source Detail shell
   Surface: `Data Source Detail`
   Depends: `UI-021`
   Done when: Overview, Schema, Values, Clients, Events, and Settings are
-  available inside one stable detail surface.
+  available inside one stable detail surface, and the source clearly shows that
+  one runtime may contain many parameters.
 
-- [ ] `UI-041` Source overview tab
+- [x] `UI-041` Source overview tab
   Surface: `Data Source Detail`
   Depends: `UI-040`
   Done when: state, endpoint, health, active behavior, and primary actions are
   visible without leaving the detail page.
 
-- [ ] `UI-044` Values tab
+- [x] `UI-044` Values tab
   Surface: `Data Source Detail`
   Depends: `UI-040`
   Done when: live values, timestamps, current mode, and stale state are clearly
-  separated from captured artifacts.
+  separated from captured artifacts, and large parameter sets remain searchable,
+  filterable, and readable.
 
-- [ ] `UI-047` Settings tab
+- [x] `UI-047` Settings tab
   Surface: `Data Source Detail`
   Depends: `UI-040`
   Done when: source-level configuration, validation, and safe editing boundaries
   are represented cleanly.
 
-- [ ] `UI-054` Assign-to-replay action
+- [x] `UI-054` Assign-to-replay action
   Surface: `Replay Flow`
   Depends: `UI-034`, `UI-035`
   Done when: assigning a recording or sample back to a source shows
@@ -327,7 +350,7 @@ Parallel execution:
 
 Read first:
 
-- `DESIGN.md`: `Entry Flow`, `Shared Workspace Behavior`,
+- `DESIGN.md`: `Entry Flow`, `Shared Usage Behavior`,
   `Imports And Exports`
 - `UI_SCREEN_SPECS.md`: `Login`, `Project Entry`, `Settings`
 
@@ -371,7 +394,7 @@ Parallel execution:
 
 Read first:
 
-- `DESIGN.md`: `Observe Path`, `Shared Workspace Behavior`
+- `DESIGN.md`: `Observe Path`, `Shared Usage Behavior`
 - `UI_SCREEN_SPECS.md`: `Data Source Detail`, `Automated Run Visibility`
 
 Parallel execution:
@@ -436,7 +459,8 @@ Parallel execution:
   Surface: `Full Schema Editor`
   Depends: `UI-040`, `UI-005`
   Done when: structure tree or table, details panel, validation, unsaved
-  changes, and shared-edit protection work together as one editor surface.
+  changes, and shared-edit protection work together as one editor surface for
+  small and very large schemas.
 
 - [ ] `UI-043` Schema dependency warnings
   Surface: `Full Schema Editor`
@@ -477,7 +501,7 @@ Parallel execution:
 
 Read first:
 
-- `DESIGN.md`: `Shared Workspace Behavior`, `Failure Handling`,
+- `DESIGN.md`: `Shared Usage Behavior`, `Failure Handling`,
   `Visual Direction`
 - `UI_SCREEN_SPECS.md`: `Settings`, `Admin UI`, `Retention & Cleanup`,
   `Notifications`
@@ -543,7 +567,7 @@ Parallel execution:
 
 Read first:
 
-- `DESIGN.md`: `Shared Workspace Behavior`
+- `DESIGN.md`: `Shared Usage Behavior`
 - `UI_SCREEN_SPECS.md`: `Activity View`, `Login`, `Admin UI`
 
 Parallel execution:
@@ -574,8 +598,8 @@ Parallel execution:
 
 Read first:
 
-- `DESIGN.md`: `Alternative Flows`, `Shared Workspace Behavior`
-- `UI_SCREEN_SPECS.md`: `Scenarios Workspace`, `Scenario Builder`,
+- `DESIGN.md`: `Alternative Flows`, `Shared Usage Behavior`
+- `UI_SCREEN_SPECS.md`: `Scenarios`, `Scenario Builder`,
   `Scenario Run View`
 
 Parallel execution:
@@ -585,8 +609,8 @@ Parallel execution:
 3. After `UI-061`, run `UI-062`, `UI-064`, and `UI-065` in parallel.
 4. After `UI-062`, run `UI-063`.
 
-- [ ] `UI-060` Scenarios Workspace
-  Surface: `Scenarios Workspace`
+- [ ] `UI-060` Scenarios
+  Surface: `Scenarios`
   Depends: `UI-003`, `UI-006`
   Done when: saved scenarios show state, last run, owner or editor context, and
   role-aware actions from one landing page.
@@ -623,7 +647,7 @@ Parallel execution:
 ## Recommended Sequence
 
 1. Complete the P0 shell and shared-pattern tasks first.
-2. Finish the P0 workspace pages so project navigation and runtime visibility are stable.
+2. Finish the P0 shell pages so project navigation and runtime visibility are stable.
 3. Build the primary `scan -> record -> replay` flow end to end.
 4. Finish source detail and evidence so the core workflow closes cleanly.
 5. Add P1 shared access, reuse flows, full editing, and operational breadth.

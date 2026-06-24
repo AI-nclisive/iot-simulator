@@ -36,7 +36,7 @@ Rules: `path` is unique within a schema; `nodeId` is the only stable reference
 
 Schemas are versioned (monotonic int). A recording/sample stores the
 `schemaVersion` it was captured against so replay can detect drift and warn (per
-`DESIGN.md` compatibility rules).
+`frontend/docs/DESIGN.md` compatibility rules).
 
 ## 2. Data types
 

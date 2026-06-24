@@ -10,9 +10,11 @@ one place — do not restate content that lives in another file.
 - `ARCHITECTURE.md` — high-level system map and binding architectural constraints.
   Do not change without explicit user approval; propose changes first.
 - `STACK.md` — approved technology stack. No new dependency without explicit approval.
-- `DESIGN.md` — product Web UI structure, UX flow, and interaction behavior.
-- `UI_PLAN.md` / `UI_SCREEN_SPECS.md` / `UI_TASKS.md` — UI delivery plan,
-  per-surface specifications, and task breakdown.
+- `frontend/docs/DESIGN.md` — product Web UI structure, UX flow, and interaction
+  behavior.
+- `frontend/docs/UI_PLAN.md` / `frontend/docs/UI_SCREEN_SPECS.md` /
+  `frontend/docs/UI_TASKS.md` — UI delivery plan, per-surface specifications,
+  and task breakdown.
 - `MEMORY.md` — project glossary and durable notes. See "Working With MEMORY.md".
 
 ## Working With MEMORY.md

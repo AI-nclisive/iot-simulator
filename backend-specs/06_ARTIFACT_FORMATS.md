@@ -49,9 +49,9 @@ Portable proof of a run (SPEC "Export Run Evidence", P0).
   `completeness` (`COMPLETE | PARTIAL | FAILED`), source/scenario context.
 - Sections: value timelines, client connection history, scenario metadata,
   runtime events, faults activated, errors. Origin (which run, who initiated,
-  completeness) is always visible (`DESIGN.md` Evidence Path).
+  completeness) is always visible (`frontend/docs/DESIGN.md` Evidence Path).
 - Export formats: ZIP bundle (default); a JSON summary subset for quick sharing.
-  Secret exclusion is explicit in the export dialog (`UI_SCREEN_SPECS.md`).
+  Secret exclusion is explicit in the export dialog (`frontend/docs/UI_SCREEN_SPECS.md`).
 
 ## Scenario model (serialized)
 
@@ -67,7 +67,7 @@ Used in storage (`scenario_steps`), project export, and the builder API.
   - `WAIT`: duration or condition.
   - `MARKER`: label (for evidence/timeline annotation).
 - Validation: a scenario is `READY` only when steps reference existing/compatible
-  targets and required params are present (`UI_TASKS.md` UI-064).
+  targets and required params are present (`frontend/docs/UI_TASKS.md` UI-064).
 
 ## Fault model (serialized)
 
@@ -96,7 +96,7 @@ Used in storage (`scenario_steps`), project export, and the builder API.
 
 ## Deterministic run settings (serialized)
 
-Shared by replay, synthetic, and scenarios (`UI_SCREEN_SPECS.md` Deterministic
+Shared by replay, synthetic, and scenarios (`frontend/docs/UI_SCREEN_SPECS.md` Deterministic
 Run Settings).
 
 - `deterministic` (bool), `seed`, `ordering`/`timing` mode, and a recorded scope

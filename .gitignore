@@ -3,6 +3,14 @@
 **/build/
 !src/**/build/
 
+# Node / frontend
+node_modules/
+dist/
+frontend/node_modules/
+frontend/dist/
+.vite/
+frontend/.vite/
+
 # IDE
 .idea/
 *.iml

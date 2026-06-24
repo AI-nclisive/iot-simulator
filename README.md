@@ -2,7 +2,8 @@
 
 Modular-monolith backend (Java 25 + Spring Boot) with out-of-process protocol
 workers. See the design docs at the repo root (`SPEC.md`, `ARCHITECTURE.md`,
-`STACK.md`, `DESIGN.md`) and the implementation specs in `backend-specs/`.
+`STACK.md`), the UI docs under `frontend/docs/` (`DESIGN.md` and others), and the
+implementation specs in `backend-specs/`.
 
 ## Module map
 

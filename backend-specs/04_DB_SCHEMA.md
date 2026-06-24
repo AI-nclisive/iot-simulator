@@ -75,7 +75,7 @@ extension.
 - **Native range partitioning by `source_time`** (monthly), declarative — no
   extension. Optional at first; the table is partition-ready so it can be enabled
   without app changes. Old partitions support retention/cleanup
-  (`UI_SCREEN_SPECS.md` Retention & Cleanup) by dropping partitions.
+  (`frontend/docs/UI_SCREEN_SPECS.md` Retention & Cleanup) by dropping partitions.
 - Per-recording locality is preserved by the clustering key, so most replays read
   one recording within a few partitions.
 

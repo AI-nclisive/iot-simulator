@@ -5,7 +5,8 @@ changes first with rationale and expected impact.
 
 Scope: a high-level map of the system — its modules, runtime model, and the
 binding constraints every developer-agent must follow. Deliberately brief; no
-implementation detail. Product capabilities live in `SPEC.md`; UI in `DESIGN.md`;
+implementation detail. Product capabilities live in `SPEC.md`; UI in
+`frontend/docs/DESIGN.md`;
 approved technology stack in `STACK.md`; glossary in `MEMORY.md`. Rationale and
 prior ADRs live in git history.
 

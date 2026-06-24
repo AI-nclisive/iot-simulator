@@ -8,7 +8,7 @@ Legend: `[x]` ✅ done · `[ ]` 🟡 partial · `[ ]` ⬜ todo. Each line tags i
 `[area]` and the owning spec (`01`–`08`) or `SPEC` epic.
 
 Prioritization basis: `ARCHITECTURE.md` ranks runtime fidelity, fault isolation,
-determinism and reproducible evidence **above CRUD convenience**; `DESIGN.md`
+determinism and reproducible evidence **above CRUD convenience**; `frontend/docs/DESIGN.md`
 anchors on `Scan → Record → Replay`; `SPEC.md` sets P0/P1/P2. Waves are
 dependency-ordered. (Optimized for "make the simulator real end to end, then
 broaden, then harden for teams" — can be re-weighted if the near-term goal

@@ -6,7 +6,7 @@
 
 It exists to define:
 
-- the structure of the workspace;
+- the structure of the shell;
 - the main user flows;
 - the interaction rules that must stay consistent across screens;
 - the shared-work behavior that makes the product understandable in daily use.
@@ -41,7 +41,7 @@ This file should not repeat:
 
 ## Product UX Model
 
-The interface is an operational workspace for simulator setup, runtime
+The interface is an operational shell for simulator setup, runtime
 observation, and reproducible evidence.
 
 It should feel:
@@ -63,26 +63,36 @@ Manual schema creation, prepared-file input, and synthetic generation remain
 first-class options, but they should appear as alternative setup paths inside
 the same product structure rather than as separate mini-products.
 
-## Workspace Structure
+## Shell Structure
 
-The UI should behave like a stable workspace.
+The UI should behave like a stable shell.
 
 ### Global Layout
 
-- top bar for persistent context;
-- left navigation for main sections;
-- central work area for the current task;
-- persistent runtime context panel as a side panel or bottom drawer.
+- minimal top bar for product identity and future utility entry points;
+- collapsible left project rail for navigation and project context;
+- central work area for the current task.
 
 ### Top Bar
 
 The top bar carries the context that should stay visible everywhere:
 
-- current project;
-- local or shared mode indicator;
-- signed-in user or local-mode status;
-- global runtime status;
-- direct access to recent evidence.
+- product identity;
+- lightweight utility entry points when they are needed.
+
+The top bar should stay light. It should not carry launch parameters, data
+source setup choices, large evidence blocks, or detailed runtime history.
+
+### Project Rail
+
+The left rail is the home for project context:
+
+- current project identity;
+- quick project switching;
+- primary navigation.
+
+The rail should remain informative when open and collapse cleanly when users
+need more space for detail work.
 
 ### Navigation Model
 
@@ -104,27 +114,43 @@ backend or architecture concepts as primary navigation.
 
 `Overview` is the operational starting point inside a project.
 
-It should answer five questions immediately:
+In the lightest version of the product, the `Overview` route can be the runtime
+dashboard itself without extra cards below it.
 
-- what is running;
+It should answer these questions immediately:
+
 - what changed recently;
 - who started or changed it;
 - where there is risk or attention needed;
-- what evidence exists from recent work.
+- where to go next.
 
-`Overview` is not a decorative dashboard. It is the team command surface.
+`Overview` is not a decorative dashboard. It is the landing point for runtime
+awareness and any minimal orientation that is still needed.
 
-### Persistent Runtime Context
+### Runtime Dashboard
 
-Live runtime context should remain reachable from anywhere in the product.
+Live runtime context should be concentrated on `Overview`, where users can
+quickly reorient before moving into a deeper task surface.
 
 Users should not lose visibility into:
 
 - active runs;
-- recent runtime events;
-- health or connection warnings;
-- stale or reconnecting live state;
+- active process where relevant, such as recording, replay, or scenario;
+- source scale, such as parameter count;
+- evidence state inside each active run;
+- run initiator or authorship context where relevant;
+- short run recency or time context;
 - quick links back to the affected object or evidence.
+
+The runtime dashboard should stay compact. Deeper runtime history, alerts, and
+operational investigation belong on dedicated runtime, activity, or evidence
+surfaces rather than following the user onto every page.
+
+It should summarize large parameter arrays rather than attempt to render them
+raw on `Overview`.
+
+If a quick value preview is needed, it should be limited to a small pinned
+subset that helps orientation and debugging.
 
 ## Entry Flow
 
@@ -136,14 +162,14 @@ In trusted local usage, users should get into work quickly:
 
 - open the product;
 - select a project or reopen the last active one;
-- land in `Overview` or the last active workspace surface.
+- land in `Overview` or the last active project surface.
 
 ### Shared Entry
 
 In shared usage, the entry flow adds accountability:
 
 - authenticate;
-- enter the project workspace;
+- open the project in the app shell;
 - immediately see who is signed in and what the current shared activity looks
   like.
 
@@ -161,8 +187,8 @@ next steps.
 
 ### Project To Source
 
-Users enter a project first. A project is the workspace boundary that groups the
-simulator setup and its reusable artifacts.
+Users enter a project first. A project groups the simulator setup and its
+reusable artifacts.
 
 From the project, the next promoted action is to create or inspect a
 data-source.
@@ -232,6 +258,7 @@ The full editor must support:
 - structural edits at any depth;
 - protocol-relevant field settings;
 - bulk navigation and inspection;
+- large parameter sets without dumping everything at once;
 - clear unsaved-change handling;
 - safe behavior under shared editing constraints.
 
@@ -276,6 +303,17 @@ The interface should distinguish:
 - exported evidence.
 
 These surfaces may be related, but they must not look interchangeable.
+
+One `data-source` may contain a very large number of parameters inside one run.
+
+The UI should not assume that a source maps to one signal or one small table.
+
+Detail and value surfaces should therefore default to:
+
+- visible total parameter count;
+- search, filtering, and grouping before raw browsing;
+- dense tables or trees rather than oversized cards;
+- partial previews and pinned subsets for fast debugging.
 
 ### Evidence Path
 
@@ -335,7 +373,7 @@ This branch should emphasize:
 - repeatability;
 - explicit control rather than realism by default.
 
-## Shared Workspace Behavior
+## Shared Usage Behavior
 
 The shared experience must be understandable at a glance.
 
@@ -345,7 +383,7 @@ The interface reacts to system role, not to job title.
 
 Role handling should be visible in action surfaces:
 
-- users can see the same shared workspace structure;
+- users can see the same shared project structure;
 - available actions change based on permissions;
 - unavailable actions should not create confusion about what is happening.
 
@@ -500,11 +538,12 @@ forms and dialogs.
 
 These design decisions are fixed unless the product direction changes:
 
-- the interface is one workspace, not a set of disconnected tools;
+- the interface is one connected shell, not a set of disconnected tools;
 - `Scan real source -> Record -> Replay` is the primary UX path;
 - manual, prepared-file, and synthetic paths remain first-class alternatives;
 - source creation uses one extensible wizard model;
 - schema editing is a full editor, not a limited patch form;
+- one `data-source` can carry hundreds or thousands of parameters at once;
 - `Overview` is the shared operational command surface;
 - shared usage must preserve authorship, concurrency awareness, and explicit
   confirmation for risky actions;
