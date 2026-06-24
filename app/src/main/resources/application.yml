@@ -15,6 +15,15 @@ spring:
 # Deployment mode: local (auth optional) | shared (OAuth2/OIDC). D2/D6.
 iotsim:
   mode: ${IOTSIM_MODE:local}
+  # Runtime controller: memory (default, no workers) | supervisor (real
+  # out-of-process protocol workers). In supervisor mode, `workers` maps each
+  # protocol to the base launch command (installDist bin script); the supervisor
+  # appends the loopback control port. See backend-specs/02_WORKER_CONTRACT_AND_IPC.md.
+  runtime:
+    mode: ${IOTSIM_RUNTIME_MODE:memory}
+    # workers:
+    #   OPC_UA:
+    #     - /opt/iotsim/workers/worker-opcua/bin/worker-opcua
 
 server:
   port: ${SERVER_PORT:8080}
