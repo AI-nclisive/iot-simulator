@@ -40,6 +40,12 @@ docker compose up --build
 
 The API serves under `/api/v1`; actuator health at `/actuator/health`.
 
+## Project tracking
+
+- **Board:** [IoT Simulator Backend](https://github.com/orgs/AI-nclisive/projects/1) —
+  live status by `BE-ID` (Todo / In Progress / In review / Done).
+- **Task catalog:** [`backend-specs/TASKS.md`](backend-specs/TASKS.md) — the source list of BE-IDs.
+
 ## Notes
 
 - gRPC/protobuf code is generated from `worker-contract/src/main/proto`.
