@@ -50,6 +50,27 @@ register (`TASKS.md`). Read the owning spec before implementing a task. Treat
 `00`–`08` as governance: change them only with explicit user approval (propose
 first), same as `ARCHITECTURE.md` / `STACK.md`.
 
+## Task Tracking
+
+The task catalogs and the GitHub **Project** are kept in sync — the Project (org
+Project #1, "IoT Simulator Backend":
+<https://github.com/orgs/AI-nclisive/projects/1>) is the live mirror of the
+catalogs, with **one issue per task ID**. Catalogs:
+
+- `backend-specs/TASKS.md` — `IS-*` (`[BE]` / `[SDLC]`).
+- `frontend/docs/UI_TASKS.md` — `UI-*` (`[FE]`).
+
+When you change tasks, change **both** the file and the Project:
+
+- Adding, renaming, removing, or re-scoping a task in a catalog → also create,
+  edit, or close the matching issue and board item (by `IS-`/`UI-` ID); never
+  create a duplicate ID.
+- Track live **status** on the board (`Status` field + open/closed issue), not by
+  flipping `TASKS.md` checkboxes inside feature PRs (merge-conflict hotspot).
+- Issue shape (see `.github/ISSUE_TEMPLATE/task.yml`): title `IS-XXX [AREA] name`,
+  label `type:task` (+ `priority:P*`); board fields `Status` / `Task ID` / `Area`
+  (`Area` ∈ BE / FE / SDLC).
+
 ## Code Contributions
 
 Follow `CONTRIBUTING.md`. For agents specifically:
@@ -59,8 +80,8 @@ Follow `CONTRIBUTING.md`. For agents specifically:
   is green; report the real result. Never claim done without building and testing.
 - Branch `feat/IS-xxx-...`; Conventional Commit titles; squash merge into `master`.
 - Add or update tests for every change.
-- Track live status in GitHub Issues/Project (by `IS-ID`); do not flip checkboxes
-  in `TASKS.md` inside feature PRs (merge-conflict hotspot).
+- Keep tasks in sync with the GitHub Project (see "Task Tracking"); status lives on
+  the board, not in `TASKS.md` checkboxes inside feature PRs.
 - No new dependency without approval; add versions only in
   `gradle/libs.versions.toml`.
 - Keep generated code (jOOQ/proto) out of version control; never commit secrets.

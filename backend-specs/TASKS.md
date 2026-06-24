@@ -20,8 +20,8 @@ dependency-ordered. (Optimized for "make the simulator real end to end, then
 broaden, then harden for teams" — can be re-weighted if the near-term goal
 differs.)
 
-Snapshot: **build green, 80 tests / 22 suites, 0 skipped.** ~38 done · 2 partial ·
-~57 todo.
+Snapshot: **build green, 80 tests / 22 suites, 0 skipped.** 54 done · 2 partial ·
+55 todo (111 total). Live status is the board; this line is a periodic snapshot.
 
 <details>
 <summary>ID crosswalk — legacy <code>BE-*</code> / <code>SDLC-*</code> → <code>IS-XXX</code></summary>
@@ -70,15 +70,15 @@ GitHub Issues/Project (TASKS.md = catalog). Admin-only steps (branch protection,
 project board, repo settings): see the config record `.github/OWNER_SETUP.md`.
 
 Tier 1 — gate & baseline:
-- [ ] IS-097 [SDLC] ⬜ Establish trunk: review & merge the foundation into `master` so branches fork from a stable baseline
+- [x] IS-097 [SDLC] ✅ Establish trunk: foundation merged into `master` (PRs squash-merged); branches fork from a stable baseline
 - [x] IS-098 [SDLC] ✅ CI pipeline (GitHub Actions): `./gradlew build` on PR + push (= IS-095)
-- [ ] IS-099 [SDLC] 🟡 Branch protection on `master` (PR + green CI + 1 approval, squash, linear) — documented; apply via `gh` after auth
+- [x] IS-099 [SDLC] ✅ Branch protection on `master` applied (PR + green CI `build` check + 1 approval, squash, linear, no force-push) — see `.github/OWNER_SETUP.md`
 - [x] IS-100 [SDLC] ✅ ITs run in CI (ubuntu runner has Docker; Testcontainers not skipped)
 
 Tier 2 — contribution hygiene:
 - [x] IS-101 [SDLC] ✅ `CONTRIBUTING.md` (branch/commit conventions, DoD, local run, parallel-work rules)
 - [x] IS-102 [SDLC] ✅ PR template
-- [ ] IS-103 [SDLC] 🟡 Issue templates + labels done; Project board pending (token lacks `project` scope — owner creates it)
+- [x] IS-103 [SDLC] ✅ Issue templates + labels + org Project #1 board applied (fields `Status` / `Task ID` / `Area` BE/FE/SDLC; issues mirrored 1:1)
 - [x] IS-104 [SDLC] ✅ `AGENTS.md` extended to code contributions
 
 Tier 3 — quality automation:
@@ -212,7 +212,7 @@ Make runs observable and produce the P0 evidence artifact.
 - [ ] IS-092 [BE] ⬜ [io] Retention & cleanup (size/age/dependency-aware) — SPEC + 06
 - [ ] IS-093 [BE] 🟡 [persist] Value-timeline partitioning (table partition-ready) — 04
 - [ ] IS-094 [BE] ⬜ [schema] Schema dependency/impact checks before save — 01
-- [ ] IS-095 [BE] ⬜ [build] CI pipeline (build + test on push) — 07
+- [x] IS-095 [BE] ✅ [build] CI pipeline (build + test on push) — 07 (delivered as IS-098)
 - [ ] IS-096 [BE] ⬜ [build] Self-contained local distribution (jlink/jpackage) — 07/STACK
 
 ## Recommended immediate next

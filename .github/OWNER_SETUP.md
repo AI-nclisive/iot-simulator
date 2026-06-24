@@ -33,22 +33,15 @@ gh api -X PATCH repos/AI-nclisive/iot-simulator \
   -F allow_rebase_merge=false -F delete_branch_on_merge=true
 ```
 
-## GitHub Pages — browsable HTML reports
-Served from the `gh-pages` branch (`/root`). CI publishes the full Gradle + JaCoCo HTML
-reports per PR under `pr-<n>/`; reports open at `https://ai-nclisive.github.io/iot-simulator/`
-(the link is also printed in each run's job summary). Publishing is non-fatal, so it
-never blocks the build.
-```bash
-gh api -X POST repos/AI-nclisive/iot-simulator/pages --input - <<'JSON'
-{"source": {"branch": "gh-pages", "path": "/"}}
-JSON
-```
+Test reports are surfaced by CI as a clickable "Tests" check (dorny/test-reporter)
+plus a downloadable `test-reports` artifact — no GitHub Pages (dropped in #6).
 
 ## Project board (IS-103 [SDLC])
 Org project **IoT Simulator Backend** — <https://github.com/orgs/AI-nclisive/projects/1>,
 linked to the repo, with fields: single-select `Status` (Todo / In Progress / In review /
-Done), text `Task ID` (`IS-XXX`), single-select `Area` (BE / FE). Live status lives here;
-`backend-specs/TASKS.md` stays the catalog. Needs the `project` token scope:
+Done), text `Task ID` (`IS-XXX`), single-select `Area` (BE / FE / SDLC). Live status lives
+here; `backend-specs/TASKS.md` stays the catalog. Created (needs the `project` token scope
+to re-create):
 ```bash
 gh auth refresh -s project,read:project
 gh project create --owner AI-nclisive --title "IoT Simulator Backend"
