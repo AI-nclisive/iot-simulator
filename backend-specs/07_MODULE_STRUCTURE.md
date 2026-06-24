@@ -60,7 +60,7 @@ Hard rules:
 
 ## Package naming
 
-Root package `com.epam.iotsim` (chosen default; renameable later). Per module:
+Root package `com.ainclusive.iotsim` (chosen default; renameable later). Per module:
 `…iotsim.protocolmodel`,
 `…iotsim.workercontract`, `…iotsim.domain.<area>` (projects, schemas, recordings,
 scenarios, faults, evidence, observability), `…iotsim.supervisor`,
@@ -90,7 +90,7 @@ scenarios, faults, evidence, observability), `…iotsim.supervisor`,
 ## Resolved
 
 - ✅ Baseline **Java 25 LTS**.
-- ✅ Root package **`com.epam.iotsim`** (renameable later).
+- ✅ Root package **`com.ainclusive.iotsim`** (renameable later).
 - ✅ **ArchUnit** approved (test-scope) for boundary enforcement, alongside the
   Gradle module graph.
 

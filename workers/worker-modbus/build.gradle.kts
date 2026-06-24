@@ -16,5 +16,5 @@ dependencies {
 }
 
 application {
-    mainClass = "com.epam.iotsim.worker.modbus.ModbusWorkerMain"
+    mainClass = "com.ainclusive.iotsim.worker.modbus.ModbusWorkerMain"
 }

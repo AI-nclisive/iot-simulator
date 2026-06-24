@@ -33,7 +33,7 @@
       </forcedTypes>
     </database>
     <target>
-      <packageName>com.epam.iotsim.persistence.jooq</packageName>
+      <packageName>com.ainclusive.iotsim.persistence.jooq</packageName>
       <directory>build/generated/jooq</directory>
     </target>
   </generator>

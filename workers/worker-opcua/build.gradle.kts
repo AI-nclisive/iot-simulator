@@ -21,5 +21,5 @@ dependencies {
 }
 
 application {
-    mainClass = "com.epam.iotsim.worker.opcua.OpcUaWorkerMain"
+    mainClass = "com.ainclusive.iotsim.worker.opcua.OpcUaWorkerMain"
 }

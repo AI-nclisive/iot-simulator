@@ -3,7 +3,7 @@ syntax = "proto3";
 package iotsim.worker.v1;
 
 option java_multiple_files = true;
-option java_package = "com.epam.iotsim.workercontract.v1";
+option java_package = "com.ainclusive.iotsim.workercontract.v1";
 option java_outer_classname = "ProtocolDataSourceProto";
 
 // Supervisor⇄worker contract. Loopback-only, versioned. Adding a protocol means
