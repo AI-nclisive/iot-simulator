@@ -1,8 +1,14 @@
-name: Backend task
-description: A backend implementation task (tracks an IS-ID from backend-specs/TASKS.md)
+name: Task
+description: A task (backend, frontend, or repo/process) tracked by an IS-ID from backend-specs/TASKS.md
 title: "IS-XXX [BE] "
 labels: ["type:task"]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        Title format: **`IS-XXX [AREA] short name`** — replace `IS-XXX` with the task id and
+        set the `[AREA]` marker in the title to match the **Area** you pick below
+        (`[BE]` / `[FE]` / `[SDLC]`).
   - type: input
     id: task-id
     attributes:
@@ -15,6 +21,18 @@ body:
     id: area
     attributes:
       label: Area
+      description: Project area — mirror it in the title marker ([BE] / [FE] / [SDLC]).
+      options:
+        - BE
+        - FE
+        - SDLC
+    validations:
+      required: true
+  - type: dropdown
+    id: module
+    attributes:
+      label: Module
+      description: Subsystem this task belongs to (mainly for backend tasks; optional).
       options:
         - build
         - persistence
@@ -32,8 +50,6 @@ body:
         - auth
         - io
         - sdlc
-    validations:
-      required: true
   - type: dropdown
     id: priority
     attributes:
