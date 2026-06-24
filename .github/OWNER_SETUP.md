@@ -14,7 +14,7 @@ code rules, issue forms, and 9 repo labels.
   gh auth refresh -s project,read:project
   ```
 
-## 1. SDLC-1 — Establish the trunk (merge the foundation into `master`)
+## 1. IS-097 [SDLC] — Establish the trunk (merge the foundation into `master`)
 The whole backend currently lives on `feature/backend-foundation` (already pushed).
 Get it onto `master` so others branch from a stable baseline. Do this **before**
 turning on branch protection (or keep `enforce_admins=false`, which lets admins
@@ -27,7 +27,7 @@ gh pr create --base master --head feature/backend-foundation \
 gh pr merge --squash --delete-branch
 ```
 
-## 2. SDLC-3 — Branch protection on `master`
+## 2. IS-099 [SDLC] — Branch protection on `master`
 Requires admin. Status check `build` = the CI job name.
 ```bash
 gh api -X PUT repos/AI-nclisive/iot-simulator/branches/master/protection \
@@ -55,15 +55,15 @@ gh api -X PATCH repos/AI-nclisive/iot-simulator \
   -F delete_branch_on_merge=true
 ```
 
-## 4. SDLC-8 — Project board (live status by BE-ID)
-Needs the `project` token scope (step 0). Track tasks by BE-ID separately from
+## 4. IS-103 [SDLC] — Project board (live status by IS-ID)
+Needs the `project` token scope (step 0). Track tasks by IS-ID separately from
 `backend-specs/TASKS.md` (which stays the catalog).
 ```bash
 gh project create --owner AI-nclisive --title "IoT Simulator Backend"
 ```
 Then in the board: add a single-select `Status` field (Todo / In progress / In
-review / Done) and a text `BE-ID` field; link issues created via the Backend task
-form. (UI: Projects → New project → Board.)
+review / Done), a text `Task ID` field, and a single-select `Area` (BE/FE) field;
+link issues created via the Backend task form. (UI: Projects → New project → Board.)
 
 ## 5. GitHub Pages — browsable HTML reports
 CI publishes the full Gradle + JaCoCo HTML reports (with navigation) to the

@@ -1,10 +1,10 @@
 name: Backend task
 description: A backend implementation task (tracks an IS-ID from backend-specs/TASKS.md)
-title: "[IS-XXX] "
+title: "IS-XXX [BE] "
 labels: ["type:task"]
 body:
   - type: input
-    id: be-id
+    id: task-id
     attributes:
       label: Task ID
       description: IS-ID from backend-specs/TASKS.md, or "new" if not yet cataloged.
