@@ -55,8 +55,12 @@ jobs:
       - name: Assemble HTML reports
         if: always()
         continue-on-error: true
+        env:
+          BUILD_REF: "${{ github.event.pull_request.number && format('PR #{0}', github.event.pull_request.number) || 'master' }}"
+          COMMIT_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
         run: |
           mkdir -p public
+          labels="$(mktemp)"
           while IFS= read -r dir; do
             rel="${dir#./}"
             module="${rel%%/build/reports/*}"
@@ -68,15 +72,57 @@ jobs:
             esac
             mkdir -p "public/$slug/$kind"
             cp -r "$dir/." "public/$slug/$kind/"
+            printf '%s\t%s\n' "$slug" "${module//\// / }" >> "$labels"
           done < <(find . -type d \( -path '*/build/reports/tests/test' -o -path '*/build/reports/jacoco/test/html' \))
+
+          # Static head + styling (no shell expansion — single-quoted heredoc).
+          cat > public/index.html <<'HTML'
+          <!doctype html>
+          <html lang="en">
+          <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <title>iot-simulator — build report</title>
+          <style>
+            :root { color-scheme: light dark; }
+            * { box-sizing: border-box; }
+            body { font: 16px/1.5 system-ui, -apple-system, sans-serif; max-width: 820px; margin: 2.5rem auto; padding: 0 1.25rem; }
+            a { color: inherit; }
+            .back { display: inline-block; font-size: .9rem; text-decoration: none; color: #888; margin-bottom: 1.25rem; }
+            .back:hover { color: inherit; }
+            h1 { font-size: 1.5rem; margin: 0 0 .25rem; }
+            .sub { color: #888; margin: 0 0 1.75rem; }
+            #modules { display: grid; gap: .75rem; }
+            .card { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+                    padding: .85rem 1.1rem; border: 1px solid #8884; border-radius: 10px; }
+            .card .mod { margin: 0; font-size: 1.02rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+            .links { display: flex; gap: .5rem; }
+            .pill { text-decoration: none; font-size: .9rem; padding: .35rem .9rem; border: 1px solid #8886; border-radius: 999px; white-space: nowrap; }
+            .pill:hover { border-color: currentColor; }
+            footer { margin-top: 2.25rem; color: #888; font-size: .85rem; }
+            code { background: #8882; padding: .1rem .35rem; border-radius: 4px; }
+          </style>
+          </head>
+          <body>
+          <a class="back" href="../">↑ All builds</a>
+          HTML
+
+          # Dynamic header + one card per module (Tests / Coverage links).
           {
-            echo "<!doctype html><meta charset=utf-8><title>iot-simulator reports</title>"
-            echo "<h1>iot-simulator — build reports</h1><ul>"
-            for idx in $(cd public && ls */*/index.html 2>/dev/null | sort); do
-              echo "<li><a href=\"$idx\">$idx</a></li>"
-            done
-            echo "</ul>"
-          } > public/index.html
+            printf '<h1>%s — build report</h1>\n' "$BUILD_REF"
+            printf '<p class="sub">Per-module Gradle test results and JaCoCo coverage.</p>\n'
+            printf '<main id="modules">\n'
+            while IFS=$'\t' read -r slug label; do
+              tests=""; cov=""
+              if [ -f "public/$slug/tests/index.html" ]; then tests="<a class=\"pill\" href=\"$slug/tests/index.html\">Tests</a>"; fi
+              if [ -f "public/$slug/jacoco/index.html" ]; then cov="<a class=\"pill\" href=\"$slug/jacoco/index.html\">Coverage</a>"; fi
+              printf '<section class="card"><p class="mod">%s</p><div class="links">%s%s</div></section>\n' "$label" "$tests" "$cov"
+            done < <(sort -u "$labels")
+            printf '</main>\n'
+            printf '<footer>Commit <code>%s</code> · %s · built %s</footer>\n' "${COMMIT_SHA:0:7}" "$BUILD_REF" "$(date -u '+%Y-%m-%d %H:%M UTC')"
+            printf '</body></html>\n'
+          } >> public/index.html
+          rm -f "$labels"
 
       - name: Publish reports to GitHub Pages
         if: always()
