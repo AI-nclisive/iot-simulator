@@ -93,4 +93,4 @@ jobs:
         continue-on-error: true
         run: |
           sub="${{ github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || 'master' }}"
-          echo "📊 HTML reports: https://darqsatyr1c0n.github.io/iot-simulator/$sub/" >> "$GITHUB_STEP_SUMMARY"
+          echo "📊 HTML reports: https://ai-nclisive.github.io/iot-simulator/$sub/" >> "$GITHUB_STEP_SUMMARY"
