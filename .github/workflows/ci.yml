@@ -6,7 +6,7 @@ on:
   pull_request:
 
 permissions:
-  contents: write # publish HTML reports to the gh-pages branch
+  contents: read
   checks: write # dorny/test-reporter creates a clickable "Tests" check run
 
 concurrency:
@@ -41,56 +41,11 @@ jobs:
           path: '**/build/test-results/test/*.xml'
           reporter: java-junit
 
-      # Full Gradle HTML report (and JaCoCo) as a downloadable backup.
+      # Full Gradle + JaCoCo HTML reports as a downloadable artifact.
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: test-reports
-          path: '**/build/reports/tests/test/**'
+          path: '**/build/reports/**'
           if-no-files-found: ignore
-
-      # Publish the full Gradle + JaCoCo HTML reports (with navigation) to GitHub
-      # Pages so they open by link, no download. Non-fatal — never blocks the build.
-      - name: Assemble HTML reports
-        if: always()
-        continue-on-error: true
-        run: |
-          mkdir -p public
-          while IFS= read -r dir; do
-            rel="${dir#./}"
-            module="${rel%%/build/reports/*}"
-            slug="${module//\//-}"
-            case "$rel" in
-              */reports/tests/test) kind=tests ;;
-              */reports/jacoco/test/html) kind=jacoco ;;
-              *) kind=other ;;
-            esac
-            mkdir -p "public/$slug/$kind"
-            cp -r "$dir/." "public/$slug/$kind/"
-          done < <(find . -type d \( -path '*/build/reports/tests/test' -o -path '*/build/reports/jacoco/test/html' \))
-          {
-            echo "<!doctype html><meta charset=utf-8><title>iot-simulator reports</title>"
-            echo "<h1>iot-simulator — build reports</h1><ul>"
-            for idx in $(cd public && ls */*/index.html 2>/dev/null | sort); do
-              echo "<li><a href=\"$idx\">$idx</a></li>"
-            done
-            echo "</ul>"
-          } > public/index.html
-
-      - name: Publish reports to GitHub Pages
-        if: always()
-        continue-on-error: true
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./public
-          destination_dir: ${{ github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || 'master' }}
-          keep_files: true
-
-      - name: Report link
-        if: always()
-        continue-on-error: true
-        run: |
-          sub="${{ github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || 'master' }}"
-          echo "📊 HTML reports: https://ai-nclisive.github.io/iot-simulator/$sub/" >> "$GITHUB_STEP_SUMMARY"
