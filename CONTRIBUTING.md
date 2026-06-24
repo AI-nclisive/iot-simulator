@@ -45,7 +45,7 @@ Always run this and confirm it is green before opening a PR.
 - File tasks with the **Backend task** issue form; labels are defined in
   `.github/labels.yml`. The Project board (live status by IS-ID) is an admin
   one-time setup: `gh project create` (needs the `project` token scope) or create
-  it in the GitHub UI with a `Task ID` field, an `Area` (BE/FE) field, and a status column.
+  it in the GitHub UI with a `Task ID` field, an `Area` (BE/FE/SDLC) field, and a status column.
 
 ## Parallel-work conventions
 - **Flyway migrations**: never reuse a version number. Two open PRs adding
