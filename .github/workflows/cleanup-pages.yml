@@ -1,0 +1,74 @@
+name: Cleanup PR Pages
+
+# Removes a closed PR's pr-<n>/ report dir from the gh-pages store and redeploys
+# the smaller site, so the branch (and the deploy artifact) never grows unbounded.
+on:
+  pull_request:
+    types: [ closed ]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: "PR number whose pr-<n>/ reports to remove from gh-pages"
+        required: true
+        type: string
+
+permissions:
+  contents: write # push the pruned gh-pages branch
+  pages: write # redeploy the smaller site
+  id-token: write # OIDC token required by actions/deploy-pages
+
+# Share the deploy lane with CI so cleanup and build deploys never overlap.
+concurrency:
+  group: pages-deploy
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Checkout gh-pages
+        uses: actions/checkout@v7
+        with:
+          ref: gh-pages
+          path: pages-site
+
+      - name: Remove pr-<n>/ reports
+        id: prune
+        working-directory: pages-site
+        run: |
+          pr="${{ github.event.pull_request.number || inputs.pr }}"
+          if [ -z "$pr" ]; then
+            echo "No PR number resolved; nothing to do."
+            echo "changed=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if [ -d "pr-$pr" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git rm -rq "pr-$pr"
+            git commit -qm "chore(pages): drop reports for closed PR #$pr"
+            git push
+            echo "Removed pr-$pr/."
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "pr-$pr/ not present; nothing to do."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Strip VCS metadata from the artifact
+        if: steps.prune.outputs.changed == 'true'
+        run: rm -rf pages-site/.git
+      - name: Configure Pages
+        if: steps.prune.outputs.changed == 'true'
+        uses: actions/configure-pages@v5
+      - name: Upload Pages artifact
+        if: steps.prune.outputs.changed == 'true'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: pages-site
+      - name: Deploy pruned site
+        id: deploy
+        if: steps.prune.outputs.changed == 'true'
+        uses: actions/deploy-pages@v4

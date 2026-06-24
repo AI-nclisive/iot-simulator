@@ -6,8 +6,10 @@ on:
   pull_request:
 
 permissions:
-  contents: write # publish HTML reports to the gh-pages branch
+  contents: write # push HTML reports to the gh-pages branch (report storage)
   checks: write # dorny/test-reporter creates a clickable "Tests" check run
+  pages: write # deploy the reports site via actions/deploy-pages
+  id-token: write # OIDC token required by actions/deploy-pages
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -78,7 +80,10 @@ jobs:
             echo "</ul>"
           } > public/index.html
 
-      - name: Publish reports to GitHub Pages
+      # Persist this build's reports on the gh-pages branch. It is the durable
+      # store (keep_files preserves master/ + other PRs' pr-*/ dirs); the action
+      # retries on push races from concurrent runs.
+      - name: Stage reports on gh-pages
         if: always()
         continue-on-error: true
         uses: peaceiris/actions-gh-pages@v4
@@ -88,9 +93,51 @@ jobs:
           destination_dir: ${{ github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || 'master' }}
           keep_files: true
 
+      # Snapshot the whole gh-pages store and hand it to deploy-pages. This serves
+      # the site via the GitHub Actions Pages pipeline (fast, atomic) instead of
+      # the slow legacy per-file branch build.
+      - name: Checkout gh-pages store
+        if: always()
+        continue-on-error: true
+        uses: actions/checkout@v7
+        with:
+          ref: gh-pages
+          path: pages-site
+      - name: Strip VCS metadata from the artifact
+        if: always()
+        continue-on-error: true
+        run: rm -rf pages-site/.git
+      - name: Configure Pages
+        if: always()
+        continue-on-error: true
+        uses: actions/configure-pages@v5
+      - name: Upload Pages artifact
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: pages-site
+
       - name: Report link
         if: always()
         continue-on-error: true
         run: |
           sub="${{ github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || 'master' }}"
           echo "📊 HTML reports: https://ai-nclisive.github.io/iot-simulator/$sub/" >> "$GITHUB_STEP_SUMMARY"
+
+  # Serve the snapshot uploaded above. Isolated to the github-pages environment
+  # with a dedicated concurrency group so deployments never overlap.
+  deploy:
+    needs: build
+    if: always()
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    concurrency:
+      group: pages-deploy
+      cancel-in-progress: false
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4
