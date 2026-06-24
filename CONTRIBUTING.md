@@ -16,11 +16,11 @@ Always run this and confirm it is green before opening a PR.
 
 ## Branching
 - Branch off `master`. One task per branch/PR.
-- Name: `feat/BE-123-short-slug`, `fix/...`, `docs/...`, `chore/...`, `test/...`.
+- Name: `feat/IS-123-short-slug`, `fix/...`, `docs/...`, `chore/...`, `test/...`.
 
 ## Commits & PRs
 - Conventional Commits: `type(scope): subject` (e.g. `feat(schema): ...`).
-- Reference the task in the PR: `Implements: BE-123`, `Closes: #<issue>`.
+- Reference the task in the PR: `Implements: IS-123`, `Closes: #<issue>`.
 - Keep PRs small and focused; fill in the PR template checklist.
 - Merge strategy: **squash merge**, linear history. CI must be green and at least
   one approving review is required.

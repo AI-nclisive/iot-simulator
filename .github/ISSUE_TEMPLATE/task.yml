@@ -1,14 +1,14 @@
 name: Backend task
-description: A backend implementation task (tracks a BE-ID from backend-specs/TASKS.md)
-title: "[BE-XXX] "
+description: A backend implementation task (tracks an IS-ID from backend-specs/TASKS.md)
+title: "[IS-XXX] "
 labels: ["type:task"]
 body:
   - type: input
     id: be-id
     attributes:
       label: Task ID
-      description: BE-ID from backend-specs/TASKS.md, or "new" if not yet cataloged.
-      placeholder: BE-R8
+      description: IS-ID from backend-specs/TASKS.md, or "new" if not yet cataloged.
+      placeholder: IS-039
     validations:
       required: true
   - type: dropdown
@@ -64,8 +64,8 @@ body:
     id: depends
     attributes:
       label: Depends on
-      description: BE-IDs that must land first (if any).
-      placeholder: BE-W9
+      description: IS-IDs that must land first (if any).
+      placeholder: IS-035
   - type: textarea
     id: notes
     attributes:
