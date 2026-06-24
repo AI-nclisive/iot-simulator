@@ -5,4 +5,4 @@ contact_links:
     about: Branch/commit conventions, how to build & test, Definition of Done.
   - name: Backend task catalog
     url: https://github.com/AI-nclisive/iot-simulator/blob/master/backend-specs/TASKS.md
-    about: Browse BE-IDs and delivery waves before filing a task.
+    about: Browse IS-IDs and delivery waves before filing a task.

@@ -1,11 +1,17 @@
-# Backend Task Register
+# Backend & SDLC Task Register
 
 One prioritized list: tasks are grouped by delivery **wave** (priority order) and
 each carries its **status**. Derived from `backend-specs/00–08` and the
 capabilities in `SPEC.md`.
 
-Legend: `[x]` ✅ done · `[ ]` 🟡 partial · `[ ]` ⬜ todo. Each line tags its
-`[area]` and the owning spec (`01`–`08`) or `SPEC` epic.
+Naming: every task is **`IS-XXX [AREA] short name`**, where `IS-XXX` is the
+project-wide ID and `[AREA]` is `[BE]` (backend), `[FE]` (frontend) or `[SDLC]`
+(repo/process). This register holds the `[BE]` and `[SDLC]` tasks; frontend
+(`[FE]`) tasks are tracked separately. Legacy `BE-*` and `SDLC-*` IDs map to the
+new ones via the crosswalk below.
+
+Legend: `[x]` ✅ done · `[ ]` 🟡 partial · `[ ]` ⬜ todo. Each line reads
+`IS-XXX [AREA]` · status · `[module]` tag · owning spec (`01`–`08`) or `SPEC` epic.
 
 Prioritization basis: `ARCHITECTURE.md` ranks runtime fidelity, fault isolation,
 determinism and reproducible evidence **above CRUD convenience**; `frontend/docs/DESIGN.md`
@@ -17,161 +23,200 @@ differs.)
 Snapshot: **build green, 80 tests / 22 suites, 0 skipped.** ~38 done · 2 partial ·
 ~57 todo.
 
+<details>
+<summary>ID crosswalk — legacy <code>BE-*</code> / <code>SDLC-*</code> → <code>IS-XXX</code></summary>
+
+| IS-XXX | legacy | IS-XXX | legacy | IS-XXX | legacy | IS-XXX | legacy |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| IS-001 | BE-F1 | IS-025 | BE-SC1 | IS-049 | BE-P7 | IS-073 | BE-IO1 |
+| IS-002 | BE-F2 | IS-026 | BE-SC2 | IS-050 | BE-P6 | IS-074 | BE-API7 |
+| IS-003 | BE-F3 | IS-027 | BE-RR1 | IS-051 | BE-OBS4 | IS-075 | BE-AUTH4 |
+| IS-004 | BE-F4 | IS-028 | BE-RR2 | IS-052 | BE-OBS3 | IS-076 | BE-AUTH5 |
+| IS-005 | BE-F5 | IS-029 | BE-API1 | IS-053 | BE-OBS5 | IS-077 | BE-AUTH6 |
+| IS-006 | BE-F6 | IS-030 | BE-API2 | IS-054 | BE-OBS6 | IS-078 | BE-AUTH3 |
+| IS-007 | BE-P1 | IS-031 | BE-API3 | IS-055 | BE-OBS1 | IS-079 | BE-P8 |
+| IS-008 | BE-P2 | IS-032 | BE-API4 | IS-056 | BE-P9 | IS-080 | BE-AUTH7 |
+| IS-009 | BE-P3 | IS-033 | BE-AUTH1 | IS-057 | BE-OBS7 | IS-081 | BE-API8 |
+| IS-010 | BE-P4 | IS-034 | BE-AUTH2 | IS-058 | BE-IO3 | IS-082 | BE-AUTH8 |
+| IS-011 | BE-M1 | IS-035 | BE-W9 | IS-059 | BE-R7 | IS-083 | BE-OBS2 |
+| IS-012 | BE-M2 | IS-036 | BE-R5 | IS-060 | BE-M5 | IS-084 | BE-PR4 |
+| IS-013 | BE-M3 | IS-037 | BE-M4 | IS-061 | BE-R10 | IS-085 | BE-GEN3 |
+| IS-014 | BE-W1 | IS-038 | BE-R6 | IS-062 | BE-GEN1 | IS-086 | BE-GEN4 |
+| IS-015 | BE-W2 | IS-039 | BE-R8 | IS-063 | BE-GEN2 | IS-087 | BE-GEN5 |
+| IS-016 | BE-W3 | IS-040 | BE-R9 | IS-064 | BE-M6 | IS-088 | BE-W7 |
+| IS-017 | BE-W4 | IS-041 | BE-R11 | IS-065 | BE-DS6 | IS-089 | BE-API6 |
+| IS-018 | BE-R1 | IS-042 | BE-DS7 | IS-066 | BE-DS3 | IS-090 | BE-W8 |
+| IS-019 | BE-R2 | IS-043 | BE-DS4 | IS-067 | BE-DS5 | IS-091 | BE-IO4 |
+| IS-020 | BE-R3 | IS-044 | BE-SC3 | IS-068 | BE-RR4 | IS-092 | BE-IO5 |
+| IS-021 | BE-R4 | IS-045 | BE-RR3 | IS-069 | BE-RR5 | IS-093 | BE-P5 |
+| IS-022 | BE-PR1 | IS-046 | BE-API5 | IS-070 | BE-RR6 (alias BE-IO2) | IS-094 | BE-SC4 |
+| IS-023 | BE-DS1 | IS-047 | BE-W5 | IS-071 | BE-PR2 | IS-095 | BE-F7 |
+| IS-024 | BE-DS2 | IS-048 | BE-W6 | IS-072 | BE-PR3 | IS-096 | BE-F8 |
+
+| IS-XXX | legacy | IS-XXX | legacy | IS-XXX | legacy | IS-XXX | legacy |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| IS-097 | SDLC-1 | IS-101 | SDLC-5 | IS-105 | SDLC-10 | IS-109 | SDLC-14 |
+| IS-098 | SDLC-2 | IS-102 | SDLC-6 | IS-106 | SDLC-11 | IS-110 | SDLC-15 |
+| IS-099 | SDLC-3 | IS-103 | SDLC-8 | IS-107 | SDLC-12 | IS-111 | SDLC-16 |
+| IS-100 | SDLC-4 | IS-104 | SDLC-9 | IS-108 | SDLC-13 | | |
+
+</details>
+
 ## SDLC & Repo Foundation
 
 Enables parallel work by humans and agents (feature branches → PRs → review →
 merge). Decisions: GitHub Actions CI, squash + linear history, live status in
 GitHub Issues/Project (TASKS.md = catalog). Admin-only steps (branch protection,
-trunk merge, project board, repo settings): see `.github/OWNER_SETUP.md`.
+project board, repo settings): see the config record `.github/OWNER_SETUP.md`.
 
 Tier 1 — gate & baseline:
-- [ ] SDLC-1 ⬜ Establish trunk: review & merge the foundation into `master` so branches fork from a stable baseline
-- [x] SDLC-2 ✅ CI pipeline (GitHub Actions): `./gradlew build` on PR + push (= BE-F7)
-- [ ] SDLC-3 🟡 Branch protection on `master` (PR + green CI + 1 approval, squash, linear) — documented; apply via `gh` after auth
-- [x] SDLC-4 ✅ ITs run in CI (ubuntu runner has Docker; Testcontainers not skipped)
+- [ ] IS-097 [SDLC] ⬜ Establish trunk: review & merge the foundation into `master` so branches fork from a stable baseline
+- [x] IS-098 [SDLC] ✅ CI pipeline (GitHub Actions): `./gradlew build` on PR + push (= IS-095)
+- [ ] IS-099 [SDLC] 🟡 Branch protection on `master` (PR + green CI + 1 approval, squash, linear) — documented; apply via `gh` after auth
+- [x] IS-100 [SDLC] ✅ ITs run in CI (ubuntu runner has Docker; Testcontainers not skipped)
 
 Tier 2 — contribution hygiene:
-- [x] SDLC-5 ✅ `CONTRIBUTING.md` (branch/commit conventions, DoD, local run, parallel-work rules)
-- [x] SDLC-6 ✅ PR template
-- [ ] SDLC-8 🟡 Issue templates + labels done; Project board pending (token lacks `project` scope — owner creates it)
-- [x] SDLC-9 ✅ `AGENTS.md` extended to code contributions
+- [x] IS-101 [SDLC] ✅ `CONTRIBUTING.md` (branch/commit conventions, DoD, local run, parallel-work rules)
+- [x] IS-102 [SDLC] ✅ PR template
+- [ ] IS-103 [SDLC] 🟡 Issue templates + labels done; Project board pending (token lacks `project` scope — owner creates it)
+- [x] IS-104 [SDLC] ✅ `AGENTS.md` extended to code contributions
 
 Tier 3 — quality automation:
-- [x] SDLC-10 ✅ Spotless (import order + whitespace hygiene) — runs in `check`/CI
-- [x] SDLC-11 ✅ Static analysis: Checkstyle (lean ruleset, generated code excluded; Error Prone/SpotBugs can be ratcheted on later)
-- [x] SDLC-12 ✅ JaCoCo coverage (XML+HTML) finalizing `test`
-- [x] SDLC-13 ✅ Dependabot (gradle + github-actions)
+- [x] IS-105 [SDLC] ✅ Spotless (import order + whitespace hygiene) — runs in `check`/CI
+- [x] IS-106 [SDLC] ✅ Static analysis: Checkstyle (lean ruleset, generated code excluded; Error Prone/SpotBugs can be ratcheted on later)
+- [x] IS-107 [SDLC] ✅ JaCoCo coverage (XML+HTML) finalizing `test`
+- [x] IS-108 [SDLC] ✅ Dependabot (gradle + github-actions)
 
 Tier 4 — parallel-conflict mitigations:
-- [x] SDLC-14 ✅ Flyway migration version-collision convention (documented)
-- [x] SDLC-15 ✅ Task-tracking model: Issues/Project = live status, TASKS.md = catalog (documented)
-- [x] SDLC-16 ✅ Generated code kept out of VCS (standard documented)
+- [x] IS-109 [SDLC] ✅ Flyway migration version-collision convention (documented)
+- [x] IS-110 [SDLC] ✅ Task-tracking model: Issues/Project = live status, TASKS.md = catalog (documented)
+- [x] IS-111 [SDLC] ✅ Generated code kept out of VCS (standard documented)
 
 ## Wave 0 — Done: foundation & primary-flow plumbing ✅
 
-- [x] BE-F1 ✅ [build] Gradle Kotlin-DSL multi-module monolith — 07
-- [x] BE-F2 ✅ [build] build-logic convention plugin (Java 25, Spring BOM) — 07
-- [x] BE-F3 ✅ [build] Version catalog — 07
-- [x] BE-F4 ✅ [build] Module boundary enforcement (Gradle graph + ArchUnit) — 07
-- [x] BE-F5 ✅ [build] Spring Boot app bootstrap — 07
-- [x] BE-F6 ✅ [build] Dockerfile + docker-compose (Postgres) — 07/08
-- [x] BE-P1 ✅ [persist] Flyway migrations V1–V6 — 04
-- [x] BE-P2 ✅ [persist] jOOQ codegen from migration SQL (offline) — 04
-- [x] BE-P3 ✅ [persist] Project/DataSource/Schema/Recording repositories — 04
-- [x] BE-P4 ✅ [persist] Value-timeline repository (append/range/all/count) — 04
-- [x] BE-M1 ✅ [model] Types: DataType/NodeKind/ValueRank/Access/Quality — 01
-- [x] BE-M2 ✅ [model] SchemaNode + NeutralValue — 01
-- [x] BE-M3 ✅ [model] ValueCodec — 01/04
-- [x] BE-W1 ✅ [ipc] ProtocolDataSource proto + contract version — 02
-- [x] BE-W2 ✅ [ipc] gRPC loopback + Hello handshake (mismatch refused) — 02
-- [x] BE-W3 ✅ [ipc] Configure/Start/Stop/Health RPCs — 02
-- [x] BE-W4 ✅ [ipc] ApplyValues client-streaming — 02
-- [x] BE-R1 ✅ [runtime] Supervisor lifecycle (port/launch/handshake/start/stop/track) — 02
-- [x] BE-R2 ✅ [runtime] WorkerClient (blocking + streaming) — 02
-- [x] BE-R3 ✅ [runtime] WorkerLauncher + ProcessWorkerLauncher — 02
-- [x] BE-R4 ✅ [runtime] RuntimeController port + in-memory default (config-wired) — 02/08
-- [x] BE-PR1 ✅ [project] Project CRUD + optimistic concurrency — SPEC: Save/Manage Projects
-- [x] BE-DS1 ✅ [source] DataSource CRUD (protocol/basis, JSONB config) — SPEC: Manage Data Sources
-- [x] BE-DS2 ✅ [source] Start/stop via runtime controller — SPEC: Manage Data Sources
-- [x] BE-SC1 ✅ [schema] Versioned schema CRUD + editor save — 01
-- [x] BE-SC2 ✅ [schema] Node validation (kind/type/uniqueness) — 01
-- [x] BE-RR1 ✅ [recording] Recording create/list/get + timeline capture — SPEC: Record/Store
-- [x] BE-RR2 ✅ [replay] Replay timeline to a running source — SPEC: Replay
-- [x] BE-API1 ✅ [api] REST /api/v1 (project/source/schema/recording/replay) — 05
-- [x] BE-API2 ✅ [api] OpenAPI + Swagger UI — 05
-- [x] BE-API3 ✅ [api] ETag/If-Match optimistic concurrency — 05
-- [x] BE-API4 ✅ [api] ProblemDetail error mapping — 05
-- [x] BE-AUTH1 ✅ [auth] External DB connection (env DataSource) — 08
-- [x] BE-AUTH2 ✅ [auth] Deployment-mode runtime wiring — 08
+- [x] IS-001 [BE] ✅ [build] Gradle Kotlin-DSL multi-module monolith — 07
+- [x] IS-002 [BE] ✅ [build] build-logic convention plugin (Java 25, Spring BOM) — 07
+- [x] IS-003 [BE] ✅ [build] Version catalog — 07
+- [x] IS-004 [BE] ✅ [build] Module boundary enforcement (Gradle graph + ArchUnit) — 07
+- [x] IS-005 [BE] ✅ [build] Spring Boot app bootstrap — 07
+- [x] IS-006 [BE] ✅ [build] Dockerfile + docker-compose (Postgres) — 07/08
+- [x] IS-007 [BE] ✅ [persist] Flyway migrations V1–V6 — 04
+- [x] IS-008 [BE] ✅ [persist] jOOQ codegen from migration SQL (offline) — 04
+- [x] IS-009 [BE] ✅ [persist] Project/DataSource/Schema/Recording repositories — 04
+- [x] IS-010 [BE] ✅ [persist] Value-timeline repository (append/range/all/count) — 04
+- [x] IS-011 [BE] ✅ [model] Types: DataType/NodeKind/ValueRank/Access/Quality — 01
+- [x] IS-012 [BE] ✅ [model] SchemaNode + NeutralValue — 01
+- [x] IS-013 [BE] ✅ [model] ValueCodec — 01/04
+- [x] IS-014 [BE] ✅ [ipc] ProtocolDataSource proto + contract version — 02
+- [x] IS-015 [BE] ✅ [ipc] gRPC loopback + Hello handshake (mismatch refused) — 02
+- [x] IS-016 [BE] ✅ [ipc] Configure/Start/Stop/Health RPCs — 02
+- [x] IS-017 [BE] ✅ [ipc] ApplyValues client-streaming — 02
+- [x] IS-018 [BE] ✅ [runtime] Supervisor lifecycle (port/launch/handshake/start/stop/track) — 02
+- [x] IS-019 [BE] ✅ [runtime] WorkerClient (blocking + streaming) — 02
+- [x] IS-020 [BE] ✅ [runtime] WorkerLauncher + ProcessWorkerLauncher — 02
+- [x] IS-021 [BE] ✅ [runtime] RuntimeController port + in-memory default (config-wired) — 02/08
+- [x] IS-022 [BE] ✅ [project] Project CRUD + optimistic concurrency — SPEC: Save/Manage Projects
+- [x] IS-023 [BE] ✅ [source] DataSource CRUD (protocol/basis, JSONB config) — SPEC: Manage Data Sources
+- [x] IS-024 [BE] ✅ [source] Start/stop via runtime controller — SPEC: Manage Data Sources
+- [x] IS-025 [BE] ✅ [schema] Versioned schema CRUD + editor save — 01
+- [x] IS-026 [BE] ✅ [schema] Node validation (kind/type/uniqueness) — 01
+- [x] IS-027 [BE] ✅ [recording] Recording create/list/get + timeline capture — SPEC: Record/Store
+- [x] IS-028 [BE] ✅ [replay] Replay timeline to a running source — SPEC: Replay
+- [x] IS-029 [BE] ✅ [api] REST /api/v1 (project/source/schema/recording/replay) — 05
+- [x] IS-030 [BE] ✅ [api] OpenAPI + Swagger UI — 05
+- [x] IS-031 [BE] ✅ [api] ETag/If-Match optimistic concurrency — 05
+- [x] IS-032 [BE] ✅ [api] ProblemDetail error mapping — 05
+- [x] IS-033 [BE] ✅ [auth] External DB connection (env DataSource) — 08
+- [x] IS-034 [BE] ✅ [auth] Deployment-mode runtime wiring — 08
 
 ## Wave A — Real runtime fidelity · P0
 
 Turn the in-memory worker into a real OPC UA simulator (the stated core risk).
 
-- [x] BE-W9 ✅ [ipc] Real Configure: push schema + protocol listen port to the worker — 02
-- [x] BE-R5 ✅ [runtime] worker-opcua gRPC + lifecycle — 02
-- [x] BE-M4 ✅ [model] OPC UA address-space projection (schema → variable nodes) — 01
-- [x] BE-R6 ✅ [runtime] worker-opcua: real Eclipse Milo server + value projection — 02
-- [ ] BE-R8 ⬜ [runtime] Real worker process spawn E2E (installDist + ProcessWorkerLauncher) — 02
-- [ ] BE-R9 ⬜ [runtime] Restart-with-backoff on unexpected failure (intentional faults excluded) — 02
-- [ ] BE-R11 ⬜ [runtime] Health monitoring loop + stale/error state propagation — 02
+- [x] IS-035 [BE] ✅ [ipc] Real Configure: push schema + protocol listen port to the worker — 02
+- [x] IS-036 [BE] ✅ [runtime] worker-opcua gRPC + lifecycle — 02
+- [x] IS-037 [BE] ✅ [model] OPC UA address-space projection (schema → variable nodes) — 01
+- [x] IS-038 [BE] ✅ [runtime] worker-opcua: real Eclipse Milo server + value projection — 02
+- [ ] IS-039 [BE] ⬜ [runtime] Real worker process spawn E2E (installDist + ProcessWorkerLauncher) — 02
+- [ ] IS-040 [BE] ⬜ [runtime] Restart-with-backoff on unexpected failure (intentional faults excluded) — 02
+- [ ] IS-041 [BE] ⬜ [runtime] Health monitoring loop + stale/error state propagation — 02
 
 ## Wave B — Primary flow against a real source · P0
 
 Make `Scan → Record → Replay` work against real instruments, not provided values.
 
-- [ ] BE-DS7 ⬜ [source] Credential handling (secrets, never persisted/exported) — 08/05
-- [ ] BE-DS4 ⬜ [source] Create from scan (real-source discovery) — SPEC: Create From Scan
-- [ ] BE-SC3 ⬜ [schema] Scan-derived schema population — 01
-- [ ] BE-RR3 ⬜ [recording] Live capture from a running real source → recording — SPEC: Record Real Data
+- [ ] IS-042 [BE] ⬜ [source] Credential handling (secrets, never persisted/exported) — 08/05
+- [ ] IS-043 [BE] ⬜ [source] Create from scan (real-source discovery) — SPEC: Create From Scan
+- [ ] IS-044 [BE] ⬜ [schema] Scan-derived schema population — 01
+- [ ] IS-045 [BE] ⬜ [recording] Live capture from a running real source → recording — SPEC: Record Real Data
 
 ## Wave C — Observability & evidence · P0
 
 Make runs observable and produce the P0 evidence artifact.
 
-- [ ] BE-API5 ⬜ [api] SSE infrastructure (live endpoints) — 05
-- [ ] BE-W5 ⬜ [ipc] ClientEvents stream (worker → supervisor) — 02
-- [ ] BE-W6 ⬜ [ipc] RuntimeEvents stream (worker → supervisor) — 02
-- [ ] BE-P7 ⬜ [persist] runtime_events repository (activity_events in Wave E) — 04
-- [ ] BE-P6 ⬜ [persist] Repos: Evidence, Run (Sample/Fault/Scenario as those land) — 04
-- [ ] BE-OBS4 ⬜ [observ] Live values + runtime state over SSE — SPEC: Observe Live Values
-- [ ] BE-OBS3 ⬜ [observ] Connected-client observation per source — SPEC: Observe Connected Clients
-- [ ] BE-OBS5 ⬜ [observ] Source health & error surfacing — SPEC: Observe Health
-- [ ] BE-OBS6 ⬜ [observ] Project overview aggregation (running/recent/attention) — SPEC: Observe Enabled/Running
-- [ ] BE-OBS1 ⬜ [observ] Runtime-event history — SPEC: Runtime Event History
-- [ ] BE-P9 ⬜ [persist] ObjectStore filesystem adapter — 08
-- [ ] BE-OBS7 ⬜ [observ] Evidence assembly + export — SPEC: Export Run Evidence (P0)
-- [ ] BE-IO3 ⬜ [io] Evidence export format (bundle + JSON summary) — 06
+- [ ] IS-046 [BE] ⬜ [api] SSE infrastructure (live endpoints) — 05
+- [ ] IS-047 [BE] ⬜ [ipc] ClientEvents stream (worker → supervisor) — 02
+- [ ] IS-048 [BE] ⬜ [ipc] RuntimeEvents stream (worker → supervisor) — 02
+- [ ] IS-049 [BE] ⬜ [persist] runtime_events repository (activity_events in Wave E) — 04
+- [ ] IS-050 [BE] ⬜ [persist] Repos: Evidence, Run (Sample/Fault/Scenario as those land) — 04
+- [ ] IS-051 [BE] ⬜ [observ] Live values + runtime state over SSE — SPEC: Observe Live Values
+- [ ] IS-052 [BE] ⬜ [observ] Connected-client observation per source — SPEC: Observe Connected Clients
+- [ ] IS-053 [BE] ⬜ [observ] Source health & error surfacing — SPEC: Observe Health
+- [ ] IS-054 [BE] ⬜ [observ] Project overview aggregation (running/recent/attention) — SPEC: Observe Enabled/Running
+- [ ] IS-055 [BE] ⬜ [observ] Runtime-event history — SPEC: Runtime Event History
+- [ ] IS-056 [BE] ⬜ [persist] ObjectStore filesystem adapter — 08
+- [ ] IS-057 [BE] ⬜ [observ] Evidence assembly + export — SPEC: Export Run Evidence (P0)
+- [ ] IS-058 [BE] ⬜ [io] Evidence export format (bundle + JSON summary) — 06
 
 ## Wave D — Modbus + creation/reuse breadth · P1
 
-- [ ] BE-R7 ⬜ [runtime] worker-modbus (j2mod) gRPC server + Modbus slave — 02
-- [ ] BE-M5 ⬜ [model] Modbus register-map binding — 01
-- [ ] BE-R10 ⬜ [runtime] Resource governance (concurrent-source caps, backpressure) — 02
-- [ ] BE-GEN1 ⬜ [gen] Synthetic generation (patterns + range + seed) — SPEC: Generate Synthetic
-- [ ] BE-GEN2 ⬜ [gen] Deterministic run settings — SPEC: Run Deterministic
-- [ ] BE-M6 ⬜ [model] Injectable clock + seeded RNG — 01
-- [ ] BE-DS6 ⬜ [source] Create from synthetic setup — SPEC: Manually Create / Synthetic
-- [ ] BE-DS3 ⬜ [source] Duplicate data source — SPEC: Manage Data Sources
-- [ ] BE-DS5 ⬜ [source] Create from import / prepared data — SPEC: Manually Create
-- [ ] BE-RR4 ⬜ [recording] Samples (named subset/snapshot) — SPEC: Store Multiple/Samples
-- [ ] BE-RR5 ⬜ [replay] Replay configuration (timing/ordering/compat checks) — SPEC: Replay
-- [ ] BE-RR6 ⬜ [recording] Recording/sample import & export (a.k.a. BE-IO2) — SPEC: Import/Export · 06
-- [ ] BE-PR2 ⬜ [project] Duplicate project — SPEC: Manage Projects
-- [ ] BE-PR3 ⬜ [project] Archive project — SPEC: Manage Projects
-- [ ] BE-IO1 ⬜ [io] Project export/import (versioned ZIP+manifest, secret-free) — 06
-- [ ] BE-API7 ⬜ [api] Cursor pagination + filtering on collections — 05
+- [ ] IS-059 [BE] ⬜ [runtime] worker-modbus (j2mod) gRPC server + Modbus slave — 02
+- [ ] IS-060 [BE] ⬜ [model] Modbus register-map binding — 01
+- [ ] IS-061 [BE] ⬜ [runtime] Resource governance (concurrent-source caps, backpressure) — 02
+- [ ] IS-062 [BE] ⬜ [gen] Synthetic generation (patterns + range + seed) — SPEC: Generate Synthetic
+- [ ] IS-063 [BE] ⬜ [gen] Deterministic run settings — SPEC: Run Deterministic
+- [ ] IS-064 [BE] ⬜ [model] Injectable clock + seeded RNG — 01
+- [ ] IS-065 [BE] ⬜ [source] Create from synthetic setup — SPEC: Manually Create / Synthetic
+- [ ] IS-066 [BE] ⬜ [source] Duplicate data source — SPEC: Manage Data Sources
+- [ ] IS-067 [BE] ⬜ [source] Create from import / prepared data — SPEC: Manually Create
+- [ ] IS-068 [BE] ⬜ [recording] Samples (named subset/snapshot) — SPEC: Store Multiple/Samples
+- [ ] IS-069 [BE] ⬜ [replay] Replay configuration (timing/ordering/compat checks) — SPEC: Replay
+- [ ] IS-070 [BE] ⬜ [recording] Recording/sample import & export (legacy alias BE-IO2) — SPEC: Import/Export · 06
+- [ ] IS-071 [BE] ⬜ [project] Duplicate project — SPEC: Manage Projects
+- [ ] IS-072 [BE] ⬜ [project] Archive project — SPEC: Manage Projects
+- [ ] IS-073 [BE] ⬜ [io] Project export/import (versioned ZIP+manifest, secret-free) — 06
+- [ ] IS-074 [BE] ⬜ [api] Cursor pagination + filtering on collections — 05
 
 ## Wave E — Shared-team & security · P1→P2
 
-- [ ] BE-AUTH4 ⬜ [auth] OIDC resource server (validate JWT via JWKS) — 08
-- [ ] BE-AUTH5 ⬜ [auth] Flexible permission model + role→permission mapping — 08
-- [ ] BE-AUTH6 ⬜ [auth] API-layer authorization enforcement (admin/user) — 08
-- [ ] BE-AUTH3 🟡 [auth] Local vs shared mode enforcement (flag exists, no enforcement) — 08
-- [ ] BE-P8 ⬜ [persist] Auth table repositories (users/roles/permissions/leases) — 04
-- [ ] BE-AUTH7 ⬜ [auth] Advisory edit leases (read-only while editing; stale recovery) — 08
-- [ ] BE-API8 ⬜ [api] Edit-lease endpoints — 05
-- [ ] BE-AUTH8 ⬜ [auth] Secrets via env/external store; structural export exclusion — 08
-- [ ] BE-OBS2 ⬜ [observ] User-activity audit (separate stream from runtime) — SPEC: User Activity History
-- [ ] BE-PR4 ⬜ [project] Project + environment settings — 05
+- [ ] IS-075 [BE] ⬜ [auth] OIDC resource server (validate JWT via JWKS) — 08
+- [ ] IS-076 [BE] ⬜ [auth] Flexible permission model + role→permission mapping — 08
+- [ ] IS-077 [BE] ⬜ [auth] API-layer authorization enforcement (admin/user) — 08
+- [ ] IS-078 [BE] 🟡 [auth] Local vs shared mode enforcement (flag exists, no enforcement) — 08
+- [ ] IS-079 [BE] ⬜ [persist] Auth table repositories (users/roles/permissions/leases) — 04
+- [ ] IS-080 [BE] ⬜ [auth] Advisory edit leases (read-only while editing; stale recovery) — 08
+- [ ] IS-081 [BE] ⬜ [api] Edit-lease endpoints — 05
+- [ ] IS-082 [BE] ⬜ [auth] Secrets via env/external store; structural export exclusion — 08
+- [ ] IS-083 [BE] ⬜ [observ] User-activity audit (separate stream from runtime) — SPEC: User Activity History
+- [ ] IS-084 [BE] ⬜ [project] Project + environment settings — 05
 
 ## Wave F — Advanced workflows & hardening · P2
 
-- [ ] BE-GEN3 ⬜ [gen] Scenario model + steps (start/stop/replay/synthetic/fault/wait/marker) — SPEC: Build Scenarios
-- [ ] BE-GEN4 ⬜ [gen] Scenario validation + run execution — SPEC: Run Scenarios
-- [ ] BE-GEN5 ⬜ [gen] Fault model + injection (neutral & protocol; never auto-healed) — SPEC: Simulate Faults
-- [ ] BE-W7 ⬜ [ipc] InjectFault RPC — 02
-- [ ] BE-API6 ⬜ [api] Runs resource + test-control endpoints (start/state/stop) — 05/SPEC: Control From Tests
-- [ ] BE-W8 ⬜ [ipc] Shutdown RPC handling — 02
-- [ ] BE-IO4 ⬜ [io] Artifact version compatibility (reject newer-than-supported) — 06
-- [ ] BE-IO5 ⬜ [io] Retention & cleanup (size/age/dependency-aware) — SPEC + 06
-- [ ] BE-P5 🟡 [persist] Value-timeline partitioning (table partition-ready) — 04
-- [ ] BE-SC4 ⬜ [schema] Schema dependency/impact checks before save — 01
-- [ ] BE-F7 ⬜ [build] CI pipeline (build + test on push) — 07
-- [ ] BE-F8 ⬜ [build] Self-contained local distribution (jlink/jpackage) — 07/STACK
+- [ ] IS-085 [BE] ⬜ [gen] Scenario model + steps (start/stop/replay/synthetic/fault/wait/marker) — SPEC: Build Scenarios
+- [ ] IS-086 [BE] ⬜ [gen] Scenario validation + run execution — SPEC: Run Scenarios
+- [ ] IS-087 [BE] ⬜ [gen] Fault model + injection (neutral & protocol; never auto-healed) — SPEC: Simulate Faults
+- [ ] IS-088 [BE] ⬜ [ipc] InjectFault RPC — 02
+- [ ] IS-089 [BE] ⬜ [api] Runs resource + test-control endpoints (start/state/stop) — 05/SPEC: Control From Tests
+- [ ] IS-090 [BE] ⬜ [ipc] Shutdown RPC handling — 02
+- [ ] IS-091 [BE] ⬜ [io] Artifact version compatibility (reject newer-than-supported) — 06
+- [ ] IS-092 [BE] ⬜ [io] Retention & cleanup (size/age/dependency-aware) — SPEC + 06
+- [ ] IS-093 [BE] 🟡 [persist] Value-timeline partitioning (table partition-ready) — 04
+- [ ] IS-094 [BE] ⬜ [schema] Schema dependency/impact checks before save — 01
+- [ ] IS-095 [BE] ⬜ [build] CI pipeline (build + test on push) — 07
+- [ ] IS-096 [BE] ⬜ [build] Self-contained local distribution (jlink/jpackage) — 07/STACK
 
 ## Recommended immediate next
 
-**Wave A, `BE-W9 → BE-R6`** (real Configure + Milo OPC UA projection): converts the
+**Wave A, `IS-035 → IS-038`** (real Configure + Milo OPC UA projection): converts the
 already-green runtime plumbing into an actual OPC UA endpoint an Edge Device can
 connect to — the single biggest jump in product value.

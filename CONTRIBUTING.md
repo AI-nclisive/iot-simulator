@@ -14,13 +14,19 @@ and pull requests. These rules keep that smooth.
 ```
 Always run this and confirm it is green before opening a PR.
 
+## Task IDs
+- Every task has a project-wide ID and area marker, named **`IS-XXX [AREA] short name`** —
+  `[AREA]` is `[BE]` (backend), `[FE]` (frontend) or `[SDLC]` (repo/process).
+- Catalog: `backend-specs/TASKS.md` (with a legacy `BE-*`/`SDLC-*` → `IS-XXX` crosswalk).
+- Reuse the ID everywhere: branch `feat/IS-038-...`, issue `IS-038 short name` (area via the form's **Area** field), PR `Implements: IS-038`.
+
 ## Branching
 - Branch off `master`. One task per branch/PR.
-- Name: `feat/BE-123-short-slug`, `fix/...`, `docs/...`, `chore/...`, `test/...`.
+- Name: `feat/IS-123-short-slug`, `fix/...`, `docs/...`, `chore/...`, `test/...`.
 
 ## Commits & PRs
 - Conventional Commits: `type(scope): subject` (e.g. `feat(schema): ...`).
-- Reference the task in the PR: `Implements: BE-123`, `Closes: #<issue>`.
+- Reference the task in the PR: `Implements: IS-123`, `Closes: #<issue>`.
 - Keep PRs small and focused; fill in the PR template checklist.
 - Merge strategy: **squash merge**, linear history. CI must be green and at least
   one approving review is required.
@@ -32,14 +38,14 @@ Always run this and confirm it is green before opening a PR.
 - Public behavior changes reflected in OpenAPI and, if needed, the specs.
 
 ## Task tracking
-- `backend-specs/TASKS.md` is the **catalog** of tasks (BE-IDs) and a periodic
+- `backend-specs/TASKS.md` is the **catalog** of tasks (IS-IDs) and a periodic
   status snapshot. **Live status/assignment lives in GitHub Issues/Project**
-  keyed by BE-ID — do not flip `TASKS.md` checkboxes inside feature PRs (it is a
+  keyed by IS-ID — do not flip `TASKS.md` checkboxes inside feature PRs (it is a
   merge-conflict hotspot). Maintainers sync the snapshot periodically.
 - File tasks with the **Backend task** issue form; labels are defined in
-  `.github/labels.yml`. The Project board (live status by BE-ID) is an admin
+  `.github/labels.yml`. The Project board (live status by IS-ID) is an admin
   one-time setup: `gh project create` (needs the `project` token scope) or create
-  it in the GitHub UI with a `BE-ID` field and a status column.
+  it in the GitHub UI with a `Task ID` field, an `Area` (BE/FE) field, and a status column.
 
 ## Parallel-work conventions
 - **Flyway migrations**: never reuse a version number. Two open PRs adding
@@ -54,9 +60,9 @@ Always run this and confirm it is green before opening a PR.
   prior owner approval — propose first (see `AGENTS.md`). No new dependency
   without approval.
 
-## Branch protection (repo admin — one-time)
-Full admin runbook: [`.github/OWNER_SETUP.md`](.github/OWNER_SETUP.md). Requires
-**admin** on the repo. Protect `master` (status check `build` = the CI job name):
+## Branch protection (repo admin)
+Applied configuration record: [`.github/OWNER_SETUP.md`](.github/OWNER_SETUP.md). Requires
+**admin** on the repo. `master` is protected (status check `build` = the CI job name):
 ```bash
 gh api -X PUT repos/AI-nclisive/iot-simulator/branches/master/protection \
   --input - <<'JSON'

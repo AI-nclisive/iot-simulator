@@ -1,9 +1,9 @@
 <!-- One task per PR. Keep changes focused and reviewable. -->
 
 ## What & why
-<!-- Short description. Link the task: Closes #<issue> / implements BE-XXX. -->
+<!-- Short description. Link the task: Closes #<issue> / implements IS-XXX. -->
 
-Implements: BE-___
+Implements: IS-___
 Closes: #___
 
 ## Checklist

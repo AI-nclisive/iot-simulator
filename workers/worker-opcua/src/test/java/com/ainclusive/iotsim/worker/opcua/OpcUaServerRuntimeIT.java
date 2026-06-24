@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Brings up a real Milo OPC UA server from a schema and verifies a projected
- * value is readable by an OPC UA client over loopback. The core BE-R6 check.
+ * value is readable by an OPC UA client over loopback. The core IS-038 check.
  */
 class OpcUaServerRuntimeIT {
 

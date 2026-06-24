@@ -1,9 +1,9 @@
 # Source of truth for repo labels. Created via `gh label create ... --force`
-# (see commands in the SDLC-8 commit / CONTRIBUTING). Area is captured by the
+# (see commands in the IS-103 [SDLC] commit / CONTRIBUTING). Area is captured by the
 # issue form's Area field, so areas are not labels.
 - name: "type:task"
   color: "1d76db"
-  description: "Implementation task (BE-ID)"
+  description: "Implementation task (IS-ID)"
 - name: "type:bug"
   color: "d73a4a"
   description: "Something broken"
