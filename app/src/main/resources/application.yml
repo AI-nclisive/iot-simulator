@@ -1,0 +1,35 @@
+spring:
+  application:
+    name: iot-simulator
+  # DB connection is externally configured (env-based DataSource) so one build
+  # targets containerized Postgres or a managed instance. Defaults match
+  # docker-compose.yml. See backend-specs/08_AUTH_AND_MODES.md.
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/iotsim}
+    username: ${DB_USER:iotsim}
+    password: ${DB_PASSWORD:iotsim}
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+# Deployment mode: local (auth optional) | shared (OAuth2/OIDC). D2/D6.
+iotsim:
+  mode: ${IOTSIM_MODE:local}
+
+server:
+  port: ${SERVER_PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+# Version-neutral docs endpoints (springdoc's "/v3/api-docs" default refers to the
+# OpenAPI spec format, not our API version). The API version lives in the
+# document's info.version (v1), not in these tooling paths.
+springdoc:
+  api-docs:
+    path: /openapi.json
+  swagger-ui:
+    path: /swagger-ui.html

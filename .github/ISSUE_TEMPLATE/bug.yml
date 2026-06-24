@@ -1,0 +1,32 @@
+name: Bug report
+description: Something is broken or behaves unexpectedly
+title: "bug: "
+labels: ["type:bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Include a failing test or commands where possible.
+  - type: input
+    id: area
+    attributes:
+      label: Area / module
+      placeholder: runtime-supervisor
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      description: OS, JDK, Docker (and whether ITs were run).

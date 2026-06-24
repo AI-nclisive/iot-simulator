@@ -40,3 +40,25 @@ Explain the proposed change clearly and ask for user confirmation before editing
 Do not change `SPEC.md` silently.
 
 Do not add technical details to `SPEC.md` unless the user explicitly confirms that the detail is a product capability.
+
+## Working With backend-specs/
+
+`backend-specs/` holds the backend implementation specs (`00`–`08`) and the task
+register (`TASKS.md`). Read the owning spec before implementing a task. Treat
+`00`–`08` as governance: change them only with explicit user approval (propose
+first), same as `ARCHITECTURE.md` / `STACK.md`.
+
+## Code Contributions
+
+Follow `CONTRIBUTING.md`. For agents specifically:
+
+- One task (a `BE-XXX` from `backend-specs/TASKS.md`) per branch and PR.
+- Before reporting work done or opening a PR, run `./gradlew build` and confirm it
+  is green; report the real result. Never claim done without building and testing.
+- Branch `feat/BE-xxx-...`; Conventional Commit titles; squash merge into `master`.
+- Add or update tests for every change.
+- Track live status in GitHub Issues/Project (by `BE-ID`); do not flip checkboxes
+  in `TASKS.md` inside feature PRs (merge-conflict hotspot).
+- No new dependency without approval; add versions only in
+  `gradle/libs.versions.toml`.
+- Keep generated code (jOOQ/proto) out of version control; never commit secrets.

@@ -5,14 +5,20 @@ Approved technologies only. No new dependency without explicit approval (see
 history.
 
 ## Backend
-- Java LTS (21/25); Spring Boot 3.x — REST/OpenAPI via springdoc, SSE/WebSocket.
-- Eclipse Milo — OPC UA server SDK (Apache 2.0).
+- Java 25 LTS (baseline; 21 also supported); Spring Boot 4.x — REST/OpenAPI via
+  springdoc, SSE/WebSocket.
+- Eclipse Milo — OPC UA server SDK (Apache 2.0). Needs JAXB on the worker
+  runtime (`javax.xml.bind:jaxb-api` + `org.glassfish.jaxb:jaxb-runtime`):
+  Milo 0.6 uses the JAXB API that was removed from the JDK in Java 11+, so it is
+  supplied as a runtime shim for this approved SDK.
 - j2mod — Modbus TCP server/slave (Apache 2.0).
 - PostgreSQL (no required extensions); Flyway migrations; PostgreSQL JDBC + jOOQ
   (typed SQL, no heavy ORM). The DB connection is externally configured (env-based
   DataSource), so one build runs against a containerized Postgres with a mounted
   volume or a managed instance (e.g. RDS / Cloud SQL) — no engine-specific features
   assumed.
+- gRPC (grpc-java) + Protocol Buffers — supervisor⇄worker IPC only (loopback,
+  versioned contract); never exposed externally.
 - Workers: lean JVMs — protocol SDK + IPC layer only, no Spring. Workers are
   long-lived, so optimize for per-process memory, sustained throughput, and small
   runtime surface rather than startup time. Default runtime is the plain JVM,
@@ -27,7 +33,8 @@ history.
 ## Platform and tooling
 - Auth: OAuth2/OIDC (e.g. Keycloak, AWS Cognito, Azure Entra ID).
 - Build: Gradle (Kotlin DSL). Deploy: Docker Compose.
-- Testing: JUnit 5, Testcontainers, AssertJ, Vitest, Testing Library, Playwright.
+- Testing: JUnit 5, Testcontainers, AssertJ, ArchUnit, Vitest, Testing Library,
+  Playwright.
 
 ## Rejected (do not introduce)
 - Node.js/NestJS as the primary simulator runtime — server-side scaling/memory risk.

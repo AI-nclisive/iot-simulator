@@ -1,0 +1,76 @@
+# Contributing
+
+This repo is built in parallel by multiple people and agents via feature branches
+and pull requests. These rules keep that smooth.
+
+## Prerequisites
+- JDK 25 (toolchain target). Gradle runs via the committed wrapper (`./gradlew`).
+- Docker (Docker Desktop / colima) — required for Testcontainers integration
+  tests. Without Docker those ITs skip locally; CI always runs them.
+
+## Build & test
+```bash
+./gradlew build        # compile + all tests (unit + ITs + ArchUnit)
+```
+Always run this and confirm it is green before opening a PR.
+
+## Branching
+- Branch off `master`. One task per branch/PR.
+- Name: `feat/BE-123-short-slug`, `fix/...`, `docs/...`, `chore/...`, `test/...`.
+
+## Commits & PRs
+- Conventional Commits: `type(scope): subject` (e.g. `feat(schema): ...`).
+- Reference the task in the PR: `Implements: BE-123`, `Closes: #<issue>`.
+- Keep PRs small and focused; fill in the PR template checklist.
+- Merge strategy: **squash merge**, linear history. CI must be green and at least
+  one approving review is required.
+
+## Definition of Done
+- `./gradlew build` green (tests added/updated for the change).
+- No secrets/credentials/PKI committed; secrets come from env/secret store.
+- Generated code (jOOQ/proto) stays under `build/` — never committed.
+- Public behavior changes reflected in OpenAPI and, if needed, the specs.
+
+## Task tracking
+- `backend-specs/TASKS.md` is the **catalog** of tasks (BE-IDs) and a periodic
+  status snapshot. **Live status/assignment lives in GitHub Issues/Project**
+  keyed by BE-ID — do not flip `TASKS.md` checkboxes inside feature PRs (it is a
+  merge-conflict hotspot). Maintainers sync the snapshot periodically.
+- File tasks with the **Backend task** issue form; labels are defined in
+  `.github/labels.yml`. The Project board (live status by BE-ID) is an admin
+  one-time setup: `gh project create` (needs the `project` token scope) or create
+  it in the GitHub UI with a `BE-ID` field and a status column.
+
+## Parallel-work conventions
+- **Flyway migrations**: never reuse a version number. Two open PRs adding
+  `V7__...` will both merge and break ordering. Use the next free `Vn` only if you
+  are sure it is unique, otherwise use a timestamped version
+  (`V20260623_1530__name.sql`). Migrations are append-only.
+- **Modules**: prefer changes scoped to one Gradle module to reduce conflicts.
+- **Versions**: add/bump dependencies only in `gradle/libs.versions.toml`.
+
+## Governance
+- `SPEC.md`, `ARCHITECTURE.md`, `STACK.md`, `backend-specs/` change only with
+  prior owner approval — propose first (see `AGENTS.md`). No new dependency
+  without approval.
+
+## Branch protection (repo admin — one-time)
+Full admin runbook: [`.github/OWNER_SETUP.md`](.github/OWNER_SETUP.md). Requires
+**admin** on the repo. Protect `master` (status check `build` = the CI job name):
+```bash
+gh api -X PUT repos/darqsatyr1c0n/iot-simulator/branches/master/protection \
+  --input - <<'JSON'
+{
+  "required_status_checks": { "strict": true, "contexts": ["build"] },
+  "enforce_admins": false,
+  "required_pull_request_reviews": { "required_approving_review_count": 1 },
+  "required_linear_history": true,
+  "allow_force_pushes": false,
+  "allow_deletions": false,
+  "restrictions": null
+}
+JSON
+```
+Also, in repo Settings: allow **squash merging only** and enable
+"Automatically delete head branches". (Set `enforce_admins` to `true` later for a
+stricter policy once more than one approver is available.)

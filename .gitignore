@@ -1,0 +1,21 @@
+# Gradle
+.gradle/
+**/build/
+!src/**/build/
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+out/
+bin/
+
+# OS / logs
+.DS_Store
+*.log
+
+# Local env / secrets (never commit)
+.env
+*.local

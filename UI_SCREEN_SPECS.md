@@ -240,8 +240,8 @@ Key states:
 
 Shared behavior:
 
-- Admin gets full available operational actions;
-- User can observe and start stopped data-sources only.
+- Admin gets full operational and configuration actions;
+- User can observe and operate runtime — start and stop data-sources and runs.
 
 Complete when:
 
@@ -292,8 +292,8 @@ Key states:
 
 Shared behavior:
 
-- User can open detail and start stopped sources only;
-- Admin can use full row actions.
+- User can open detail and start/stop sources;
+- Admin can use full row actions (configure, duplicate, delete).
 
 Complete when:
 
@@ -342,7 +342,7 @@ Key states:
 
 Shared behavior:
 
-- User can inspect all tabs and start a stopped source;
+- User can inspect all tabs, start/stop the source, and start replay runs;
 - Admin can use mutation and configuration actions.
 
 Complete when:
@@ -440,8 +440,8 @@ Key states:
 
 Shared behavior:
 
-- User can view saved scenarios only;
-- Admin can create, edit, run, and stop scenarios.
+- User can view saved scenarios and run/stop them;
+- Admin can additionally create, edit, and duplicate scenarios.
 
 Complete when:
 
@@ -915,8 +915,8 @@ Key states:
 
 Shared behavior:
 
-- User can observe but not configure replay in shared mode;
-- Admin can set up and execute replay actions.
+- User can start and stop a configured replay; configuring it is Admin-only;
+- Admin can set up, configure, and execute replay.
 
 Complete when:
 
@@ -1007,7 +1007,7 @@ Key states:
 
 Shared behavior:
 
-- User can inspect but not edit or run in shared mode;
+- User can inspect but not edit scenarios; running a saved scenario is allowed;
 - Admin can edit and execute scenarios.
 
 Complete when:
@@ -1058,7 +1058,7 @@ Key states:
 Shared behavior:
 
 - all users can inspect scenario run state;
-- stop action is restricted by permissions.
+- stopping a run is available to both User and Admin.
 
 Complete when:
 

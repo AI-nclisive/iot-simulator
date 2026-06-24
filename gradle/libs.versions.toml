@@ -1,0 +1,66 @@
+# Single source of dependency versions (backend-specs/07_MODULE_STRUCTURE.md).
+# Versions managed by the Spring Boot BOM (jOOQ, Flyway, PostgreSQL, JUnit,
+# AssertJ, Testcontainers) are intentionally omitted and resolved from the BOM
+# imported in the java-conventions plugin.
+
+[versions]
+springBoot = "4.1.0"
+jooq = "3.21.5"
+testcontainers = "1.20.6"
+springdoc = "3.0.3"
+grpc = "1.82.0"
+protobuf = "4.35.1"
+protobufPlugin = "0.10.0"
+milo = "0.6.16"
+jaxb = "2.3.1"
+j2mod = "3.3.0"
+archunit = "1.4.2"
+
+[libraries]
+# Spring (versions from BOM)
+spring-boot-starter-web = { module = "org.springframework.boot:spring-boot-starter-web" }
+spring-boot-starter-actuator = { module = "org.springframework.boot:spring-boot-starter-actuator" }
+spring-boot-starter-jdbc = { module = "org.springframework.boot:spring-boot-starter-jdbc" }
+spring-boot-starter-jooq = { module = "org.springframework.boot:spring-boot-starter-jooq" }
+spring-boot-starter-flyway = { module = "org.springframework.boot:spring-boot-starter-flyway" }
+spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }
+
+# Spring (extra)
+spring-context = { module = "org.springframework:spring-context" }
+springdoc-openapi-webmvc = { module = "org.springdoc:springdoc-openapi-starter-webmvc-ui", version.ref = "springdoc" }
+
+# Persistence (versions from BOM)
+jooq = { module = "org.jooq:jooq" }
+# jOOQ code generation runs against migration SQL via DDLDatabase (no DB needed).
+jooq-codegen = { module = "org.jooq:jooq-codegen", version.ref = "jooq" }
+jooq-meta-extensions = { module = "org.jooq:jooq-meta-extensions", version.ref = "jooq" }
+flyway-core = { module = "org.flywaydb:flyway-core" }
+flyway-postgresql = { module = "org.flywaydb:flyway-database-postgresql" }
+postgresql = { module = "org.postgresql:postgresql" }
+testcontainers-postgresql = { module = "org.testcontainers:postgresql", version.ref = "testcontainers" }
+testcontainers-junit = { module = "org.testcontainers:junit-jupiter", version.ref = "testcontainers" }
+
+# gRPC + protobuf (IPC, D1)
+grpc-bom = { module = "io.grpc:grpc-bom", version.ref = "grpc" }
+grpc-stub = { module = "io.grpc:grpc-stub" }
+grpc-protobuf = { module = "io.grpc:grpc-protobuf" }
+grpc-netty-shaded = { module = "io.grpc:grpc-netty-shaded" }
+protobuf-java = { module = "com.google.protobuf:protobuf-java", version.ref = "protobuf" }
+protobuf-protoc = { module = "com.google.protobuf:protoc", version.ref = "protobuf" }
+grpc-protoc-gen = { module = "io.grpc:protoc-gen-grpc-java", version.ref = "grpc" }
+tomcat-annotations = { module = "org.apache.tomcat:annotations-api", version = "6.0.53" }
+
+# Protocol SDKs (workers only)
+milo-sdk-server = { module = "org.eclipse.milo:sdk-server", version.ref = "milo" }
+milo-sdk-client = { module = "org.eclipse.milo:sdk-client", version.ref = "milo" }
+# Milo 0.6 uses the JDK-removed javax.xml.bind (JAXB); supply it at runtime on Java 11+.
+jaxb-api = { module = "javax.xml.bind:jaxb-api", version.ref = "jaxb" }
+jaxb-runtime = { module = "org.glassfish.jaxb:jaxb-runtime", version.ref = "jaxb" }
+j2mod = { module = "com.ghgande:j2mod", version.ref = "j2mod" }
+
+# Architecture tests
+archunit-junit5 = { module = "com.tngtech.archunit:archunit-junit5", version.ref = "archunit" }
+
+[plugins]
+protobuf = { id = "com.google.protobuf", version.ref = "protobufPlugin" }
+spring-boot = { id = "org.springframework.boot", version.ref = "springBoot" }

@@ -1,0 +1,133 @@
+syntax = "proto3";
+
+package iotsim.worker.v1;
+
+option java_multiple_files = true;
+option java_package = "com.epam.iotsim.workercontract.v1";
+option java_outer_classname = "ProtocolDataSourceProto";
+
+// Supervisor⇄worker contract. Loopback-only, versioned. Adding a protocol means
+// adding a worker that implements this service — never changing the supervisor.
+// See backend-specs/02_WORKER_CONTRACT_AND_IPC.md.
+service ProtocolDataSource {
+  rpc Hello (HelloRequest) returns (HelloResponse);
+  rpc Configure (ConfigureRequest) returns (Ack);
+  rpc Start (StartRequest) returns (Ack);
+  rpc Stop (StopRequest) returns (Ack);
+
+  // Supervisor pushes neutral value batches for the worker to project onto its
+  // native protocol address space (replay / synthetic / live).
+  rpc ApplyValues (stream ValueBatch) returns (Ack);
+
+  // Worker -> supervisor streams.
+  rpc ClientEvents (StreamRequest) returns (stream ClientEvent);
+  rpc RuntimeEvents (StreamRequest) returns (stream RuntimeEvent);
+
+  rpc InjectFault (InjectFaultRequest) returns (Ack);
+  rpc Health (HealthRequest) returns (HealthResponse);
+  rpc Shutdown (ShutdownRequest) returns (Ack);
+}
+
+message Ack {
+  bool ok = 1;
+  string message = 2;
+}
+
+message HelloRequest {
+  string contract_version = 1; // semver; mismatched major is refused
+}
+
+message HelloResponse {
+  string contract_version = 1;
+  string protocol = 2;                 // e.g. "OPC_UA", "MODBUS_TCP"
+  repeated string capabilities = 3;    // supported data types, fault kinds, ...
+}
+
+message ConfigureRequest {
+  Schema schema = 1;         // protocol-neutral schema the worker projects
+  int32 listen_port = 2;     // protocol port the Edge Device connects to (0 = ephemeral)
+  map<string, string> options = 3;
+}
+
+message Schema {
+  int32 version = 1;
+  repeated SchemaNodeMsg nodes = 2;
+}
+
+message SchemaNodeMsg {
+  string node_id = 1;
+  string parent_id = 2;   // empty if root
+  string path = 3;
+  string name = 4;
+  string kind = 5;        // FOLDER | VARIABLE
+  string data_type = 6;   // empty if unset
+  string value_rank = 7;  // empty if unset
+  string access = 8;      // empty if unset
+  string unit = 9;
+  string description = 10;
+}
+
+message StartRequest {}
+message StopRequest {}
+message StreamRequest {}
+message HealthRequest {}
+message ShutdownRequest {}
+
+// ---- Values ----
+
+enum Quality {
+  QUALITY_UNSPECIFIED = 0;
+  GOOD = 1;
+  UNCERTAIN = 2;
+  BAD = 3;
+}
+
+message Value {
+  string node_id = 1;
+  int64 source_time_micros = 2; // epoch micros, UTC
+  bytes value_enc = 3;          // encoded per the node's data type
+  Quality quality = 4;
+  string quality_reason = 5;
+}
+
+message ValueBatch {
+  repeated Value values = 1;
+}
+
+// ---- Events ----
+
+message ClientEvent {
+  enum Kind {
+    KIND_UNSPECIFIED = 0;
+    CONNECTED = 1;
+    DISCONNECTED = 2;
+    SUBSCRIPTION = 3;
+  }
+  Kind kind = 1;
+  string client_id = 2;
+  int64 at_micros = 3;
+}
+
+message RuntimeEvent {
+  string type = 1; // SOURCE_START, SOURCE_STOP, ERROR, FAULT_STATE_CHANGE, ...
+  int64 at_micros = 2;
+  string detail = 3;
+}
+
+// ---- Faults ----
+
+message InjectFaultRequest {
+  string kind = 1;   // BAD_VALUE, DELAY, CONNECTION_DROP, TIMEOUT, ...
+  string layer = 2;  // NEUTRAL | PROTOCOL
+  bool active = 3;   // true = activate, false = clear
+  map<string, string> params = 4;
+}
+
+// ---- Health ----
+
+message HealthResponse {
+  bool live = 1;
+  bool ready = 2;
+  int64 rss_bytes = 3;
+  string state = 4; // SPAWNED, READY, CONFIGURED, RUNNING, STOPPED
+}

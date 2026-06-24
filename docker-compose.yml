@@ -1,0 +1,34 @@
+# Local/shared deployment. DB connection is externally configured via env, so the
+# same image targets this containerized Postgres + volume or a managed instance.
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: iotsim
+      POSTGRES_USER: iotsim
+      POSTGRES_PASSWORD: iotsim
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U iotsim"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/iotsim
+      DB_USER: iotsim
+      DB_PASSWORD: iotsim
+      IOTSIM_MODE: local
+    ports:
+      - "8080:8080"
+
+volumes:
+  pgdata:

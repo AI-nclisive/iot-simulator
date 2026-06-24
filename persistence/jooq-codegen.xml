@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration xmlns="http://www.jooq.org/xsd/jooq-codegen-3.21.0.xsd">
+  <!-- Generates jOOQ classes by parsing the Flyway migration SQL directly via
+       DDLDatabase — no live database required. See backend-specs/04_DB_SCHEMA.md. -->
+  <generator>
+    <database>
+      <name>org.jooq.meta.extensions.ddl.DDLDatabase</name>
+      <properties>
+        <property>
+          <key>scripts</key>
+          <value>src/main/resources/db/migration</value>
+        </property>
+        <property>
+          <key>sort</key>
+          <value>flyway</value>
+        </property>
+        <property>
+          <key>defaultNameCase</key>
+          <value>lower</value>
+        </property>
+        <property>
+          <key>parseDialect</key>
+          <value>POSTGRES</value>
+        </property>
+      </properties>
+      <!-- DDLDatabase (H2) maps Postgres jsonb -> json; the real columns are
+           jsonb, so force the binding to org.jooq.JSONB for correct runtime SQL. -->
+      <forcedTypes>
+        <forcedType>
+          <name>JSONB</name>
+          <includeTypes>(?i:JSON)</includeTypes>
+        </forcedType>
+      </forcedTypes>
+    </database>
+    <target>
+      <packageName>com.epam.iotsim.persistence.jooq</packageName>
+      <directory>build/generated/jooq</directory>
+    </target>
+  </generator>
+</configuration>

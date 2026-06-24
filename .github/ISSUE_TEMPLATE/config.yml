@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Contributing guide
+    url: https://github.com/darqsatyr1c0n/iot-simulator/blob/master/CONTRIBUTING.md
+    about: Branch/commit conventions, how to build & test, Definition of Done.
+  - name: Backend task catalog
+    url: https://github.com/darqsatyr1c0n/iot-simulator/blob/master/backend-specs/TASKS.md
+    about: Browse BE-IDs and delivery waves before filing a task.
