@@ -60,9 +60,9 @@ Always run this and confirm it is green before opening a PR.
   prior owner approval — propose first (see `AGENTS.md`). No new dependency
   without approval.
 
-## Branch protection (repo admin — one-time)
-Full admin runbook: [`.github/OWNER_SETUP.md`](.github/OWNER_SETUP.md). Requires
-**admin** on the repo. Protect `master` (status check `build` = the CI job name):
+## Branch protection (repo admin)
+Applied configuration record: [`.github/OWNER_SETUP.md`](.github/OWNER_SETUP.md). Requires
+**admin** on the repo. `master` is protected (status check `build` = the CI job name):
 ```bash
 gh api -X PUT repos/AI-nclisive/iot-simulator/branches/master/protection \
   --input - <<'JSON'

@@ -67,7 +67,7 @@ Snapshot: **build green, 80 tests / 22 suites, 0 skipped.** ~38 done · 2 partia
 Enables parallel work by humans and agents (feature branches → PRs → review →
 merge). Decisions: GitHub Actions CI, squash + linear history, live status in
 GitHub Issues/Project (TASKS.md = catalog). Admin-only steps (branch protection,
-trunk merge, project board, repo settings): see `.github/OWNER_SETUP.md`.
+project board, repo settings): see the config record `.github/OWNER_SETUP.md`.
 
 Tier 1 — gate & baseline:
 - [ ] IS-097 [SDLC] ⬜ Establish trunk: review & merge the foundation into `master` so branches fork from a stable baseline

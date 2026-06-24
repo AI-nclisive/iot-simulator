@@ -1,37 +1,18 @@
-# Repo Owner / Admin Setup (one-time)
+# Repo Configuration (admin-applied)
 
-Actions that require **admin** on `AI-nclisive/iot-simulator`. They could not be
-done from a WRITE-only account; do them once admin access is available. Run the
-`gh` commands as an admin account (`gh auth status` should show admin).
+Record of the one-time **admin** configuration applied to `AI-nclisive/iot-simulator`,
+with the `gh` commands to re-apply it (after a settings reset, or when recreating /
+forking the repo). Run them as an admin (`gh auth status` shows admin).
 
-Done already (no admin needed): CI workflow, PR template, CONTRIBUTING, AGENTS.md
-code rules, issue forms, and 9 repo labels.
+Status: **all applied.** The trunk is established on `master` (IS-097 [SDLC]); CI,
+PR/issue templates, `CONTRIBUTING.md`, `AGENTS.md` rules, and repo labels are in place.
 
-## 0. Prerequisites
-- Admin on the repo (or perform these as owner `AI-nclisive`).
-- For the Project board, add the project scope to the token:
-  ```bash
-  gh auth refresh -s project,read:project
-  ```
-
-## 1. IS-097 [SDLC] — Establish the trunk (merge the foundation into `master`)
-The whole backend currently lives on `feature/backend-foundation` (already pushed).
-Get it onto `master` so others branch from a stable baseline. Do this **before**
-turning on branch protection (or keep `enforce_admins=false`, which lets admins
-merge it):
+## Branch protection — `master` (IS-099 [SDLC])
+Required status check `build` (= the CI job name), 1 approving review, linear history,
+no force-push/deletion, `enforce_admins=false` (admins can merge without a second
+approval; raise to `true` once a second reviewer exists).
 ```bash
-gh pr create --base master --head feature/backend-foundation \
-  --title "Backend foundation: specs, scaffold, core slices, runtime, SDLC" \
-  --body "Establishes the trunk. See backend-specs/ and CONTRIBUTING.md."
-# review, then:
-gh pr merge --squash --delete-branch
-```
-
-## 2. IS-099 [SDLC] — Branch protection on `master`
-Requires admin. Status check `build` = the CI job name.
-```bash
-gh api -X PUT repos/AI-nclisive/iot-simulator/branches/master/protection \
-  --input - <<'JSON'
+gh api -X PUT repos/AI-nclisive/iot-simulator/branches/master/protection --input - <<'JSON'
 {
   "required_status_checks": { "strict": true, "contexts": ["build"] },
   "enforce_admins": false,
@@ -43,47 +24,40 @@ gh api -X PUT repos/AI-nclisive/iot-simulator/branches/master/protection \
 }
 JSON
 ```
-Flip `enforce_admins` to `true` later for a stricter policy once a second approver
-exists.
 
-## 3. Repo merge settings
+## Merge settings
+Squash-only, with auto-delete of merged branches.
 ```bash
 gh api -X PATCH repos/AI-nclisive/iot-simulator \
-  -F allow_squash_merge=true \
-  -F allow_merge_commit=false \
-  -F allow_rebase_merge=false \
-  -F delete_branch_on_merge=true
+  -F allow_squash_merge=true -F allow_merge_commit=false \
+  -F allow_rebase_merge=false -F delete_branch_on_merge=true
 ```
 
-## 4. IS-103 [SDLC] — Project board (live status by IS-ID)
-Needs the `project` token scope (step 0). Track tasks by IS-ID separately from
-`backend-specs/TASKS.md` (which stays the catalog).
+## GitHub Pages — browsable HTML reports
+Served from the `gh-pages` branch (`/root`). CI publishes the full Gradle + JaCoCo HTML
+reports per PR under `pr-<n>/`; reports open at `https://ai-nclisive.github.io/iot-simulator/`
+(the link is also printed in each run's job summary). Publishing is non-fatal, so it
+never blocks the build.
 ```bash
+gh api -X POST repos/AI-nclisive/iot-simulator/pages --input - <<'JSON'
+{"source": {"branch": "gh-pages", "path": "/"}}
+JSON
+```
+
+## Project board (IS-103 [SDLC])
+Org project **IoT Simulator Backend** — <https://github.com/orgs/AI-nclisive/projects/1>,
+linked to the repo, with fields: single-select `Status` (Todo / In Progress / In review /
+Done), text `Task ID` (`IS-XXX`), single-select `Area` (BE / FE). Live status lives here;
+`backend-specs/TASKS.md` stays the catalog. Needs the `project` token scope:
+```bash
+gh auth refresh -s project,read:project
 gh project create --owner AI-nclisive --title "IoT Simulator Backend"
 ```
-Then in the board: add a single-select `Status` field (Todo / In progress / In
-review / Done), a text `Task ID` field, and a single-select `Area` (BE/FE) field;
-link issues created via the Backend task form. (UI: Projects → New project → Board.)
 
-## 5. GitHub Pages — browsable HTML reports
-CI publishes the full Gradle + JaCoCo HTML reports (with navigation) to the
-`gh-pages` branch, per PR under `pr-<n>/`. Enable Pages to serve them:
-- Settings → Pages → Build and deployment → Source: **Deploy from a branch** →
-  Branch: `gh-pages` `/ (root)` → Save.
-
-The `gh-pages` branch is created automatically by the first CI run. Reports then
-open at `https://ai-nclisive.github.io/iot-simulator/pr-<n>/` (the link is also
-printed in each run's job summary). Publishing is non-fatal, so it never blocks
-the build.
-
-## 6. Verify
-- `master` now contains the backend; the **Actions** tab shows CI on PRs.
-- Issue forms appear under **New issue** (they load from the default branch).
-- Open a throwaway PR and confirm it cannot merge without a green `build` + 1
-  approval.
+## Labels
+9 repo labels are defined in `.github/labels.yml`; (re)create with `gh label create ... --force`.
 
 ## Notes
-- Issue templates and CI config are read from the **default branch** (`master`),
-  so they become fully active only after step 1.
-- Grant collaborators write access (and reviewers) so the 1-approval rule has
-  approvers other than the PR author.
+- Issue/PR templates and CI config are read from the **default branch** (`master`).
+- Grant collaborators write access (and reviewers) so the 1-approval rule has approvers
+  other than the PR author; then `enforce_admins` can be raised to `true`.
