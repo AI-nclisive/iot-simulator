@@ -31,6 +31,30 @@ Always run this and confirm it is green before opening a PR.
 - Merge strategy: **squash merge**, linear history. CI must be green and at least
   one approving review is required.
 
+## AI review loop
+Every PR is reviewed automatically by an advisory Claude reviewer (IS-112; see
+`.github/workflows/claude-review.yml`). It posts **inline comments on the specific
+lines** it thinks need rework (prefixed `[blocking]` / `[nit]`) and **one top-level
+verdict comment** — `## Claude review: ✅ Mergeable` or `## Claude review:
+❌ Changes requested` with the reasons. It is advisory and does not gate merge — the
+required check stays `build`.
+
+After opening (or updating) a PR:
+1. **Wait for the verdict.**
+2. For each finding, either **fix it**, or **reply on the comment** explaining why
+   the current approach is correct and the better choice. Then **push to the same
+   branch** — each push re-triggers the review.
+3. **Wait for the new verdict** and repeat.
+
+The PR is ready for **human review** — move the task to **In review** on the board —
+once either:
+- the verdict is `✅ Mergeable` (no remaining blocking findings), or
+- **3 review rounds** have completed without a clean verdict (then summarize the
+  still-open points for the human reviewer in the PR description).
+
+While iterating on review findings the task stays **In Progress**; it becomes
+**In review** only when one of the above is met, and **Done** when merged.
+
 ## Definition of Done
 - `./gradlew build` green (tests added/updated for the change).
 - No secrets/credentials/PKI committed; secrets come from env/secret store.

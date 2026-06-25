@@ -80,6 +80,10 @@ Follow `CONTRIBUTING.md`. For agents specifically:
   is green; report the real result. Never claim done without building and testing.
 - Branch `feat/IS-xxx-...`; Conventional Commit titles; squash merge into `master`.
 - Add or update tests for every change.
+- After opening a PR, follow the **AI review loop** in `CONTRIBUTING.md`: wait for the
+  advisory Claude reviewer's verdict, fix each finding (or reply why the current choice
+  is best), push, and wait for re-review. Move the task to **In review** (ready for
+  human review) only when the verdict is ✅ or after 3 review rounds.
 - Keep tasks in sync with the GitHub Project (see "Task Tracking"); status lives on
   the board, not in `TASKS.md` checkboxes inside feature PRs.
 - No new dependency without approval; add versions only in
