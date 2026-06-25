@@ -89,9 +89,8 @@ Follow `CONTRIBUTING.md`. For agents specifically:
   is green; report the real result. Never claim done without building and testing.
 - Branch `feat/IS-xxx-...`; Conventional Commit titles; squash merge into `master`.
 - Add or update tests for every change.
-- Move the board `Status` to **In Progress** when you start the task, and to
-  **In review** as soon as you **open the PR** (the open PR is the trigger — don't
-  wait for the AI verdict).
+- Move the board `Status` in step with the work — **In Progress** when you start,
+  **In review** when you open the PR (see "Task Tracking" above for the full transitions).
 - After opening a PR, follow the **AI review loop** in `CONTRIBUTING.md`: wait for the
   advisory Claude reviewer's verdict, fix each finding (or reply why the current choice
   is best), mark the thread resolved, push, and wait for re-review. **The task is
