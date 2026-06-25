@@ -25,6 +25,8 @@ Always run this and confirm it is green before opening a PR.
 - Name: `feat/IS-123-short-slug`, `fix/...`, `docs/...`, `chore/...`, `test/...`.
 
 ## Commits & PRs
+- **Language: write all GitHub text in English** — commit messages, PR titles and
+  descriptions, issue text, and every comment (including replies to review findings).
 - Conventional Commits: `type(scope): subject` (e.g. `feat(schema): ...`).
 - Reference the task in the PR: `Implements: IS-123`, `Closes: #<issue>`.
 - Keep PRs small and focused; fill in the PR template checklist.
