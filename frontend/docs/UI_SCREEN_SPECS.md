@@ -258,7 +258,7 @@ Must show:
 
 - dense source table;
 - protocol and endpoint summary;
-- current status;
+- state (`Run` or `Off`);
 - connected-client summary where available;
 - health summary;
 - initiator or last-operator context where relevant;
@@ -269,8 +269,10 @@ Primary actions:
 - filter and search;
 - create source;
 - open detail;
-- start source;
+- start recording from a source in `Run` state with no conflicting process;
+- configure replay for a source in `Run` state with no conflicting process;
 - stop source;
+- start source;
 - duplicate source;
 - delete source.
 
@@ -309,26 +311,28 @@ Entry points:
 
 Must show:
 
-- source identity and status header;
+- source identity and state header;
 - endpoint summary;
-- parameter count and schema scale context;
+- parameter count and source scale context, with clear direction to Schema;
 - tabs or segmented sections for Overview, Schema, Values, Clients, Events, and
   Settings;
-- active runtime context that stays visible while switching tabs.
+- current state that stays visible while switching tabs;
+- process context only when recording or replay is active;
+- health diagnostic guidance when the source is in Warning or Error.
 
 Primary actions:
 
-- start source;
-- stop source;
+- start recording only when the source is in `Run` state and no conflicting process is active;
+- configure replay only when the source is in `Run` state and no conflicting process is active;
 - open schema editor;
-- start recording;
-- configure replay;
+- stop source;
+- start source;
 - inspect clients and events.
 
 Key states:
 
-- stopped;
-- running;
+- off;
+- run;
 - error;
 - stale live state;
 - read-only;
@@ -702,7 +706,7 @@ Primary actions:
 - back;
 - cancel;
 - create;
-- test details where relevant.
+- test connection where relevant.
 
 Key states:
 
@@ -795,7 +799,7 @@ Must show:
 Primary actions:
 
 - edit structure;
-- edit field details;
+- edit parameter details;
 - save;
 - discard;
 - inspect validation and dependencies.
@@ -875,7 +879,7 @@ Type: `Flow`
 
 Primary purpose:
 
-- replay a recording or sample through a simulated source.
+- replay a recording or sample through a source.
 
 Entry points:
 
