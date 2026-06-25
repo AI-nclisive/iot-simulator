@@ -80,6 +80,7 @@ Tier 2 — contribution hygiene:
 - [x] IS-102 [SDLC] ✅ PR template
 - [x] IS-103 [SDLC] ✅ Issue templates + labels + org Project #1 board applied (fields `Status` / `Task ID` / `Area` BE/FE/SDLC; issues mirrored 1:1)
 - [x] IS-104 [SDLC] ✅ `AGENTS.md` extended to code contributions
+- [x] IS-113 [SDLC] ✅ Board status flow + review-completion rule documented (In Progress at start, In review at PR open; task done only when all review comments resolved) — `AGENTS.md`/`CONTRIBUTING.md`
 
 Tier 3 — quality automation:
 - [x] IS-105 [SDLC] ✅ Spotless (import order + whitespace hygiene) — runs in `check`/CI

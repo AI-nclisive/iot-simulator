@@ -66,7 +66,10 @@ When you change tasks, change **both** the file and the Project:
   edit, or close the matching issue and board item (by `IS-`/`UI-` ID); never
   create a duplicate ID.
 - In-progress status (`In Progress` / `In review`) lives on the **board only**
-  (`Status` field + open issue) — don't edit catalog checkboxes for those.
+  (`Status` field + open issue) — don't edit catalog checkboxes for those. Move it
+  in step with the work: **In Progress** the moment you start the task, **In review**
+  as soon as you **open the PR** (the open PR is the trigger — don't wait for the AI
+  reviewer's verdict).
 - **Done is recorded in two places:** flip the catalog checkbox to `[x]` ✅ **in
   the implementation PR itself** (the same PR that delivers the work — this avoids
   a separate catalog-only PR, which the no-direct-push-to-`master` rule would
@@ -86,10 +89,14 @@ Follow `CONTRIBUTING.md`. For agents specifically:
   is green; report the real result. Never claim done without building and testing.
 - Branch `feat/IS-xxx-...`; Conventional Commit titles; squash merge into `master`.
 - Add or update tests for every change.
+- Move the board `Status` in step with the work — **In Progress** when you start,
+  **In review** when you open the PR (see "Task Tracking" above for the full transitions).
 - After opening a PR, follow the **AI review loop** in `CONTRIBUTING.md`: wait for the
   advisory Claude reviewer's verdict, fix each finding (or reply why the current choice
-  is best), push, and wait for re-review. Move the task to **In review** (ready for
-  human review) only when the verdict is ✅ or after 3 review rounds.
+  is best), mark the thread resolved, push, and wait for re-review. **The task is
+  finished only once every reviewer comment is resolved** (or after 3 review rounds —
+  see the full loop in `CONTRIBUTING.md`) and the build is green — don't treat the
+  work as done while review threads are still open.
 - Keep tasks in sync with the GitHub Project (see "Task Tracking"): the board
   `Status` is the live source for `In Progress` / `In review`; mark the catalog
   checkbox `[x]` ✅ in the implementation PR and flip the board to **Done** only
