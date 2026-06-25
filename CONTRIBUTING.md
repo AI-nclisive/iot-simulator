@@ -41,35 +41,43 @@ verdict comment** — `## Claude review: ✅ Mergeable` or `## Claude review:
 ❌ Changes requested` with the reasons. It is advisory and does not gate merge — the
 required check stays `build`.
 
-After opening (or updating) a PR:
-1. **Wait for the verdict.**
+By the time the review runs the task is already **In review** (moved there when the
+PR was opened — see "Task tracking"). Resolving the review is part of finishing the
+task, not an optional follow-up. After opening (or updating) a PR:
+1. **Wait for the verdict** and the inline comments to land.
 2. For each finding, either **fix it**, or **reply on the comment** explaining why
-   the current approach is correct and the better choice. Then **push to the same
-   branch** — each push re-triggers the review.
-3. **Wait for the new verdict** and repeat.
+   the current approach is the better choice; mark the thread **resolved** once it is
+   addressed. Then **push to the same branch** — each push re-triggers the review.
+3. **Wait for the new verdict** and repeat until either:
+   - the verdict is `✅ Mergeable` with **no unresolved comments**, or
+   - **3 review rounds** have completed (then summarize any still-open points for the
+     human reviewer in the PR description and leave each thread resolved-with-rationale).
 
-The PR is ready for **human review** — move the task to **In review** on the board —
-once either:
-- the verdict is `✅ Mergeable` (no remaining blocking findings), or
-- **3 review rounds** have completed without a clean verdict (then summarize the
-  still-open points for the human reviewer in the PR description).
-
-While iterating on review findings the task stays **In Progress**; it becomes
-**In review** only when one of the above is met. The board `Status` moves to
-**Done** only when the PR is merged — the catalog checkbox itself is flipped
-inside the implementation PR (see "Task tracking").
+**A feature is finished only when every reviewer comment is resolved** — fixed or
+answered with a rationale — and `./gradlew build` is green. Do not consider the work
+done, or walk away from the PR, while review threads are still open. The board
+`Status` moves to **Done** only when the PR is merged; the catalog checkbox itself is
+flipped inside the implementation PR (see "Task tracking").
 
 ## Definition of Done
 - `./gradlew build` green (tests added/updated for the change).
 - No secrets/credentials/PKI committed; secrets come from env/secret store.
 - Generated code (jOOQ/proto) stays under `build/` — never committed.
 - Public behavior changes reflected in OpenAPI and, if needed, the specs.
+- **All AI-review comments resolved** (fixed or answered with a rationale) — see
+  "AI review loop". A task is not done while review threads are still open.
 
 ## Task tracking
 - `backend-specs/TASKS.md` / `frontend/docs/UI_TASKS.md` are the task
   **catalogs** (IS-/UI-IDs). **Live `In Progress` / `In review` status lives in
-  GitHub Issues/Project** keyed by ID — don't track those by editing catalog
-  checkboxes.
+  GitHub Issues/Project** (org Project #1) keyed by ID — don't track those by
+  editing catalog checkboxes. Move the board `Status` in lockstep with the work;
+  these transitions are mandatory:
+  - **In Progress** — the moment you **start** the task (before/at the first
+    commit), so concurrent contributors see it is taken.
+  - **In review** — as soon as you **open the PR**. The open PR *is* the trigger;
+    do **not** wait for the AI reviewer's verdict to move it here.
+  - **Done** — only **after the PR is merged** (then close the issue).
 - **Marking a task Done:** flip its catalog checkbox to `[x]` ✅ **in the same PR
   that implements it** — this keeps the catalog current without a separate
   catalog-only PR, which branch protection on `master` would otherwise require.
