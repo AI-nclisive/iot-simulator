@@ -3,7 +3,7 @@
 # issue form's Area field, so areas are not labels.
 - name: "type:task"
   color: "1d76db"
-  description: "Implementation task (IS-ID)"
+  description: "Implementation task (IS/UI ID)"
 - name: "type:bug"
   color: "d73a4a"
   description: "Something broken"

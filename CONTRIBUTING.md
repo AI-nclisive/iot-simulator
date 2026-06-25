@@ -20,10 +20,13 @@ npm run build          # production frontend build
 Always run this and confirm it is green before opening a PR.
 
 ## Task IDs
-- Every task has a project-wide ID and area marker, named **`IS-XXX [AREA] short name`** —
-  `[AREA]` is `[BE]` (backend), `[FE]` (frontend) or `[SDLC]` (repo/process).
-- Catalog: `backend-specs/TASKS.md` (with a legacy `BE-*`/`SDLC-*` → `IS-XXX` crosswalk).
-- Reuse the ID everywhere: branch `feat/IS-038-...`, issue `IS-038 short name` (area via the form's **Area** field), PR `Implements: IS-038`.
+- Backend and repo/process tasks use **`IS-XXX [AREA] short name`** from
+  `backend-specs/TASKS.md`; `[AREA]` is `[BE]` or `[SDLC]`.
+- Frontend tasks use **`UI-XXX [FE] short name`** from
+  `frontend/docs/UI_TASKS.md`.
+- Reuse the ID everywhere: branch `feat/IS-038-...` or `feat/UI-022-...`, issue
+  `IS-038 short name` / `UI-022 short name` (area via the form's **Area** field),
+  PR `Implements: IS-038` or `Implements: UI-022`.
 
 ## Branching
 - Branch off `master`. One task per branch/PR.
@@ -33,7 +36,8 @@ Always run this and confirm it is green before opening a PR.
 - **Language: write all GitHub text in English** — commit messages, PR titles and
   descriptions, issue text, and every comment (including replies to review findings).
 - Conventional Commits: `type(scope): subject` (e.g. `feat(schema): ...`).
-- Reference the task in the PR: `Implements: IS-123`, `Closes: #<issue>`.
+- Reference the task in the PR: `Implements: IS-123` / `Implements: UI-123`,
+  `Closes: #<issue>`.
 - Keep PRs small and focused; fill in the PR template checklist.
 - Merge strategy: **squash merge**, linear history. CI must be green and at least
   one approving review is required.
@@ -90,10 +94,11 @@ flipped inside the implementation PR (see "Task tracking").
   Move the **board `Status` to Done and close the issue only after that PR is
   merged**. Each PR edits only its own task's line, so conflicts are rare; only
   the aggregate snapshot count line is periodically retallied.
-- File tasks with the **Backend task** issue form; labels are defined in
-  `.github/labels.yml`. The Project board (live status by IS-ID) is an admin
+- File tasks with the **Task** issue form; labels are defined in
+  `.github/labels.yml`. The Project board (live status by task ID) is an admin
   one-time setup: `gh project create` (needs the `project` token scope) or create
-  it in the GitHub UI with a `Task ID` field, an `Area` (BE/FE/SDLC) field, and a status column.
+  it in the GitHub UI with a `Task ID` field, an `Area` (BE/FE/SDLC) field, and a
+  status column.
 
 ## Parallel-work conventions
 - **Flyway migrations**: never reuse a version number. Two open PRs adding

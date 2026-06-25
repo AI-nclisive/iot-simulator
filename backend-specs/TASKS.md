@@ -4,11 +4,12 @@ One prioritized list: tasks are grouped by delivery **wave** (priority order) an
 each carries its **status**. Derived from `backend-specs/00–08` and the
 capabilities in `SPEC.md`.
 
-Naming: every task is **`IS-XXX [AREA] short name`**, where `IS-XXX` is the
-project-wide ID and `[AREA]` is `[BE]` (backend), `[FE]` (frontend) or `[SDLC]`
-(repo/process). This register holds the `[BE]` and `[SDLC]` tasks; frontend
-(`[FE]`) tasks are tracked separately. Legacy `BE-*` and `SDLC-*` IDs map to the
-new ones via the crosswalk below.
+Naming: backend and repo/process tasks are **`IS-XXX [AREA] short name`**, where
+`IS-XXX` is the backend/SDLC task ID and `[AREA]` is `[BE]` (backend) or
+`[SDLC]` (repo/process). This register holds the `[BE]` and `[SDLC]` tasks;
+frontend (`[FE]`) tasks use `UI-XXX` IDs and are tracked in
+`frontend/docs/UI_TASKS.md`. Legacy `BE-*` and `SDLC-*` IDs map to the new
+`IS-*` IDs via the crosswalk below.
 
 Legend: `[x]` ✅ done · `[ ]` 🟡 partial · `[ ]` ⬜ todo. Each line reads
 `IS-XXX [AREA]` · status · `[module]` tag · owning spec (`01`–`08`) or `SPEC` epic.

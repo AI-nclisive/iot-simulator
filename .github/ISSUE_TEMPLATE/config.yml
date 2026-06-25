@@ -6,3 +6,6 @@ contact_links:
   - name: Backend task catalog
     url: https://github.com/AI-nclisive/iot-simulator/blob/master/backend-specs/TASKS.md
     about: Browse IS-IDs and delivery waves before filing a task.
+  - name: Frontend task catalog
+    url: https://github.com/AI-nclisive/iot-simulator/blob/master/frontend/docs/UI_TASKS.md
+    about: Browse UI-IDs and frontend delivery waves before filing a task.
