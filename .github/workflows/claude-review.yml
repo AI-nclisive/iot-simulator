@@ -1,0 +1,88 @@
+name: Claude PR Review
+
+# IS-112 [SDLC] — automated, advisory AI code review on every PR.
+# Requires (see .github/OWNER_SETUP.md): (1) the Claude GitHub App installed on the
+# repo — https://github.com/apps/claude (org-owner approval), and (2) the
+# CLAUDE_CODE_OAUTH_TOKEN secret. Both are needed; the token alone fails with
+# "Claude Code is not installed on this repository".
+# Uses the `pull_request` trigger (NOT `pull_request_target`): GitHub withholds
+# repo secrets from fork-originated PRs on this event, so the OAuth token is never
+# exposed to untrusted forks. The review posts comments only; it is advisory and
+# does NOT gate merge (the required check stays `build` from ci.yml).
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+# Least-privilege: read code, write PR review comments. id-token is required by
+# anthropics/claude-code-action.
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write
+
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    # Skip drafts; skip if the OAuth token is absent (e.g. fork PRs) so the job
+    # is a clean no-op instead of a red failure.
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check token presence
+        id: gate
+        env:
+          TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          if [ -n "$TOKEN" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::CLAUDE_CODE_OAUTH_TOKEN not available (fork PR or secret unset) — skipping Claude review."
+          fi
+
+      - name: Checkout
+        if: steps.gate.outputs.enabled == 'true'
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Claude review
+        if: steps.gate.outputs.enabled == 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            You are reviewing pull request #${{ github.event.pull_request.number }}
+            in ${{ github.repository }}. This is an advisory review that runs before
+            a human reviewer.
+
+            First read AGENTS.md and CONTRIBUTING.md, then review the PR diff
+            (`gh pr diff`) against this repo's contribution rules. Flag violations
+            of the following, with the highest-impact issues first:
+
+            - One task (an IS-XXX from backend-specs/TASKS.md) per PR; PR title is a
+              Conventional Commit referencing that task.
+            - Tests are added or updated for every behavioral change.
+            - No new dependency is introduced without it being declared only in
+              gradle/libs.versions.toml; flag any version added elsewhere.
+            - No secrets are committed, and no generated code (jOOQ / protobuf) is
+              checked in.
+            - Module boundaries are respected (the Gradle graph + ArchUnit rules);
+              flag cross-module reach-throughs.
+            - The public REST surface stays /api/v1 (no unprompted /api/v2).
+            - General correctness: likely bugs, unhandled edge cases, concurrency
+              and resource-lifecycle issues, and security implications.
+
+            Post specific findings as inline comments on the changed lines. End with
+            one concise summary comment: list any blocking concerns, then nits
+            separately. Do not approve or request changes (humans do that); do not
+            comment on files outside the diff; skip praise-only comments. If the PR
+            looks clean, say so briefly. Note that you cannot run `./gradlew build`
+            here — CI's `build` job is the source of truth for compile/test status.
+          claude_args: |
+            --model claude-sonnet-4-6
+            --max-turns 15
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr comment:*),Read,Grep,Glob"

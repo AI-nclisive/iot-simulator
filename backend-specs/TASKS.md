@@ -21,7 +21,7 @@ broaden, then harden for teams" — can be re-weighted if the near-term goal
 differs.)
 
 Snapshot: **build green, 80 tests / 22 suites, 0 skipped.** 54 done · 2 partial ·
-55 todo (111 total). Live status is the board; this line is a periodic snapshot.
+56 todo (112 total). Live status is the board; this line is a periodic snapshot.
 
 <details>
 <summary>ID crosswalk — legacy <code>BE-*</code> / <code>SDLC-*</code> → <code>IS-XXX</code></summary>
@@ -68,6 +68,9 @@ Enables parallel work by humans and agents (feature branches → PRs → review 
 merge). Decisions: GitHub Actions CI, squash + linear history, live status in
 GitHub Issues/Project (TASKS.md = catalog). Admin-only steps (branch protection,
 project board, repo settings): see the config record `.github/OWNER_SETUP.md`.
+
+Tier 0 — highest priority (next up):
+- [ ] IS-112 [SDLC] ⬜ Automated PR code review by a Claude agent in CI: a `pull_request` workflow runs a Claude agent (Anthropic `claude-code-action`) over the diff and posts review comments enforcing repo conventions (AGENTS.md/CONTRIBUTING.md — one task per PR, tests added, `./gradlew build` green, no new deps, no secrets/generated code). Advisory to start; gate decision deferred. Needs `ANTHROPIC_API_KEY` secret (record in `.github/OWNER_SETUP.md`).
 
 Tier 1 — gate & baseline:
 - [x] IS-097 [SDLC] ✅ Establish trunk: foundation merged into `master` (PRs squash-merged); branches fork from a stable baseline
@@ -217,6 +220,10 @@ Make runs observable and produce the P0 evidence artifact.
 
 ## Recommended immediate next
 
-**Wave A, `IS-035 → IS-038`** (real Configure + Milo OPC UA projection): converts the
-already-green runtime plumbing into an actual OPC UA endpoint an Edge Device can
-connect to — the single biggest jump in product value.
+**SDLC, `IS-112`** (Claude-agent PR code review in CI) — explicitly set as highest
+priority by the owner: every PR gets an automated review against repo conventions
+before human review.
+
+Next product feature: **Wave A, `IS-035 → IS-038`** (real Configure + Milo OPC UA
+projection): converts the already-green runtime plumbing into an actual OPC UA
+endpoint an Edge Device can connect to — the single biggest jump in product value.

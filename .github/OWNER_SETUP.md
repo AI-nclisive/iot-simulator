@@ -47,6 +47,32 @@ gh auth refresh -s project,read:project
 gh project create --owner AI-nclisive --title "IoT Simulator"
 ```
 
+## Claude PR review setup (IS-112 [SDLC])
+The `.github/workflows/claude-review.yml` workflow runs an advisory Claude review on
+every PR (see the workflow header). It needs **two** things — both are required; the
+token alone is not enough:
+
+**1. The Claude GitHub App** — provides the GitHub identity/permissions the action
+uses to read the PR and post review comments. Install it on this repo (org-owned, so
+an **org owner must approve** the install):
+```bash
+# Easiest, from the repo dir — installs the App and sets the secret:
+claude   # then run: /install-github-app
+```
+Or install manually at <https://github.com/apps/claude> → choose the `AI-nclisive`
+org → **Only select repositories** → `iot-simulator`. Symptom when missing: the job
+fails with "Claude Code is not installed on this repository."
+
+**2. The Claude API token** — a Claude Pro/Max **subscription OAuth token** (not an
+Anthropic API key), stored as the repo secret `CLAUDE_CODE_OAUTH_TOKEN`:
+```bash
+claude setup-token   # prints the OAuth token (Pro/Max subscription)
+gh secret set CLAUDE_CODE_OAUTH_TOKEN --repo AI-nclisive/iot-simulator
+```
+The token is long-lived; rotate by re-running both commands. The workflow uses the
+`pull_request` event, so the secret is withheld from fork PRs (the job no-ops there).
+The review is advisory only — it does not gate merge; the required check stays `build`.
+
 ## Labels
 9 repo labels are defined in `.github/labels.yml`; (re)create with `gh label create ... --force`.
 
