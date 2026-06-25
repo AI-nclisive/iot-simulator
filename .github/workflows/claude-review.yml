@@ -14,7 +14,8 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
 
 # Least-privilege: read code, write PR review comments. id-token is required by
-# anthropics/claude-code-action.
+# anthropics/claude-code-action. pull-requests: write already covers resolving
+# review threads (GraphQL resolveReviewThread) and posting in-thread replies.
 permissions:
   contents: read
   pull-requests: write
@@ -63,7 +64,55 @@ jobs:
             Steps:
             1. Read AGENTS.md and CONTRIBUTING.md for the repo's rules.
             2. Read the diff: `gh pr diff ${{ github.event.pull_request.number }}`.
-            3. Evaluate against these rules, highest-impact first:
+            3. Reconcile YOUR OWN earlier review threads on this PR before doing a
+               fresh review. On the first push there are none — skip to step 4.
+
+               a. Work out which threads are yours. Find the account you post
+                  under: read this PR's top-level comments
+                  (`gh pr view ${{ github.event.pull_request.number }} --json comments`)
+                  and take the author of the most recent comment whose body
+                  starts with "## Claude review:" — that bot account is you. A
+                  review thread is yours ONLY when its root comment was written
+                  by that same account (these are the inline notes you prefixed
+                  with "[blocking]" or "[nit]"). NEVER resolve, reply to, or
+                  otherwise touch a thread rooted in anyone else's comment.
+
+               b. List the PR's review threads and their comments via GraphQL:
+                    gh api graphql -f query='
+                      query($owner:String!,$name:String!,$number:Int!){
+                        repository(owner:$owner,name:$name){
+                          pullRequest(number:$number){
+                            reviewThreads(first:100){ nodes{
+                              id isResolved isOutdated path line
+                              comments(first:100){ nodes{
+                                databaseId body author{ login } } } } } } } }' \
+                      -f owner=${{ github.repository_owner }} \
+                      -f name=${{ github.event.repository.name }} \
+                      -F number=${{ github.event.pull_request.number }}
+
+               c. For each of YOUR threads that is NOT already resolved, read the
+                  current code/diff at its path and pick exactly one action:
+                    - FIXED: the problem you raised is gone in the current code
+                      → resolve the thread.
+                    - NOT fixed, someone replied disputing it, and on reflection
+                      their reasoning is correct → resolve the thread.
+                    - NOT fixed, someone replied disputing it, but you are NOT
+                      convinced → post ONE reply giving the concrete reason the
+                      concern still stands. Do NOT resolve.
+                    - NOT fixed and nobody pushed back → leave the thread open and
+                      stay silent (it remains a blocking item in the verdict).
+                  Act only when the newest comment in the thread is not already
+                  yours; if you had the last word, leave the thread untouched.
+
+               d. Resolve a thread:
+                    gh api graphql -f query='mutation($id:ID!){
+                      resolveReviewThread(input:{threadId:$id}){ thread{ isResolved } } }' \
+                      -f id=<thread id>
+                  Reply in-thread (to the root comment's databaseId):
+                    gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments/<databaseId>/replies \
+                      -f body='...'
+
+            4. Review the current diff against these rules, highest-impact first:
                - One task (an IS-XXX from backend-specs/TASKS.md) per PR; Conventional
                  Commit title referencing it.
                - Tests added/updated for every behavioral change.
@@ -81,7 +130,9 @@ jobs:
               think must be reworked, post a comment ON THAT LINE with
               mcp__github_inline_comment__create_inline_comment. State what to change
               and why. Prefix blocking items with "[blocking]" and minor ones with
-              "[nit]". Only comment on lines that are part of this PR's diff.
+              "[nit]". Only comment on lines that are part of this PR's diff. Do NOT
+              open a second thread on a line where you already have one — reply on the
+              existing thread (step 3d) instead of duplicating.
 
             - VERDICT — post exactly ONE top-level PR comment with `gh pr comment`,
               and keep it short (the detail lives in the inline comments):
@@ -92,6 +143,8 @@ jobs:
                     ## Claude review: ❌ Changes requested
                     <one bullet per blocking reason, each citing the file:line you
                      commented on inline>
+              A prior issue you resolved in step 3 is no longer blocking; one you
+              left open, or replied to while still unconvinced, still is.
 
             This review is advisory: do NOT submit a formal GitHub approval or
             request-changes review (a human does that); the required merge check
@@ -100,5 +153,5 @@ jobs:
             no praise-only comments.
           claude_args: |
             --model claude-sonnet-4-6
-            --max-turns 20
-            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr comment:*),Read,Grep,Glob"
+            --max-turns 30
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr comment:*),Bash(gh api:*),Read,Grep,Glob"
