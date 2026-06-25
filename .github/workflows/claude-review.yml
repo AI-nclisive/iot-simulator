@@ -113,8 +113,9 @@ jobs:
                       -f body='...'
 
             4. Review the current diff against these rules, highest-impact first:
-               - One task (an IS-XXX from backend-specs/TASKS.md) per PR; Conventional
-                 Commit title referencing it.
+               - One task per PR: IS-XXX from backend-specs/TASKS.md for
+                 backend/SDLC work, or UI-XXX from frontend/docs/UI_TASKS.md
+                 for frontend work; Conventional Commit title referencing it.
                - Tests added/updated for every behavioral change.
                - No new dependency outside gradle/libs.versions.toml.
                - No secrets and no generated code (jOOQ / protobuf) committed.

@@ -1,19 +1,20 @@
 name: Task
-description: A task (backend, frontend, or repo/process) tracked by an IS-ID from backend-specs/TASKS.md
-title: "IS-XXX "
+description: A backend/SDLC IS task or frontend UI task tracked in the repo catalogs
+title: "IS-XXX or UI-XXX "
 labels: ["type:task"]
 body:
   - type: markdown
     attributes:
       value: |
-        Title: **`IS-XXX short name`** (replace `IS-XXX` with the task id). The area is
-        captured by the **Area** field below.
+        Title: **`IS-XXX short name`** for backend/SDLC tasks or
+        **`UI-XXX short name`** for frontend tasks. The area is captured by the
+        **Area** field below.
   - type: input
     id: task-id
     attributes:
       label: Task ID
-      description: IS-ID from backend-specs/TASKS.md, or "new" if not yet cataloged.
-      placeholder: IS-039
+      description: IS-ID from backend-specs/TASKS.md, UI-ID from frontend/docs/UI_TASKS.md, or "new" if not yet cataloged.
+      placeholder: UI-022
     validations:
       required: true
   - type: dropdown
@@ -72,15 +73,15 @@ body:
     id: acceptance
     attributes:
       label: Acceptance criteria
-      description: Definition of done — behavior, tests, `./gradlew build` green.
+      description: Definition of done — behavior, tests, required backend/frontend checks green.
     validations:
       required: true
   - type: input
     id: depends
     attributes:
       label: Depends on
-      description: IS-IDs that must land first (if any).
-      placeholder: IS-035
+      description: Task IDs that must land first (if any).
+      placeholder: UI-001
   - type: textarea
     id: notes
     attributes:
