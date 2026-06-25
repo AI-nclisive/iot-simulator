@@ -338,7 +338,7 @@ Parallel execution:
   Done when: keyboard flow, focus visibility, labels, status messaging, and
   contrast are checked on the core P0 path.
 
-- [ ] `UI-092` Edge-state review
+- [x] `UI-092` Edge-state review
   Surface: cross-surface review
   Depends: `UI-001`, `UI-002`, `UI-090`
   Done when: empty, loading, locked, permission, stale, partial, and error
