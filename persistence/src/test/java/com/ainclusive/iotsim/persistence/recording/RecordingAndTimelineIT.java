@@ -27,6 +27,7 @@ class RecordingAndTimelineIT {
     @Container
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17");
 
+    static DSLContext dsl;
     static RecordingRepository recordings;
     static ValueTimelineRepository timeline;
     static String projectId;
@@ -39,7 +40,7 @@ class RecordingAndTimelineIT {
                 .locations("classpath:db/migration")
                 .load()
                 .migrate();
-        DSLContext dsl = DSL.using(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
+        dsl = DSL.using(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
         projectId = new JooqProjectRepository(dsl).insert("Plant", null, "it").id();
         dataSourceId = new JooqDataSourceRepository(dsl)
                 .insert(projectId, "Pump", "OPC_UA", "MANUAL", null, null, "it").id();
@@ -72,5 +73,22 @@ class RecordingAndTimelineIT {
                 recording.id(), t.atOffset(ZoneOffset.UTC), t.plusMillis(20).atOffset(ZoneOffset.UTC),
                 timeline.count(recording.id()), 0L);
         assertThat(finalized.valueCount()).isEqualTo(3);
+    }
+
+    /** IS-093: value_timeline is range-partitioned by source_time with a DEFAULT partition. */
+    @Test
+    void valueTimelineIsRangePartitioned() {
+        // pg_partitioned_table.partstrat = 'r' => RANGE partitioning is in effect.
+        String strategy = dsl.resultQuery(
+                "select partstrat::text from pg_partitioned_table p "
+                        + "join pg_class c on c.oid = p.partrelid where c.relname = 'value_timeline'")
+                .fetchOne(0, String.class);
+        assertThat(strategy).isEqualTo("r");
+
+        // A DEFAULT partition exists so appends never fail before a monthly partition is added.
+        Boolean hasDefault = dsl.resultQuery(
+                "select exists (select 1 from pg_class where relname = 'value_timeline_default')")
+                .fetchOne(0, Boolean.class);
+        assertThat(hasDefault).isTrue();
     }
 }

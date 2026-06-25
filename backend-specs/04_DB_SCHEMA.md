@@ -72,10 +72,16 @@ extension.
 
 ### Partitioning
 
-- **Native range partitioning by `source_time`** (monthly), declarative — no
-  extension. Optional at first; the table is partition-ready so it can be enabled
-  without app changes. Old partitions support retention/cleanup
-  (`frontend/docs/UI_SCREEN_SPECS.md` Retention & Cleanup) by dropping partitions.
+- **Enabled: native range partitioning by `source_time`**, declarative — no
+  extension (IS-093). The partition key is part of the primary key, as Postgres
+  requires. A `DEFAULT` partition guarantees appends always land somewhere even
+  before a monthly partition exists; monthly partitions (granularity TBD by
+  retention need) are attached as scale warrants. Old partitions support
+  retention/cleanup (`frontend/docs/UI_SCREEN_SPECS.md` Retention & Cleanup) by
+  dropping partitions.
+- jOOQ's `DDLDatabase` parser does not understand the partitioning clauses, so
+  they are wrapped in `[jooq ignore]` markers in `V4`: Flyway/Postgres execute the
+  full DDL while codegen sees a plain table with the correct columns.
 - Per-recording locality is preserved by the clustering key, so most replays read
   one recording within a few partitions.
 
@@ -103,7 +109,7 @@ Local trusted mode does not require these to be populated.
 - `V1__core_entities.sql` — projects, data_sources, schemas, schema_nodes, settings.
 - `V2__recordings_samples_scenarios_faults.sql`
 - `V3__runs_evidence_clients.sql`
-- `V4__value_timeline.sql` (partition-ready)
+- `V4__value_timeline.sql` (range-partitioned by `source_time` + `DEFAULT` partition)
 - `V5__runtime_and_activity_events.sql`
 - `V6__auth_and_leases.sql`
 
@@ -113,5 +119,5 @@ against containerized Postgres + volume or a managed instance (`STACK.md`).
 ## Open questions for reviewer
 
 - Confirm single encoded `value_enc` bytea vs per-type columns.
-- Confirm monthly partition granularity and whether to enable partitioning from
-  day one or keep partition-ready.
+- Confirm monthly partition granularity (partitioning itself is now enabled from
+  day one — IS-093).
