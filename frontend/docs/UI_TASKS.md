@@ -360,7 +360,7 @@ Parallel execution:
 2. After `UI-011` plus the required shared patterns, run `UI-012`, `UI-013`,
    and `UI-014` in parallel.
 
-- [ ] `UI-005` Edit-lock pattern
+- [x] `UI-005` Edit-lock pattern
   Surface: cross-surface pattern
   Depends: `UI-001`
   Done when: lock ownership, read-only mode, and stale-lock recovery are defined
