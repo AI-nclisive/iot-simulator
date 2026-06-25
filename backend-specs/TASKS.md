@@ -20,8 +20,8 @@ dependency-ordered. (Optimized for "make the simulator real end to end, then
 broaden, then harden for teams" — can be re-weighted if the near-term goal
 differs.)
 
-Snapshot: **build green, 80 tests / 22 suites, 0 skipped.** 54 done · 2 partial ·
-56 todo (112 total). Live status is the board; this line is a periodic snapshot.
+Snapshot: **build green, 80 tests / 22 suites, 0 skipped.** 55 done · 2 partial ·
+55 todo (112 total). Live status is the board; this line is a periodic snapshot.
 
 <details>
 <summary>ID crosswalk — legacy <code>BE-*</code> / <code>SDLC-*</code> → <code>IS-XXX</code></summary>
@@ -69,9 +69,6 @@ merge). Decisions: GitHub Actions CI, squash + linear history, live status in
 GitHub Issues/Project (TASKS.md = catalog). Admin-only steps (branch protection,
 project board, repo settings): see the config record `.github/OWNER_SETUP.md`.
 
-Tier 0 — highest priority (next up):
-- [ ] IS-112 [SDLC] ⬜ Automated PR code review by a Claude agent in CI: a `pull_request` workflow runs a Claude agent (Anthropic `claude-code-action`) over the diff and posts review comments enforcing repo conventions (AGENTS.md/CONTRIBUTING.md — one task per PR, tests added, `./gradlew build` green, no new deps, no secrets/generated code). Advisory to start; gate decision deferred. Needs `ANTHROPIC_API_KEY` secret (record in `.github/OWNER_SETUP.md`).
-
 Tier 1 — gate & baseline:
 - [x] IS-097 [SDLC] ✅ Establish trunk: foundation merged into `master` (PRs squash-merged); branches fork from a stable baseline
 - [x] IS-098 [SDLC] ✅ CI pipeline (GitHub Actions): `./gradlew build` on PR + push (= IS-095)
@@ -89,6 +86,7 @@ Tier 3 — quality automation:
 - [x] IS-106 [SDLC] ✅ Static analysis: Checkstyle (lean ruleset, generated code excluded; Error Prone/SpotBugs can be ratcheted on later)
 - [x] IS-107 [SDLC] ✅ JaCoCo coverage (XML+HTML) finalizing `test`
 - [x] IS-108 [SDLC] ✅ Dependabot (gradle + github-actions)
+- [x] IS-112 [SDLC] ✅ Advisory Claude PR code review (`anthropics/claude-code-action` on `pull_request`): reviews every PR diff against repo conventions and posts comments; non-blocking (required check stays `build`). Auth = `CLAUDE_CODE_OAUTH_TOKEN` + Claude GitHub App — see `.github/OWNER_SETUP.md`
 
 Tier 4 — parallel-conflict mitigations:
 - [x] IS-109 [SDLC] ✅ Flyway migration version-collision convention (documented)
@@ -220,10 +218,6 @@ Make runs observable and produce the P0 evidence artifact.
 
 ## Recommended immediate next
 
-**SDLC, `IS-112`** (Claude-agent PR code review in CI) — explicitly set as highest
-priority by the owner: every PR gets an automated review against repo conventions
-before human review.
-
-Next product feature: **Wave A, `IS-035 → IS-038`** (real Configure + Milo OPC UA
-projection): converts the already-green runtime plumbing into an actual OPC UA
-endpoint an Edge Device can connect to — the single biggest jump in product value.
+**Wave A, `IS-035 → IS-038`** (real Configure + Milo OPC UA projection): converts the
+already-green runtime plumbing into an actual OPC UA endpoint an Edge Device can
+connect to — the single biggest jump in product value.
