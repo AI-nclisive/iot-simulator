@@ -1,6 +1,10 @@
 name: Claude PR Review
 
 # IS-112 [SDLC] — automated, advisory AI code review on every PR.
+# Requires (see .github/OWNER_SETUP.md): (1) the Claude GitHub App installed on the
+# repo — https://github.com/apps/claude (org-owner approval), and (2) the
+# CLAUDE_CODE_OAUTH_TOKEN secret. Both are needed; the token alone fails with
+# "Claude Code is not installed on this repository".
 # Uses the `pull_request` trigger (NOT `pull_request_target`): GitHub withholds
 # repo secrets from fork-originated PRs on this event, so the OAuth token is never
 # exposed to untrusted forks. The review posts comments only; it is advisory and
