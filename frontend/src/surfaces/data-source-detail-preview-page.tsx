@@ -4,6 +4,7 @@ import { resolveAccess } from "../shell/access-policy";
 import { useDataSourcesStore } from "../shell/data-sources-store";
 import { useShellStore } from "../shell/shell-store";
 import { ConfirmationDialog } from "../ui/confirmation-dialog";
+import { DataSourceDetailClientsTab } from "./data-source-detail-clients-tab";
 import { DataSourceDetailOverviewTab } from "./data-source-detail-overview-tab";
 import { DataSourceDetailSettingsTab } from "./data-source-detail-settings-tab";
 import { DataSourceDetailValuesTab } from "./data-source-detail-values-tab";
@@ -209,13 +210,7 @@ export function DataSourceDetailPreviewPage() {
     }
 
     if (activeTab === "clients") {
-      return (
-        <SharedStatePanel
-          message="Client connection details will live here without sending users back to the source list or Overview."
-          state="empty"
-          title="Clients tab is attached to the detail shell."
-        />
-      );
+      return <DataSourceDetailClientsTab source={activeSource} />;
     }
 
     if (activeTab === "events") {
