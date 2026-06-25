@@ -7,6 +7,7 @@ import { OverviewPage } from "./surfaces/overview-page";
 import { ProjectEntryPage } from "./surfaces/project-entry-page";
 import { RecordingFlowPage } from "./surfaces/recording-flow-page";
 import { ReplayFlowPage } from "./surfaces/replay-flow-page";
+import { SettingsPage } from "./surfaces/settings-page";
 import { SurfaceStubPage } from "./surfaces/surface-stub-page";
 
 const surfaceContent = {
@@ -117,7 +118,7 @@ export const router = createBrowserRouter([
       },
       {
         path: "settings",
-        element: <SurfaceStubPage {...surfaceContent.settings} />,
+        element: <SettingsPage />,
       },
       {
         path: "admin",
