@@ -13,23 +13,31 @@ import {
   evidenceStatusTone,
   evidenceTimelineTone,
   isEvidenceExportAvailable,
+  willRetryFail,
 } from "./evidence-detail-helpers";
 import { evidenceArtifacts, type EvidenceArtifact, type EvidenceFormat } from "./mock-evidence";
 
 type ExportDialogProps = {
   evidence: EvidenceArtifact;
   open: boolean;
+  recoveryMode: boolean;
   onClose: () => void;
   onExportComplete: (result: "success" | "failed", format: EvidenceFormat) => void;
 };
 
-function ExportEvidenceDialog({ evidence, open, onClose, onExportComplete }: ExportDialogProps) {
+function ExportEvidenceDialog({
+  evidence,
+  open,
+  recoveryMode,
+  onClose,
+  onExportComplete,
+}: ExportDialogProps) {
   const titleId = useId();
   const descriptionId = useId();
   const [format, setFormat] = useState<EvidenceFormat>(evidence.formats[0] ?? "PDF");
   const [includeSummary, setIncludeSummary] = useState(true);
   const [includeTimeline, setIncludeTimeline] = useState(true);
-  const [includeClients, setIncludeClients] = useState(true);
+  const [includeClients, setIncludeClients] = useState(!recoveryMode);
   const [includeIssues, setIncludeIssues] = useState(evidence.issues.length > 0);
 
   useEffect(() => {
@@ -37,13 +45,15 @@ function ExportEvidenceDialog({ evidence, open, onClose, onExportComplete }: Exp
     setFormat(evidence.formats[0] ?? "PDF");
     setIncludeSummary(true);
     setIncludeTimeline(true);
-    setIncludeClients(true);
+    setIncludeClients(!recoveryMode);
     setIncludeIssues(evidence.issues.length > 0);
-  }, [evidence.formats, evidence.issues.length, open]);
+  }, [evidence.formats, evidence.issues.length, open, recoveryMode]);
 
   if (!open || typeof document === "undefined") return null;
 
   const selectedScope = buildExportScopeLabel({ includeSummary, includeTimeline, includeClients, includeIssues });
+
+  const retryWillFail = willRetryFail(recoveryMode, format, includeClients, evidence.clientCount);
 
   return createPortal(
     // eslint-disable-next-line jsx-a11y/no-static-element-interactions
@@ -67,9 +77,12 @@ function ExportEvidenceDialog({ evidence, open, onClose, onExportComplete }: Exp
         role="dialog"
       >
         <div className="border-b border-shell-line px-5 py-4">
-          <StatusBadge label="Export evidence" tone="accent" />
+          <StatusBadge
+            label={recoveryMode ? "Recovery export" : "Export evidence"}
+            tone={recoveryMode ? "warning" : "accent"}
+          />
           <h2 id={titleId} className="mt-3 text-lg font-semibold text-shell-ink">
-            Export evidence
+            {recoveryMode ? "Retry evidence export" : "Export evidence"}
           </h2>
           <p id={descriptionId} className="mt-2 text-sm leading-6 text-shell-muted">
             Choose the artifact format and scope. Credential material, passwords, and secret
@@ -137,6 +150,16 @@ function ExportEvidenceDialog({ evidence, open, onClose, onExportComplete }: Exp
             ))}
           </fieldset>
 
+          {retryWillFail ? (
+            <div className="rounded-md border border-shell-danger/25 bg-shell-danger/10 px-4 py-3">
+              <p className="text-sm font-medium text-shell-danger">Retry will fail with this scope.</p>
+              <p className="mt-2 text-sm leading-6 text-shell-muted">
+                Client delivery details are unavailable for this artifact. Remove Clients from the
+                scope or choose a non-bundle format.
+              </p>
+            </div>
+          ) : null}
+
           <div className="rounded-md border border-shell-line bg-shell-base/60 px-4 py-3">
             <p className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
               Export summary
@@ -153,12 +176,12 @@ function ExportEvidenceDialog({ evidence, open, onClose, onExportComplete }: Exp
             Cancel
           </button>
           <button
-            className="shell-action"
+            className={retryWillFail ? "shell-action-warning" : "shell-action"}
             disabled={selectedScope.length === 0}
             type="button"
-            onClick={() => onExportComplete("success", format)}
+            onClick={() => onExportComplete(retryWillFail ? "failed" : "success", format)}
           >
-            Start export
+            {recoveryMode ? "Retry export" : "Start export"}
           </button>
         </div>
       </div>
@@ -242,6 +265,8 @@ export function EvidenceDetailPage() {
       ? ("Export failed" as const)
       : evidence.status;
 
+  const recoveryMode = currentExportState === "Export failed";
+
   return (
     <div className="flex h-full flex-col gap-3">
       <section className="shell-panel px-5 py-5">
@@ -273,12 +298,12 @@ export function EvidenceDetailPage() {
 
         <div className="mt-6 flex flex-wrap items-center gap-2">
           <button
-            className="shell-action"
+            className={recoveryMode ? "shell-action-warning" : "shell-action"}
             disabled={!access.isAdmin || !exportAvailable}
             type="button"
             onClick={() => setExportDialogOpen(true)}
           >
-            {exportAvailable ? "Export evidence" : "Export not ready"}
+            {recoveryMode ? "Retry export" : exportAvailable ? "Export evidence" : "Export not ready"}
           </button>
           {evidence.sourcePath ? (
             <Link className="shell-text-action" to={evidence.sourcePath}>
@@ -295,16 +320,46 @@ export function EvidenceDetailPage() {
         {exportedFormat ? (
           <div className="mt-4 rounded-md border border-shell-line bg-shell-base/60 px-4 py-3">
             <p className="text-sm font-medium text-shell-ink">
-              Last export: {exportedFormat}
+              Last export attempt: {exportedFormat}
             </p>
             <p className="mt-1 text-sm text-shell-muted">
               {exportOutcome === "success"
                 ? "Export completed. Secret values were excluded from the artifact."
-                : "Export failed. Adjust the scope or format and retry."}
+                : "Export failed again. Adjust the scope and retry."}
             </p>
           </div>
         ) : null}
       </section>
+
+      {recoveryMode ? (
+        <section className="rounded-lg border border-shell-danger/25 bg-white px-5 py-5 shadow-panel">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0 max-w-3xl">
+              <StatusBadge label="Export recovery" tone="danger" />
+              <h3 className="mt-3 text-base font-semibold text-shell-ink">
+                Export needs another pass
+              </h3>
+              <p className="mt-2 text-sm leading-6 text-shell-muted">
+                {evidence.exportFailureReason ??
+                  "The previous export failed before the artifact was written."}
+              </p>
+              <p className="mt-2 text-sm leading-6 text-shell-muted">
+                {evidence.exportNextAction ??
+                  "Retry export after adjusting the artifact scope or format."}
+              </p>
+            </div>
+            {access.isAdmin ? (
+              <button
+                className="shell-action-warning"
+                type="button"
+                onClick={() => setExportDialogOpen(true)}
+              >
+                Retry export
+              </button>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
 
       <div className="grid gap-3 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         <section className="shell-panel px-5 py-5">
@@ -438,6 +493,7 @@ export function EvidenceDetailPage() {
       <ExportEvidenceDialog
         evidence={evidence}
         open={exportDialogOpen}
+        recoveryMode={recoveryMode}
         onClose={closeExportDialog}
         onExportComplete={handleExportComplete}
       />
