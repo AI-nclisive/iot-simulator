@@ -303,7 +303,7 @@ Parallel execution:
   Done when: summary, timeline, clients, faults or errors, and partial states
   explain what happened and how complete the artifact is.
 
-- [ ] `UI-072` Evidence export dialog
+- [x] `UI-072` Evidence export dialog
   Surface: `Evidence Detail`
   Depends: `UI-071`
   Done when: export formats, artifact scope, and secret exclusion are explicit.

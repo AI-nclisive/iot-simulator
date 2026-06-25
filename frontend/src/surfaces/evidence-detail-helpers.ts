@@ -40,3 +40,19 @@ export function evidenceDeliveryTone(
 export function isEvidenceExportAvailable(evidence: EvidenceArtifact): boolean {
   return evidence.status !== "Capturing" && evidence.exportState !== "Not ready";
 }
+
+export type ExportScope = {
+  includeSummary: boolean;
+  includeTimeline: boolean;
+  includeClients: boolean;
+  includeIssues: boolean;
+};
+
+export function buildExportScopeLabel(scope: ExportScope): string[] {
+  return [
+    scope.includeSummary ? "Summary" : null,
+    scope.includeTimeline ? "Timeline" : null,
+    scope.includeClients ? "Clients" : null,
+    scope.includeIssues ? "Faults and errors" : null,
+  ].filter((s): s is string => s !== null);
+}
