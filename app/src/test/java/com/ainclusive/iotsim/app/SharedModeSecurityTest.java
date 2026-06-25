@@ -43,4 +43,14 @@ class SharedModeSecurityTest {
         mockMvc.perform(get("/api/v1/meta").with(jwt()))
                 .andExpect(status().isOk());
     }
+
+    @Test
+    void publicEndpointsAreReachableWithoutCredentials() throws Exception {
+        // permitAll lets the unauthenticated request past the security chain; the
+        // actuator endpoint itself isn't registered in this controller slice, so it
+        // resolves to 404 (not the 401 an authenticated-only path returns). Asserting
+        // "not 401" guards the PUBLIC_ENDPOINTS permitAll stanza against regressions.
+        mockMvc.perform(get("/actuator/health"))
+                .andExpect(status().isNotFound());
+    }
 }
