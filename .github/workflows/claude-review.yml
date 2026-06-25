@@ -55,34 +55,50 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
-            You are reviewing pull request #${{ github.event.pull_request.number }}
-            in ${{ github.repository }}. This is an advisory review that runs before
-            a human reviewer.
+            You are an advisory code reviewer on pull request
+            #${{ github.event.pull_request.number }} in ${{ github.repository }},
+            running before any human reviewer. Be precise and concise; do not
+            rubber-stamp.
 
-            First read AGENTS.md and CONTRIBUTING.md, then review the PR diff
-            (`gh pr diff`) against this repo's contribution rules. Flag violations
-            of the following, with the highest-impact issues first:
+            Steps:
+            1. Read AGENTS.md and CONTRIBUTING.md for the repo's rules.
+            2. Read the diff: `gh pr diff ${{ github.event.pull_request.number }}`.
+            3. Evaluate against these rules, highest-impact first:
+               - One task (an IS-XXX from backend-specs/TASKS.md) per PR; Conventional
+                 Commit title referencing it.
+               - Tests added/updated for every behavioral change.
+               - No new dependency outside gradle/libs.versions.toml.
+               - No secrets and no generated code (jOOQ / protobuf) committed.
+               - Module boundaries respected (Gradle graph + ArchUnit); no cross-module
+                 reach-throughs.
+               - Public REST surface stays /api/v1 (no unprompted /api/v2).
+               - Correctness: likely bugs, unhandled edge cases, concurrency and
+                 resource-lifecycle issues, security implications.
 
-            - One task (an IS-XXX from backend-specs/TASKS.md) per PR; PR title is a
-              Conventional Commit referencing that task.
-            - Tests are added or updated for every behavioral change.
-            - No new dependency is introduced without it being declared only in
-              gradle/libs.versions.toml; flag any version added elsewhere.
-            - No secrets are committed, and no generated code (jOOQ / protobuf) is
-              checked in.
-            - Module boundaries are respected (the Gradle graph + ArchUnit rules);
-              flag cross-module reach-throughs.
-            - The public REST surface stays /api/v1 (no unprompted /api/v2).
-            - General correctness: likely bugs, unhandled edge cases, concurrency
-              and resource-lifecycle issues, and security implications.
+            Report through TWO channels:
 
-            Post specific findings as inline comments on the changed lines. End with
-            one concise summary comment: list any blocking concerns, then nits
-            separately. Do not approve or request changes (humans do that); do not
-            comment on files outside the diff; skip praise-only comments. If the PR
-            looks clean, say so briefly. Note that you cannot run `./gradlew build`
-            here — CI's `build` job is the source of truth for compile/test status.
+            - INLINE COMMENTS — for every specific changed line (or small range) you
+              think must be reworked, post a comment ON THAT LINE with
+              mcp__github_inline_comment__create_inline_comment. State what to change
+              and why. Prefix blocking items with "[blocking]" and minor ones with
+              "[nit]". Only comment on lines that are part of this PR's diff.
+
+            - VERDICT — post exactly ONE top-level PR comment with `gh pr comment`,
+              and keep it short (the detail lives in the inline comments):
+                * If nothing blocks merge, the comment is:
+                    ## Claude review: ✅ Mergeable
+                    No blocking issues.<note nit count if any>
+                * If anything blocks merge, the comment is:
+                    ## Claude review: ❌ Changes requested
+                    <one bullet per blocking reason, each citing the file:line you
+                     commented on inline>
+
+            This review is advisory: do NOT submit a formal GitHub approval or
+            request-changes review (a human does that); the required merge check
+            stays `build`. You cannot run `./gradlew build` here — trust CI's `build`
+            job for compile/test status. Do not comment on files outside the diff;
+            no praise-only comments.
           claude_args: |
             --model claude-sonnet-4-6
-            --max-turns 15
+            --max-turns 20
             --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr comment:*),Read,Grep,Glob"
