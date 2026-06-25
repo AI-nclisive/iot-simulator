@@ -9,6 +9,7 @@ import { DataSourceDetailSettingsTab } from "./data-source-detail-settings-tab";
 import { DataSourceDetailValuesTab } from "./data-source-detail-values-tab";
 import { SharedStatePanel } from "../ui/shared-state-panel";
 import { StatusBadge } from "../ui/status-badge";
+import { stopActionCopy } from "./source-action-copy";
 
 type DetailTabId =
   | "overview"
@@ -53,14 +54,6 @@ function currentTabId(searchValue: string | null): DetailTabId {
   return detailTabs.some((tab) => tab.id === searchValue)
     ? (searchValue as DetailTabId)
     : "overview";
-}
-
-function stopActionCopy() {
-  return {
-    confirmLabel: "Stop source",
-    message: "Stopping this source stops its current activity for everyone using this project.",
-    title: "Stop this source?",
-  };
 }
 
 function healthDiagnosticCopy(source: {
