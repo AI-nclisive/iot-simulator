@@ -80,6 +80,7 @@ Tier 2 — contribution hygiene:
 - [x] IS-102 [SDLC] ✅ PR template
 - [x] IS-103 [SDLC] ✅ Issue templates + labels + org Project #1 board applied (fields `Status` / `Task ID` / `Area` BE/FE/SDLC; issues mirrored 1:1)
 - [x] IS-104 [SDLC] ✅ `AGENTS.md` extended to code contributions
+- [x] IS-113 [SDLC] ✅ Board status flow + review-completion rule documented (In Progress at start, In review at PR open; task done only when all review comments resolved) — `AGENTS.md`/`CONTRIBUTING.md`
 
 Tier 3 — quality automation:
 - [x] IS-105 [SDLC] ✅ Spotless (import order + whitespace hygiene) — runs in `check`/CI
@@ -139,7 +140,7 @@ Turn the in-memory worker into a real OPC UA simulator (the stated core risk).
 - [x] IS-037 [BE] ✅ [model] OPC UA address-space projection (schema → variable nodes) — 01
 - [x] IS-038 [BE] ✅ [runtime] worker-opcua: real Eclipse Milo server + value projection — 02
 - [x] IS-039 [BE] ✅ [runtime] Real worker process spawn E2E (installDist + ProcessWorkerLauncher) — 02
-- [ ] IS-040 [BE] ⬜ [runtime] Restart-with-backoff on unexpected failure (intentional faults excluded) — 02
+- [x] IS-040 [BE] ✅ [runtime] Restart-with-backoff on unexpected failure (intentional faults excluded) — 02
 - [ ] IS-041 [BE] ⬜ [runtime] Health monitoring loop + stale/error state propagation — 02
 
 ## Wave B — Primary flow against a real source · P0
