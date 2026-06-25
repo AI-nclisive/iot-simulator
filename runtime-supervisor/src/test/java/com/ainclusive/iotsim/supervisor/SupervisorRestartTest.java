@@ -129,6 +129,28 @@ class SupervisorRestartTest {
     }
 
     @Test
+    void stopDuringRestartHandshakeReturnsPromptly() {
+        supervisor = new Supervisor(launcher, fastPolicy);
+        supervisor.start("ds1", spec());
+
+        // The relaunch will hang in the Hello handshake (no service bound), so the
+        // restart sits in connect()/awaitReady — the window the nit was about.
+        launcher.setHandshakeBroken(true);
+        launcher.crashLast();
+        await(() -> launcher.launchCount() == 2);
+        await(() -> "STARTING".equals(supervisor.state("ds1")));
+
+        long startNanos = System.nanoTime();
+        assertThat(supervisor.stop("ds1")).isEqualTo("STOPPED");
+        long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
+
+        // Must not wait out the worker ready-timeout (10s); the handshake is interrupted.
+        assertThat(elapsedMs).as("stop() should not block on the in-flight handshake").isLessThan(2_000);
+        assertStable(() -> "STOPPED".equals(supervisor.state("ds1")));
+        await(launcher::allServersShutDown);
+    }
+
+    @Test
     void startAfterCloseThrows() {
         supervisor = new Supervisor(launcher, fastPolicy);
         supervisor.close();

@@ -199,6 +199,15 @@ public final class Supervisor implements RuntimeController, AutoCloseable {
         }
     }
 
+    /** A live worker built by {@code connect()} but not yet adopted as the managed worker. */
+    private record Connection(LaunchedWorker launched, WorkerClient client) {
+
+        void close() {
+            closeQuietly(client);
+            launched.close();
+        }
+    }
+
     /**
      * One data-source's worker across its (possibly restarted) lifetime. Holds the
      * start spec so a crashed worker can be relaunched, the current launch/client,
@@ -223,12 +232,21 @@ public final class Supervisor implements RuntimeController, AutoCloseable {
         }
 
         /** Initial bring-up, synchronous so the caller of {@code start()} sees failures. */
-        synchronized void launchAndStart() {
-            connectAndStart();
+        void launchAndStart() {
+            // connect() blocks (spawn + handshake); the worker isn't reachable by stop()
+            // until installed, so no monitor is needed around the launch itself.
+            Connection conn = connect();
+            synchronized (this) {
+                install(conn);
+            }
         }
 
-        /** Caller holds the monitor. Spawns, handshakes, configures and starts a worker. */
-        private void connectAndStart() {
+        /**
+         * Spawns, handshakes, configures and starts a worker. Blocking and lock-free —
+         * a concurrent {@code stop()} stays responsive instead of waiting out the
+         * handshake. Returns the live connection or throws and leaves nothing running.
+         */
+        private Connection connect() {
             int controlPort = PortAllocator.freeLoopbackPort();
             LaunchedWorker newLaunched;
             try {
@@ -246,11 +264,16 @@ public final class Supervisor implements RuntimeController, AutoCloseable {
                 newLaunched.close();
                 throw e;
             }
-            this.launched = newLaunched;
-            this.client = newClient;
+            return new Connection(newLaunched, newClient);
+        }
+
+        /** Caller holds the monitor. Adopts a freshly built connection as the live worker. */
+        private void install(Connection conn) {
+            this.launched = conn.launched();
+            this.client = conn.client();
             this.state = WorkerState.RUNNING;
             // Watch THIS launch; a stale notification from a superseded launch is ignored.
-            newLaunched.onExit().whenComplete((v, t) -> onWorkerExit(newLaunched));
+            conn.launched().onExit().whenComplete((v, t) -> onWorkerExit(conn.launched()));
         }
 
         /** Fires when a worker process exits — schedules a restart unless it was intentional. */
@@ -282,16 +305,32 @@ public final class Supervisor implements RuntimeController, AutoCloseable {
             }
         }
 
-        private synchronized void restart() {
-            if (stopping) {
+        private void restart() {
+            synchronized (this) {
+                if (stopping) {
+                    return;
+                }
+            }
+            Connection conn;
+            try {
+                conn = connect(); // blocking, no monitor — stop() can interrupt via cancel(true)
+            } catch (RuntimeException e) {
+                // Relaunch itself failed (or was interrupted by stop()); back off again
+                // unless we are tearing down.
+                synchronized (this) {
+                    if (!stopping) {
+                        scheduleRestart();
+                    }
+                }
                 return;
             }
-            pendingRestart = null;
-            try {
-                connectAndStart();
-            } catch (RuntimeException e) {
-                // Relaunch itself failed; treat as another failure and back off again.
-                scheduleRestart();
+            synchronized (this) {
+                if (stopping) {
+                    // stop() raced in during the handshake — discard the fresh worker.
+                    conn.close();
+                    return;
+                }
+                install(conn);
             }
         }
 
@@ -310,8 +349,10 @@ public final class Supervisor implements RuntimeController, AutoCloseable {
                 client = null;
             }
             // Tear down outside the lock; onWorkerExit will see stopping=true and skip restart.
+            // cancel(true) also interrupts a restart whose handshake is already in flight,
+            // so stop() returns promptly instead of waiting out the ready-timeout.
             if (toCancel != null) {
-                toCancel.cancel(false);
+                toCancel.cancel(true);
             }
             if (clientToClose != null) {
                 try {

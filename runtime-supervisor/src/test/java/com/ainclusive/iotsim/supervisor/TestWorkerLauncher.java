@@ -22,15 +22,26 @@ final class TestWorkerLauncher implements WorkerLauncher {
     record Launch(Server server, TestProtocolService service, CompletableFuture<Void> exit) {}
 
     private final List<Launch> launches = new CopyOnWriteArrayList<>();
+    private volatile boolean handshakeBroken;
+
+    /**
+     * From now on, launched workers bind their port but expose no service, so the
+     * supervisor's {@code Hello} never succeeds and its handshake stays in flight —
+     * used to exercise a stop() that races an unfinished restart.
+     */
+    void setHandshakeBroken(boolean broken) {
+        this.handshakeBroken = broken;
+    }
 
     @Override
     public LaunchedWorker launch(String protocol, int controlPort) throws Exception {
         TestProtocolService service = new TestProtocolService();
-        Server server = NettyServerBuilder
-                .forAddress(new InetSocketAddress(InetAddress.getLoopbackAddress(), controlPort))
-                .addService(service)
-                .build()
-                .start();
+        NettyServerBuilder builder = NettyServerBuilder
+                .forAddress(new InetSocketAddress(InetAddress.getLoopbackAddress(), controlPort));
+        if (!handshakeBroken) {
+            builder.addService(service);
+        }
+        Server server = builder.build().start();
         CompletableFuture<Void> exit = new CompletableFuture<>();
         launches.add(new Launch(server, service, exit));
         return new LaunchedWorker() {
