@@ -48,8 +48,9 @@ class OpcUaWorkerProcessIT {
         int listenPort = PortAllocator.freeLoopbackPort();
         RuntimeStartSpec spec = new RuntimeStartSpec("OPC_UA", 1, List.of(variable("temp", "Temperature")), listenPort);
 
-        assertThat(supervisor.start("ds1", spec)).isEqualTo("RUNNING");
         try {
+            assertThat(supervisor.start("ds1", spec)).isEqualTo("RUNNING");
+
             OpcUaClient client = OpcUaClient.create("opc.tcp://127.0.0.1:" + listenPort + "/iotsim");
             try {
                 client.connect().get(15, SECONDS);

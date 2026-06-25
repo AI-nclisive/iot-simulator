@@ -41,6 +41,7 @@ class OpcUaWorkerSpawnIT {
         int listenPort = PortAllocator.freeLoopbackPort();
         RuntimeStartSpec spec = new RuntimeStartSpec("OPC_UA", 1, List.of(variable("temp", "Temperature")), listenPort);
 
+        String stopState;
         try {
             // start() completes the full Hello -> Configure -> Start handshake against
             // the spawned process; it would throw if the worker failed to come up.
@@ -55,9 +56,12 @@ class OpcUaWorkerSpawnIT {
                     NeutralValue.good("temp", Instant.now(), 21.5)));
             assertThat(applied).isEqualTo(1);
         } finally {
-            assertThat(supervisor.stop("ds1")).isEqualTo("STOPPED");
+            // Tear the worker down unconditionally; assert the outcomes afterwards so a
+            // failed assertion here cannot mask the leak check below.
+            stopState = supervisor.stop("ds1");
         }
 
+        assertThat(stopState).as("stop should report STOPPED").isEqualTo("STOPPED");
         assertThat(awaitPort(listenPort, false))
                 .as("listen port should be released after stop")
                 .isTrue();
