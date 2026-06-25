@@ -18,7 +18,7 @@ import java.time.Duration;
  */
 public record HealthPolicy(Duration pollInterval, Duration probeTimeout, int staleThreshold) {
 
-    /** Sensible default: probe every 5s with a 2s deadline; STALE after 3 misses (~15s). */
+    /** Sensible default: probe every 5 s with a 2 s deadline; STALE after 3 consecutive misses. */
     public static final HealthPolicy DEFAULT =
             new HealthPolicy(Duration.ofSeconds(5), Duration.ofSeconds(2), 3);
 
