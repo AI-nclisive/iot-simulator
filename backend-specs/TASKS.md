@@ -218,6 +218,8 @@ Make runs observable and produce the P0 evidence artifact.
 
 ## Recommended immediate next
 
-**Wave A, `IS-035 → IS-038`** (real Configure + Milo OPC UA projection): converts the
-already-green runtime plumbing into an actual OPC UA endpoint an Edge Device can
-connect to — the single biggest jump in product value.
+**Wave A, `IS-040 → IS-041`** (restart-with-backoff + health-monitoring loop):
+now that the real out-of-process worker spawn (`IS-039`) is in place, finish
+runtime fidelity so unexpected worker failure is contained and source
+health/state propagates to the API/UI — the remaining P0 fault-isolation gap
+before broadening to real-source scan/record (Wave B).
