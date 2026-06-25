@@ -21,7 +21,7 @@ public class RuntimeConfig {
     @Bean
     public RuntimeController runtimeController(RuntimeProperties props) {
         if (props.isSupervisorMode()) {
-            return new Supervisor(new ProcessWorkerLauncher(props.workers()));
+            return new Supervisor(new ProcessWorkerLauncher(props.workers()), props.restartPolicy());
         }
         return new InMemoryRuntimeController();
     }

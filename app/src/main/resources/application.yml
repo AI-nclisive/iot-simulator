@@ -27,6 +27,14 @@ iotsim:
     # workers:
     #   OPC_UA:
     #     - /opt/iotsim/workers/worker-opcua/bin/worker-opcua
+    # Restart-with-backoff on unexpected worker exit (supervisor mode). Intentional
+    # stops and faults are never restarted. Unset fields use built-in defaults
+    # (500ms initial, x2, 30s cap, 5 attempts). See 02_WORKER_CONTRACT_AND_IPC.md §4.
+    # restart:
+    #   initial-backoff: 500ms
+    #   multiplier: 2.0
+    #   max-backoff: 30s
+    #   max-restarts: 5
 
 server:
   port: ${SERVER_PORT:8080}

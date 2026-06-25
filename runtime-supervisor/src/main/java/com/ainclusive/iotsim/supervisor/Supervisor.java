@@ -14,56 +14,111 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Owns worker lifecycle: port allocation, launch, IPC handshake, start/stop and
- * tracking. Protocol-agnostic — adding a protocol means adding a worker, not
- * changing the supervisor. Implements the {@link RuntimeController} port so the
- * domain can drive runtime without depending on this module.
+ * Owns worker lifecycle: port allocation, launch, IPC handshake, start/stop,
+ * tracking, and restart-with-backoff on unexpected failure. Protocol-agnostic —
+ * adding a protocol means adding a worker, not changing the supervisor.
+ * Implements the {@link RuntimeController} port so the domain can drive runtime
+ * without depending on this module.
  *
- * <p>See backend-specs/02_WORKER_CONTRACT_AND_IPC.md.
+ * <p>Only <em>unexpected</em> worker exits are restarted (exponential backoff up
+ * to a cap, per {@link RestartPolicy}); an intentional {@code stop()} and worker
+ * faults are never auto-healed. While a worker is recovering the source reports
+ * {@code STARTING}; once the cap is exhausted it reports {@code ERROR}. The
+ * health-monitoring loop and stale-state detection are a separate concern
+ * (IS-041).
+ *
+ * <p>See backend-specs/02_WORKER_CONTRACT_AND_IPC.md §4.
  */
-public final class Supervisor implements RuntimeController {
+public final class Supervisor implements RuntimeController, AutoCloseable {
 
     private static final String RUNNING = "RUNNING";
     private static final String STOPPED = "STOPPED";
+    private static final String STARTING = "STARTING";
+    private static final String ERROR = "ERROR";
     private static final Duration READY_TIMEOUT = Duration.ofSeconds(10);
 
     private final WorkerLauncher launcher;
-    private final Map<String, RunningWorker> running = new ConcurrentHashMap<>();
+    private final RestartPolicy restartPolicy;
+    private final ScheduledExecutorService scheduler;
+    private final Map<String, ManagedWorker> running = new ConcurrentHashMap<>();
+    private volatile boolean closed;
 
     public Supervisor(WorkerLauncher launcher) {
+        this(launcher, RestartPolicy.DEFAULT);
+    }
+
+    public Supervisor(WorkerLauncher launcher, RestartPolicy restartPolicy) {
         this.launcher = launcher;
+        this.restartPolicy = restartPolicy;
+        AtomicInteger seq = new AtomicInteger();
+        this.scheduler = Executors.newScheduledThreadPool(2, r -> {
+            Thread t = new Thread(r, "worker-restart-" + seq.incrementAndGet());
+            t.setDaemon(true);
+            return t;
+        });
     }
 
     @Override
     public String start(String dataSourceId, RuntimeStartSpec spec) {
-        running.computeIfAbsent(dataSourceId, id -> launchAndStart(spec));
+        if (closed) {
+            throw new IllegalStateException("supervisor is closed");
+        }
+        // launchAndStart() throws on failure, so compute leaves the map unchanged and
+        // the caller sees the launch error directly. A worker still active (RUNNING or
+        // recovering) is left as-is — start is idempotent. A worker that exhausted its
+        // restart budget (ERROR) is replaced, so an operator can explicitly retry it.
+        // Only an exit after a successful start is recovered via restart-with-backoff.
+        running.compute(dataSourceId, (id, existing) -> {
+            if (existing != null && existing.isActive()) {
+                return existing;
+            }
+            ManagedWorker worker = new ManagedWorker(id, spec);
+            worker.launchAndStart();
+            return worker;
+        });
         return RUNNING;
     }
 
     @Override
     public String stop(String dataSourceId) {
-        RunningWorker worker = running.remove(dataSourceId);
+        ManagedWorker worker = running.remove(dataSourceId);
         if (worker != null) {
-            worker.shutdown();
+            worker.stop();
         }
         return STOPPED;
     }
 
     @Override
     public String state(String dataSourceId) {
-        return running.containsKey(dataSourceId) ? RUNNING : STOPPED;
+        ManagedWorker worker = running.get(dataSourceId);
+        return worker == null ? STOPPED : worker.stateName();
     }
 
     @Override
     public long applyValues(String dataSourceId, List<NeutralValue> values) {
-        RunningWorker worker = running.get(dataSourceId);
+        ManagedWorker worker = running.get(dataSourceId);
         if (worker == null) {
             throw new IllegalStateException("data source is not running: " + dataSourceId);
         }
         List<Value> protoValues = values.stream().map(Supervisor::toProto).toList();
-        return worker.client().applyValues(protoValues);
+        return worker.applyValues(protoValues);
+    }
+
+    /** Stops every worker and the restart scheduler; safe to call on app shutdown. */
+    @Override
+    public void close() {
+        closed = true;
+        scheduler.shutdownNow();
+        running.values().forEach(ManagedWorker::stop);
+        running.clear();
     }
 
     private static Value toProto(NeutralValue nv) {
@@ -76,27 +131,6 @@ public final class Supervisor implements RuntimeController {
                 .setQuality(Quality.valueOf(nv.quality().name()))
                 .setQualityReason(nv.qualityReason() == null ? "" : nv.qualityReason())
                 .build();
-    }
-
-    private RunningWorker launchAndStart(RuntimeStartSpec spec) {
-        int controlPort = PortAllocator.freeLoopbackPort();
-        LaunchedWorker launched;
-        try {
-            launched = launcher.launch(spec.protocol(), controlPort);
-        } catch (Exception e) {
-            throw new WorkerLaunchException("failed to launch " + spec.protocol() + " worker", e);
-        }
-        WorkerClient client = new WorkerClient("127.0.0.1", controlPort);
-        try {
-            awaitReady(client);
-            client.configure(toProtoSchema(spec), spec.listenPort());
-            client.start();
-            return new RunningWorker(launched, client);
-        } catch (RuntimeException e) {
-            client.close();
-            launched.close();
-            throw e;
-        }
     }
 
     private static Schema toProtoSchema(RuntimeStartSpec spec) {
@@ -142,16 +176,166 @@ public final class Supervisor implements RuntimeController {
         throw new WorkerLaunchException("worker did not become ready in time", last);
     }
 
-    private record RunningWorker(LaunchedWorker launched, WorkerClient client) {
-
-        void shutdown() {
+    private static void closeQuietly(WorkerClient client) {
+        if (client != null) {
             try {
-                client.stop();
+                client.close();
             } catch (RuntimeException ignored) {
                 // best effort; we are tearing down
             }
-            client.close();
-            launched.close();
+        }
+    }
+
+    /**
+     * One data-source's worker across its (possibly restarted) lifetime. Holds the
+     * start spec so a crashed worker can be relaunched, the current launch/client,
+     * and the restart bookkeeping. All mutable fields are guarded by the monitor;
+     * {@link #state} is volatile so {@link #stateName()} reads it lock-free.
+     */
+    private final class ManagedWorker {
+
+        private final String dataSourceId;
+        private final RuntimeStartSpec spec;
+
+        private LaunchedWorker launched;
+        private WorkerClient client;
+        private int restarts;
+        private boolean stopping;
+        private ScheduledFuture<?> pendingRestart;
+        private volatile WorkerState state = WorkerState.SPAWNED;
+
+        ManagedWorker(String dataSourceId, RuntimeStartSpec spec) {
+            this.dataSourceId = dataSourceId;
+            this.spec = spec;
+        }
+
+        /** Initial bring-up, synchronous so the caller of {@code start()} sees failures. */
+        synchronized void launchAndStart() {
+            connectAndStart();
+        }
+
+        /** Caller holds the monitor. Spawns, handshakes, configures and starts a worker. */
+        private void connectAndStart() {
+            int controlPort = PortAllocator.freeLoopbackPort();
+            LaunchedWorker newLaunched;
+            try {
+                newLaunched = launcher.launch(spec.protocol(), controlPort);
+            } catch (Exception e) {
+                throw new WorkerLaunchException("failed to launch " + spec.protocol() + " worker", e);
+            }
+            WorkerClient newClient = new WorkerClient("127.0.0.1", controlPort);
+            try {
+                awaitReady(newClient);
+                newClient.configure(toProtoSchema(spec), spec.listenPort());
+                newClient.start();
+            } catch (RuntimeException e) {
+                newClient.close();
+                newLaunched.close();
+                throw e;
+            }
+            this.launched = newLaunched;
+            this.client = newClient;
+            this.state = WorkerState.RUNNING;
+            // Watch THIS launch; a stale notification from a superseded launch is ignored.
+            newLaunched.onExit().whenComplete((v, t) -> onWorkerExit(newLaunched));
+        }
+
+        /** Fires when a worker process exits — schedules a restart unless it was intentional. */
+        private synchronized void onWorkerExit(LaunchedWorker exited) {
+            if (stopping || launched != exited) {
+                return;
+            }
+            // The process is gone; release its client channel before relaunching.
+            closeQuietly(client);
+            client = null;
+            launched = null;
+            scheduleRestart();
+        }
+
+        /** Caller holds the monitor. Backs off and schedules a restart, or gives up at the cap. */
+        private void scheduleRestart() {
+            if (restarts >= restartPolicy.maxRestarts()) {
+                state = WorkerState.EXITED; // exhausted -> reported as ERROR
+                return;
+            }
+            restarts++;
+            state = WorkerState.SPAWNED; // recovering -> reported as STARTING
+            Duration delay = restartPolicy.backoffFor(restarts);
+            try {
+                pendingRestart = scheduler.schedule(
+                        this::restart, delay.toMillis(), TimeUnit.MILLISECONDS);
+            } catch (RejectedExecutionException e) {
+                state = WorkerState.EXITED; // scheduler shutting down; nothing more to try
+            }
+        }
+
+        private synchronized void restart() {
+            if (stopping) {
+                return;
+            }
+            pendingRestart = null;
+            try {
+                connectAndStart();
+            } catch (RuntimeException e) {
+                // Relaunch itself failed; treat as another failure and back off again.
+                scheduleRestart();
+            }
+        }
+
+        void stop() {
+            ScheduledFuture<?> toCancel;
+            LaunchedWorker toClose;
+            WorkerClient clientToClose;
+            synchronized (this) {
+                stopping = true;
+                state = WorkerState.STOPPED;
+                toCancel = pendingRestart;
+                pendingRestart = null;
+                toClose = launched;
+                clientToClose = client;
+                launched = null;
+                client = null;
+            }
+            // Tear down outside the lock; onWorkerExit will see stopping=true and skip restart.
+            if (toCancel != null) {
+                toCancel.cancel(false);
+            }
+            if (clientToClose != null) {
+                try {
+                    clientToClose.stop();
+                } catch (RuntimeException ignored) {
+                    // best effort; we are tearing down
+                }
+                clientToClose.close();
+            }
+            if (toClose != null) {
+                toClose.close();
+            }
+        }
+
+        long applyValues(List<Value> protoValues) {
+            WorkerClient current;
+            synchronized (this) {
+                current = client;
+            }
+            if (current == null) {
+                throw new IllegalStateException("data source is not running: " + dataSourceId);
+            }
+            return current.applyValues(protoValues);
+        }
+
+        /** Still running or recovering — i.e. not a worker that exhausted its restart budget. */
+        boolean isActive() {
+            return state != WorkerState.EXITED;
+        }
+
+        String stateName() {
+            return switch (state) {
+                case RUNNING -> RUNNING;
+                case EXITED -> ERROR;
+                case STOPPED -> STOPPED;
+                default -> STARTING; // SPAWNED / READY / CONFIGURED: starting or restarting
+            };
         }
     }
 }
