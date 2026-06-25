@@ -46,8 +46,8 @@ public final class ProcessWorkerLauncher implements WorkerLauncher {
                 process.destroyForcibly();
             }
         } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
             process.destroyForcibly();
+            Thread.currentThread().interrupt();
         }
     }
 }

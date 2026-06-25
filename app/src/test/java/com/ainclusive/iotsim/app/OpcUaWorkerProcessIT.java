@@ -51,11 +51,13 @@ class OpcUaWorkerProcessIT {
         assertThat(supervisor.start("ds1", spec)).isEqualTo("RUNNING");
         try {
             OpcUaClient client = OpcUaClient.create("opc.tcp://127.0.0.1:" + listenPort + "/iotsim");
-            client.connect().get(15, SECONDS);
             try {
+                client.connect().get(15, SECONDS);
+
                 NodeId nodeId = new NodeId(schemaNamespaceIndex(client), "temp");
 
                 DataValue initial = client.readValue(0.0, TimestampsToReturn.Both, nodeId).get(10, SECONDS);
+                assertThat(initial.getStatusCode().isGood()).as("initial read status").isTrue();
                 assertThat(((Number) initial.getValue().getValue()).doubleValue()).isEqualTo(0.0);
 
                 supervisor.applyValues("ds1", List.of(NeutralValue.good("temp", Instant.now(), 42.5)));
@@ -89,9 +91,11 @@ class OpcUaWorkerProcessIT {
         double last = Double.NaN;
         for (int attempt = 0; attempt < 25; attempt++) {
             DataValue value = client.readValue(0.0, TimestampsToReturn.Both, nodeId).get(10, SECONDS);
-            last = ((Number) value.getValue().getValue()).doubleValue();
-            if (last == 42.5) {
-                return last;
+            if (value.getValue().getValue() instanceof Number number) {
+                last = number.doubleValue();
+                if (last == 42.5) {
+                    return last;
+                }
             }
             Thread.sleep(200);
         }
