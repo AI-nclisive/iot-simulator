@@ -65,8 +65,14 @@ When you change tasks, change **both** the file and the Project:
 - Adding, renaming, removing, or re-scoping a task in a catalog → also create,
   edit, or close the matching issue and board item (by `IS-`/`UI-` ID); never
   create a duplicate ID.
-- Track live **status** on the board (`Status` field + open/closed issue), not by
-  flipping `TASKS.md` checkboxes inside feature PRs (merge-conflict hotspot).
+- In-progress status (`In Progress` / `In review`) lives on the **board only**
+  (`Status` field + open issue) — don't edit catalog checkboxes for those.
+- **Done is recorded in two places:** flip the catalog checkbox to `[x]` ✅ **in
+  the implementation PR itself** (the same PR that delivers the work — this avoids
+  a separate catalog-only PR, which the no-direct-push-to-`master` rule would
+  otherwise force), and move the board `Status` to **Done** + close the issue
+  **only after that PR is merged**. Each PR edits only its own task's line, so
+  catalog conflicts are rare.
 - Issue shape (see `.github/ISSUE_TEMPLATE/task.yml`): title `IS-XXX [AREA] name`,
   label `type:task` (+ `priority:P*`); board fields `Status` / `Task ID` / `Area`
   (`Area` ∈ BE / FE / SDLC).
@@ -84,8 +90,10 @@ Follow `CONTRIBUTING.md`. For agents specifically:
   advisory Claude reviewer's verdict, fix each finding (or reply why the current choice
   is best), push, and wait for re-review. Move the task to **In review** (ready for
   human review) only when the verdict is ✅ or after 3 review rounds.
-- Keep tasks in sync with the GitHub Project (see "Task Tracking"); status lives on
-  the board, not in `TASKS.md` checkboxes inside feature PRs.
+- Keep tasks in sync with the GitHub Project (see "Task Tracking"): the board
+  `Status` is the live source for `In Progress` / `In review`; mark the catalog
+  checkbox `[x]` ✅ in the implementation PR and flip the board to **Done** only
+  after that PR is merged.
 - No new dependency without approval; add versions only in
   `gradle/libs.versions.toml`.
 - Keep generated code (jOOQ/proto) out of version control; never commit secrets.

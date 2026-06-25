@@ -53,7 +53,9 @@ once either:
   still-open points for the human reviewer in the PR description).
 
 While iterating on review findings the task stays **In Progress**; it becomes
-**In review** only when one of the above is met, and **Done** when merged.
+**In review** only when one of the above is met. The board `Status` moves to
+**Done** only when the PR is merged — the catalog checkbox itself is flipped
+inside the implementation PR (see "Task tracking").
 
 ## Definition of Done
 - `./gradlew build` green (tests added/updated for the change).
@@ -62,10 +64,16 @@ While iterating on review findings the task stays **In Progress**; it becomes
 - Public behavior changes reflected in OpenAPI and, if needed, the specs.
 
 ## Task tracking
-- `backend-specs/TASKS.md` is the **catalog** of tasks (IS-IDs) and a periodic
-  status snapshot. **Live status/assignment lives in GitHub Issues/Project**
-  keyed by IS-ID — do not flip `TASKS.md` checkboxes inside feature PRs (it is a
-  merge-conflict hotspot). Maintainers sync the snapshot periodically.
+- `backend-specs/TASKS.md` / `frontend/docs/UI_TASKS.md` are the task
+  **catalogs** (IS-/UI-IDs). **Live `In Progress` / `In review` status lives in
+  GitHub Issues/Project** keyed by ID — don't track those by editing catalog
+  checkboxes.
+- **Marking a task Done:** flip its catalog checkbox to `[x]` ✅ **in the same PR
+  that implements it** — this keeps the catalog current without a separate
+  catalog-only PR, which branch protection on `master` would otherwise require.
+  Move the **board `Status` to Done and close the issue only after that PR is
+  merged**. Each PR edits only its own task's line, so conflicts are rare; only
+  the aggregate snapshot count line is periodically retallied.
 - File tasks with the **Backend task** issue form; labels are defined in
   `.github/labels.yml`. The Project board (live status by IS-ID) is an admin
   one-time setup: `gh project create` (needs the `project` token scope) or create
