@@ -16,6 +16,10 @@ dependencies {
     implementation(libs.spring.boot.starter.actuator)
 
     testImplementation(libs.spring.boot.starter.test)
+    testImplementation(libs.spring.boot.starter.webmvc.test)
+    testImplementation(libs.spring.boot.starter.security)
+    testImplementation(libs.spring.boot.starter.oauth2.resource.server)
+    testImplementation(libs.spring.security.test)
     testImplementation(libs.archunit.junit5)
     testImplementation(libs.testcontainers.postgresql)
     testImplementation(libs.testcontainers.junit)
