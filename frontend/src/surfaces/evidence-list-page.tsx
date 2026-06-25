@@ -10,6 +10,10 @@ import {
   type TableSortState,
 } from "../ui/table-pattern";
 import { StatusBadge, type StatusTone } from "../ui/status-badge";
+import {
+  canExportEvidenceArtifact,
+  filterEvidenceArtifacts,
+} from "./evidence-list-filter";
 import { evidenceArtifacts, type EvidenceArtifact, type EvidenceStatus } from "./mock-evidence";
 
 function statusTone(status: EvidenceStatus): StatusTone {
@@ -131,44 +135,13 @@ export function EvidenceListPage() {
   ];
 
   const filteredRows = useMemo(() => {
-    const normalizedSearch = searchValue.trim().toLowerCase();
-
-    return evidenceArtifacts.filter((artifact) => {
-      const searchMatches =
-        normalizedSearch.length === 0 ||
-        [
-          artifact.title,
-          artifact.projectName,
-          artifact.sourceName,
-          artifact.scenarioName ?? "",
-          artifact.runId,
-          artifact.runType,
-          artifact.initiator,
-          artifact.status,
-          artifact.exportState,
-        ]
-          .join(" ")
-          .toLowerCase()
-          .includes(normalizedSearch);
-
-      const projectMatches =
-        projectFilter === "all" || artifact.projectName === projectFilter;
-      const sourceMatches = sourceFilter === "all" || artifact.sourceName === sourceFilter;
-      const initiatorMatches =
-        initiatorFilter === "all" || artifact.initiator === initiatorFilter;
-      const stateMatches = stateFilter === "all" || artifact.status === stateFilter;
-      const scenarioMatches =
-        scenarioFilter === "all" ||
-        (scenarioFilter === "scenario" ? artifact.scenarioName : !artifact.scenarioName);
-
-      return (
-        searchMatches &&
-        projectMatches &&
-        sourceMatches &&
-        initiatorMatches &&
-        stateMatches &&
-        scenarioMatches
-      );
+    return filterEvidenceArtifacts(evidenceArtifacts, {
+      initiatorFilter,
+      projectFilter,
+      scenarioFilter,
+      searchValue,
+      sourceFilter,
+      stateFilter,
     });
   }, [initiatorFilter, projectFilter, scenarioFilter, searchValue, sourceFilter, stateFilter]);
 
@@ -451,7 +424,7 @@ export function EvidenceListPage() {
                 },
               ];
 
-              if (access.isAdmin && row.status !== "Capturing") {
+              if (access.isAdmin && canExportEvidenceArtifact(row)) {
                 actions.push({
                   label: row.exportState === "Export failed" ? "Recover export" : "Export",
                   onClick: () => navigate(`/evidence/${row.id}?export=1`),
