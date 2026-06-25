@@ -30,7 +30,7 @@ Dependencies flow downward only (`backend-specs/07_MODULE_STRUCTURE.md`):
 | --- | --- | --- |
 | JDK | 25 (toolchain target) | Backend build & run. Gradle itself may run on JDK 17+ or 25; the build provisions a JDK 25 toolchain to compile/run. |
 | Docker | Docker Desktop / colima | Postgres for local runs, and Testcontainers integration tests (ITs skip locally if Docker is absent; CI always runs them). |
-| Node.js | 18+ (with npm) | Frontend dev server (React + Vite). |
+| Node.js | 20 (with npm) | Frontend dev server and checks (React + Vite). |
 
 The Gradle wrapper (`./gradlew`) is committed — no separate Gradle install needed.
 
@@ -39,7 +39,11 @@ The Gradle wrapper (`./gradlew`) is committed — no separate Gradle install nee
 ```bash
 git clone https://github.com/AI-nclisive/iot-simulator.git
 cd iot-simulator
+nvm use                 # optional, uses .nvmrc when nvm/fnm/asdf is installed
 ./gradlew build        # compile + all tests (unit + ITs + ArchUnit)
+npm ci                 # install locked frontend dependencies
+npm run typecheck      # frontend TypeScript check
+npm run build          # production frontend build
 ```
 
 ### Run the backend
@@ -86,13 +90,16 @@ The React/TypeScript/Vite UI lives in `frontend/` (config and `package.json` at
 the repo root). From the repo root:
 
 ```bash
-npm install
+nvm use            # optional, uses .nvmrc when nvm/fnm/asdf is installed
+npm ci
 npm run dev        # Vite dev server on http://localhost:4173
 ```
 
 Other scripts: `npm run build` (production bundle), `npm run preview` (serve the
-build), `npm run typecheck` (`tsc --noEmit`). The dev server currently runs
-standalone on in-memory data and does not yet call the backend API.
+build), `npm run typecheck` (`tsc --noEmit`). Vite binds to `0.0.0.0`, so the
+same dev server can also be opened from another device on the local network via
+`http://<your-lan-ip>:4173/`. The dev server currently runs standalone on
+in-memory data and does not yet call the backend API.
 
 ### Configuration (environment variables)
 
@@ -115,6 +122,18 @@ Postgres:
 ./gradlew :workers:worker-opcua:installDist # package a worker for supervisor mode
 ./gradlew :app:bootJar                       # build the runnable app jar (used by the Dockerfile)
 ```
+
+Run the frontend locally:
+
+```bash
+nvm use          # optional, uses Node 20 from .nvmrc
+npm ci
+npm run dev
+```
+
+Vite serves the UI at `http://localhost:4173/` and binds to `0.0.0.0`, so the
+same dev server can also be opened from another device on the local network via
+`http://<your-lan-ip>:4173/`.
 
 ## Project tracking
 

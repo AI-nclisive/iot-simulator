@@ -5,12 +5,17 @@ and pull requests. These rules keep that smooth.
 
 ## Prerequisites
 - JDK 25 (toolchain target). Gradle runs via the committed wrapper (`./gradlew`).
+- Node.js 20 for the frontend. Run `nvm use` from the repo root if you use
+  nvm/fnm/asdf; the expected version is recorded in `.nvmrc`.
 - Docker (Docker Desktop / colima) — required for Testcontainers integration
   tests. Without Docker those ITs skip locally; CI always runs them.
 
 ## Build & test
 ```bash
 ./gradlew build        # compile + all tests (unit + ITs + ArchUnit)
+npm ci                 # install locked frontend dependencies
+npm run typecheck      # frontend TypeScript check
+npm run build          # production frontend build
 ```
 Always run this and confirm it is green before opening a PR.
 
