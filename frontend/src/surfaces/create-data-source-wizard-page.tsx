@@ -1059,22 +1059,26 @@ export function CreateDataSourceWizardPage() {
             </h2>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            {wizardSteps.map((step, index) => (
-              <button
-                key={step.id}
-                className={`rounded-md border px-3 py-2 text-sm ${stepChipClass(
-                  currentStep === index,
-                  index < currentStep,
-                )}`}
-                disabled={index > currentStep}
-                type="button"
-                onClick={() => setCurrentStep(index)}
-              >
-                {index + 1}. {step.label}
-              </button>
-            ))}
-          </div>
+          <nav aria-label="Wizard steps">
+            <ol className="flex flex-wrap items-center gap-2">
+              {wizardSteps.map((step, index) => (
+                <li key={step.id}>
+                  <button
+                    aria-current={currentStep === index ? "step" : undefined}
+                    className={`rounded-md border px-3 py-2 text-sm ${stepChipClass(
+                      currentStep === index,
+                      index < currentStep,
+                    )}`}
+                    disabled={index > currentStep}
+                    type="button"
+                    onClick={() => setCurrentStep(index)}
+                  >
+                    {index + 1}. {step.label}
+                  </button>
+                </li>
+              ))}
+            </ol>
+          </nav>
         </div>
       </section>
 

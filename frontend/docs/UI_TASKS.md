@@ -332,7 +332,7 @@ Parallel execution:
   Done when: typography, spacing, forms, tables, dialogs, status treatment, and
   shared component rules are defined for the approved stack.
 
-- [ ] `UI-091` Accessibility review
+- [x] `UI-091` Accessibility review
   Surface: cross-surface review
   Depends: `UI-001`, `UI-002`, `UI-090`
   Done when: keyboard flow, focus visibility, labels, status messaging, and

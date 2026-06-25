@@ -216,26 +216,42 @@ export function OperationalTable<T>({
         <table className="min-w-full border-collapse">
           <thead className="bg-shell-base/65">
             <tr>
-              {columns.map((column) => (
-                <th key={column.id} className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted ${column.className ?? ""}`}>
-                  {column.sortable ? (
-                    <button
-                      className="inline-flex items-center gap-2 text-left text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted"
-                      type="button"
-                      onClick={() => onSortChange(nextSortState(column.id, sortState))}
-                    >
-                      <span>{column.header}</span>
-                      {sortState?.columnId === column.id ? (
-                        <span>{sortLabel(sortState.direction)}</span>
-                      ) : null}
-                    </button>
-                  ) : (
-                    column.header
-                  )}
-                </th>
-              ))}
+              {columns.map((column) => {
+                const isActiveSort = sortState?.columnId === column.id;
+                const ariaSortValue = column.sortable
+                  ? isActiveSort
+                    ? sortState!.direction === "asc"
+                      ? ("ascending" as const)
+                      : ("descending" as const)
+                    : ("none" as const)
+                  : undefined;
+
+                return (
+                  <th
+                    key={column.id}
+                    scope="col"
+                    aria-sort={ariaSortValue}
+                    className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted ${column.className ?? ""}`}
+                  >
+                    {column.sortable ? (
+                      <button
+                        className="inline-flex items-center gap-2 text-left text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted"
+                        type="button"
+                        onClick={() => onSortChange(nextSortState(column.id, sortState))}
+                      >
+                        <span>{column.header}</span>
+                        {isActiveSort ? (
+                          <span aria-hidden="true">{sortLabel(sortState!.direction)}</span>
+                        ) : null}
+                      </button>
+                    ) : (
+                      column.header
+                    )}
+                  </th>
+                );
+              })}
               {rowActions ? (
-                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
+                <th scope="col" className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
                   Actions
                 </th>
               ) : null}
