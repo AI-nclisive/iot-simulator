@@ -31,6 +31,18 @@ jobs:
       - name: Build & test
         run: ./gradlew build --no-daemon --stacktrace
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Frontend typecheck & build
+        run: |
+          npm ci
+          npm run typecheck
+          npm run build
+
       # Renders JUnit results as a clickable "Tests" check (PR → Checks tab),
       # no download needed.
       - name: Publish test report

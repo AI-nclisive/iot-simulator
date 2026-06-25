@@ -66,6 +66,7 @@ flipped inside the implementation PR (see "Task tracking").
 
 ## Definition of Done
 - `./gradlew build` green (tests added/updated for the change).
+- `npm ci`, `npm run typecheck`, and `npm run build` green for frontend changes.
 - No secrets/credentials/PKI committed; secrets come from env/secret store.
 - Generated code (jOOQ/proto) stays under `build/` — never committed.
 - Public behavior changes reflected in OpenAPI and, if needed, the specs.
