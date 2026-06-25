@@ -47,6 +47,19 @@ gh auth refresh -s project,read:project
 gh project create --owner AI-nclisive --title "IoT Simulator"
 ```
 
+## Claude PR review secret (IS-112 [SDLC])
+The `.github/workflows/claude-review.yml` workflow runs an advisory Claude review on
+every PR (see the workflow header). Auth is a Claude Pro/Max **subscription OAuth
+token** (not an Anthropic API key), stored as the repo secret
+`CLAUDE_CODE_OAUTH_TOKEN`. Generate and set it as the owner:
+```bash
+claude setup-token   # prints the OAuth token (Pro/Max subscription)
+gh secret set CLAUDE_CODE_OAUTH_TOKEN --repo AI-nclisive/iot-simulator
+```
+The token is long-lived; rotate by re-running both commands. The workflow uses the
+`pull_request` event, so the secret is withheld from fork PRs (the job no-ops there).
+The review is advisory only — it does not gate merge; the required check stays `build`.
+
 ## Labels
 9 repo labels are defined in `.github/labels.yml`; (re)create with `gh label create ... --force`.
 
