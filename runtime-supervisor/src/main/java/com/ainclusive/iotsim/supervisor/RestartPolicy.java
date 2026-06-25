@@ -21,8 +21,10 @@ public record RestartPolicy(
             new RestartPolicy(Duration.ofMillis(500), 2.0, Duration.ofSeconds(30), 5);
 
     public RestartPolicy {
-        if (initialBackoff == null || initialBackoff.isNegative()) {
-            throw new IllegalArgumentException("initialBackoff must be non-negative");
+        if (initialBackoff == null || initialBackoff.isNegative() || initialBackoff.isZero()) {
+            // Zero would make every backoff zero (immediate retry), defeating the
+            // purpose and hammering relaunch until the cap; require a real delay.
+            throw new IllegalArgumentException("initialBackoff must be positive");
         }
         if (multiplier < 1.0) {
             throw new IllegalArgumentException("multiplier must be >= 1.0");

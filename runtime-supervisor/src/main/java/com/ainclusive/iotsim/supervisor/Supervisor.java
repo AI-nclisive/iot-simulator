@@ -20,6 +20,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Owns worker lifecycle: port allocation, launch, IPC handshake, start/stop,
@@ -76,14 +77,26 @@ public final class Supervisor implements RuntimeController, AutoCloseable {
         // recovering) is left as-is — start is idempotent. A worker that exhausted its
         // restart budget (ERROR) is replaced, so an operator can explicitly retry it.
         // Only an exit after a successful start is recovered via restart-with-backoff.
+        AtomicReference<ManagedWorker> launched = new AtomicReference<>();
         running.compute(dataSourceId, (id, existing) -> {
             if (existing != null && existing.isActive()) {
                 return existing;
             }
             ManagedWorker worker = new ManagedWorker(id, spec);
             worker.launchAndStart();
+            launched.set(worker);
             return worker;
         });
+        // close() can race in after the guard above: it sets `closed`, then drains the
+        // map. If we just launched a worker, re-check and tear it down ourselves so it
+        // can never be orphaned — whichever of close()/start() observes the other,
+        // the worker is stopped exactly by one path (stop() is idempotent).
+        ManagedWorker mine = launched.get();
+        if (mine != null && closed) {
+            running.remove(dataSourceId, mine);
+            mine.stop();
+            throw new IllegalStateException("supervisor is closed");
+        }
         return RUNNING;
     }
 

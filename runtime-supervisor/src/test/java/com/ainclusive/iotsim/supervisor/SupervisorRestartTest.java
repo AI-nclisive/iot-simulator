@@ -1,6 +1,7 @@
 package com.ainclusive.iotsim.supervisor;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.ainclusive.iotsim.platform.runtime.RuntimeStartSpec;
 import java.time.Duration;
@@ -125,6 +126,39 @@ class SupervisorRestartTest {
         supervisor.close();
 
         assertThat(supervisor.state("ds1")).isEqualTo("STOPPED");
+    }
+
+    @Test
+    void startAfterCloseThrows() {
+        supervisor = new Supervisor(launcher, fastPolicy);
+        supervisor.close();
+
+        assertThatThrownBy(() -> supervisor.start("ds1", spec()))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void concurrentStartAndCloseNeverLeavesAWorkerRunning() throws InterruptedException {
+        // Race start() against close() repeatedly: under no interleaving may a worker
+        // be orphaned — the worker a racing start launches must be torn down either by
+        // close()'s drain or by start()'s post-compute rollback.
+        for (int i = 0; i < 25; i++) {
+            TestWorkerLauncher raceLauncher = new TestWorkerLauncher();
+            Supervisor raceSupervisor = new Supervisor(raceLauncher, fastPolicy);
+            Thread starter = new Thread(() -> {
+                try {
+                    raceSupervisor.start("ds1", spec());
+                } catch (RuntimeException expectedWhenCloseWins) {
+                    // start() throws when close() raced ahead — acceptable.
+                }
+            });
+            starter.start();
+            raceSupervisor.close();
+            starter.join(5_000);
+
+            await(raceLauncher::allServersShutDown);
+            raceLauncher.closeAll();
+        }
     }
 
     /** Polls until the condition holds, up to ~5s. */

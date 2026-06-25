@@ -33,6 +33,10 @@ class RestartPolicyTest {
                 new RestartPolicy(Duration.ofMillis(-1), 2.0, Duration.ofSeconds(1), 1))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() ->
+                new RestartPolicy(Duration.ZERO, 2.0, Duration.ofSeconds(1), 1))
+                .as("zero initial backoff would mean immediate retry")
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() ->
                 new RestartPolicy(Duration.ofMillis(100), 0.5, Duration.ofSeconds(1), 1))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() ->

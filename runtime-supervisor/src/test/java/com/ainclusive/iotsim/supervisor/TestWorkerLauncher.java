@@ -62,6 +62,11 @@ final class TestWorkerLauncher implements WorkerLauncher {
         return launches.get(launches.size() - 1);
     }
 
+    /** True when every worker this launcher created has been torn down (no leak). */
+    boolean allServersShutDown() {
+        return launches.stream().allMatch(l -> l.server.isShutdown());
+    }
+
     void closeAll() {
         for (Launch l : launches) {
             try {
