@@ -138,7 +138,7 @@ Turn the in-memory worker into a real OPC UA simulator (the stated core risk).
 - [x] IS-036 [BE] ✅ [runtime] worker-opcua gRPC + lifecycle — 02
 - [x] IS-037 [BE] ✅ [model] OPC UA address-space projection (schema → variable nodes) — 01
 - [x] IS-038 [BE] ✅ [runtime] worker-opcua: real Eclipse Milo server + value projection — 02
-- [ ] IS-039 [BE] ⬜ [runtime] Real worker process spawn E2E (installDist + ProcessWorkerLauncher) — 02
+- [x] IS-039 [BE] ✅ [runtime] Real worker process spawn E2E (installDist + ProcessWorkerLauncher) — 02
 - [ ] IS-040 [BE] ⬜ [runtime] Restart-with-backoff on unexpected failure (intentional faults excluded) — 02
 - [ ] IS-041 [BE] ⬜ [runtime] Health monitoring loop + stale/error state propagation — 02
 
@@ -193,7 +193,7 @@ Make runs observable and produce the P0 evidence artifact.
 - [ ] IS-075 [BE] ⬜ [auth] OIDC resource server (validate JWT via JWKS) — 08
 - [ ] IS-076 [BE] ⬜ [auth] Flexible permission model + role→permission mapping — 08
 - [ ] IS-077 [BE] ⬜ [auth] API-layer authorization enforcement (admin/user) — 08
-- [ ] IS-078 [BE] 🟡 [auth] Local vs shared mode enforcement (flag exists, no enforcement) — 08
+- [x] IS-078 [BE] ✅ [auth] Local vs shared mode enforcement (flag exists, no enforcement) — 08
 - [ ] IS-079 [BE] ⬜ [persist] Auth table repositories (users/roles/permissions/leases) — 04
 - [ ] IS-080 [BE] ⬜ [auth] Advisory edit leases (read-only while editing; stale recovery) — 08
 - [ ] IS-081 [BE] ⬜ [api] Edit-lease endpoints — 05
@@ -211,7 +211,7 @@ Make runs observable and produce the P0 evidence artifact.
 - [ ] IS-090 [BE] ⬜ [ipc] Shutdown RPC handling — 02
 - [ ] IS-091 [BE] ⬜ [io] Artifact version compatibility (reject newer-than-supported) — 06
 - [ ] IS-092 [BE] ⬜ [io] Retention & cleanup (size/age/dependency-aware) — SPEC + 06
-- [ ] IS-093 [BE] 🟡 [persist] Value-timeline partitioning (table partition-ready) — 04
+- [x] IS-093 [BE] ✅ [persist] Value-timeline partitioning (table partition-ready) — 04
 - [ ] IS-094 [BE] ⬜ [schema] Schema dependency/impact checks before save — 01
 - [x] IS-095 [BE] ✅ [build] CI pipeline (build + test on push) — 07 (delivered as IS-098)
 - [ ] IS-096 [BE] ⬜ [build] Self-contained local distribution (jlink/jpackage) — 07/STACK
