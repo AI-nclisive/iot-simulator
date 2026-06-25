@@ -529,141 +529,141 @@ export function CreateDataSourceWizardPage() {
                   className="shell-field"
                   placeholder={suggestedEndpoint(form.protocol, form.basis)}
                   type="text"
-	                  value={form.scanEndpoint}
-	                  onChange={(event) =>
-	                    updateForm({
-	                      scanEndpoint: event.target.value,
-	                      scanState: "idle",
-	                      scanTestResult: "idle",
-	                    })
-	                  }
-	                />
-	              </label>
+                    value={form.scanEndpoint}
+                    onChange={(event) =>
+                      updateForm({
+                        scanEndpoint: event.target.value,
+                        scanState: "idle",
+                        scanTestResult: "idle",
+                      })
+                    }
+                  />
+                </label>
 
-	              <div className="space-y-3 border-t border-shell-line pt-4">
-	                <div className="flex flex-wrap items-center justify-between gap-2">
-	                  <p className="text-sm font-medium text-shell-ink">Credential handling</p>
-	                  <div className="flex flex-wrap items-center gap-2">
-	                    <StatusBadge label={credentialPersistenceLabel(form)} />
-	                    {form.scanCredentialConfirmed ? (
-	                      <StatusBadge label="Confirmed" tone="accent" />
-	                    ) : null}
-	                  </div>
-	                </div>
+                <div className="space-y-3 border-t border-shell-line pt-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm font-medium text-shell-ink">Credential handling</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <StatusBadge label={credentialPersistenceLabel(form)} />
+                      {form.scanCredentialConfirmed ? (
+                        <StatusBadge label="Confirmed" tone="accent" />
+                      ) : null}
+                    </div>
+                  </div>
 
-	                <label className="flex flex-col gap-2 text-sm text-shell-muted">
-	                  Authentication
-	                  <select
-	                    className="shell-field"
-	                    value={form.scanCredentialMode}
-	                    onChange={(event) =>
-	                      handleCredentialModeChange(
-	                        event.target.value as WizardFormState["scanCredentialMode"],
-	                      )
-	                    }
-	                  >
-	                    <option value="anonymous">Anonymous</option>
-	                    <option value="password">Username and password</option>
-	                    <option value="external-ref">External secret reference</option>
-	                  </select>
-	                </label>
+                  <label className="flex flex-col gap-2 text-sm text-shell-muted">
+                    Authentication
+                    <select
+                      className="shell-field"
+                      value={form.scanCredentialMode}
+                      onChange={(event) =>
+                        handleCredentialModeChange(
+                          event.target.value as WizardFormState["scanCredentialMode"],
+                        )
+                      }
+                    >
+                      <option value="anonymous">Anonymous</option>
+                      <option value="password">Username and password</option>
+                      <option value="external-ref">External secret reference</option>
+                    </select>
+                  </label>
 
-	                {form.scanCredentialMode === "password" ? (
-	                  <div className="grid gap-3 sm:grid-cols-2">
-	                    <label className="flex flex-col gap-2 text-sm text-shell-muted">
-	                      Username
-	                      <input
-	                        autoComplete="username"
-	                        className="shell-field"
-	                        type="text"
-	                        value={form.scanUsername}
-	                        onChange={(event) =>
-	                          updateForm({
-	                            scanCredentialConfirmed: false,
-	                            scanTestResult: "idle",
-	                            scanUsername: event.target.value,
-	                          })
-	                        }
-	                      />
-	                    </label>
+                  {form.scanCredentialMode === "password" ? (
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <label className="flex flex-col gap-2 text-sm text-shell-muted">
+                        Username
+                        <input
+                          autoComplete="username"
+                          className="shell-field"
+                          type="text"
+                          value={form.scanUsername}
+                          onChange={(event) =>
+                            updateForm({
+                              scanCredentialConfirmed: false,
+                              scanTestResult: "idle",
+                              scanUsername: event.target.value,
+                            })
+                          }
+                        />
+                      </label>
 
-	                    <label className="flex flex-col gap-2 text-sm text-shell-muted">
-	                      Password
-	                      <input
-	                        autoComplete="current-password"
-	                        className="shell-field"
-	                        type="password"
-	                        value={form.scanPassword}
-	                        onChange={(event) =>
-	                          updateForm({
-	                            scanCredentialConfirmed: false,
-	                            scanPassword: event.target.value,
-	                            scanTestResult: "idle",
-	                          })
-	                        }
-	                      />
-	                    </label>
-	                  </div>
-	                ) : null}
+                      <label className="flex flex-col gap-2 text-sm text-shell-muted">
+                        Password
+                        <input
+                          autoComplete="current-password"
+                          className="shell-field"
+                          type="password"
+                          value={form.scanPassword}
+                          onChange={(event) =>
+                            updateForm({
+                              scanCredentialConfirmed: false,
+                              scanPassword: event.target.value,
+                              scanTestResult: "idle",
+                            })
+                          }
+                        />
+                      </label>
+                    </div>
+                  ) : null}
 
-	                {form.scanCredentialMode === "external-ref" ? (
-	                  <label className="flex flex-col gap-2 text-sm text-shell-muted">
-	                    Secret reference
-	                    <input
-	                      className="shell-field"
-	                      placeholder="vault/plant/line-a/opcua"
-	                      type="text"
-	                      value={form.scanSecretRef}
-	                      onChange={(event) =>
-	                        updateForm({
-	                          scanCredentialConfirmed: false,
-	                          scanSecretRef: event.target.value,
-	                          scanTestResult: "idle",
-	                        })
-	                      }
-	                    />
-	                  </label>
-	                ) : null}
+                  {form.scanCredentialMode === "external-ref" ? (
+                    <label className="flex flex-col gap-2 text-sm text-shell-muted">
+                      Secret reference
+                      <input
+                        className="shell-field"
+                        placeholder="vault/plant/line-a/opcua"
+                        type="text"
+                        value={form.scanSecretRef}
+                        onChange={(event) =>
+                          updateForm({
+                            scanCredentialConfirmed: false,
+                            scanSecretRef: event.target.value,
+                            scanTestResult: "idle",
+                          })
+                        }
+                      />
+                    </label>
+                  ) : null}
 
-	                {form.scanCredentialMode !== "anonymous" ? (
-	                  <div className="flex flex-wrap items-center gap-3">
-	                    <label className="flex items-center gap-2 text-sm text-shell-muted">
-	                      <input
-	                        checked={form.scanCredentialConfirmed}
-	                        type="checkbox"
-	                        onChange={(event) =>
-	                          updateForm({ scanCredentialConfirmed: event.target.checked })
-	                        }
-	                      />
-	                      Use for this scan
-	                    </label>
-	                    <button
-	                      className="shell-text-action"
-	                      type="button"
-	                      onClick={clearCredentialMaterial}
-	                    >
-	                      Clear value
-	                    </button>
-	                  </div>
-	                ) : null}
+                  {form.scanCredentialMode !== "anonymous" ? (
+                    <div className="flex flex-wrap items-center gap-3">
+                      <label className="flex items-center gap-2 text-sm text-shell-muted">
+                        <input
+                          checked={form.scanCredentialConfirmed}
+                          type="checkbox"
+                          onChange={(event) =>
+                            updateForm({ scanCredentialConfirmed: event.target.checked })
+                          }
+                        />
+                        Use for this scan
+                      </label>
+                      <button
+                        className="shell-text-action"
+                        type="button"
+                        onClick={clearCredentialMaterial}
+                      >
+                        Clear value
+                      </button>
+                    </div>
+                  ) : null}
 
-	                <div className="flex flex-wrap items-center gap-3">
-	                  <button className="shell-action" type="button" onClick={testScanDetails}>
-	                    Test connection
-	                  </button>
-	                  {form.scanTestResult === "success" ? (
-	                    <StatusBadge label="Connection ready" tone="accent" />
-	                  ) : null}
-	                  {form.scanTestResult === "error" ? (
-	                    <StatusBadge label="Enter a valid endpoint" tone="danger" />
-	                  ) : null}
-	                  {form.scanTestResult === "auth-error" ? (
-	                    <StatusBadge label="Check credentials" tone="danger" />
-	                  ) : null}
-	                </div>
-	              </div>
-	            </div>
-	          ) : null}
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button className="shell-action" type="button" onClick={testScanDetails}>
+                      Test connection
+                    </button>
+                    {form.scanTestResult === "success" ? (
+                      <StatusBadge label="Connection ready" tone="accent" />
+                    ) : null}
+                    {form.scanTestResult === "error" ? (
+                      <StatusBadge label="Enter a valid endpoint" tone="danger" />
+                    ) : null}
+                    {form.scanTestResult === "auth-error" ? (
+                      <StatusBadge label="Check credentials" tone="danger" />
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            ) : null}
 
           {form.protocol === "OPC UA" ? (
             <div className="grid gap-4 sm:grid-cols-2">
@@ -793,24 +793,24 @@ export function CreateDataSourceWizardPage() {
             Current path
           </p>
           <dl className="mt-3 space-y-3 text-sm">
-	            <div>
-	              <dt className="text-shell-muted">Protocol</dt>
-	              <dd className="mt-1 text-shell-ink">{form.protocol ?? "-"}</dd>
-	            </div>
-	            <div>
-	              <dt className="text-shell-muted">Source basis</dt>
-	              <dd className="mt-1 text-shell-ink">{currentBasis?.label ?? "-"}</dd>
-	            </div>
-	            {form.basis === "scan" ? (
-	              <div>
-	                <dt className="text-shell-muted">Credentials</dt>
-	                <dd className="mt-1 text-shell-ink">{credentialReviewValue(form)}</dd>
-	              </div>
-	            ) : null}
-	            <div>
-	              <dt className="text-shell-muted">Next</dt>
-	              <dd className="mt-1 text-shell-ink">Schema review</dd>
-	            </div>
+              <div>
+                <dt className="text-shell-muted">Protocol</dt>
+                <dd className="mt-1 text-shell-ink">{form.protocol ?? "-"}</dd>
+              </div>
+              <div>
+                <dt className="text-shell-muted">Source basis</dt>
+                <dd className="mt-1 text-shell-ink">{currentBasis?.label ?? "-"}</dd>
+              </div>
+              {form.basis === "scan" ? (
+                <div>
+                  <dt className="text-shell-muted">Credentials</dt>
+                  <dd className="mt-1 text-shell-ink">{credentialReviewValue(form)}</dd>
+                </div>
+              ) : null}
+              <div>
+                <dt className="text-shell-muted">Next</dt>
+                <dd className="mt-1 text-shell-ink">Schema review</dd>
+              </div>
           </dl>
         </section>
       </div>
@@ -855,15 +855,15 @@ export function CreateDataSourceWizardPage() {
             <section className="rounded-md border border-shell-line bg-white px-4 py-4">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div>
-	                  <p className="text-sm font-medium text-shell-ink">Discovery result</p>
-	                  <p className="mt-2 text-sm leading-6 text-shell-muted">
-	                    {scanCopy.message}
-	                  </p>
-	                </div>
+                    <p className="text-sm font-medium text-shell-ink">Discovery result</p>
+                    <p className="mt-2 text-sm leading-6 text-shell-muted">
+                      {scanCopy.message}
+                    </p>
+                  </div>
 
                 <div className="flex flex-wrap items-center gap-2">
                   <StatusBadge
-	                    label={scanCopy.status}
+                      label={scanCopy.status}
                     tone={
                       form.scanState === "complete"
                         ? "accent"
@@ -875,7 +875,7 @@ export function CreateDataSourceWizardPage() {
                 </div>
               </div>
 
-	              <dl className="mt-4 grid gap-3 text-sm text-shell-muted sm:grid-cols-3">
+                <dl className="mt-4 grid gap-3 text-sm text-shell-muted sm:grid-cols-3">
                 <div>
                   <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
                     Endpoint
@@ -888,19 +888,19 @@ export function CreateDataSourceWizardPage() {
                   </dt>
                   <dd className="mt-2 text-sm text-shell-ink">{form.protocol}</dd>
                 </div>
-	                <div>
-	                  <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
-	                    Next
-	                  </dt>
-	                  <dd className="mt-2 text-sm text-shell-ink">Continue into schema review</dd>
-	                </div>
-	                <div>
-	                  <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
-	                    Credentials
-	                  </dt>
-	                  <dd className="mt-2 text-sm text-shell-ink">{credentialReviewValue(form)}</dd>
-	                </div>
-	              </dl>
+                  <div>
+                    <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
+                      Next
+                    </dt>
+                    <dd className="mt-2 text-sm text-shell-ink">Continue into schema review</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
+                      Credentials
+                    </dt>
+                    <dd className="mt-2 text-sm text-shell-ink">{credentialReviewValue(form)}</dd>
+                  </div>
+                </dl>
 
               <div className="mt-4">
                 <button className="shell-action" type="button" onClick={retryScan}>
@@ -948,13 +948,13 @@ export function CreateDataSourceWizardPage() {
           onClick={() => updateForm({ runtimeBehavior: "stopped" })}
         >
           <div className="flex flex-wrap items-center gap-2">
-	            <p className="text-sm font-medium text-shell-ink">Save without starting</p>
-	            <StatusBadge label="Recommended" tone="accent" />
-	          </div>
-	          <p className="mt-2 text-sm leading-6 text-shell-muted">
-	            Create the source as inactive. You can start it later from the source detail.
-	          </p>
-	        </button>
+              <p className="text-sm font-medium text-shell-ink">Save without starting</p>
+              <StatusBadge label="Recommended" tone="accent" />
+            </div>
+            <p className="mt-2 text-sm leading-6 text-shell-muted">
+              Create the source as inactive. You can start it later from the source detail.
+            </p>
+          </button>
 
         <button
           className={optionButtonClass(form.runtimeBehavior === "start-now")}
@@ -1125,16 +1125,16 @@ export function CreateDataSourceWizardPage() {
               <button className="shell-action" type="button" onClick={createSource}>
                 Create source
               </button>
-	            ) : (
-	              <button
-	                className="shell-action"
-	                disabled={Boolean(currentValidationMessage)}
-	                type="button"
-	                onClick={goNext}
-	              >
-	                Next
-	              </button>
-	            )}
+              ) : (
+                <button
+                  className="shell-action"
+                  disabled={Boolean(currentValidationMessage)}
+                  type="button"
+                  onClick={goNext}
+                >
+                  Next
+                </button>
+              )}
           </div>
         </div>
       </section>

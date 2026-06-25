@@ -6,6 +6,7 @@ import { useShellStore } from "../shell/shell-store";
 import { type DataSourceRow } from "./mock-data-sources";
 import { ConfirmationDialog } from "../ui/confirmation-dialog";
 import { StatusBadge } from "../ui/status-badge";
+import { stopActionCopy } from "./source-action-copy";
 import {
   OperationalTable,
   TableToolbar,
@@ -37,14 +38,6 @@ function healthTone(health: DataSourceRow["health"]) {
   }
 
   return "accent";
-}
-
-function stopActionCopy() {
-  return {
-    confirmLabel: "Stop source",
-    message: "Stopping this source stops its current activity for everyone using this project.",
-    title: "Stop this source?",
-  };
 }
 
 function stateMeta(row: DataSourceRow) {
@@ -294,11 +287,7 @@ export function DataSourcesListPage() {
       header: "Health",
       sortable: true,
       sortValue: (row) => row.health,
-      cell: (row) => (
-        <div className="flex flex-col items-start gap-1">
-          <StatusBadge label={row.health} tone={healthTone(row.health)} />
-        </div>
-      ),
+      cell: (row) => <StatusBadge label={row.health} tone={healthTone(row.health)} />,
       className: "w-[9rem]",
     },
     {
