@@ -297,7 +297,7 @@ Parallel execution:
   Done when: users can find evidence by source, initiator, project, scenario,
   and state; export remains role-aware.
 
-- [ ] `UI-071` Evidence Detail
+- [x] `UI-071` Evidence Detail
   Surface: `Evidence Detail`
   Depends: `UI-070`
   Done when: summary, timeline, clients, faults or errors, and partial states

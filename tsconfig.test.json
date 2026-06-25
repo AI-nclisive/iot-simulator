@@ -8,6 +8,7 @@
     "sourceMap": false
   },
   "include": [
+    "frontend/src/surfaces/evidence-detail-helpers.ts",
     "frontend/src/surfaces/evidence-list-filter.ts",
     "frontend/src/surfaces/mock-evidence.ts"
   ]
