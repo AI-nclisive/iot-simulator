@@ -423,7 +423,7 @@ export function ReplayFlowPage() {
             value={sourceBusyWithAnotherProcess ? "Already active" : "Ready"}
           />
           <MetricCard
-            label="Parameters in target"
+            label="Parameters"
             value={source.parameterCount.toLocaleString()}
           />
           <MetricCard label="Client activity" value={source.clients} />

@@ -39,8 +39,32 @@ function healthTone(health: DataSourceRow["health"]) {
   return "accent";
 }
 
-function statusTone(status: DataSourceRow["status"]) {
-  return status === "Active" ? "accent" : "neutral";
+function stopActionCopy() {
+  return {
+    confirmLabel: "Stop source",
+    message: "Stopping this source stops its current activity for everyone using this project.",
+    title: "Stop this source?",
+  };
+}
+
+function stateMeta(row: DataSourceRow) {
+  if (row.status === "Active") {
+    return { key: "run", label: "Run", tone: "accent" as const };
+  }
+
+  return { key: "off", label: "Off", tone: "neutral" as const };
+}
+
+function stateFilterLabel(value: string) {
+  if (value === "run") {
+    return "Run";
+  }
+
+  if (value === "off") {
+    return "Off";
+  }
+
+  return value;
 }
 
 export function DataSourcesListPage() {
@@ -54,7 +78,7 @@ export function DataSourcesListPage() {
   const deleteDataSource = useDataSourcesStore((state) => state.deleteDataSource);
   const [searchValue, setSearchValue] = useState("");
   const [protocolFilter, setProtocolFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [stateFilter, setStateFilter] = useState("all");
   const [sortState, setSortState] = useState<TableSortState>({
     columnId: "name",
     direction: "asc",
@@ -73,11 +97,11 @@ export function DataSourcesListPage() {
           .includes(searchValue.trim().toLowerCase());
 
       const protocolMatches = protocolFilter === "all" || row.protocol === protocolFilter;
-      const statusMatches = statusFilter === "all" || row.status === statusFilter;
+      const stateMatches = stateFilter === "all" || stateMeta(row).key === stateFilter;
 
-      return searchMatches && protocolMatches && statusMatches;
+      return searchMatches && protocolMatches && stateMatches;
     });
-  }, [protocolFilter, rows, searchValue, statusFilter]);
+  }, [protocolFilter, rows, searchValue, stateFilter]);
 
   const confirmationModel = useMemo(() => {
     if (!confirmationRequest) {
@@ -95,10 +119,12 @@ export function DataSourcesListPage() {
           ? "Recording stops immediately and the current capture ends on this source."
           : row.process === "Replay"
             ? "Replay stops immediately for this source."
-            : "The source stops serving simulated values until someone starts it again.";
+            : "The source stops serving values until someone starts it again.";
+
+      const copy = stopActionCopy();
 
       return {
-        confirmLabel: "Stop source",
+        confirmLabel: copy.confirmLabel,
         impacts: [
           { label: "Endpoint", value: row.endpoint },
           { label: "Runtime impact", value: runtimeImpact },
@@ -110,12 +136,11 @@ export function DataSourcesListPage() {
                 : "No connected clients are currently shown for this source.",
           },
         ],
-        message:
-          "Stopping a source interrupts its current runtime behavior for everyone using this project.",
+        message: copy.message,
         objectLabel: `${row.name} (${row.protocol})`,
         reversibilityLabel:
           "This action is reversible. The source can be started again later.",
-        title: "Stop this source?",
+        title: copy.title,
         tone: "warning" as const,
       };
     }
@@ -185,14 +210,14 @@ export function DataSourcesListPage() {
       ],
     },
     {
-      id: "status",
-      label: "Status",
-      value: statusFilter,
-      onChange: setStatusFilter,
+      id: "state",
+      label: "State",
+      value: stateFilter,
+      onChange: setStateFilter,
       options: [
-        { label: "All statuses", value: "all" },
-        { label: "Active", value: "Active" },
-        { label: "Stopped", value: "Stopped" },
+        { label: "All states", value: "all" },
+        { label: "Run", value: "run" },
+        { label: "Off", value: "off" },
       ],
     },
   ];
@@ -218,13 +243,13 @@ export function DataSourcesListPage() {
           },
         ]
       : []),
-    ...(statusFilter !== "all"
+    ...(stateFilter !== "all"
       ? [
           {
-            id: "status",
-            label: "Status",
-            value: statusFilter,
-            onClear: () => setStatusFilter("all"),
+            id: "state",
+            label: "State",
+            value: stateFilterLabel(stateFilter),
+            onClear: () => setStateFilter("all"),
           },
         ]
       : []),
@@ -241,47 +266,20 @@ export function DataSourcesListPage() {
           <p className="text-sm font-medium text-shell-ink">{row.name}</p>
           <p className="mt-1 text-sm text-shell-muted">{row.endpoint}</p>
           <p className="mt-1 text-xs text-shell-muted">
-            {row.parameterCount.toLocaleString()} parameters
+            {row.protocol} · {row.parameterCount.toLocaleString()} parameters
           </p>
         </div>
       ),
     },
     {
-      id: "protocol",
-      header: "Protocol",
+      id: "state",
+      header: "State",
       sortable: true,
-      sortValue: (row) => row.protocol,
-      cell: (row) => <span className="text-sm text-shell-ink">{row.protocol}</span>,
-      className: "w-[10rem]",
-    },
-    {
-      id: "parameters",
-      header: "Parameters",
-      sortable: true,
-      sortValue: (row) => row.parameterCount,
+      sortValue: (row) => stateMeta(row).label,
       cell: (row) => (
-        <span className="text-sm text-shell-ink">
-          {row.parameterCount.toLocaleString()}
-        </span>
+        <StatusBadge label={stateMeta(row).label} tone={stateMeta(row).tone} />
       ),
       className: "w-[8rem]",
-    },
-    {
-      id: "status",
-      header: "Status",
-      sortable: true,
-      sortValue: (row) => row.status,
-      cell: (row) => <StatusBadge label={row.status} tone={statusTone(row.status)} />,
-      className: "w-[9rem]",
-    },
-    {
-      id: "process",
-      header: "Process",
-      sortable: true,
-      sortValue: (row) => row.process ?? "",
-      cell: (row) =>
-        row.process ? <StatusBadge label={row.process} tone={row.process === "Recording" ? "warning" : "accent"} /> : <span className="text-sm text-shell-muted">-</span>,
-      className: "w-[10rem]",
     },
     {
       id: "clients",
@@ -296,7 +294,11 @@ export function DataSourcesListPage() {
       header: "Health",
       sortable: true,
       sortValue: (row) => row.health,
-      cell: (row) => <StatusBadge label={row.health} tone={healthTone(row.health)} />,
+      cell: (row) => (
+        <div className="flex flex-col items-start gap-1">
+          <StatusBadge label={row.health} tone={healthTone(row.health)} />
+        </div>
+      ),
       className: "w-[9rem]",
     },
     {
@@ -310,7 +312,7 @@ export function DataSourcesListPage() {
   ];
 
   const hasQueryState =
-    searchValue.trim().length > 0 || protocolFilter !== "all" || statusFilter !== "all";
+    searchValue.trim().length > 0 || protocolFilter !== "all" || stateFilter !== "all";
 
   return (
     <div className="flex h-full flex-col gap-3">
@@ -321,7 +323,7 @@ export function DataSourcesListPage() {
           onClearAll={() => {
             setSearchValue("");
             setProtocolFilter("all");
-            setStatusFilter("all");
+            setStateFilter("all");
           }}
           onSearchChange={setSearchValue}
           onPrimaryAction={
@@ -342,6 +344,7 @@ export function DataSourcesListPage() {
             noResultsTitle="No sources match the current filters."
             onSortChange={setSortState}
             rowActions={(row) => {
+              const sourceStarted = row.status === "Active";
               const actions: TableRowAction<DataSourceRow>[] = [
                 {
                   label: "Open",
@@ -349,17 +352,39 @@ export function DataSourcesListPage() {
                 },
               ];
 
-              if (row.status === "Active" && access.canStopSource) {
+              if (row.process === "Recording") {
                 actions.push({
-                  label: "Stop",
-                  onClick: () =>
-                    setConfirmationRequest({ action: "stop", rowId: row.id }),
+                  label: "Open recording",
+                  onClick: () => navigate(`/data-sources/${row.id}/record`),
+                });
+              } else if (access.canRecordSource && sourceStarted && row.process !== "Replay") {
+                actions.push({
+                  label: "Start recording",
+                  onClick: () => navigate(`/data-sources/${row.id}/record`),
                 });
               }
 
-              if (row.status === "Stopped" && access.canStartStoppedSource) {
+              if (row.process === "Replay") {
                 actions.push({
-                  label: "Start",
+                  label: "Open replay",
+                  onClick: () => navigate(`/data-sources/${row.id}/replay`),
+                });
+              } else if (access.canConfigureReplay && sourceStarted && row.process !== "Recording") {
+                actions.push({
+                  label: "Set up replay",
+                  onClick: () => navigate(`/data-sources/${row.id}/replay`),
+                });
+              }
+
+              if (row.status === "Active" && access.canStopSource) {
+                actions.push({
+                  label: "Stop source",
+                  onClick: () =>
+                    setConfirmationRequest({ action: "stop", rowId: row.id }),
+                });
+              } else if (row.status === "Stopped" && access.canStartStoppedSource) {
+                actions.push({
+                  label: "Start source",
                   onClick: () => startSource(row.id),
                 });
               }

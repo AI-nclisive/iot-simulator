@@ -27,8 +27,14 @@ const detailTabs: { id: DetailTabId; label: string }[] = [
   { id: "settings", label: "Settings" },
 ];
 
-function statusTone(status: "Active" | "Stopped") {
-  return status === "Active" ? "accent" : "neutral";
+function stateMeta(source: {
+  status: "Active" | "Stopped";
+}) {
+  if (source.status === "Active") {
+    return { label: "Run", tone: "accent" as const };
+  }
+
+  return { label: "Off", tone: "neutral" as const };
 }
 
 function healthTone(health: "Healthy" | "Warning" | "Error") {
@@ -47,6 +53,53 @@ function currentTabId(searchValue: string | null): DetailTabId {
   return detailTabs.some((tab) => tab.id === searchValue)
     ? (searchValue as DetailTabId)
     : "overview";
+}
+
+function stopActionCopy() {
+  return {
+    confirmLabel: "Stop source",
+    message: "Stopping this source stops its current activity for everyone using this project.",
+    title: "Stop this source?",
+  };
+}
+
+function healthDiagnosticCopy(source: {
+  endpoint: string;
+  health: "Healthy" | "Warning" | "Error";
+  process?: "Recording" | "Replay";
+  clients: number;
+}) {
+  if (source.health === "Healthy") {
+    return null;
+  }
+
+  if (source.health === "Warning") {
+    return {
+      checks: [
+        `Check recent reconnects or slow responses from ${source.endpoint}.`,
+        source.clients > 0
+          ? "Review connected clients for partial delivery or backpressure."
+          : "No clients are connected; confirm whether that is expected.",
+        source.process
+          ? `Review the active ${source.process.toLowerCase()} process before changing source settings.`
+          : "Open Settings if the endpoint or protocol setup needs correction.",
+      ],
+      message:
+        "The source is still usable, but recent runtime events need review before relying on its values.",
+      title: "Health warning needs review.",
+    };
+  }
+
+  return {
+    checks: [
+      `Verify that ${source.endpoint} is reachable from this environment.`,
+      "Check credentials, protocol settings, and endpoint address in Settings.",
+      "Review connected clients after the source returns to Run.",
+    ],
+    message:
+      "The source is not healthy enough for normal operation. Fix the connection or configuration before recording or replaying from it.",
+    title: "Health error requires action.",
+  };
 }
 
 export function DataSourceDetailPreviewPage() {
@@ -83,9 +136,26 @@ export function DataSourceDetailPreviewPage() {
   }
 
   const activeSource = source;
+  const healthDiagnostic = healthDiagnosticCopy(activeSource);
+  const activeState = stateMeta(activeSource);
+  const sourceStarted = activeSource.status === "Active";
+  const recordingActive = activeSource.process === "Recording";
+  const replayActive = activeSource.process === "Replay";
+  const sourceControlAction =
+    sourceStarted && access.canStopSource
+      ? {
+          label: "Stop source",
+          onClick: () => setStopConfirmationOpen(true),
+        }
+      : !sourceStarted && access.canStartStoppedSource
+        ? {
+            label: "Start source",
+            onClick: () => startDataSource(activeSource.id),
+          }
+        : null;
 
   const stopConfirmationModel = useMemo(() => {
-    if (activeSource.status !== "Active") {
+    if (!sourceStarted) {
       return null;
     }
 
@@ -94,10 +164,12 @@ export function DataSourceDetailPreviewPage() {
         ? "Recording stops immediately and the current capture ends on this source."
         : activeSource.process === "Replay"
           ? "Replay stops immediately for this source."
-          : "The source stops serving simulated values until someone starts it again.";
+          : "The source stops serving values until someone starts it again.";
+
+    const copy = stopActionCopy();
 
     return {
-      confirmLabel: "Stop source",
+      confirmLabel: copy.confirmLabel,
       impacts: [
         { label: "Endpoint", value: activeSource.endpoint },
         { label: "Runtime impact", value: runtimeImpact },
@@ -109,15 +181,14 @@ export function DataSourceDetailPreviewPage() {
               : "No connected clients are currently shown for this source.",
         },
       ],
-      message:
-        "Stopping a source interrupts its current runtime behavior for everyone using this project.",
+      message: copy.message,
       objectLabel: `${activeSource.name} (${activeSource.protocol})`,
       reversibilityLabel:
         "This action is reversible. The source can be started again later.",
-      title: "Stop this source?",
+      title: copy.title,
       tone: "warning" as const,
     };
-  }, [activeSource]);
+  }, [activeSource, sourceStarted]);
 
   function setActiveTab(tabId: DetailTabId) {
     const nextParams = new URLSearchParams(searchParams);
@@ -133,9 +204,9 @@ export function DataSourceDetailPreviewPage() {
     if (activeTab === "schema") {
       return (
         <SharedStatePanel
-          message={`Schema work will open here for ${activeSource.parameterCount.toLocaleString()} parameters, with the deeper editor behavior added in the later schema task.`}
+          message={`Parameters for this source are managed in Schema. The full editor will open here for ${activeSource.parameterCount.toLocaleString()} parameters, with deeper editor behavior added in the later schema task.`}
           state="empty"
-          title="Schema surface is attached to the detail shell."
+          title="Schema manages source parameters."
         />
       );
     }
@@ -155,12 +226,42 @@ export function DataSourceDetailPreviewPage() {
     }
 
     if (activeTab === "events") {
+      if (!healthDiagnostic) {
+        return (
+          <SharedStatePanel
+            message="Runtime event history for this source will open here. No health diagnostics are currently required."
+            state="empty"
+            title="No health issues are shown for this source."
+          />
+        );
+      }
+
       return (
-        <SharedStatePanel
-          message="Runtime event history for this source will open here as part of the full detail surface."
-          state="empty"
-          title="Events tab is attached to the detail shell."
-        />
+        <div className="rounded-md border border-shell-line bg-white px-4 py-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusBadge label={activeSource.health} tone={healthTone(activeSource.health)} />
+            <p className="text-sm font-medium text-shell-ink">{healthDiagnostic.title}</p>
+          </div>
+          <p className="mt-3 text-sm leading-6 text-shell-muted">
+            {healthDiagnostic.message}
+          </p>
+          <ul className="mt-4 space-y-2 text-sm text-shell-ink">
+            {healthDiagnostic.checks.map((check) => (
+              <li key={check} className="rounded-md border border-shell-line/70 px-3 py-2">
+                {check}
+              </li>
+            ))}
+          </ul>
+          <div className="mt-4">
+            <button
+              className="shell-text-action"
+              type="button"
+              onClick={() => setActiveTab("settings")}
+            >
+              Open Settings
+            </button>
+          </div>
+        </div>
       );
     }
 
@@ -177,14 +278,8 @@ export function DataSourceDetailPreviewPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <StatusBadge label={activeSource.status} tone={statusTone(activeSource.status)} />
+            <StatusBadge label={activeState.label} tone={activeState.tone} />
             <StatusBadge label={activeSource.health} tone={healthTone(activeSource.health)} />
-            {activeSource.process ? (
-              <StatusBadge
-                label={activeSource.process}
-                tone={activeSource.process === "Recording" ? "warning" : "accent"}
-              />
-            ) : null}
           </div>
         </div>
 
@@ -200,7 +295,7 @@ export function DataSourceDetailPreviewPage() {
               Parameters
             </dt>
             <dd className="mt-2 text-sm text-shell-ink">
-              {activeSource.parameterCount.toLocaleString()}
+              {activeSource.parameterCount.toLocaleString()} in Schema
             </dd>
           </div>
           <div>
@@ -209,12 +304,14 @@ export function DataSourceDetailPreviewPage() {
             </dt>
             <dd className="mt-2 text-sm text-shell-ink">{activeSource.clients}</dd>
           </div>
-          <div>
-            <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
-              Current process
-            </dt>
-            <dd className="mt-2 text-sm text-shell-ink">{activeSource.process ?? "Idle"}</dd>
-          </div>
+          {activeSource.process ? (
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
+                Process
+              </dt>
+              <dd className="mt-2 text-sm text-shell-ink">{activeSource.process}</dd>
+            </div>
+          ) : null}
           <div>
             <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
               Last operator
@@ -224,42 +321,37 @@ export function DataSourceDetailPreviewPage() {
         </dl>
 
         <div className="mt-6 flex flex-wrap items-center gap-2">
-          {activeSource.status === "Stopped" && access.canStartStoppedSource ? (
-            <button
-              className="shell-action"
-              type="button"
-              onClick={() => startDataSource(activeSource.id)}
-            >
-              Start source
-            </button>
-          ) : null}
-          {activeSource.status === "Active" && access.canStopSource ? (
-            <button
-              className="shell-action"
-              type="button"
-              onClick={() => setStopConfirmationOpen(true)}
-            >
-              Stop source
-            </button>
-          ) : null}
-          {access.canRecordSource ? (
+          {recordingActive ? (
             <Link className="shell-action" to={`/data-sources/${activeSource.id}/record`}>
-              Record
+              Open recording
+            </Link>
+          ) : access.canRecordSource && sourceStarted && !replayActive ? (
+            <Link className="shell-action" to={`/data-sources/${activeSource.id}/record`}>
+              Start recording
             </Link>
           ) : (
             <button className="shell-action" disabled type="button">
-              Record
+              Start recording
             </button>
           )}
-          {access.canConfigureReplay ? (
+          {replayActive ? (
             <Link className="shell-action" to={`/data-sources/${activeSource.id}/replay`}>
-              Replay
+              Open replay
+            </Link>
+          ) : access.canConfigureReplay && sourceStarted && !recordingActive ? (
+            <Link className="shell-action" to={`/data-sources/${activeSource.id}/replay`}>
+              Set up replay
             </Link>
           ) : (
             <button className="shell-action" disabled type="button">
-              Replay
+              Set up replay
             </button>
           )}
+          {sourceControlAction ? (
+            <button className="shell-action" type="button" onClick={sourceControlAction.onClick}>
+              {sourceControlAction.label}
+            </button>
+          ) : null}
           <Link className="shell-text-action" to="/data-sources">
             Back to sources
           </Link>
