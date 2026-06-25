@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -35,7 +36,23 @@ public final class ProcessWorkerLauncher implements WorkerLauncher {
         List<String> command = new ArrayList<>(base);
         command.add(Integer.toString(controlPort));
         Process process = new ProcessBuilder(command).inheritIO().start();
-        return () -> terminate(process);
+        return new ProcessLaunchedWorker(process);
+    }
+
+    /** {@link LaunchedWorker} backed by a child {@link Process}. */
+    private record ProcessLaunchedWorker(Process process) implements LaunchedWorker {
+
+        @Override
+        public void close() {
+            terminate(process);
+        }
+
+        @Override
+        public CompletionStage<Void> onExit() {
+            // Completes whether the process crashed or we asked it to exit; the
+            // supervisor decides whether the exit was unexpected.
+            return process.onExit().thenAccept(p -> {});
+        }
     }
 
     /** Asks the worker to exit, then force-kills it if it overstays the grace period. */
