@@ -291,7 +291,7 @@ Parallel execution:
 3. After `UI-071`, run `UI-072`.
 4. After `UI-072`, run `UI-073`.
 
-- [ ] `UI-070` Evidence List
+- [x] `UI-070` Evidence List
   Surface: `Evidence List`
   Depends: `UI-003`, `UI-006`
   Done when: users can find evidence by source, initiator, project, scenario,
