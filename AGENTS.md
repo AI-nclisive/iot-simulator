@@ -76,9 +76,10 @@ When you change tasks, change **both** the file and the Project:
   otherwise force), and move the board `Status` to **Done** + close the issue
   **only after that PR is merged**. Each PR edits only its own task's line, so
   catalog conflicts are rare. CI enforces this pairing: a PR whose body links a
-  task (`Closes: #…` / `Implements: IS-/UI-…`) must also edit that task's catalog
+  task (`Implements: IS-/UI-…`) must also edit that task's catalog
   line in the same PR, so a merged task can never leave a stale `[ ]` behind (see
-  `.github/workflows/ci.yml` → `catalog-sync` job).
+  `.github/workflows/ci.yml` → `catalog-sync` job). (`Closes: #…` is not used as
+  the trigger — it can reference non-task issues such as bug reports.)
 - **Source of truth on conflict: the board wins.** The Project board is the live
   mirror; the catalogs can lag. A task whose board `Status` is `Done` (or that has
   a merged PR) but whose catalog checkbox is still `[ ]` is **done** — fix the
