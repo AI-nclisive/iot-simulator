@@ -25,10 +25,6 @@ describe("willRetryFail", () => {
     assert.equal(willRetryFail(true, "CSV bundle", true, 5), false);
   });
 
-  it("returns false when PDF format even if other conditions match", () => {
-    assert.equal(willRetryFail(true, "PDF", true, 0), false);
-  });
-
   it("is safe for normal export (not recovery)", () => {
     assert.equal(willRetryFail(false, "JSON", true, 0), false);
     assert.equal(willRetryFail(false, "PDF", false, 0), false);

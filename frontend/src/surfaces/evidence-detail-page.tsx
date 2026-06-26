@@ -320,7 +320,7 @@ export function EvidenceDetailPage() {
         {exportedFormat ? (
           <div className="mt-4 rounded-md border border-shell-line bg-shell-base/60 px-4 py-3">
             <p className="text-sm font-medium text-shell-ink">
-              Last export attempt: {exportedFormat}
+              {exportOutcome === "success" ? "Last export:" : "Last export attempt:"} {exportedFormat}
             </p>
             <p className="mt-1 text-sm text-shell-muted">
               {exportOutcome === "success"
