@@ -41,14 +41,21 @@ Always run this and confirm it is green before opening a PR.
 - Keep PRs small and focused; fill in the PR template checklist.
 - Merge strategy: **squash merge**, linear history. CI must be green and at least
   one approving review is required.
+- **Arm auto-merge when you open the PR**: `gh pr merge <n> --auto --squash`. GitHub
+  then merges the PR automatically once branch protection is satisfied — i.e. the
+  Claude reviewer's **APPROVE** plus a green `build` — with no manual merge click.
+  (Native auto-merge is enabled on the repo; see `.github/OWNER_SETUP.md`.)
 
 ## AI review loop
-Every PR is reviewed automatically by an advisory Claude reviewer (IS-112; see
+Every PR is reviewed automatically by a Claude reviewer (IS-112; see
 `.github/workflows/claude-review.yml`). It posts **inline comments on the specific
 lines** it thinks need rework (prefixed `[blocking]` / `[nit]`) and **one top-level
 verdict comment** — `## Claude review: ✅ Mergeable` or `## Claude review:
-❌ Changes requested` with the reasons. It is advisory and does not gate merge — the
-required check stays `build`.
+❌ Changes requested` with the reasons. It then submits a **formal GitHub review**
+matching that verdict: **APPROVE** when nothing blocks, **REQUEST_CHANGES** otherwise.
+This gates merge: the APPROVE supplies branch protection's required approving review,
+and a REQUEST_CHANGES blocks merge until a later push earns an APPROVE. The required
+status check stays `build`.
 
 By the time the review runs the task is already **In review** (moved there when the
 PR was opened — see "Task tracking"). Resolving the review is part of finishing the
@@ -58,7 +65,9 @@ task, not an optional follow-up. After opening (or updating) a PR:
    the current approach is the better choice; mark the thread **resolved** once it is
    addressed. Then **push to the same branch** — each push re-triggers the review.
 3. **Wait for the new verdict** and repeat until either:
-   - the verdict is `✅ Mergeable` with **no unresolved comments**, or
+   - the verdict is `✅ Mergeable` with **no unresolved comments** — the reviewer's
+     **APPROVE** then lands and, with auto-merge armed and `build` green, the PR
+     squash-merges itself, or
    - **3 review rounds** have completed (then summarize any still-open points for the
      human reviewer in the PR description and leave each thread resolved-with-rationale).
 

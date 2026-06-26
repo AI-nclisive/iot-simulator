@@ -7,15 +7,18 @@ name: Claude PR Review
 # "Claude Code is not installed on this repository".
 # Uses the `pull_request` trigger (NOT `pull_request_target`): GitHub withholds
 # repo secrets from fork-originated PRs on this event, so the OAuth token is never
-# exposed to untrusted forks. The review posts comments only; it is advisory and
-# does NOT gate merge (the required check stays `build` from ci.yml).
+# exposed to untrusted forks. The review submits a FORMAL GitHub review — APPROVE
+# when nothing blocks, REQUEST_CHANGES otherwise — so its verdict gates merge
+# alongside the required `build` check from ci.yml: the Claude GitHub App's APPROVE
+# satisfies branch protection's 1-approval rule, enabling automated merge.
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
 
 # Least-privilege: read code, write PR review comments. id-token is required by
 # anthropics/claude-code-action. pull-requests: write already covers resolving
-# review threads (GraphQL resolveReviewThread) and posting in-thread replies.
+# review threads (GraphQL resolveReviewThread), posting in-thread replies, and
+# submitting the formal APPROVE / REQUEST_CHANGES review.
 permissions:
   contents: read
   pull-requests: write
@@ -56,10 +59,10 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
-            You are an advisory code reviewer on pull request
+            You are the code reviewer on pull request
             #${{ github.event.pull_request.number }} in ${{ github.repository }},
-            running before any human reviewer. Be precise and concise; do not
-            rubber-stamp.
+            running automatically on every push. Your verdict gates merge (see
+            VERDICT below), so be precise and concise; do not rubber-stamp.
 
             Steps:
             1. Read AGENTS.md and CONTRIBUTING.md for the repo's rules.
@@ -135,24 +138,39 @@ jobs:
               open a second thread on a line where you already have one — reply on the
               existing thread (step 3d) instead of duplicating.
 
-            - VERDICT — post exactly ONE top-level PR comment with `gh pr comment`,
-              and keep it short (the detail lives in the inline comments):
-                * If nothing blocks merge, the comment is:
-                    ## Claude review: ✅ Mergeable
-                    No blocking issues.<note nit count if any>
-                * If anything blocks merge, the comment is:
-                    ## Claude review: ❌ Changes requested
-                    <one bullet per blocking reason, each citing the file:line you
-                     commented on inline>
-              A prior issue you resolved in step 3 is no longer blocking; one you
-              left open, or replied to while still unconvinced, still is.
+            - VERDICT — first post exactly ONE top-level PR comment with `gh pr comment`
+              (keep it short — the detail lives in the inline comments), then submit
+              exactly ONE matching FORMAL review so the verdict gates merge:
+                * If nothing blocks merge:
+                    - comment body:
+                        ## Claude review: ✅ Mergeable
+                        No blocking issues.<note nit count if any>
+                    - then APPROVE the PR:
+                        gh pr review ${{ github.event.pull_request.number }} --approve \
+                          --body "Claude review: ✅ Mergeable — no blocking issues."
+                * If anything blocks merge:
+                    - comment body:
+                        ## Claude review: ❌ Changes requested
+                        <one bullet per blocking reason, each citing the file:line you
+                         commented on inline>
+                    - then REQUEST CHANGES on the PR:
+                        gh pr review ${{ github.event.pull_request.number }} --request-changes \
+                          --body "Claude review: ❌ Changes requested — see the inline [blocking] comments."
+              A prior issue you resolved in step 3 is no longer blocking; one you left
+              open, or replied to while still unconvinced, still is. Submit the formal
+              review LAST, after the comment and any thread reconciliation. When a
+              previous run requested changes and everything is now fixed, your new
+              --approve supersedes that earlier REQUEST_CHANGES state and unblocks merge.
 
-            This review is advisory: do NOT submit a formal GitHub approval or
-            request-changes review (a human does that); the required merge check
-            stays `build`. You cannot run `./gradlew build` here — trust CI's `build`
-            job for compile/test status. Do not comment on files outside the diff;
-            no praise-only comments.
+            Your verdict now gates merge. The `build` status check is independently
+            required by branch protection, so you do NOT need to verify it — judge the
+            diff only and trust CI for compile/test status (you cannot run
+            `./gradlew build` here). An --approve supplies the one required approving
+            review; combined with a green `build`, GitHub auto-merge can then merge the
+            PR. A --request-changes blocks merge until a later push earns an --approve
+            that supersedes it. Do not comment on files outside the diff; no praise-only
+            comments.
           claude_args: |
             --model claude-sonnet-4-6
             --max-turns 30
-            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr comment:*),Bash(gh api:*),Read,Grep,Glob"
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr comment:*),Bash(gh pr review:*),Bash(gh api:*),Read,Grep,Glob"

@@ -88,7 +88,7 @@ Tier 3 — quality automation:
 - [x] IS-106 [SDLC] ✅ Static analysis: Checkstyle (lean ruleset, generated code excluded; Error Prone/SpotBugs can be ratcheted on later)
 - [x] IS-107 [SDLC] ✅ JaCoCo coverage (XML+HTML) finalizing `test`
 - [x] IS-108 [SDLC] ✅ Dependabot (gradle + github-actions)
-- [x] IS-112 [SDLC] ✅ Advisory Claude PR code review (`anthropics/claude-code-action` on `pull_request`): reviews every PR diff against repo conventions and posts comments; non-blocking (required check stays `build`). Auth = `CLAUDE_CODE_OAUTH_TOKEN` + Claude GitHub App — see `.github/OWNER_SETUP.md`
+- [x] IS-112 [SDLC] ✅ Claude PR code review (`anthropics/claude-code-action` on `pull_request`): reviews every PR diff against repo conventions, posts inline + verdict comments, and submits a formal review (APPROVE / REQUEST_CHANGES) that gates merge — the Claude GitHub App's APPROVE supplies branch protection's 1 required review; required check stays `build`. Auth = `CLAUDE_CODE_OAUTH_TOKEN` + Claude GitHub App — see `.github/OWNER_SETUP.md`
 
 Tier 4 — parallel-conflict mitigations:
 - [x] IS-109 [SDLC] ✅ Flyway migration version-collision convention (documented)

@@ -92,12 +92,16 @@ Follow `CONTRIBUTING.md`. For agents specifically:
   is green; report the real result. Never claim done without building and testing.
 - Branch `feat/IS-xxx-...` or `feat/UI-xxx-...`; Conventional Commit titles;
   squash merge into `master`.
+- When you open the PR, arm auto-merge: `gh pr merge <n> --auto --squash`. The PR then
+  merges itself once the Claude reviewer's APPROVE lands and `build` is green — no
+  manual merge step (see `CONTRIBUTING.md`).
 - Add or update tests for every change.
 - Move the board `Status` in step with the work — **In Progress** when you start,
   **In review** when you open the PR (see "Task Tracking" above for the full transitions).
 - After opening a PR, follow the **AI review loop** in `CONTRIBUTING.md`: wait for the
-  advisory Claude reviewer's verdict, fix each finding (or reply why the current choice
-  is best), mark the thread resolved, push, and wait for re-review. **The task is
+  Claude reviewer's verdict (it submits a formal APPROVE / REQUEST_CHANGES that gates
+  merge), fix each finding (or reply why the current choice is best), mark the thread
+  resolved, push, and wait for re-review. **The task is
   finished only once every reviewer comment is resolved** (or after 3 review rounds —
   see the full loop in `CONTRIBUTING.md`) and the build is green — don't treat the
   work as done while review threads are still open.
