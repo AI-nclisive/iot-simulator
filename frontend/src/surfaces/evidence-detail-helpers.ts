@@ -1,5 +1,5 @@
 import type { StatusTone } from "../ui/status-badge";
-import type { EvidenceArtifact, EvidenceStatus } from "./mock-evidence";
+import type { EvidenceArtifact, EvidenceFormat, EvidenceStatus } from "./mock-evidence";
 
 export function evidenceStatusTone(status: EvidenceStatus): StatusTone {
   if (status === "Export failed") return "danger";
@@ -55,4 +55,13 @@ export function buildExportScopeLabel(scope: ExportScope): string[] {
     scope.includeClients ? "Clients" : null,
     scope.includeIssues ? "Faults and errors" : null,
   ].filter((s): s is string => s !== null);
+}
+
+export function willRetryFail(
+  recoveryMode: boolean,
+  format: EvidenceFormat,
+  includeClients: boolean,
+  clientCount: number,
+): boolean {
+  return recoveryMode && format === "CSV bundle" && includeClients && clientCount === 0;
 }

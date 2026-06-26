@@ -308,7 +308,7 @@ Parallel execution:
   Depends: `UI-071`
   Done when: export formats, artifact scope, and secret exclusion are explicit.
 
-- [ ] `UI-073` Evidence export failure recovery
+- [x] `UI-073` Evidence export failure recovery
   Surface: `Evidence Detail`
   Depends: `UI-072`
   Done when: export failure states support retry with a clear reason and next
