@@ -319,6 +319,9 @@ function reviewLines(form: WizardFormState) {
         ]
       : []),
     { label: "Runtime behavior", value: runtimeLabel },
+    ...(form.basis === "manual"
+      ? [{ label: "Schema handoff", value: "Schema Editor (opens after create)" }]
+      : []),
     { label: "Schema note", value: form.schemaReviewNote.trim() || "No note" },
   ];
 }
@@ -503,7 +506,11 @@ export function CreateDataSourceWizardPage() {
       startDataSource(createdId);
     }
 
-    navigate(`/data-sources/${createdId}`);
+    if (form.basis === "manual") {
+      navigate(`/data-sources/${createdId}?tab=schema`);
+    } else {
+      navigate(`/data-sources/${createdId}`);
+    }
   }
 
   function renderSetupStep() {
@@ -913,12 +920,34 @@ export function CreateDataSourceWizardPage() {
       );
     }
 
+    if (form.basis === "manual") {
+      return (
+        <div className="space-y-4">
+          <section className="rounded-md border border-shell-line bg-white px-4 py-4">
+            <p className="text-sm font-medium text-shell-ink">Schema Editor handoff</p>
+            <p className="mt-2 text-sm leading-6 text-shell-muted">
+              Structure will be defined in the Schema Editor after this source is saved. Choose a
+              starting template in the Setup step to seed the initial structure.
+            </p>
+          </section>
+
+          <label className="flex flex-col gap-2 text-sm text-shell-muted">
+            Review note
+            <textarea
+              className="shell-field min-h-[7rem] resize-y"
+              placeholder="Optional schema note for this draft path"
+              value={form.schemaReviewNote}
+              onChange={(event) => updateForm({ schemaReviewNote: event.target.value })}
+            />
+          </label>
+        </div>
+      );
+    }
+
     const note =
-      form.basis === "manual"
-        ? "Manual structure will start from the chosen template."
-        : form.basis === "import"
-          ? "Prepared artifact will seed the initial schema and value shape."
-            : "Synthetic setup will generate the starting schema profile.";
+      form.basis === "import"
+        ? "Prepared artifact will seed the initial schema and value shape."
+        : "Synthetic setup will generate the starting schema profile.";
 
     return (
       <div className="space-y-4">
