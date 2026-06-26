@@ -7,6 +7,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.function.BooleanSupplier;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * Teardown must kill the worker's whole process tree, not just the launcher wrapper
@@ -18,6 +19,7 @@ import org.junit.jupiter.api.Test;
 class ProcessWorkerLauncherTerminateTest {
 
     @Test
+    @Timeout(30) // terminate() can block ~5s grace + await() up to 10s; fail fast if wedged
     void terminateKillsDescendantProcesses() throws Exception {
         // A shell that waits on a long-lived child, mirroring the wrapper → worker
         // indirection. The child is reparented (not killed) when the shell dies, so

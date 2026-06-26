@@ -66,6 +66,9 @@ public final class ProcessWorkerLauncher implements WorkerLauncher {
      * orphans the worker JVM — and an orphan that inherited our I/O can keep a pipe
      * open and stall the spawning JVM. We therefore snapshot the process tree and
      * tear the whole tree down.
+     *
+     * <p>Package-private only so the teardown is testable
+     * ({@code ProcessWorkerLauncherTerminateTest}); it is not an intended API surface.
      */
     static void terminate(Process process) {
         // Snapshot before destroy(): once the wrapper exits the parent/child links are
