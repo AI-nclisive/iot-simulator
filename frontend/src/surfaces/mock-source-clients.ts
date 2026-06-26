@@ -27,14 +27,6 @@ const clientsBySource: Record<string, SourceClient[]> = {
       readCount: 9340,
       lastReadAt: "14:32",
     },
-    {
-      id: "cli-01-c",
-      remoteAddress: "192.168.1.77:50011",
-      state: "Connecting",
-      connectedSince: "14:31",
-      readCount: 0,
-      lastReadAt: "—",
-    },
   ],
   "src-02": [
     {
@@ -45,25 +37,8 @@ const clientsBySource: Record<string, SourceClient[]> = {
       readCount: 42100,
       lastReadAt: "14:31",
     },
-    {
-      id: "cli-02-b",
-      remoteAddress: "10.0.0.21:38502",
-      state: "Disconnected",
-      connectedSince: "13:50",
-      readCount: 5000,
-      lastReadAt: "14:10",
-    },
   ],
-  "src-03": [
-    {
-      id: "cli-03-a",
-      remoteAddress: "172.16.0.8:51200",
-      state: "Connected",
-      connectedSince: "14:00",
-      readCount: 71800,
-      lastReadAt: "14:32",
-    },
-  ],
+  "src-03": [],
 };
 
 export function getClientsForSource(sourceId: string): SourceClient[] {
