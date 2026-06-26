@@ -149,7 +149,7 @@ function ExportEvidenceDialog({ evidence, open, onClose, onExportComplete }: Exp
         </div>
 
         <div className="flex flex-col-reverse gap-2 border-t border-shell-line px-5 py-4 sm:flex-row sm:items-center sm:justify-end">
-          <button className="shell-action" type="button" onClick={onClose}>
+          <button autoFocus className="shell-action" type="button" onClick={onClose}>
             Cancel
           </button>
           <button
