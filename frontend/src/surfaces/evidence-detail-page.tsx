@@ -325,7 +325,7 @@ export function EvidenceDetailPage() {
             <p className="mt-1 text-sm text-shell-muted">
               {exportOutcome === "success"
                 ? "Export completed. Secret values were excluded from the artifact."
-                : "Export failed again. Adjust the scope and retry."}
+                : "Export failed. Adjust the scope and retry."}
             </p>
           </div>
         ) : null}
