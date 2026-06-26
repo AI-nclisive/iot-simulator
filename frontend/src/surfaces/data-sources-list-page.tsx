@@ -3,8 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { resolveAccess } from "../shell/access-policy";
 import { useDataSourcesStore } from "../shell/data-sources-store";
 import { useShellStore } from "../shell/shell-store";
+import { sourceListError, sourceListStale } from "../shell/mock-workspace";
 import { type DataSourceRow } from "./mock-data-sources";
 import { ConfirmationDialog } from "../ui/confirmation-dialog";
+import { SharedStatePanel } from "../ui/shared-state-panel";
+import { StaleBanner } from "../ui/stale-banner";
 import { StatusBadge } from "../ui/status-badge";
 import { stopActionCopy } from "./source-action-copy";
 import {
@@ -303,9 +306,26 @@ export function DataSourcesListPage() {
   const hasQueryState =
     searchValue.trim().length > 0 || protocolFilter !== "all" || stateFilter !== "all";
 
+  if (sourceListError) {
+    return (
+      <div className="flex h-full flex-col gap-3">
+        <section className="shell-panel px-5 py-5">
+          <SharedStatePanel
+            message="Check your connection and try refreshing. If the problem continues, contact your project admin."
+            state="error"
+            title="Data sources could not be loaded."
+          />
+        </section>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-full flex-col gap-3">
       <section className="shell-panel px-5 py-5">
+        {sourceListStale ? (
+          <StaleBanner message="Source status may be outdated. Refresh the page to see the latest state." />
+        ) : null}
         <TableToolbar
           activeFilters={activeFilters}
           filters={filters}
