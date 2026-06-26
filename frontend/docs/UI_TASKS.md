@@ -223,7 +223,7 @@ Parallel execution:
   Done when: target compatibility, active-target impact, no-client state,
   replay progress, and completion or failure states are clear.
 
-- [ ] `UI-039A` Real-source credential handling
+- [x] `UI-039A` Real-source credential handling
   Surface: `Credential Handling`
   Depends: `UI-033`, `UI-039`
   Done when: sensitive fields are masked, persistence behavior is visible, and

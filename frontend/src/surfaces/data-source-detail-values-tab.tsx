@@ -18,11 +18,15 @@ function freshnessTone(freshness: SourceValueRow["freshness"]) {
 }
 
 function currentModeLabel(source: DataSourceRow) {
-  if (source.process) {
-    return source.process;
+  if (source.process === "Recording") {
+    return "Recording";
   }
 
-  return source.status === "Active" ? "Runtime" : "Stopped";
+  if (source.process === "Replay") {
+    return "Replay";
+  }
+
+  return source.status === "Active" ? "Run" : "Off";
 }
 
 export function DataSourceDetailValuesTab({
@@ -30,9 +34,7 @@ export function DataSourceDetailValuesTab({
 }: {
   source: DataSourceRow;
 }) {
-  const values = useSourceValuesStore((state) =>
-    state.values.filter((valueRow) => valueRow.sourceId === source.id),
-  );
+  const allValues = useSourceValuesStore((state) => state.values);
   const togglePinnedValue = useSourceValuesStore((state) => state.togglePinnedValue);
   const [searchValue, setSearchValue] = useState("");
   const [groupFilter, setGroupFilter] = useState("all");
@@ -42,6 +44,11 @@ export function DataSourceDetailValuesTab({
     columnId: "path",
     direction: "asc",
   });
+
+  const values = useMemo(
+    () => allValues.filter((valueRow) => valueRow.sourceId === source.id),
+    [allValues, source.id],
+  );
 
   const filteredRows = useMemo(() => {
     return values.filter((row) => {
@@ -208,10 +215,11 @@ export function DataSourceDetailValuesTab({
     <div className="space-y-5">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 max-w-3xl">
-          <p className="text-sm font-medium text-shell-ink">Current runtime values</p>
+          <p className="text-sm font-medium text-shell-ink">Current values</p>
           <p className="mt-2 text-sm leading-6 text-shell-muted">
-            This table shows current runtime output only. Recordings, samples, and
-            evidence stay in their own surfaces and are not mixed into live browsing.
+            Parameter definitions live in Schema. Values shows current readings
+            from those parameters; recordings, samples, and evidence stay in
+            their own surfaces.
           </p>
         </div>
 

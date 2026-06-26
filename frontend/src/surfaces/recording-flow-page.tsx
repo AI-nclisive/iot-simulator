@@ -265,7 +265,7 @@ export function RecordingFlowPage() {
         <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           <MetricCard label="Capture state" value={recordingLabel(recordingState)} />
           <MetricCard
-            label="Parameters in source"
+            label="Parameters"
             value={source.parameterCount.toLocaleString()}
           />
           <MetricCard label="Duration" value={formatDuration(durationSeconds)} />

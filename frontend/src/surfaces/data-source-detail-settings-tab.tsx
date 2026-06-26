@@ -68,7 +68,7 @@ export function DataSourceDetailSettingsTab({
 
       {source.status === "Active" ? (
         <SharedStatePanel
-          message="Editing this form changes saved source configuration. Current runtime behavior stays separate until the next start or replay setup."
+          message="Editing this form changes saved source configuration. Current source output stays separate until the next start or replay setup."
           state="warning"
           title="Configuration and runtime are separated."
         />
