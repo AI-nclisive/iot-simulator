@@ -26,7 +26,7 @@ type ExportDialogProps = {
 function ExportEvidenceDialog({ evidence, open, onClose, onExportComplete }: ExportDialogProps) {
   const titleId = useId();
   const descriptionId = useId();
-  const [format, setFormat] = useState<EvidenceFormat>(evidence.formats[0]);
+  const [format, setFormat] = useState<EvidenceFormat>(evidence.formats[0] ?? "PDF");
   const [includeSummary, setIncludeSummary] = useState(true);
   const [includeTimeline, setIncludeTimeline] = useState(true);
   const [includeClients, setIncludeClients] = useState(true);
@@ -34,7 +34,7 @@ function ExportEvidenceDialog({ evidence, open, onClose, onExportComplete }: Exp
 
   useEffect(() => {
     if (!open) return;
-    setFormat(evidence.formats[0]);
+    setFormat(evidence.formats[0] ?? "PDF");
     setIncludeSummary(true);
     setIncludeTimeline(true);
     setIncludeClients(true);
