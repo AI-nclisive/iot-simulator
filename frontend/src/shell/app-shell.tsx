@@ -93,6 +93,7 @@ export function AppShell() {
                           <NavLink
                             key={item.to}
                             aria-label={item.label}
+                            title={item.label}
                             className={({ isActive }) =>
                               `shell-nav-item-compact ${
                                 isActive ? "shell-nav-item-compact-active" : ""
