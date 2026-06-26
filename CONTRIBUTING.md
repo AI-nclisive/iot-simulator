@@ -5,20 +5,28 @@ and pull requests. These rules keep that smooth.
 
 ## Prerequisites
 - JDK 25 (toolchain target). Gradle runs via the committed wrapper (`./gradlew`).
+- Node.js 20 for the frontend. Run `nvm use` from the repo root if you use
+  nvm/fnm/asdf; the expected version is recorded in `.nvmrc`.
 - Docker (Docker Desktop / colima) — required for Testcontainers integration
   tests. Without Docker those ITs skip locally; CI always runs them.
 
 ## Build & test
 ```bash
 ./gradlew build        # compile + all tests (unit + ITs + ArchUnit)
+npm ci                 # install locked frontend dependencies
+npm run typecheck      # frontend TypeScript check
+npm run build          # production frontend build
 ```
 Always run this and confirm it is green before opening a PR.
 
 ## Task IDs
-- Every task has a project-wide ID and area marker, named **`IS-XXX [AREA] short name`** —
-  `[AREA]` is `[BE]` (backend), `[FE]` (frontend) or `[SDLC]` (repo/process).
-- Catalog: `backend-specs/TASKS.md` (with a legacy `BE-*`/`SDLC-*` → `IS-XXX` crosswalk).
-- Reuse the ID everywhere: branch `feat/IS-038-...`, issue `IS-038 short name` (area via the form's **Area** field), PR `Implements: IS-038`.
+- Backend and repo/process tasks use **`IS-XXX [AREA] short name`** from
+  `backend-specs/TASKS.md`; `[AREA]` is `[BE]` or `[SDLC]`.
+- Frontend tasks use **`UI-XXX [FE] short name`** from
+  `frontend/docs/UI_TASKS.md`.
+- Reuse the ID everywhere: branch `feat/IS-038-...` or `feat/UI-022-...`, issue
+  `IS-038 short name` / `UI-022 short name` (area via the form's **Area** field),
+  PR `Implements: IS-038` or `Implements: UI-022`.
 
 ## Branching
 - Branch off `master`. One task per branch/PR.
@@ -28,18 +36,29 @@ Always run this and confirm it is green before opening a PR.
 - **Language: write all GitHub text in English** — commit messages, PR titles and
   descriptions, issue text, and every comment (including replies to review findings).
 - Conventional Commits: `type(scope): subject` (e.g. `feat(schema): ...`).
-- Reference the task in the PR: `Implements: IS-123`, `Closes: #<issue>`.
+- Reference the task in the PR: `Implements: IS-123` / `Implements: UI-123`,
+  `Closes: #<issue>`.
 - Keep PRs small and focused; fill in the PR template checklist.
 - Merge strategy: **squash merge**, linear history. CI must be green and at least
   one approving review is required.
+- **Arm auto-merge when you open the PR**: `gh pr merge <n> --auto --squash`. GitHub
+  then merges the PR automatically once branch protection is satisfied — i.e. the
+  Claude reviewer's **APPROVE** plus a green `build` — with no manual merge click.
+  (Native auto-merge is enabled on the repo; see `.github/OWNER_SETUP.md`.)
 
 ## AI review loop
-Every PR is reviewed automatically by an advisory Claude reviewer (IS-112; see
+Every PR is reviewed automatically by a Claude reviewer (IS-112; see
 `.github/workflows/claude-review.yml`). It posts **inline comments on the specific
 lines** it thinks need rework (prefixed `[blocking]` / `[nit]`) and **one top-level
 verdict comment** — `## Claude review: ✅ Mergeable` or `## Claude review:
-❌ Changes requested` with the reasons. It is advisory and does not gate merge — the
-required check stays `build`.
+❌ Changes requested` with the reasons. It then submits a **formal GitHub review**
+matching that verdict: **APPROVE** only when nothing blocks **and every review thread
+is resolved** (including nits and any human's comments), **REQUEST_CHANGES** otherwise.
+This gates merge: the APPROVE supplies branch protection's required approving review,
+and a REQUEST_CHANGES blocks merge until a later push earns an APPROVE. The required
+status check stays `build`. Because it never approves while a thread is open, you must
+**resolve every comment and push** to earn the approval — resolving alone does not
+re-trigger the review.
 
 By the time the review runs the task is already **In review** (moved there when the
 PR was opened — see "Task tracking"). Resolving the review is part of finishing the
@@ -49,7 +68,9 @@ task, not an optional follow-up. After opening (or updating) a PR:
    the current approach is the better choice; mark the thread **resolved** once it is
    addressed. Then **push to the same branch** — each push re-triggers the review.
 3. **Wait for the new verdict** and repeat until either:
-   - the verdict is `✅ Mergeable` with **no unresolved comments**, or
+   - the verdict is `✅ Mergeable` with **no unresolved comments** — the reviewer's
+     **APPROVE** then lands and, with auto-merge armed and `build` green, the PR
+     squash-merges itself, or
    - **3 review rounds** have completed (then summarize any still-open points for the
      human reviewer in the PR description and leave each thread resolved-with-rationale).
 
@@ -61,6 +82,7 @@ flipped inside the implementation PR (see "Task tracking").
 
 ## Definition of Done
 - `./gradlew build` green (tests added/updated for the change).
+- `npm ci`, `npm run typecheck`, and `npm run build` green for frontend changes.
 - No secrets/credentials/PKI committed; secrets come from env/secret store.
 - Generated code (jOOQ/proto) stays under `build/` — never committed.
 - Public behavior changes reflected in OpenAPI and, if needed, the specs.
@@ -84,10 +106,11 @@ flipped inside the implementation PR (see "Task tracking").
   Move the **board `Status` to Done and close the issue only after that PR is
   merged**. Each PR edits only its own task's line, so conflicts are rare; only
   the aggregate snapshot count line is periodically retallied.
-- File tasks with the **Backend task** issue form; labels are defined in
-  `.github/labels.yml`. The Project board (live status by IS-ID) is an admin
+- File tasks with the **Task** issue form; labels are defined in
+  `.github/labels.yml`. The Project board (live status by task ID) is an admin
   one-time setup: `gh project create` (needs the `project` token scope) or create
-  it in the GitHub UI with a `Task ID` field, an `Area` (BE/FE/SDLC) field, and a status column.
+  it in the GitHub UI with a `Task ID` field, an `Area` (BE/FE/SDLC) field, and a
+  status column.
 
 ## Parallel-work conventions
 - **Flyway migrations**: never reuse a version number. Two open PRs adding

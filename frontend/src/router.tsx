@@ -3,6 +3,7 @@ import { AppShell } from "./shell/app-shell";
 import { CreateDataSourceWizardPage } from "./surfaces/create-data-source-wizard-page";
 import { DataSourceDetailPreviewPage } from "./surfaces/data-source-detail-preview-page";
 import { DataSourcesListPage } from "./surfaces/data-sources-list-page";
+import { NotificationDemoPage } from "./surfaces/notification-demo-page";
 import { OverviewPage } from "./surfaces/overview-page";
 import { ProjectEntryPage } from "./surfaces/project-entry-page";
 import { RecordingFlowPage } from "./surfaces/recording-flow-page";
@@ -123,6 +124,10 @@ export const router = createBrowserRouter([
       {
         path: "admin",
         element: <SurfaceStubPage {...surfaceContent.admin} adminOnly />,
+      },
+      {
+        path: "notifications-demo",
+        element: <NotificationDemoPage adminOnly />,
       },
     ],
   },

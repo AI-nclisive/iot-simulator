@@ -1,13 +1,14 @@
 <!-- One task per PR. Keep changes focused and reviewable. -->
 
 ## What & why
-<!-- Short description. Link the task: Closes #<issue> / implements IS-XXX. -->
+<!-- Short description. Link one task: Closes #<issue> / Implements IS-XXX or UI-XXX. -->
 
-Implements: IS-___
-Closes: #___
+Implements: <!-- IS-XXX or UI-XXX -->
+Closes: <!-- #issue -->
 
 ## Checklist
 - [ ] `./gradlew build` is green locally (compile + tests)
+- [ ] `npm ci`, `npm run typecheck`, and `npm run build` are green locally for frontend changes
 - [ ] Tests added/updated for the change
 - [ ] Conventional Commit title (`type(scope): subject`)
 - [ ] No secrets/credentials/PKI committed; secrets come from env

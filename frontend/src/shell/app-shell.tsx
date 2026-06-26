@@ -1,4 +1,6 @@
 import { Link, NavLink, Outlet } from "react-router-dom";
+import { ToastRegion } from "../ui/notification-pattern";
+import { useNotificationStore } from "./notification-store";
 import { projects, topLevelNav } from "./mock-workspace";
 import { useShellStore } from "./shell-store";
 import { resolveAccess } from "./access-policy";
@@ -33,10 +35,14 @@ export function AppShell() {
   const sharedRole = useShellStore((state) => state.sharedRole);
   const toggleProjectRail = useShellStore((state) => state.toggleProjectRail);
 
+  const toasts = useNotificationStore((state) => state.toasts);
+  const dismissNotification = useNotificationStore((state) => state.dismiss);
+
   const currentProject = projects.find((project) => project.id === currentProjectId) ?? projects[0];
   const access = resolveAccess(accessMode, sharedRole);
 
   return (
+    <>
     <div className="min-h-screen px-3 py-3 text-shell-ink sm:px-4 lg:px-5">
       <div className="mx-auto flex min-h-[calc(100vh-1.5rem)] max-w-[1680px] flex-col gap-3">
         <header className="shell-panel px-4 py-3 lg:px-5">
@@ -160,5 +166,9 @@ export function AppShell() {
         </div>
       </div>
     </div>
+
+    {/* Global toast notifications — rendered via portal into document.body */}
+    <ToastRegion toasts={toasts} onDismiss={dismissNotification} />
+  </>
   );
 }
