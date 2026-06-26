@@ -105,6 +105,8 @@ export const activeRuns: ActiveRun[] = [
   },
 ];
 
+export const mockExportShouldFail = false;
+
 export const topLevelNav = [
   { to: "/overview", label: "Overview" },
   { to: "/data-sources", label: "Data Sources" },
