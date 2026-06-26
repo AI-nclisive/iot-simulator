@@ -162,6 +162,25 @@ function validationMessage(stepIndex: number, form: WizardFormState) {
     if (form.basis === "import" && !form.importArtifactName.trim()) {
       return "Enter the prepared artifact name before continuing.";
     }
+
+    if (form.basis === "synthetic") {
+      const min = Number(form.syntheticValueMin);
+      const max = Number(form.syntheticValueMax);
+      const count = Number(form.syntheticParameterCount);
+      const interval = Number(form.syntheticUpdateInterval);
+      if (!form.syntheticParameterCount.trim() || isNaN(count) || count < 1) {
+        return "Parameter count must be a positive number.";
+      }
+      if (isNaN(min) || isNaN(max)) {
+        return "Value range min and max must be numbers.";
+      }
+      if (min > max) {
+        return "Value range min must not be greater than max.";
+      }
+      if (!form.syntheticUpdateInterval.trim() || isNaN(interval) || interval < 1) {
+        return "Update interval must be a positive number (milliseconds).";
+      }
+    }
   }
 
   if (stepIndex === 3 && form.basis === "scan") {
@@ -329,6 +348,7 @@ function reviewLines(form: WizardFormState) {
       { label: "Synthetic profile", value: form.syntheticProfile },
       { label: "Parameters", value: form.syntheticParameterCount || "100" },
       { label: "Value range", value: `${form.syntheticValueMin} – ${form.syntheticValueMax}` },
+      { label: "Update interval", value: `${form.syntheticUpdateInterval || "1000"} ms` },
       { label: "Repeatability", value: form.syntheticSeed ? `Seed: ${form.syntheticSeed}` : "Non-deterministic" },
     ] : []),
   ];
