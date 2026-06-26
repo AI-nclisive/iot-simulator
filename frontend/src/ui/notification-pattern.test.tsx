@@ -38,42 +38,66 @@ describe("Toast — auto-dismiss timer", () => {
     vi.useRealTimers();
   });
 
-  it("calls onDismiss after autoDismissMs", () => {
-    const onDismiss = vi.fn();
+  it("calls onDismissId with notification.id after autoDismissMs", () => {
+    const onDismissId = vi.fn();
     render(
       <Toast
-        notification={makeNotification({ autoDismissMs: 4_000 })}
-        onDismiss={onDismiss}
+        notification={makeNotification({ id: "test-id", autoDismissMs: 4_000 })}
+        onDismissId={onDismissId}
       />,
     );
-    expect(onDismiss).not.toHaveBeenCalled();
+    expect(onDismissId).not.toHaveBeenCalled();
     vi.advanceTimersByTime(4_000);
-    expect(onDismiss).toHaveBeenCalledOnce();
+    expect(onDismissId).toHaveBeenCalledOnce();
+    expect(onDismissId).toHaveBeenCalledWith("test-id");
   });
 
-  it("does not call onDismiss when autoDismissMs is undefined", () => {
-    const onDismiss = vi.fn();
+  it("does not call onDismissId when autoDismissMs is undefined", () => {
+    const onDismissId = vi.fn();
     render(
       <Toast
         notification={makeNotification({ autoDismissMs: undefined })}
-        onDismiss={onDismiss}
+        onDismissId={onDismissId}
       />,
     );
     vi.advanceTimersByTime(60_000);
-    expect(onDismiss).not.toHaveBeenCalled();
+    expect(onDismissId).not.toHaveBeenCalled();
   });
 
   it("clears timer on unmount — no stale callback after unmount", () => {
-    const onDismiss = vi.fn();
+    const onDismissId = vi.fn();
     const { unmount } = render(
       <Toast
         notification={makeNotification({ autoDismissMs: 4_000 })}
-        onDismiss={onDismiss}
+        onDismissId={onDismissId}
       />,
     );
     unmount();
     vi.advanceTimersByTime(4_000);
-    expect(onDismiss).not.toHaveBeenCalled();
+    expect(onDismissId).not.toHaveBeenCalled();
+  });
+
+  it("timer is not restarted when ToastRegion re-renders with a new toast added", () => {
+    // Regression: inline () => onDismiss(t.id) in ToastRegion created a new
+    // function ref on every render, which restarted the useEffect timer on all
+    // existing toasts. With onDismissId + useCallback the timer should fire only
+    // once at the original deadline.
+    const onDismissId = vi.fn();
+    const first = makeNotification({ id: "first", autoDismissMs: 4_000 });
+
+    const { rerender } = render(
+      <ToastRegion toasts={[first]} onDismiss={onDismissId} />,
+    );
+
+    // Advance half way, then add a second toast (simulates a new push)
+    vi.advanceTimersByTime(2_000);
+    const second = makeNotification({ id: "second", autoDismissMs: 4_000 });
+    rerender(<ToastRegion toasts={[first, second]} onDismiss={onDismissId} />);
+
+    // Advance the remaining 2 s — first toast should fire exactly once
+    vi.advanceTimersByTime(2_000);
+    expect(onDismissId).toHaveBeenCalledTimes(1);
+    expect(onDismissId).toHaveBeenCalledWith("first");
   });
 });
 

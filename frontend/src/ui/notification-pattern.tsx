@@ -17,7 +17,7 @@
  * No color-only: every tone carries a distinct label and icon shape.
  */
 
-import { useEffect, useId } from "react";
+import { useCallback, useEffect, useId } from "react";
 import { createPortal } from "react-dom";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -275,13 +275,27 @@ function NotificationCard({ notification, onDismiss, compact = false }: Notifica
 // each card out of that container, leaving the flex stack empty.
 //
 // Escape-key handling lives in ToastRegion (one listener for the whole stack).
+//
+// onDismissId receives the stable store-level dismiss reference + the item id
+// separately so useCallback can produce a stable onDismiss callback. This
+// prevents the () => onDismissId(id) inline closure in ToastRegion from
+// restarting the auto-dismiss timer on existing toasts whenever a new toast
+// is pushed.
 
 interface ToastProps {
   notification: NotificationItem;
-  onDismiss: () => void;
+  /** Stable dismiss function (e.g. from Zustand store). Called with notification.id. */
+  onDismissId: (id: string) => void;
 }
 
-export function Toast({ notification, onDismiss }: ToastProps) {
+export function Toast({ notification, onDismissId }: ToastProps) {
+  // Stable callback — only recreated when id or onDismissId changes, not on
+  // every ToastRegion re-render caused by an unrelated toast being added.
+  const onDismiss = useCallback(
+    () => onDismissId(notification.id),
+    [onDismissId, notification.id],
+  );
+
   // Auto-dismiss timer only — Escape is handled by ToastRegion.
   useEffect(() => {
     if (!notification.autoDismissMs) return;
@@ -327,7 +341,7 @@ export function ToastRegion({ toasts, onDismiss }: ToastRegionProps) {
       className="pointer-events-none fixed bottom-4 right-4 z-50 flex w-full max-w-sm flex-col gap-2"
     >
       {toasts.map((t) => (
-        <Toast key={t.id} notification={t} onDismiss={() => onDismiss(t.id)} />
+        <Toast key={t.id} notification={t} onDismissId={onDismiss} />
       ))}
     </div>,
     document.body,
