@@ -467,7 +467,7 @@ Parallel execution:
   Depends: `UI-042`, `UI-004`
   Done when: identifier, type, and dependency impact is visible before save.
 
-- [ ] `UI-050` Recordings & Samples list
+- [x] `UI-050` Recordings & Samples list
   Surface: `Recordings & Samples`
   Depends: `UI-003`
   Done when: reusable artifacts are easy to browse by name, source, type,
