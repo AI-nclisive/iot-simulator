@@ -69,8 +69,7 @@ export function DesignSystemPage() {
 
   return (
     <div
-      className="min-h-screen"
-      style={{ background: "var(--tw-colors-shell-base, #eef1e7)" }}
+      className="min-h-screen bg-shell-base"
     >
       <div className="mx-auto max-w-5xl space-y-4 px-4 py-8">
         <header className="shell-panel px-6 py-5">
@@ -228,8 +227,8 @@ export function DesignSystemPage() {
                 key={item.state}
                 state={item.state}
                 message={item.message}
-                actionLabel={"actionLabel" in item ? (item as { actionLabel: string }).actionLabel : undefined}
-                secondaryActionLabel={"secondaryActionLabel" in item ? (item as { secondaryActionLabel: string }).secondaryActionLabel : undefined}
+                actionLabel={"actionLabel" in item ? item.actionLabel : undefined}
+                secondaryActionLabel={"secondaryActionLabel" in item ? item.secondaryActionLabel : undefined}
                 onAction={() => {}}
                 onSecondaryAction={() => {}}
               />
@@ -291,6 +290,11 @@ export function DesignSystemPage() {
                 <li>
                   <strong className="text-shell-ink">shell-text-action</strong> — navigation
                   links and secondary contextual links
+                </li>
+                <li>
+                  <strong className="text-shell-ink">shell-text-action-danger</strong> — inline
+                  destructive text links (e.g. remove, revoke); prefer shell-action-danger for
+                  button-form destructive actions
                 </li>
               </ul>
             </Row>
