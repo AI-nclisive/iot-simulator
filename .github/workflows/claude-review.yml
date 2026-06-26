@@ -140,26 +140,39 @@ jobs:
 
             - VERDICT — first post exactly ONE top-level PR comment with `gh pr comment`
               (keep it short — the detail lives in the inline comments), then submit
-              exactly ONE matching FORMAL review so the verdict gates merge:
-                * If nothing blocks merge:
+              exactly ONE matching FORMAL review so the verdict gates merge. You may
+              APPROVE only when BOTH conditions hold:
+                (i)  nothing in the current diff blocks merge, AND
+                (ii) there are ZERO unresolved review threads on the PR — not just
+                     yours. After your step-3 reconciliation, RE-LIST the review
+                     threads (step 3b) and count every node with `isResolved == false`,
+                     INCLUDING your own [nit] threads and threads opened by anyone else
+                     (e.g. a human reviewer). You may resolve only YOUR OWN threads
+                     (step 3); someone else's open thread, or a [nit] of yours the
+                     author has not addressed, still blocks approval until its author
+                     or the PR author resolves it.
+                * If BOTH hold:
                     - comment body:
                         ## Claude review: ✅ Mergeable
-                        No blocking issues.<note nit count if any>
+                        No blocking issues and no unresolved comments.
                     - then APPROVE the PR:
                         gh pr review ${{ github.event.pull_request.number }} --approve \
-                          --body "Claude review: ✅ Mergeable — no blocking issues."
-                * If anything blocks merge:
+                          --body "Claude review: ✅ Mergeable — no blocking issues, no unresolved comments."
+                * Otherwise — anything blocks merge OR any thread is still unresolved:
                     - comment body:
                         ## Claude review: ❌ Changes requested
                         <one bullet per blocking reason, each citing the file:line you
                          commented on inline>
+                        <plus, for each still-unresolved thread you are not resolving,
+                         one bullet: "Unresolved comment at file:line (author)">
                     - then REQUEST CHANGES on the PR:
                         gh pr review ${{ github.event.pull_request.number }} --request-changes \
-                          --body "Claude review: ❌ Changes requested — see the inline [blocking] comments."
+                          --body "Claude review: ❌ Changes requested — blocking issues and/or unresolved comments remain."
               A prior issue you resolved in step 3 is no longer blocking; one you left
-              open, or replied to while still unconvinced, still is. Submit the formal
-              review LAST, after the comment and any thread reconciliation. When a
-              previous run requested changes and everything is now fixed, your new
+              open, or replied to while still unconvinced, still is. NEVER approve while
+              any review thread is unresolved. Submit the formal review LAST, after the
+              comment and any thread reconciliation. When a previous run requested
+              changes and everything is now fixed AND every thread is resolved, your new
               --approve supersedes that earlier REQUEST_CHANGES state and unblocks merge.
 
             Your verdict now gates merge. The `build` status check is independently
