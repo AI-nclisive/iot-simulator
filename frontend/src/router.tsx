@@ -6,6 +6,7 @@ import { DataSourcesListPage } from "./surfaces/data-sources-list-page";
 import { DesignSystemPage } from "./surfaces/design-system-page";
 import { EvidenceDetailPage } from "./surfaces/evidence-detail-page";
 import { EvidenceListPage } from "./surfaces/evidence-list-page";
+import { LoginPage } from "./surfaces/login-page";
 import { NotificationDemoPage } from "./surfaces/notification-demo-page";
 import { OverviewPage } from "./surfaces/overview-page";
 import { ProjectEntryPage } from "./surfaces/project-entry-page";
@@ -74,6 +75,10 @@ export const router = createBrowserRouter([
   {
     path: "/design-system",
     element: <DesignSystemPage />,
+  },
+  {
+    path: "/login",
+    element: <LoginPage />,
   },
   {
     path: "/projects",

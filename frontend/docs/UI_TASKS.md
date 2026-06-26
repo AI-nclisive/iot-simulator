@@ -366,7 +366,7 @@ Parallel execution:
   Done when: lock ownership, read-only mode, and stale-lock recovery are defined
   for shared editing.
 
-- [ ] `UI-010` Login screen
+- [x] `UI-010` Login screen
   Surface: `Login`
   Depends: `UI-001`, `UI-007`
   Done when: loading, invalid credentials, server failure, and session-expired
