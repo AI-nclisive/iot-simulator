@@ -108,6 +108,12 @@ class DataSourceControllerTest {
     }
 
     @Test
+    void connectionConfigRequestRedactsSecretInToString() {
+        ConnectionConfigRequest cfg = new ConnectionConfigRequest("password", "operator", "s3cr3t", null);
+        assertThat(cfg.toString()).doesNotContain("s3cr3t").contains("***").contains("operator");
+    }
+
+    @Test
     void clearCredentialsReturnsMissingState() {
         given(service.clearCredentials(PROJECT, "ds1"))
                 .willReturn(sample(0, RuntimeState.STOPPED, CredentialState.MISSING));

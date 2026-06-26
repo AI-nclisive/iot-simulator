@@ -158,7 +158,17 @@ public class DataSourceController {
      * returned: the response carries only {@code credentialState}. Secrets are
      * held session-only and never persisted/exported (backend-specs/08).
      */
-    public record ConnectionConfigRequest(String mode, String username, String secret, String secretRef) {}
+    public record ConnectionConfigRequest(String mode, String username, String secret, String secretRef) {
+
+        /** Redacted: never renders the secret in logs, test output, or exception messages. */
+        @Override
+        public String toString() {
+            return "ConnectionConfigRequest[mode=" + mode
+                    + ", username=" + username
+                    + ", secret=" + (secret == null ? "null" : "***")
+                    + ", secretRef=" + secretRef + ']';
+        }
+    }
 
     public record DataSourceResponse(
             String id, String projectId, String name, String protocol, String basis,
