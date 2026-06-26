@@ -7,6 +7,7 @@ import { sourceListError, sourceListStale } from "../shell/mock-workspace";
 import { type DataSourceRow } from "./mock-data-sources";
 import { ConfirmationDialog } from "../ui/confirmation-dialog";
 import { SharedStatePanel } from "../ui/shared-state-panel";
+import { StaleBanner } from "../ui/stale-banner";
 import { StatusBadge } from "../ui/status-badge";
 import { stopActionCopy } from "./source-action-copy";
 import {
@@ -323,9 +324,7 @@ export function DataSourcesListPage() {
     <div className="flex h-full flex-col gap-3">
       <section className="shell-panel px-5 py-5">
         {sourceListStale ? (
-          <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            Source status may be outdated. Refresh the page to see the latest state.
-          </div>
+          <StaleBanner message="Source status may be outdated. Refresh the page to see the latest state." />
         ) : null}
         <TableToolbar
           activeFilters={activeFilters}

@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { activeRuns, dashboardStale } from "../shell/mock-workspace";
 import { SharedStatePanel } from "../ui/shared-state-panel";
+import { StaleBanner } from "../ui/stale-banner";
 import { StatusBadge, type StatusTone } from "../ui/status-badge";
 
 function processTone(processType: "Recording" | "Replay" | "Scenario"): StatusTone {
@@ -31,9 +32,7 @@ export function RuntimeDashboardPanel() {
   return (
     <section aria-label="Runtime dashboard" className="shell-panel px-5 py-5">
       {dashboardStale ? (
-        <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          Dashboard data may be outdated. Refresh the page to see the latest runtime state.
-        </div>
+        <StaleBanner message="Dashboard data may be outdated. Refresh the page to see the latest runtime state." />
       ) : null}
       {activeRuns.length === 0 ? (
         <SharedStatePanel
