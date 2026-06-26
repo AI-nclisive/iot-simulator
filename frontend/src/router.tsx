@@ -126,7 +126,7 @@ export const router = createBrowserRouter([
       },
       {
         path: "notifications-demo",
-        element: <NotificationDemoPage />,
+        element: <NotificationDemoPage adminOnly />,
       },
     ],
   },

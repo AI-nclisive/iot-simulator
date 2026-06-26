@@ -17,7 +17,7 @@
  * No color-only: every tone carries a distinct label and icon shape.
  */
 
-import { useEffect, useId, useRef } from "react";
+import { useEffect, useId } from "react";
 import { createPortal } from "react-dom";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -267,7 +267,14 @@ function NotificationCard({ notification, onDismiss, compact = false }: Notifica
   );
 }
 
-// ─── Toast (auto-dismiss, portal) ──────────────────────────────────────────
+// ─── Toast (auto-dismiss card, no own portal) ─────────────────────────────
+//
+// Toast renders a plain NotificationCard with an auto-dismiss timer.
+// It does NOT create its own portal — ToastRegion owns the single portal
+// and the positioning container. Rendering another portal here would teleport
+// each card out of that container, leaving the flex stack empty.
+//
+// Escape-key handling lives in ToastRegion (one listener for the whole stack).
 
 interface ToastProps {
   notification: NotificationItem;
@@ -275,33 +282,21 @@ interface ToastProps {
 }
 
 export function Toast({ notification, onDismiss }: ToastProps) {
-  // Auto-dismiss timer
+  // Auto-dismiss timer only — Escape is handled by ToastRegion.
   useEffect(() => {
     if (!notification.autoDismissMs) return;
     const timer = setTimeout(onDismiss, notification.autoDismissMs);
     return () => clearTimeout(timer);
   }, [notification.autoDismissMs, onDismiss]);
 
-  // Escape key dismisses
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onDismiss();
-    };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, [onDismiss]);
-
-  if (typeof document === "undefined") return null;
-
-  return createPortal(
+  return (
     <div className="pointer-events-auto w-full max-w-sm">
       <NotificationCard compact notification={notification} onDismiss={onDismiss} />
-    </div>,
-    document.body,
+    </div>
   );
 }
 
-// ─── ToastRegion (renders all active toasts) ───────────────────────────────
+// ─── ToastRegion (renders all active toasts, owns the portal) ─────────────
 
 interface ToastRegionProps {
   toasts: NotificationItem[];
@@ -309,6 +304,20 @@ interface ToastRegionProps {
 }
 
 export function ToastRegion({ toasts, onDismiss }: ToastRegionProps) {
+  // Single Escape-key listener for the entire stack — dismisses only the
+  // most recent toast so users can clear one at a time.
+  useEffect(() => {
+    if (toasts.length === 0) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        const last = toasts[toasts.length - 1];
+        onDismiss(last.id);
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [toasts, onDismiss]);
+
   if (toasts.length === 0 || typeof document === "undefined") return null;
 
   return createPortal(
@@ -351,16 +360,3 @@ export function InlineNotification({ notification, onDismiss }: InlineNotificati
   return <NotificationCard compact notification={notification} onDismiss={onDismiss} />;
 }
 
-// ─── useAutoFocusDismiss — utility for persistent banners ─────────────────
-
-/**
- * Focuses the dismiss button when a persistent banner mounts, so keyboard
- * users don't have to tab to it.
- */
-export function useDismissRef() {
-  const ref = useRef<HTMLButtonElement | null>(null);
-  useEffect(() => {
-    ref.current?.focus();
-  }, []);
-  return ref;
-}

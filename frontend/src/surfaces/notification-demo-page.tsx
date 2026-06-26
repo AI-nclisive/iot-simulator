@@ -9,13 +9,16 @@
  */
 
 import { useState } from "react";
+import { resolveAccess } from "../shell/access-policy";
+import { useNotificationStore } from "../shell/notification-store";
+import { useShellStore } from "../shell/shell-store";
 import {
   Banner,
   InlineNotification,
   type NotificationItem,
   type NotificationTone,
 } from "../ui/notification-pattern";
-import { useNotificationStore } from "../shell/notification-store";
+import { SharedStatePanel } from "../ui/shared-state-panel";
 
 const TONES: NotificationTone[] = [
   "success",
@@ -68,7 +71,11 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 // ─── Main demo page ───────────────────────────────────────────────────────────
 
-export function NotificationDemoPage() {
+export function NotificationDemoPage({ adminOnly = false }: { adminOnly?: boolean }) {
+  const accessMode = useShellStore((s) => s.accessMode);
+  const sharedRole = useShellStore((s) => s.sharedRole);
+  const access = resolveAccess(accessMode, sharedRole);
+
   const push = useNotificationStore((s) => s.push);
   const pushBanner = useNotificationStore((s) => s.pushBanner);
   const clearToasts = useNotificationStore((s) => s.clearToasts);
@@ -88,6 +95,20 @@ export function NotificationDemoPage() {
   function removeBanner(id: string) {
     dismiss(id);
     setBanners((prev) => prev.filter((b) => b.id !== id));
+  }
+
+  if (adminOnly && access.isSharedUser) {
+    return (
+      <div className="flex h-full flex-col gap-3">
+        <section className="shell-panel px-5 py-5">
+          <SharedStatePanel
+            state="locked"
+            title="Admin access is required."
+            message="This page is a developer review surface reserved for shared administrators."
+          />
+        </section>
+      </div>
+    );
   }
 
   return (
