@@ -326,7 +326,7 @@ Parallel execution:
 1. Start `UI-090` first.
 2. After `UI-090`, run `UI-091` and `UI-092` in parallel.
 
-- [ ] `UI-090` Visual system baseline
+- [x] `UI-090` Visual system baseline
   Surface: cross-surface pattern
   Depends: `UI-001`, `UI-002`, `UI-003`, `UI-004`
   Done when: typography, spacing, forms, tables, dialogs, status treatment, and

@@ -3,6 +3,7 @@ import { AppShell } from "./shell/app-shell";
 import { CreateDataSourceWizardPage } from "./surfaces/create-data-source-wizard-page";
 import { DataSourceDetailPreviewPage } from "./surfaces/data-source-detail-preview-page";
 import { DataSourcesListPage } from "./surfaces/data-sources-list-page";
+import { DesignSystemPage } from "./surfaces/design-system-page";
 import { EvidenceDetailPage } from "./surfaces/evidence-detail-page";
 import { EvidenceListPage } from "./surfaces/evidence-list-page";
 import { NotificationDemoPage } from "./surfaces/notification-demo-page";
@@ -70,6 +71,10 @@ const entrySurfaceContent = {
 } as const;
 
 export const router = createBrowserRouter([
+  {
+    path: "/design-system",
+    element: <DesignSystemPage />,
+  },
   {
     path: "/projects",
     element: <ProjectEntryPage />,
