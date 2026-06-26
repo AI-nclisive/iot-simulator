@@ -142,7 +142,7 @@ Turn the in-memory worker into a real OPC UA simulator (the stated core risk).
 - [x] IS-038 [BE] ✅ [runtime] worker-opcua: real Eclipse Milo server + value projection — 02
 - [x] IS-039 [BE] ✅ [runtime] Real worker process spawn E2E (installDist + ProcessWorkerLauncher) — 02
 - [x] IS-040 [BE] ✅ [runtime] Restart-with-backoff on unexpected failure (intentional faults excluded) — 02
-- [ ] IS-041 [BE] ⬜ [runtime] Health monitoring loop + stale/error state propagation — 02
+- [x] IS-041 [BE] ✅ [runtime] Health monitoring loop + stale/error state propagation — 02
 
 ## Wave B — Primary flow against a real source · P0
 

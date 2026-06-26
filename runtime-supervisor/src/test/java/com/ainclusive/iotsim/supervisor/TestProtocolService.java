@@ -3,6 +3,8 @@ package com.ainclusive.iotsim.supervisor;
 import com.ainclusive.iotsim.workercontract.WorkerContract;
 import com.ainclusive.iotsim.workercontract.v1.Ack;
 import com.ainclusive.iotsim.workercontract.v1.ConfigureRequest;
+import com.ainclusive.iotsim.workercontract.v1.HealthRequest;
+import com.ainclusive.iotsim.workercontract.v1.HealthResponse;
 import com.ainclusive.iotsim.workercontract.v1.HelloRequest;
 import com.ainclusive.iotsim.workercontract.v1.HelloResponse;
 import com.ainclusive.iotsim.workercontract.v1.ProtocolDataSourceGrpc;
@@ -18,6 +20,8 @@ final class TestProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSourc
 
     private final AtomicLong applied = new AtomicLong();
     private final AtomicInteger configuredNodes = new AtomicInteger();
+    private volatile boolean healthLive = true;
+    private volatile boolean healthHang;
 
     long appliedCount() {
         return applied.get();
@@ -25,6 +29,27 @@ final class TestProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSourc
 
     int configuredNodeCount() {
         return configuredNodes.get();
+    }
+
+    /** Simulates an alive-but-unhealthy worker: Health answers with {@code live=false}. */
+    void setHealthLive(boolean live) {
+        this.healthLive = live;
+    }
+
+    /** Simulates a hung worker: Health stops answering, so the probe deadline fires. */
+    void setHealthHang(boolean hang) {
+        this.healthHang = hang;
+    }
+
+    @Override
+    public void health(HealthRequest request, StreamObserver<HealthResponse> obs) {
+        if (healthHang) {
+            // Never answer; the supervisor's deadline cancels the probe. Don't complete
+            // the observer so this models a worker stuck mid-call.
+            return;
+        }
+        obs.onNext(HealthResponse.newBuilder().setLive(healthLive).setReady(healthLive).build());
+        obs.onCompleted();
     }
 
     @Override
