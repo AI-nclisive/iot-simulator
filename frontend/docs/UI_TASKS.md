@@ -372,7 +372,7 @@ Parallel execution:
   Done when: loading, invalid credentials, server failure, and session-expired
   states work cleanly in shared mode.
 
-- [ ] `UI-012` Project import flow
+- [x] `UI-012` Project import flow
   Surface: `Project Entry` / `Settings`
   Depends: `UI-004`, `UI-011`
   Done when: progress, failure, overwrite impact, and version compatibility are

@@ -1,3 +1,5 @@
+import { createPortal } from "react-dom";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { projects } from "../shell/mock-workspace";
 import { resolveAccess } from "../shell/access-policy";
@@ -8,12 +10,172 @@ function summaryLabel(value: number, singular: string, plural: string) {
   return `${value} ${value === 1 ? singular : plural}`;
 }
 
+type ImportState =
+  | { phase: "idle" }
+  | { phase: "ready"; fileName: string; compatible: boolean; overwriteTarget: string | null }
+  | { phase: "importing"; fileName: string; overwriteTarget: string | null }
+  | { phase: "failed"; reason: string; fileName: string; overwriteTarget: string | null }
+  | { phase: "done"; projectName: string };
+
+function ImportProjectDialog({ onClose }: { onClose: () => void }) {
+  const [fileName, setFileName] = useState("");
+  const [state, setState] = useState<ImportState>({ phase: "idle" });
+
+  function handleFileInput(value: string) {
+    setFileName(value);
+    if (!value.trim()) {
+      setState({ phase: "idle" });
+      return;
+    }
+
+    const isCompatible = !value.toLowerCase().includes("old");
+    const existingProject = projects.find((p) =>
+      p.name.toLowerCase() === value.replace(/\.iotsim$/, "").toLowerCase()
+    );
+
+    setState({
+      phase: "ready",
+      fileName: value.trim(),
+      compatible: isCompatible,
+      overwriteTarget: existingProject ? existingProject.name : null,
+    });
+  }
+
+  function handleImport() {
+    if (state.phase !== "ready" || !state.compatible) return;
+
+    const { fileName, overwriteTarget } = state;
+    setState({ phase: "importing", fileName, overwriteTarget });
+
+    setTimeout(() => {
+      const shouldFail = fileName.toLowerCase().includes("broken");
+      if (shouldFail) {
+        setState({ phase: "failed", reason: "The archive is malformed or missing required files.", fileName, overwriteTarget });
+      } else {
+        setState({ phase: "done", projectName: fileName.replace(/\.iotsim$/, "") });
+      }
+    }, 1200);
+  }
+
+  const isImporting = state.phase === "importing";
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div
+        className="w-full max-w-md rounded-lg border border-shell-line bg-white shadow-xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="import-dialog-title"
+      >
+        <div className="border-b border-shell-line px-5 py-4">
+          <h2 id="import-dialog-title" className="text-base font-semibold text-shell-ink">
+            Import project
+          </h2>
+        </div>
+
+        <div className="space-y-4 px-5 py-5">
+          {state.phase === "done" ? (
+            <div className="space-y-4">
+              <SharedStatePanel
+                message={`"${state.projectName}" was imported successfully and is now available in the project list.`}
+                state="empty"
+                title="Import complete."
+              />
+            </div>
+          ) : (
+            <>
+              <label className="flex flex-col gap-2 text-sm text-shell-muted">
+                Project file name
+                <input
+                  className="shell-field"
+                  disabled={isImporting}
+                  placeholder="assembly-line-a.iotsim"
+                  type="text"
+                  value={fileName}
+                  onChange={(event) => handleFileInput(event.target.value)}
+                />
+                <span className="text-xs text-shell-muted">
+                  Accepted format: <code>.iotsim</code> archive
+                </span>
+              </label>
+
+              {state.phase === "ready" || state.phase === "importing" || state.phase === "failed" ? (
+                <div className="space-y-3 rounded-md border border-shell-line bg-shell-base/50 px-4 py-3 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-shell-muted">Version compatibility</span>
+                    <span
+                      className={
+                        state.phase === "ready" && !state.compatible
+                          ? "font-medium text-shell-danger"
+                          : "font-medium text-shell-ink"
+                      }
+                    >
+                      {state.phase === "ready"
+                        ? state.compatible
+                          ? "Compatible"
+                          : "Incompatible — cannot import"
+                        : "Compatible"}
+                    </span>
+                  </div>
+
+                  {(state.phase === "ready" || state.phase === "importing" || state.phase === "failed") && state.overwriteTarget ? (
+                    <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                      A project named <span className="font-medium">"{state.overwriteTarget}"</span> already
+                      exists. Importing will overwrite its saved configuration.
+                    </div>
+                  ) : null}
+
+                  {state.phase === "failed" ? (
+                    <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
+                      Import failed: {state.reason}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {isImporting ? (
+                <p className="text-center text-sm text-shell-muted">Importing…</p>
+              ) : null}
+            </>
+          )}
+        </div>
+
+        <div className="flex items-center justify-end gap-2 border-t border-shell-line px-5 py-4">
+          <button className="shell-action" type="button" onClick={onClose}>
+            {state.phase === "done" ? "Close" : "Cancel"}
+          </button>
+          {state.phase !== "done" ? (
+            <button
+              className="shell-action"
+              disabled={
+                isImporting ||
+                state.phase === "idle" ||
+                (state.phase === "ready" && !state.compatible)
+              }
+              type="button"
+              onClick={
+                state.phase === "failed"
+                  ? () => handleFileInput(state.fileName)
+                  : handleImport
+              }
+            >
+              {state.phase === "failed" ? "Retry import" : "Import"}
+            </button>
+          ) : null}
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 export function ProjectEntryPage() {
   const navigate = useNavigate();
   const accessMode = useShellStore((state) => state.accessMode);
   const sharedRole = useShellStore((state) => state.sharedRole);
   const setCurrentProjectId = useShellStore((state) => state.setCurrentProjectId);
   const access = resolveAccess(accessMode, sharedRole);
+  const [importOpen, setImportOpen] = useState(false);
 
   function openProject(projectId: string) {
     setCurrentProjectId(projectId);
@@ -41,7 +203,7 @@ export function ProjectEntryPage() {
                 <button
                   className="shell-action"
                   type="button"
-                  onClick={() => navigate("/projects/import")}
+                  onClick={() => setImportOpen(true)}
                 >
                   Import project
                 </button>
@@ -125,6 +287,8 @@ export function ProjectEntryPage() {
           </section>
         )}
       </div>
+
+      {importOpen ? <ImportProjectDialog onClose={() => setImportOpen(false)} /> : null}
     </div>
   );
 }
