@@ -3,6 +3,7 @@ import { AppShell } from "./shell/app-shell";
 import { CreateDataSourceWizardPage } from "./surfaces/create-data-source-wizard-page";
 import { DataSourceDetailPreviewPage } from "./surfaces/data-source-detail-preview-page";
 import { DataSourcesListPage } from "./surfaces/data-sources-list-page";
+import { EvidenceDetailPage } from "./surfaces/evidence-detail-page";
 import { EvidenceListPage } from "./surfaces/evidence-list-page";
 import { NotificationDemoPage } from "./surfaces/notification-demo-page";
 import { OverviewPage } from "./surfaces/overview-page";
@@ -121,7 +122,7 @@ export const router = createBrowserRouter([
       },
       {
         path: "evidence/:evidenceId",
-        element: <SurfaceStubPage {...surfaceContent.evidenceDetail} />,
+        element: <EvidenceDetailPage />,
       },
       {
         path: "activity",
