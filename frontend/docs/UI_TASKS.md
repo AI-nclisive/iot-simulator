@@ -384,7 +384,7 @@ Parallel execution:
   Done when: rename, duplicate, archive, and delete flows are clear and expose
   shared impact before destructive changes.
 
-- [ ] `UI-014` Project export flow
+- [x] `UI-014` Project export flow
   Surface: `Settings`
   Depends: `UI-006`, `UI-011`
   Done when: export scope, completion state, failure state, and secret exclusion
