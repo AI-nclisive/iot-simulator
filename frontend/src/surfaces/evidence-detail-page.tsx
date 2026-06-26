@@ -82,15 +82,13 @@ export function EvidenceDetailPage() {
         </div>
 
         <div className="mt-6 flex flex-wrap items-center gap-2">
-          {access.isAdmin && exportAvailable ? (
-            <button className="shell-action" disabled type="button">
-              Export evidence
-            </button>
-          ) : (
-            <button className="shell-action" disabled type="button">
-              {exportAvailable ? "Export evidence" : "Export not ready"}
-            </button>
-          )}
+          <button
+            className="shell-action"
+            disabled={!access.isAdmin || !exportAvailable}
+            type="button"
+          >
+            {exportAvailable ? "Export evidence" : "Export not ready"}
+          </button>
           {evidence.sourcePath ? (
             <Link className="shell-text-action" to={evidence.sourcePath}>
               Open source
