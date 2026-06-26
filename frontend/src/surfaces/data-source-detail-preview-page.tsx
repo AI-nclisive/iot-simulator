@@ -159,7 +159,7 @@ export function DataSourceDetailPreviewPage() {
           ? "Replay stops immediately for this source."
           : "The source stops serving values until someone starts it again.";
 
-    const copy = stopActionCopy();
+    const copy = stopActionCopy;
 
     return {
       confirmLabel: copy.confirmLabel,

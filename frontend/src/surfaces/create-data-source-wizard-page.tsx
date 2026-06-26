@@ -1128,7 +1128,7 @@ export function CreateDataSourceWizardPage() {
               ) : (
                 <button
                   className="shell-action"
-                  disabled={Boolean(currentValidationMessage)}
+                  disabled={!!currentValidationMessage}
                   type="button"
                   onClick={goNext}
                 >
