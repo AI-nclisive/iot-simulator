@@ -75,7 +75,14 @@ When you change tasks, change **both** the file and the Project:
   a separate catalog-only PR, which the no-direct-push-to-`master` rule would
   otherwise force), and move the board `Status` to **Done** + close the issue
   **only after that PR is merged**. Each PR edits only its own task's line, so
-  catalog conflicts are rare.
+  catalog conflicts are rare. CI enforces this pairing: a PR whose body links a
+  task (`Closes: #…` / `Implements: IS-/UI-…`) must also edit that task's catalog
+  line in the same PR, so a merged task can never leave a stale `[ ]` behind (see
+  `.github/workflows/ci.yml` → `catalog-sync` job).
+- **Source of truth on conflict: the board wins.** The Project board is the live
+  mirror; the catalogs can lag. A task whose board `Status` is `Done` (or that has
+  a merged PR) but whose catalog checkbox is still `[ ]` is **done** — fix the
+  stale checkbox in your next related PR rather than re-implementing the task.
 - Issue shape (see `.github/ISSUE_TEMPLATE/task.yml`): title `IS-XXX [AREA] name`
   for backend/SDLC or `UI-XXX [FE] name` for frontend, label `type:task`
   (+ `priority:P*`); board fields `Status` / `Task ID` / `Area` (`Area` ∈
@@ -85,6 +92,17 @@ When you change tasks, change **both** the file and the Project:
 
 Follow `CONTRIBUTING.md`. For agents specifically:
 
+- **Before taking a task, verify it is actually open — in this order:**
+  1. Board `Status` is `Todo` (not `In Progress` / `In review` / `Done`) — the
+     board is the live source of truth.
+  2. No open or merged PR references the task ID (e.g.
+     `gh pr list --search "IS-XXX" --state all`).
+  3. The issue is open with no comment claiming it.
+
+  If any check fails, pick a different task. **The catalog checkbox alone is not
+  sufficient evidence a task is free** — it can lag behind the board (a merged PR
+  may have moved the board to `Done` without flipping the checkbox). When the
+  catalog and the board disagree, the board wins (see "Task Tracking").
 - One task per branch and PR: use an `IS-XXX` from `backend-specs/TASKS.md` for
   backend/SDLC work, or a `UI-XXX` from `frontend/docs/UI_TASKS.md` for frontend
   work.
