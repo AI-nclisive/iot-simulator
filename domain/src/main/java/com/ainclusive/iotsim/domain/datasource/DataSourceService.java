@@ -7,6 +7,8 @@ import com.ainclusive.iotsim.persistence.datasource.DataSourceRow;
 import com.ainclusive.iotsim.persistence.project.ProjectRepository;
 import com.ainclusive.iotsim.persistence.schema.SchemaRepository;
 import com.ainclusive.iotsim.platform.runtime.RuntimeController;
+import com.ainclusive.iotsim.platform.secret.ConnectionCredentials;
+import com.ainclusive.iotsim.platform.secret.CredentialStore;
 import java.util.List;
 import org.springframework.stereotype.Service;
 
@@ -18,22 +20,25 @@ public class DataSourceService {
     private final ProjectRepository projects;
     private final SchemaRepository schemas;
     private final RuntimeController runtime;
+    private final CredentialStore credentials;
 
     public DataSourceService(DataSourceRepository dataSources, ProjectRepository projects,
-            SchemaRepository schemas, RuntimeController runtime) {
+            SchemaRepository schemas, RuntimeController runtime, CredentialStore credentials) {
         this.dataSources = dataSources;
         this.projects = projects;
         this.schemas = schemas;
         this.runtime = runtime;
+        this.credentials = credentials;
     }
 
     public DataSource create(String projectId, String name, String protocol, String basis,
-            String endpoint, String runtimeConfig, String actor) {
+            String endpoint, String runtimeConfig, ConnectionCredentials connectionCredentials, String actor) {
         requireProject(projectId);
         // Validate enum inputs early (invalid -> IllegalArgumentException -> 400).
         Protocol.valueOf(protocol);
         SourceBasis.valueOf(basis);
         DataSourceRow row = dataSources.insert(projectId, name, protocol, basis, endpoint, runtimeConfig, actor);
+        applyCredentials(row.id(), connectionCredentials);
         return map(row);
     }
 
@@ -47,21 +52,32 @@ public class DataSourceService {
     }
 
     public DataSource update(String projectId, String id, String name, String endpoint,
-            String runtimeConfig, Boolean enabled, long expectedVersion) {
+            String runtimeConfig, Boolean enabled, ConnectionCredentials connectionCredentials,
+            long expectedVersion) {
         DataSourceRow existing = requireRow(projectId, id);
         String newName = name != null ? name : existing.name();
         String newEndpoint = endpoint != null ? endpoint : existing.endpoint();
         String newRuntimeConfig = runtimeConfig != null ? runtimeConfig : existing.runtimeConfig();
         boolean newEnabled = enabled != null ? enabled : existing.enabled();
-        return dataSources.update(id, newName, newEndpoint, newRuntimeConfig, newEnabled, expectedVersion)
-                .map(this::map)
+        DataSourceRow updated = dataSources.update(id, newName, newEndpoint, newRuntimeConfig, newEnabled, expectedVersion)
                 .orElseThrow(() -> new ConcurrencyConflictException("DataSource", id, expectedVersion));
+        // Apply credentials only after the version check passes, so a stale write touches no secret.
+        applyCredentials(id, connectionCredentials);
+        return map(updated);
+    }
+
+    /** Clears any held connection credentials for the source ("clear value" in the Credential Handling UI). */
+    public DataSource clearCredentials(String projectId, String id) {
+        DataSourceRow row = requireRow(projectId, id);
+        credentials.clear(id);
+        return map(row);
     }
 
     public void delete(String projectId, String id) {
         requireRow(projectId, id);
         runtime.stop(id);
         dataSources.deleteById(id);
+        credentials.clear(id);
     }
 
     public DataSource start(String projectId, String id) {
@@ -74,6 +90,22 @@ public class DataSourceService {
         DataSourceRow row = requireRow(projectId, id);
         runtime.stop(id);
         return map(row);
+    }
+
+    /**
+     * Stores or clears credentials for the source. {@code null} leaves them
+     * unchanged; {@code ANONYMOUS} clears them; otherwise they are stored
+     * session-only (never persisted in the row — backend-specs/08).
+     */
+    private void applyCredentials(String id, ConnectionCredentials connectionCredentials) {
+        if (connectionCredentials == null) {
+            return;
+        }
+        if (connectionCredentials.mode() == ConnectionCredentials.Mode.ANONYMOUS) {
+            credentials.clear(id);
+        } else {
+            credentials.put(id, connectionCredentials);
+        }
     }
 
     private void requireProject(String projectId) {
@@ -101,6 +133,7 @@ public class DataSourceService {
                 r.runtimeConfig(),
                 r.enabled(),
                 RuntimeState.valueOf(runtime.state(r.id())),
+                credentials.has(r.id()) ? CredentialState.SESSION_ONLY : CredentialState.MISSING,
                 r.createdAt().toInstant(),
                 r.updatedAt().toInstant(),
                 r.createdBy(),

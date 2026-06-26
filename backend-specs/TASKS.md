@@ -21,8 +21,8 @@ dependency-ordered. (Optimized for "make the simulator real end to end, then
 broaden, then harden for teams" — can be re-weighted if the near-term goal
 differs.)
 
-Snapshot: **build green, 80 tests / 22 suites, 0 skipped.** 55 done · 2 partial ·
-55 todo (112 total). Live status is the board; this line is a periodic snapshot.
+Snapshot: **build green, 124 tests / 32 suites, 0 skipped.** 64 done · 1 partial ·
+50 todo (115 total). Live status is the board; this line is a periodic snapshot.
 
 <details>
 <summary>ID crosswalk — legacy <code>BE-*</code> / <code>SDLC-*</code> → <code>IS-XXX</code></summary>
@@ -150,7 +150,7 @@ Turn the in-memory worker into a real OPC UA simulator (the stated core risk).
 
 Make `Scan → Record → Replay` work against real instruments, not provided values.
 
-- [ ] IS-042 [BE] ⬜ [source] Credential handling (secrets, never persisted/exported) — 08/05
+- [x] IS-042 [BE] ✅ [source] Credential handling (secrets, never persisted/exported) — 08/05
 - [ ] IS-043 [BE] ⬜ [source] Create from scan (real-source discovery) — SPEC: Create From Scan
 - [ ] IS-044 [BE] ⬜ [schema] Scan-derived schema population — 01
 - [ ] IS-045 [BE] ⬜ [recording] Live capture from a running real source → recording — SPEC: Record Real Data
@@ -222,8 +222,8 @@ Make runs observable and produce the P0 evidence artifact.
 
 ## Recommended immediate next
 
-**Wave A, `IS-040 → IS-041`** (restart-with-backoff + health-monitoring loop):
-now that the real out-of-process worker spawn (`IS-039`) is in place, finish
-runtime fidelity so unexpected worker failure is contained and source
-health/state propagates to the API/UI — the remaining P0 fault-isolation gap
-before broadening to real-source scan/record (Wave B).
+**Wave B, `IS-043 → IS-044 → IS-045`** (create-from-scan → scan-derived schema →
+live capture): Wave A runtime fidelity is complete and credential handling
+(`IS-042`) is in place, so the primary `Scan → Record → Replay` flow can now be
+built against a *real* source. Start with `IS-043` (real-source discovery), which
+the credential mechanism from `IS-042` unblocks.
