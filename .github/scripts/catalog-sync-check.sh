@@ -3,8 +3,8 @@
 # catalog-sync-check.sh
 #
 # Enforces the AGENTS.md "Done is recorded in two places" rule at CI time:
-# if a PR body links a task (Implements: IS-XXX / UI-XXX, or Closes: #issue that
-# maps to a task), the PR must also edit that task's checkbox line in the owning
+# if a PR body links a task via `Implements: IS-XXX` or `Implements: UI-XXX`,
+# the PR must also edit that task's checkbox line in the owning
 # catalog (backend-specs/TASKS.md for IS-*, frontend/docs/UI_TASKS.md for UI-*).
 #
 # This stops a merged task from leaving a stale "[ ]" in the catalog, which is
