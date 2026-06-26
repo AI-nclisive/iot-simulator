@@ -555,7 +555,7 @@ Parallel execution:
   Done when: desktop-first behavior, tablet tolerance, phone limits, and
   browser consistency across Linux, Windows, and macOS are explicitly decided.
 
-- [ ] `UI-095` Notification pattern
+- [x] `UI-095` Notification pattern
   Surface: `Notifications`
   Depends: `UI-001`, `UI-002`
   Done when: success, warning, error, stale, reconnecting, and shared-impact

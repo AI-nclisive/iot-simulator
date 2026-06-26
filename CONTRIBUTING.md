@@ -52,10 +52,13 @@ Every PR is reviewed automatically by a Claude reviewer (IS-112; see
 lines** it thinks need rework (prefixed `[blocking]` / `[nit]`) and **one top-level
 verdict comment** — `## Claude review: ✅ Mergeable` or `## Claude review:
 ❌ Changes requested` with the reasons. It then submits a **formal GitHub review**
-matching that verdict: **APPROVE** when nothing blocks, **REQUEST_CHANGES** otherwise.
+matching that verdict: **APPROVE** only when nothing blocks **and every review thread
+is resolved** (including nits and any human's comments), **REQUEST_CHANGES** otherwise.
 This gates merge: the APPROVE supplies branch protection's required approving review,
 and a REQUEST_CHANGES blocks merge until a later push earns an APPROVE. The required
-status check stays `build`.
+status check stays `build`. Because it never approves while a thread is open, you must
+**resolve every comment and push** to earn the approval — resolving alone does not
+re-trigger the review.
 
 By the time the review runs the task is already **In review** (moved there when the
 PR was opened — see "Task tracking"). Resolving the review is part of finishing the

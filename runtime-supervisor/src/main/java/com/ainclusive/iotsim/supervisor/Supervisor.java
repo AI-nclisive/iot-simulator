@@ -32,9 +32,14 @@ import java.util.concurrent.atomic.AtomicReference;
  * <p>Only <em>unexpected</em> worker exits are restarted (exponential backoff up
  * to a cap, per {@link RestartPolicy}); an intentional {@code stop()} and worker
  * faults are never auto-healed. While a worker is recovering the source reports
- * {@code STARTING}; once the cap is exhausted it reports {@code ERROR}. The
- * health-monitoring loop and stale-state detection are a separate concern
- * (IS-041).
+ * {@code STARTING}; once the cap is exhausted it reports {@code ERROR}.
+ *
+ * <p>A separate health-monitoring loop probes each {@code RUNNING} worker's
+ * {@code Health} RPC on a fixed interval (per {@link HealthPolicy}). A worker that
+ * is alive but stops answering — a hang that never fires a process exit — is
+ * reported as {@code STALE}; a good probe clears it back to {@code RUNNING}. This
+ * is propagation only: stale detection reflects worker health to the API/UI and
+ * does not itself restart the worker.
  *
  * <p>See backend-specs/02_WORKER_CONTRACT_AND_IPC.md §4.
  */
@@ -44,27 +49,58 @@ public final class Supervisor implements RuntimeController, AutoCloseable {
     private static final String STOPPED = "STOPPED";
     private static final String STARTING = "STARTING";
     private static final String ERROR = "ERROR";
+    private static final String STALE = "STALE";
     private static final Duration READY_TIMEOUT = Duration.ofSeconds(10);
 
     private final WorkerLauncher launcher;
     private final RestartPolicy restartPolicy;
+    private final HealthPolicy healthPolicy;
     private final ScheduledExecutorService scheduler;
     private final Map<String, ManagedWorker> running = new ConcurrentHashMap<>();
     private volatile boolean closed;
 
     public Supervisor(WorkerLauncher launcher) {
-        this(launcher, RestartPolicy.DEFAULT);
+        this(launcher, RestartPolicy.DEFAULT, HealthPolicy.DEFAULT);
     }
 
     public Supervisor(WorkerLauncher launcher, RestartPolicy restartPolicy) {
+        this(launcher, restartPolicy, HealthPolicy.DEFAULT);
+    }
+
+    public Supervisor(WorkerLauncher launcher, RestartPolicy restartPolicy, HealthPolicy healthPolicy) {
         this.launcher = launcher;
         this.restartPolicy = restartPolicy;
+        this.healthPolicy = healthPolicy;
         AtomicInteger seq = new AtomicInteger();
-        this.scheduler = Executors.newScheduledThreadPool(2, r -> {
-            Thread t = new Thread(r, "worker-restart-" + seq.incrementAndGet());
+        // One pool serves restarts and the health-monitoring loop; sized so a probe
+        // (bounded by HealthPolicy.probeTimeout) cannot starve a pending restart.
+        this.scheduler = Executors.newScheduledThreadPool(3, r -> {
+            Thread t = new Thread(r, "worker-supervisor-" + seq.incrementAndGet());
             t.setDaemon(true);
             return t;
         });
+        long periodMillis = healthPolicy.pollInterval().toMillis();
+        scheduler.scheduleWithFixedDelay(
+                this::pollHealth, periodMillis, periodMillis, TimeUnit.MILLISECONDS);
+    }
+
+    /**
+     * Health-monitoring loop body: probes every tracked worker so an alive-but-hung
+     * worker (one that never fires an exit) is reflected as {@code STALE} to the
+     * API/UI. One worker's probe failure must not stop the others, so each is
+     * isolated.
+     */
+    private void pollHealth() {
+        if (closed) {
+            return;
+        }
+        for (ManagedWorker worker : running.values()) {
+            try {
+                worker.probeHealth();
+            } catch (RuntimeException ignored) {
+                // best effort; a single bad probe must not kill the loop
+            }
+        }
     }
 
     @Override
@@ -224,7 +260,9 @@ public final class Supervisor implements RuntimeController, AutoCloseable {
         private int restarts;
         private boolean stopping;
         private ScheduledFuture<?> pendingRestart;
+        private int healthFailures;
         private volatile WorkerState state = WorkerState.SPAWNED;
+        private volatile boolean stale;
 
         ManagedWorker(String dataSourceId, RuntimeStartSpec spec) {
             this.dataSourceId = dataSourceId;
@@ -272,6 +310,10 @@ public final class Supervisor implements RuntimeController, AutoCloseable {
             this.launched = conn.launched();
             this.client = conn.client();
             this.state = WorkerState.RUNNING;
+            // A fresh worker starts healthy: drop any staleness carried over from the
+            // launch it replaced so the health loop judges this one on its own probes.
+            this.healthFailures = 0;
+            this.stale = false;
             // Watch THIS launch; a stale notification from a superseded launch is ignored.
             conn.launched().onExit().whenComplete((v, t) -> onWorkerExit(conn.launched()));
         }
@@ -378,6 +420,39 @@ public final class Supervisor implements RuntimeController, AutoCloseable {
             return current.applyValues(protoValues);
         }
 
+        /**
+         * One health-monitoring tick. Probes the worker's {@code Health} RPC off the
+         * monitor (it can block up to the probe timeout) and folds the result back in:
+         * a worker that misses {@code staleThreshold} consecutive probes is marked
+         * {@code stale}; a single good probe clears it. Only a steady-state
+         * {@code RUNNING} worker is probed — a stopping, recovering, or exited worker
+         * has no live worker to ask, and its non-RUNNING lifecycle state already drives
+         * {@link #stateName()}.
+         */
+        void probeHealth() {
+            WorkerClient current;
+            synchronized (this) {
+                if (stopping || state != WorkerState.RUNNING || client == null) {
+                    return;
+                }
+                current = client;
+            }
+            boolean healthy = current.isHealthy(healthPolicy.probeTimeout());
+            synchronized (this) {
+                // The worker may have stopped or been restarted while we probed; if the
+                // live client changed, our verdict is about a now-defunct worker — drop it.
+                if (stopping || state != WorkerState.RUNNING || client != current) {
+                    return;
+                }
+                if (healthy) {
+                    healthFailures = 0;
+                    stale = false;
+                } else if (++healthFailures >= healthPolicy.staleThreshold()) {
+                    stale = true;
+                }
+            }
+        }
+
         /** Still running or recovering — i.e. not a worker that exhausted its restart budget. */
         boolean isActive() {
             return state != WorkerState.EXITED;
@@ -385,7 +460,9 @@ public final class Supervisor implements RuntimeController, AutoCloseable {
 
         String stateName() {
             return switch (state) {
-                case RUNNING -> RUNNING;
+                // A live worker that has stopped answering health probes is alive-but-stuck:
+                // surface it as STALE rather than a healthy RUNNING.
+                case RUNNING -> stale ? STALE : RUNNING;
                 case EXITED -> ERROR;
                 case STOPPED -> STOPPED;
                 default -> STARTING; // SPAWNED / READY / CONFIGURED: starting or restarting

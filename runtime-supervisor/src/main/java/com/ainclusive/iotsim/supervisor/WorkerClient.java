@@ -16,6 +16,7 @@ import com.ainclusive.iotsim.workercontract.v1.ValueBatch;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.stub.StreamObserver;
+import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -62,6 +63,23 @@ public final class WorkerClient implements AutoCloseable {
 
     public HealthResponse health() {
         return stub.health(HealthRequest.getDefaultInstance());
+    }
+
+    /**
+     * Probes the worker's health under a deadline so a hung worker cannot block the
+     * caller. Returns {@code true} only when the worker answers in time and reports
+     * itself live; any RPC error, timeout, or {@code live=false} returns
+     * {@code false}. Used by the supervisor's health-monitoring loop.
+     */
+    public boolean isHealthy(Duration timeout) {
+        try {
+            HealthResponse response = stub
+                    .withDeadlineAfter(timeout.toMillis(), TimeUnit.MILLISECONDS)
+                    .health(HealthRequest.getDefaultInstance());
+            return response.getLive();
+        } catch (RuntimeException e) {
+            return false;
+        }
     }
 
     /** Streams values to the worker (client-streaming) and waits for the ack. */
