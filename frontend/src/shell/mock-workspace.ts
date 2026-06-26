@@ -9,15 +9,15 @@ export type ProjectSummary = {
 
 export type ActiveRun = {
   id: string;
-  label: string;
   initiator: string;
   startedAt: string;
+  protocol: "OPC UA" | "Modbus TCP";
   processType?: "Recording" | "Replay" | "Scenario";
   parameterCount: number;
   previewParameters: string[];
   previewOverflowCount: number;
-  relatedLabel: string;
-  relatedPath: string;
+  sourceName: string;
+  sourcePath: string;
   evidence: "Ready" | "Assembling" | "Retry needed";
   evidencePath?: string;
 };
@@ -52,9 +52,9 @@ export const projects: ProjectSummary[] = [
 export const activeRuns: ActiveRun[] = [
   {
     id: "run-1",
-    label: "OPC UA replay / Line A telemetry",
     initiator: "Alex M.",
     startedAt: "14:31",
+    protocol: "OPC UA",
     processType: "Replay",
     parameterCount: 2480,
     previewParameters: [
@@ -63,16 +63,16 @@ export const activeRuns: ActiveRun[] = [
       "alarm.state",
     ],
     previewOverflowCount: 2477,
-    relatedLabel: "Line A telemetry",
-    relatedPath: "/data-sources/src-01",
+    sourceName: "Line A telemetry",
+    sourcePath: "/data-sources/src-01",
     evidence: "Assembling",
     evidencePath: "/evidence",
   },
   {
     id: "run-2",
-    label: "Modbus source / Packaging cell stream",
     initiator: "Automation",
     startedAt: "14:27",
+    protocol: "Modbus TCP",
     parameterCount: 640,
     previewParameters: [
       "register[120].state",
@@ -80,16 +80,16 @@ export const activeRuns: ActiveRun[] = [
       "jam.warning",
     ],
     previewOverflowCount: 637,
-    relatedLabel: "Packaging cell stream",
-    relatedPath: "/data-sources/src-02",
+    sourceName: "Packaging cell stream",
+    sourcePath: "/data-sources/src-02",
     evidence: "Ready",
     evidencePath: "/evidence",
   },
   {
     id: "run-3",
-    label: "Record session / Field capture telemetry",
     initiator: "Jordan K.",
     startedAt: "14:14",
+    protocol: "OPC UA",
     processType: "Recording",
     parameterCount: 3120,
     previewParameters: [
@@ -98,12 +98,23 @@ export const activeRuns: ActiveRun[] = [
       "quality.flag",
     ],
     previewOverflowCount: 3117,
-    relatedLabel: "Field capture telemetry",
-    relatedPath: "/data-sources/src-03",
+    sourceName: "Field capture telemetry",
+    sourcePath: "/data-sources/src-03",
     evidence: "Retry needed",
     evidencePath: "/evidence",
   },
 ];
+
+export const mockExportShouldFail = false;
+
+export const sourceListStale = false;
+
+export const sourceListError = false;
+
+export const dashboardStale = false;
+
+export const mockSourceLock: "unlocked" | "locked-by-self" | "locked-by-other" | "stale" =
+  "unlocked";
 
 export const topLevelNav = [
   { to: "/overview", label: "Overview" },

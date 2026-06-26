@@ -3,11 +3,15 @@ import { AppShell } from "./shell/app-shell";
 import { CreateDataSourceWizardPage } from "./surfaces/create-data-source-wizard-page";
 import { DataSourceDetailPreviewPage } from "./surfaces/data-source-detail-preview-page";
 import { DataSourcesListPage } from "./surfaces/data-sources-list-page";
+import { DesignSystemPage } from "./surfaces/design-system-page";
+import { EvidenceDetailPage } from "./surfaces/evidence-detail-page";
+import { EvidenceListPage } from "./surfaces/evidence-list-page";
 import { NotificationDemoPage } from "./surfaces/notification-demo-page";
 import { OverviewPage } from "./surfaces/overview-page";
 import { ProjectEntryPage } from "./surfaces/project-entry-page";
 import { RecordingFlowPage } from "./surfaces/recording-flow-page";
 import { ReplayFlowPage } from "./surfaces/replay-flow-page";
+import { SettingsPage } from "./surfaces/settings-page";
 import { SurfaceStubPage } from "./surfaces/surface-stub-page";
 
 const surfaceContent = {
@@ -30,6 +34,11 @@ const surfaceContent = {
     title: "Evidence",
     summary: "Review exported runtime results and their traceability.",
     note: "This screen will hold evidence history, filters, and links back to the runs and sources that produced each artifact.",
+  },
+  evidenceDetail: {
+    title: "Evidence Detail",
+    summary: "Review one evidence artifact and understand what happened.",
+    note: "This screen will hold the artifact summary, timeline, clients, faults, export options, and recovery states.",
   },
   activity: {
     title: "Activity",
@@ -62,6 +71,10 @@ const entrySurfaceContent = {
 } as const;
 
 export const router = createBrowserRouter([
+  {
+    path: "/design-system",
+    element: <DesignSystemPage />,
+  },
   {
     path: "/projects",
     element: <ProjectEntryPage />,
@@ -110,7 +123,11 @@ export const router = createBrowserRouter([
       },
       {
         path: "evidence",
-        element: <SurfaceStubPage {...surfaceContent.evidence} />,
+        element: <EvidenceListPage />,
+      },
+      {
+        path: "evidence/:evidenceId",
+        element: <EvidenceDetailPage />,
       },
       {
         path: "activity",
@@ -118,7 +135,7 @@ export const router = createBrowserRouter([
       },
       {
         path: "settings",
-        element: <SurfaceStubPage {...surfaceContent.settings} />,
+        element: <SettingsPage />,
       },
       {
         path: "admin",

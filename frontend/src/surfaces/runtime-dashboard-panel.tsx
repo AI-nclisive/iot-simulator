@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
-import { activeRuns } from "../shell/mock-workspace";
+import { activeRuns, dashboardStale } from "../shell/mock-workspace";
 import { SharedStatePanel } from "../ui/shared-state-panel";
+import { StaleBanner } from "../ui/stale-banner";
 import { StatusBadge, type StatusTone } from "../ui/status-badge";
 
 function processTone(processType: "Recording" | "Replay" | "Scenario"): StatusTone {
@@ -30,6 +31,9 @@ function evidenceTone(status: "Ready" | "Assembling" | "Retry needed"): StatusTo
 export function RuntimeDashboardPanel() {
   return (
     <section aria-label="Runtime dashboard" className="shell-panel px-5 py-5">
+      {dashboardStale ? (
+        <StaleBanner message="Dashboard data may be outdated. Refresh the page to see the latest runtime state." />
+      ) : null}
       {activeRuns.length === 0 ? (
         <SharedStatePanel
           message="Start a source, recording, replay, or scenario to bring active runtime back into view here."
@@ -45,13 +49,14 @@ export function RuntimeDashboardPanel() {
             >
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-shell-ink">{run.label}</p>
+                  <p className="text-sm font-medium text-shell-ink">{run.sourceName}</p>
                   <p className="mt-1 text-sm text-shell-muted">
                     {run.initiator} • {run.startedAt}
                   </p>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
+                  <StatusBadge label={run.protocol} />
                   {run.processType ? (
                     <StatusBadge
                       label={run.processType}
@@ -66,9 +71,7 @@ export function RuntimeDashboardPanel() {
               </div>
 
               <div className="mt-4 flex flex-wrap items-center gap-3">
-                <p className="text-sm text-shell-muted">
-                  {run.parameterCount.toLocaleString()} parameters in this run
-                </p>
+                <StatusBadge label={`${run.parameterCount.toLocaleString()} parameters`} />
               </div>
 
               <div className="mt-4">
@@ -91,8 +94,8 @@ export function RuntimeDashboardPanel() {
               </div>
 
               <div className="mt-4 flex flex-wrap items-center gap-3">
-                <Link className="shell-text-action" to={run.relatedPath}>
-                  Open {run.relatedLabel}
+                <Link className="shell-text-action" to={run.sourcePath}>
+                  Open {run.sourceName}
                 </Link>
                 {run.evidencePath ? (
                   <Link className="shell-text-action" to={run.evidencePath}>

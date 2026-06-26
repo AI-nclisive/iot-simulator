@@ -223,7 +223,7 @@ Parallel execution:
   Done when: target compatibility, active-target impact, no-client state,
   replay progress, and completion or failure states are clear.
 
-- [ ] `UI-039A` Real-source credential handling
+- [x] `UI-039A` Real-source credential handling
   Surface: `Credential Handling`
   Depends: `UI-033`, `UI-039`
   Done when: sensitive fields are masked, persistence behavior is visible, and
@@ -291,24 +291,24 @@ Parallel execution:
 3. After `UI-071`, run `UI-072`.
 4. After `UI-072`, run `UI-073`.
 
-- [ ] `UI-070` Evidence List
+- [x] `UI-070` Evidence List
   Surface: `Evidence List`
   Depends: `UI-003`, `UI-006`
   Done when: users can find evidence by source, initiator, project, scenario,
   and state; export remains role-aware.
 
-- [ ] `UI-071` Evidence Detail
+- [x] `UI-071` Evidence Detail
   Surface: `Evidence Detail`
   Depends: `UI-070`
   Done when: summary, timeline, clients, faults or errors, and partial states
   explain what happened and how complete the artifact is.
 
-- [ ] `UI-072` Evidence export dialog
+- [x] `UI-072` Evidence export dialog
   Surface: `Evidence Detail`
   Depends: `UI-071`
   Done when: export formats, artifact scope, and secret exclusion are explicit.
 
-- [ ] `UI-073` Evidence export failure recovery
+- [x] `UI-073` Evidence export failure recovery
   Surface: `Evidence Detail`
   Depends: `UI-072`
   Done when: export failure states support retry with a clear reason and next
@@ -326,19 +326,19 @@ Parallel execution:
 1. Start `UI-090` first.
 2. After `UI-090`, run `UI-091` and `UI-092` in parallel.
 
-- [ ] `UI-090` Visual system baseline
+- [x] `UI-090` Visual system baseline
   Surface: cross-surface pattern
   Depends: `UI-001`, `UI-002`, `UI-003`, `UI-004`
   Done when: typography, spacing, forms, tables, dialogs, status treatment, and
   shared component rules are defined for the approved stack.
 
-- [ ] `UI-091` Accessibility review
+- [x] `UI-091` Accessibility review
   Surface: cross-surface review
   Depends: `UI-001`, `UI-002`, `UI-090`
   Done when: keyboard flow, focus visibility, labels, status messaging, and
   contrast are checked on the core P0 path.
 
-- [ ] `UI-092` Edge-state review
+- [x] `UI-092` Edge-state review
   Surface: cross-surface review
   Depends: `UI-001`, `UI-002`, `UI-090`
   Done when: empty, loading, locked, permission, stale, partial, and error
@@ -360,7 +360,7 @@ Parallel execution:
 2. After `UI-011` plus the required shared patterns, run `UI-012`, `UI-013`,
    and `UI-014` in parallel.
 
-- [ ] `UI-005` Edit-lock pattern
+- [x] `UI-005` Edit-lock pattern
   Surface: cross-surface pattern
   Depends: `UI-001`
   Done when: lock ownership, read-only mode, and stale-lock recovery are defined
@@ -384,7 +384,7 @@ Parallel execution:
   Done when: rename, duplicate, archive, and delete flows are clear and expose
   shared impact before destructive changes.
 
-- [ ] `UI-014` Project export flow
+- [x] `UI-014` Project export flow
   Surface: `Settings`
   Depends: `UI-006`, `UI-011`
   Done when: export scope, completion state, failure state, and secret exclusion

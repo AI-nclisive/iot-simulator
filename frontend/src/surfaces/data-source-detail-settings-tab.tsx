@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { resolveAccess } from "../shell/access-policy";
 import { useDataSourcesStore } from "../shell/data-sources-store";
 import { useShellStore } from "../shell/shell-store";
+import { mockSourceLock } from "../shell/mock-workspace";
+import { EditLockBanner, type EditLockState } from "../ui/edit-lock-banner";
 import { SharedStatePanel } from "../ui/shared-state-panel";
 import { StatusBadge } from "../ui/status-badge";
 import type { DataSourceRow } from "./mock-data-sources";
@@ -24,6 +26,20 @@ export function DataSourceDetailSettingsTab({
   const [name, setName] = useState(source.name);
   const [endpoint, setEndpoint] = useState(source.endpoint);
   const [savedMessage, setSavedMessage] = useState("");
+  const [lockState, setLockState] = useState<EditLockState>(() => {
+    if (mockSourceLock === "locked-by-self") {
+      return { kind: "locked-by-self", since: "just now", onRelease: () => setLockState({ kind: "unlocked" }) };
+    }
+    if (mockSourceLock === "locked-by-other") {
+      return { kind: "locked-by-other", owner: "Alex M.", since: "3 min ago" };
+    }
+    if (mockSourceLock === "stale") {
+      return { kind: "stale", owner: "Jordan K.", since: "18 min ago", onTake: () => setLockState({ kind: "locked-by-self", since: "just now", onRelease: () => setLockState({ kind: "unlocked" }) }) };
+    }
+    return { kind: "unlocked" };
+  });
+
+  const isLockedByOther = lockState.kind === "locked-by-other" || lockState.kind === "stale";
 
   const validationMessage = useMemo(() => {
     if (name.trim().length === 0) {
@@ -38,7 +54,7 @@ export function DataSourceDetailSettingsTab({
   }, [endpoint, name]);
 
   const hasChanges = name !== source.name || endpoint !== source.endpoint;
-  const canSave = access.isAdmin && hasChanges && validationMessage.length === 0;
+  const canSave = access.isAdmin && !isLockedByOther && hasChanges && validationMessage.length === 0;
 
   function resetForm() {
     setName(source.name);
@@ -60,15 +76,17 @@ export function DataSourceDetailSettingsTab({
 
   return (
     <div className="space-y-5">
+      <EditLockBanner lock={lockState} />
+
       <div className="flex flex-wrap items-center gap-2">
-        <StatusBadge label={access.isAdmin ? "Editable" : "Read-only"} tone="neutral" />
+        <StatusBadge label={access.isAdmin && !isLockedByOther ? "Editable" : "Read-only"} tone="neutral" />
         {hasChanges ? <StatusBadge label="Unsaved changes" tone="warning" /> : null}
         {savedMessage ? <StatusBadge label={savedMessage} tone="accent" /> : null}
       </div>
 
       {source.status === "Active" ? (
         <SharedStatePanel
-          message="Editing this form changes saved source configuration. Current runtime behavior stays separate until the next start or replay setup."
+          message="Editing this form changes saved source configuration. Current source output stays separate until the next start or replay setup."
           state="warning"
           title="Configuration and runtime are separated."
         />
@@ -87,7 +105,7 @@ export function DataSourceDetailSettingsTab({
           Source name
           <input
             className="shell-field"
-            disabled={!access.isAdmin}
+            disabled={!access.isAdmin || isLockedByOther}
             type="text"
             value={name}
             onChange={(event) => {
@@ -101,7 +119,7 @@ export function DataSourceDetailSettingsTab({
           Endpoint
           <input
             className="shell-field"
-            disabled={!access.isAdmin}
+            disabled={!access.isAdmin || isLockedByOther}
             type="text"
             value={endpoint}
             onChange={(event) => {
@@ -149,7 +167,7 @@ export function DataSourceDetailSettingsTab({
         </button>
         <button
           className="shell-action"
-          disabled={!access.isAdmin || !hasChanges}
+          disabled={!access.isAdmin || isLockedByOther || !hasChanges}
           type="button"
           onClick={resetForm}
         >

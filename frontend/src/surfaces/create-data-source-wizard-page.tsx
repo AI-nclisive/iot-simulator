@@ -32,9 +32,14 @@ type WizardFormState = {
   opcUaSecurity: "Basic256Sha256" | "None";
   protocol: ProtocolOption["id"] | null;
   runtimeBehavior: "start-now" | "stopped";
+  scanCredentialConfirmed: boolean;
+  scanCredentialMode: "anonymous" | "external-ref" | "password";
+  scanPassword: string;
   scanEndpoint: string;
+  scanSecretRef: string;
   scanState: "complete" | "error" | "idle" | "large" | "partial" | "scanning" | "unknown";
-  scanTestResult: "idle" | "success" | "error";
+  scanTestResult: "auth-error" | "idle" | "success" | "error";
+  scanUsername: string;
   schemaReviewNote: string;
   syntheticProfile: "steady" | "spike" | "cycle";
 };
@@ -141,6 +146,14 @@ function validationMessage(stepIndex: number, form: WizardFormState) {
       return "Enter the real endpoint before continuing.";
     }
 
+    if (form.basis === "scan") {
+      const credentialMessage = credentialValidationMessage(form);
+
+      if (credentialMessage) {
+        return credentialMessage;
+      }
+    }
+
     if (form.basis === "import" && !form.importArtifactName.trim()) {
       return "Enter the prepared artifact name before continuing.";
     }
@@ -153,6 +166,112 @@ function validationMessage(stepIndex: number, form: WizardFormState) {
   }
 
   return null;
+}
+
+function credentialValidationMessage(form: WizardFormState) {
+  if (form.scanCredentialMode === "anonymous") {
+    return null;
+  }
+
+  if (form.scanCredentialMode === "password") {
+    if (!form.scanUsername.trim()) {
+      return "Enter the username required for this endpoint.";
+    }
+
+    if (!form.scanPassword.trim()) {
+      return "Enter the password required for this endpoint.";
+    }
+  }
+
+  if (form.scanCredentialMode === "external-ref" && !form.scanSecretRef.trim()) {
+    return "Enter the external secret reference required for this endpoint.";
+  }
+
+  if (!form.scanCredentialConfirmed) {
+    return "Confirm credential use before continuing.";
+  }
+
+  return null;
+}
+
+function credentialReviewValue(form: WizardFormState) {
+  if (form.scanCredentialMode === "anonymous") {
+    return "Anonymous access";
+  }
+
+  if (!form.scanCredentialConfirmed) {
+    return "Pending confirmation";
+  }
+
+  if (form.scanCredentialMode === "external-ref") {
+    return "External secret reference configured";
+  }
+
+  return "Session-only username/password configured";
+}
+
+function credentialPersistenceLabel(form: WizardFormState) {
+  if (form.scanCredentialMode === "external-ref") {
+    return "Saved reference";
+  }
+
+  if (form.scanCredentialMode === "password") {
+    return "Session only";
+  }
+
+  return "Not required";
+}
+
+function resolveScanTestResult(form: WizardFormState): WizardFormState["scanTestResult"] {
+  if (!form.scanEndpoint.trim()) {
+    return "error";
+  }
+
+  if (credentialValidationMessage(form)) {
+    return "auth-error";
+  }
+
+  const loweredEndpoint = form.scanEndpoint.toLowerCase();
+  const loweredPassword = form.scanPassword.toLowerCase();
+  const loweredSecretRef = form.scanSecretRef.toLowerCase();
+
+  if (
+    loweredEndpoint.includes("authfail") ||
+    loweredPassword.includes("invalid") ||
+    loweredSecretRef.includes("invalid")
+  ) {
+    return "auth-error";
+  }
+
+  return "success";
+}
+
+function scanReviewCopy(scanState: WizardFormState["scanState"]) {
+  if (scanState === "complete") {
+    return {
+      message: "Review the discovered structure, then continue when it matches what this source should simulate.",
+      status: "Ready for review",
+    };
+  }
+
+  if (scanState === "partial") {
+    return {
+      message: "Review the discovered subset and continue only if the missing areas are acceptable for this source.",
+      status: "Review partial result",
+    };
+  }
+
+  if (scanState === "large") {
+    return {
+      message: "Review the high-level structure first. You can refine the parameter set later in Schema.",
+      status: "Review large schema",
+    };
+  }
+
+  return {
+    message: "Review the unknown values and continue only if they can be mapped later in schema editing.",
+    status: "Resolve unknown types",
+  };
 }
 
 function resolveScanOutcome(form: WizardFormState): WizardFormState["scanState"] {
@@ -176,7 +295,7 @@ function resolveScanOutcome(form: WizardFormState): WizardFormState["scanState"]
 function reviewLines(form: WizardFormState) {
   const basisLabel = basisOptions.find((option) => option.id === form.basis)?.label ?? "-";
   const runtimeLabel =
-    form.runtimeBehavior === "start-now" ? "Start immediately" : "Create stopped";
+    form.runtimeBehavior === "start-now" ? "Start immediately" : "Save without starting";
 
   return [
     { label: "Source name", value: form.name || "-" },
@@ -191,6 +310,14 @@ function reviewLines(form: WizardFormState) {
             ? form.importArtifactName || "-"
             : suggestedEndpoint(form.protocol, form.basis),
     },
+    ...(form.basis === "scan"
+      ? [
+          {
+            label: "Credentials",
+            value: credentialReviewValue(form),
+          },
+        ]
+      : []),
     { label: "Runtime behavior", value: runtimeLabel },
     { label: "Schema note", value: form.schemaReviewNote.trim() || "No note" },
   ];
@@ -217,9 +344,14 @@ export function CreateDataSourceWizardPage() {
     opcUaSecurity: "None",
     protocol: null,
     runtimeBehavior: "stopped",
+    scanCredentialConfirmed: false,
+    scanCredentialMode: "anonymous",
+    scanPassword: "",
     scanEndpoint: "",
+    scanSecretRef: "",
     scanState: "idle",
     scanTestResult: "idle",
+    scanUsername: "",
     schemaReviewNote: "",
     syntheticProfile: "steady",
   });
@@ -290,29 +422,43 @@ export function CreateDataSourceWizardPage() {
   }
 
   function testScanDetails() {
-    if (!form.scanEndpoint.trim()) {
-      updateForm({ scanTestResult: "error" });
-      return;
-    }
-
-    updateForm({ scanTestResult: "success" });
+    updateForm({ scanTestResult: resolveScanTestResult(form) });
   }
 
   function startScan() {
-    if (!form.scanEndpoint.trim()) {
-      updateForm({ scanState: "error", scanTestResult: "error" });
+    const scanTestResult = resolveScanTestResult(form);
+
+    if (scanTestResult !== "success") {
+      updateForm({ scanState: "error", scanTestResult });
       return;
     }
 
-    if (form.scanTestResult !== "success") {
-      updateForm({ scanTestResult: "success" });
-    }
-
-    updateForm({ scanState: "scanning" });
+    updateForm({ scanState: "scanning", scanTestResult });
   }
 
   function retryScan() {
     updateForm({ scanState: "idle" });
+  }
+
+  function handleCredentialModeChange(mode: WizardFormState["scanCredentialMode"]) {
+    updateForm({
+      scanCredentialConfirmed: mode === "anonymous",
+      scanCredentialMode: mode,
+      scanPassword: mode === "password" ? form.scanPassword : "",
+      scanSecretRef: mode === "external-ref" ? form.scanSecretRef : "",
+      scanTestResult: "idle",
+      scanUsername: mode === "password" ? form.scanUsername : "",
+    });
+  }
+
+  function clearCredentialMaterial() {
+    updateForm({
+      scanCredentialConfirmed: form.scanCredentialMode === "anonymous",
+      scanPassword: "",
+      scanSecretRef: "",
+      scanTestResult: "idle",
+      scanUsername: "",
+    });
   }
 
   function goNext() {
@@ -383,30 +529,141 @@ export function CreateDataSourceWizardPage() {
                   className="shell-field"
                   placeholder={suggestedEndpoint(form.protocol, form.basis)}
                   type="text"
-                  value={form.scanEndpoint}
-                  onChange={(event) =>
-                    updateForm({
-                      scanEndpoint: event.target.value,
-                      scanState: "idle",
-                      scanTestResult: "idle",
-                    })
-                  }
-                />
-              </label>
+                    value={form.scanEndpoint}
+                    onChange={(event) =>
+                      updateForm({
+                        scanEndpoint: event.target.value,
+                        scanState: "idle",
+                        scanTestResult: "idle",
+                      })
+                    }
+                  />
+                </label>
 
-              <div className="flex flex-wrap items-center gap-3">
-                <button className="shell-action" type="button" onClick={testScanDetails}>
-                  Test details
-                </button>
-                {form.scanTestResult === "success" ? (
-                  <StatusBadge label="Connection ready" tone="accent" />
-                ) : null}
-                {form.scanTestResult === "error" ? (
-                  <StatusBadge label="Enter a valid endpoint" tone="danger" />
-                ) : null}
+                <div className="space-y-3 border-t border-shell-line pt-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm font-medium text-shell-ink">Credential handling</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <StatusBadge label={credentialPersistenceLabel(form)} />
+                      {form.scanCredentialConfirmed ? (
+                        <StatusBadge label="Confirmed" tone="accent" />
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <label className="flex flex-col gap-2 text-sm text-shell-muted">
+                    Authentication
+                    <select
+                      className="shell-field"
+                      value={form.scanCredentialMode}
+                      onChange={(event) =>
+                        handleCredentialModeChange(
+                          event.target.value as WizardFormState["scanCredentialMode"],
+                        )
+                      }
+                    >
+                      <option value="anonymous">Anonymous</option>
+                      <option value="password">Username and password</option>
+                      <option value="external-ref">External secret reference</option>
+                    </select>
+                  </label>
+
+                  {form.scanCredentialMode === "password" ? (
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <label className="flex flex-col gap-2 text-sm text-shell-muted">
+                        Username
+                        <input
+                          autoComplete="username"
+                          className="shell-field"
+                          type="text"
+                          value={form.scanUsername}
+                          onChange={(event) =>
+                            updateForm({
+                              scanCredentialConfirmed: false,
+                              scanTestResult: "idle",
+                              scanUsername: event.target.value,
+                            })
+                          }
+                        />
+                      </label>
+
+                      <label className="flex flex-col gap-2 text-sm text-shell-muted">
+                        Password
+                        <input
+                          autoComplete="current-password"
+                          className="shell-field"
+                          type="password"
+                          value={form.scanPassword}
+                          onChange={(event) =>
+                            updateForm({
+                              scanCredentialConfirmed: false,
+                              scanPassword: event.target.value,
+                              scanTestResult: "idle",
+                            })
+                          }
+                        />
+                      </label>
+                    </div>
+                  ) : null}
+
+                  {form.scanCredentialMode === "external-ref" ? (
+                    <label className="flex flex-col gap-2 text-sm text-shell-muted">
+                      Secret reference
+                      <input
+                        className="shell-field"
+                        placeholder="vault/plant/line-a/opcua"
+                        type="text"
+                        value={form.scanSecretRef}
+                        onChange={(event) =>
+                          updateForm({
+                            scanCredentialConfirmed: false,
+                            scanSecretRef: event.target.value,
+                            scanTestResult: "idle",
+                          })
+                        }
+                      />
+                    </label>
+                  ) : null}
+
+                  {form.scanCredentialMode !== "anonymous" ? (
+                    <div className="flex flex-wrap items-center gap-3">
+                      <label className="flex items-center gap-2 text-sm text-shell-muted">
+                        <input
+                          checked={form.scanCredentialConfirmed}
+                          type="checkbox"
+                          onChange={(event) =>
+                            updateForm({ scanCredentialConfirmed: event.target.checked })
+                          }
+                        />
+                        Use for this scan
+                      </label>
+                      <button
+                        className="shell-text-action"
+                        type="button"
+                        onClick={clearCredentialMaterial}
+                      >
+                        Clear value
+                      </button>
+                    </div>
+                  ) : null}
+
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button className="shell-action" type="button" onClick={testScanDetails}>
+                      Test connection
+                    </button>
+                    {form.scanTestResult === "success" ? (
+                      <StatusBadge label="Connection ready" tone="accent" />
+                    ) : null}
+                    {form.scanTestResult === "error" ? (
+                      <StatusBadge label="Enter a valid endpoint" tone="danger" />
+                    ) : null}
+                    {form.scanTestResult === "auth-error" ? (
+                      <StatusBadge label="Check credentials" tone="danger" />
+                    ) : null}
+                  </div>
+                </div>
               </div>
-            </div>
-          ) : null}
+            ) : null}
 
           {form.protocol === "OPC UA" ? (
             <div className="grid gap-4 sm:grid-cols-2">
@@ -490,7 +747,7 @@ export function CreateDataSourceWizardPage() {
                 }
               >
                 <option value="empty">Empty structure</option>
-                <option value="analog">Analog signal set</option>
+                <option value="analog">Analog parameter set</option>
                 <option value="discrete">Discrete state set</option>
               </select>
             </label>
@@ -536,18 +793,24 @@ export function CreateDataSourceWizardPage() {
             Current path
           </p>
           <dl className="mt-3 space-y-3 text-sm">
-            <div>
-              <dt className="text-shell-muted">Protocol</dt>
-              <dd className="mt-1 text-shell-ink">{form.protocol ?? "-"}</dd>
-            </div>
-            <div>
-              <dt className="text-shell-muted">Source basis</dt>
-              <dd className="mt-1 text-shell-ink">{currentBasis?.label ?? "-"}</dd>
-            </div>
-            <div>
-              <dt className="text-shell-muted">Next</dt>
-              <dd className="mt-1 text-shell-ink">Schema review</dd>
-            </div>
+              <div>
+                <dt className="text-shell-muted">Protocol</dt>
+                <dd className="mt-1 text-shell-ink">{form.protocol ?? "-"}</dd>
+              </div>
+              <div>
+                <dt className="text-shell-muted">Source basis</dt>
+                <dd className="mt-1 text-shell-ink">{currentBasis?.label ?? "-"}</dd>
+              </div>
+              {form.basis === "scan" ? (
+                <div>
+                  <dt className="text-shell-muted">Credentials</dt>
+                  <dd className="mt-1 text-shell-ink">{credentialReviewValue(form)}</dd>
+                </div>
+              ) : null}
+              <div>
+                <dt className="text-shell-muted">Next</dt>
+                <dd className="mt-1 text-shell-ink">Schema review</dd>
+              </div>
           </dl>
         </section>
       </div>
@@ -555,15 +818,17 @@ export function CreateDataSourceWizardPage() {
   }
 
   function renderSchemaStep() {
+    const scanCopy = scanReviewCopy(form.scanState);
+
     if (form.basis === "scan") {
       return (
         <div className="space-y-4">
           {form.scanState === "idle" ? (
             <SharedStatePanel
               actionLabel="Start scan"
-              message="Run discovery to see what structure was found before you continue into guided review."
+              message="Start discovery now. This step cannot be reviewed until the simulator reads the real endpoint."
               state="warning"
-              title="No scan result is available yet."
+              title="Scan the endpoint before reviewing schema."
               onAction={startScan}
             />
           ) : null}
@@ -579,7 +844,7 @@ export function CreateDataSourceWizardPage() {
           {form.scanState === "error" ? (
             <SharedStatePanel
               actionLabel="Retry"
-              message="Enter a valid endpoint and test the details again before retrying discovery."
+              message="Go back to Setup if the endpoint or credentials need changes, then test the connection before retrying."
               state="error"
               title="The scan could not start."
               onAction={retryScan}
@@ -590,29 +855,15 @@ export function CreateDataSourceWizardPage() {
             <section className="rounded-md border border-shell-line bg-white px-4 py-4">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div>
-                  <p className="text-sm font-medium text-shell-ink">Discovery result</p>
-                  <p className="mt-2 text-sm leading-6 text-shell-muted">
-                    {form.scanState === "complete"
-                      ? "Structure discovery is ready for review."
-                      : form.scanState === "partial"
-                        ? "Some structure was discovered, but a subset needs manual review."
-                        : form.scanState === "large"
-                          ? "A large structure was discovered. Guided review should narrow the first pass."
-                          : "One or more values use an unknown type and need manual review later."}
-                  </p>
-                </div>
+                    <p className="text-sm font-medium text-shell-ink">Discovery result</p>
+                    <p className="mt-2 text-sm leading-6 text-shell-muted">
+                      {scanCopy.message}
+                    </p>
+                  </div>
 
                 <div className="flex flex-wrap items-center gap-2">
                   <StatusBadge
-                    label={
-                      form.scanState === "complete"
-                        ? "Complete"
-                        : form.scanState === "partial"
-                          ? "Partial"
-                          : form.scanState === "large"
-                            ? "Large schema"
-                            : "Unknown type"
-                    }
+                      label={scanCopy.status}
                     tone={
                       form.scanState === "complete"
                         ? "accent"
@@ -624,7 +875,7 @@ export function CreateDataSourceWizardPage() {
                 </div>
               </div>
 
-              <dl className="mt-4 grid gap-3 text-sm text-shell-muted sm:grid-cols-3">
+                <dl className="mt-4 grid gap-3 text-sm text-shell-muted sm:grid-cols-3">
                 <div>
                   <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
                     Endpoint
@@ -637,13 +888,19 @@ export function CreateDataSourceWizardPage() {
                   </dt>
                   <dd className="mt-2 text-sm text-shell-ink">{form.protocol}</dd>
                 </div>
-                <div>
-                  <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
-                    Next
-                  </dt>
-                  <dd className="mt-2 text-sm text-shell-ink">Continue into schema review</dd>
-                </div>
-              </dl>
+                  <div>
+                    <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
+                      Next
+                    </dt>
+                    <dd className="mt-2 text-sm text-shell-ink">Continue into schema review</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
+                      Credentials
+                    </dt>
+                    <dd className="mt-2 text-sm text-shell-ink">{credentialReviewValue(form)}</dd>
+                  </div>
+                </dl>
 
               <div className="mt-4">
                 <button className="shell-action" type="button" onClick={retryScan}>
@@ -691,13 +948,13 @@ export function CreateDataSourceWizardPage() {
           onClick={() => updateForm({ runtimeBehavior: "stopped" })}
         >
           <div className="flex flex-wrap items-center gap-2">
-            <p className="text-sm font-medium text-shell-ink">Create stopped</p>
-            <StatusBadge label="Recommended" tone="accent" />
-          </div>
-          <p className="mt-2 text-sm leading-6 text-shell-muted">
-            Save the source first, then decide when to start recording or replay.
-          </p>
-        </button>
+              <p className="text-sm font-medium text-shell-ink">Save without starting</p>
+              <StatusBadge label="Recommended" tone="accent" />
+            </div>
+            <p className="mt-2 text-sm leading-6 text-shell-muted">
+              Create the source as inactive. You can start it later from the source detail.
+            </p>
+          </button>
 
         <button
           className={optionButtonClass(form.runtimeBehavior === "start-now")}
@@ -802,22 +1059,26 @@ export function CreateDataSourceWizardPage() {
             </h2>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            {wizardSteps.map((step, index) => (
-              <button
-                key={step.id}
-                className={`rounded-md border px-3 py-2 text-sm ${stepChipClass(
-                  currentStep === index,
-                  index < currentStep,
-                )}`}
-                disabled={index > currentStep}
-                type="button"
-                onClick={() => setCurrentStep(index)}
-              >
-                {index + 1}. {step.label}
-              </button>
-            ))}
-          </div>
+          <nav aria-label="Wizard steps">
+            <ol className="flex flex-wrap items-center gap-2">
+              {wizardSteps.map((step, index) => (
+                <li key={step.id}>
+                  <button
+                    aria-current={currentStep === index ? "step" : undefined}
+                    className={`rounded-md border px-3 py-2 text-sm ${stepChipClass(
+                      currentStep === index,
+                      index < currentStep,
+                    )}`}
+                    disabled={index > currentStep}
+                    type="button"
+                    onClick={() => setCurrentStep(index)}
+                  >
+                    {index + 1}. {step.label}
+                  </button>
+                </li>
+              ))}
+            </ol>
+          </nav>
         </div>
       </section>
 
@@ -868,11 +1129,16 @@ export function CreateDataSourceWizardPage() {
               <button className="shell-action" type="button" onClick={createSource}>
                 Create source
               </button>
-            ) : (
-              <button className="shell-action" type="button" onClick={goNext}>
-                Next
-              </button>
-            )}
+              ) : (
+                <button
+                  className="shell-action"
+                  disabled={!!currentValidationMessage}
+                  type="button"
+                  onClick={goNext}
+                >
+                  Next
+                </button>
+              )}
           </div>
         </div>
       </section>
