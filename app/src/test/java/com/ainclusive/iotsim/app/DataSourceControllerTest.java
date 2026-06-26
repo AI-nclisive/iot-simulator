@@ -179,11 +179,12 @@ class DataSourceControllerTest {
         given(service.create(eq(PROJECT), any(), any(), any(), any(), any(), any(), any()))
                 .willReturn(sample(0, RuntimeState.STOPPED));
 
-        // Empty mode and mixed-case "ANONYMOUS" both resolve to anonymous credentials.
+        // Empty mode and mixed-case "Anonymous" both resolve to anonymous credentials
+        // ("Anonymous" only matches the lowercase switch case via the controller's toLowerCase).
         controller.create(PROJECT, new CreateDataSourceRequest(
                 "Pump", "OPC_UA", "MANUAL", null, null, new ConnectionConfigRequest("", null, null, null)));
         controller.create(PROJECT, new CreateDataSourceRequest(
-                "Pump", "OPC_UA", "MANUAL", null, null, new ConnectionConfigRequest("ANONYMOUS", null, null, null)));
+                "Pump", "OPC_UA", "MANUAL", null, null, new ConnectionConfigRequest("Anonymous", null, null, null)));
 
         ArgumentCaptor<ConnectionCredentials> creds = ArgumentCaptor.forClass(ConnectionCredentials.class);
         verify(service, times(2)).create(eq(PROJECT), any(), any(), any(), any(), any(), creds.capture(), any());
