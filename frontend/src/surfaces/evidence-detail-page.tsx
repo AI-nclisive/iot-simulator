@@ -6,6 +6,7 @@ import { useShellStore } from "../shell/shell-store";
 import { SharedStatePanel } from "../ui/shared-state-panel";
 import { StatusBadge } from "../ui/status-badge";
 import {
+  buildExportScopeLabel,
   evidenceDeliveryTone,
   evidenceExportStateTone,
   evidenceIssueTone,
@@ -42,15 +43,15 @@ function ExportEvidenceDialog({ evidence, open, onClose, onExportComplete }: Exp
 
   if (!open || typeof document === "undefined") return null;
 
-  const selectedScope = [
-    includeSummary ? "Summary" : null,
-    includeTimeline ? "Timeline" : null,
-    includeClients ? "Clients" : null,
-    includeIssues ? "Faults and errors" : null,
-  ].filter(Boolean);
+  const selectedScope = buildExportScopeLabel({ includeSummary, includeTimeline, includeClients, includeIssues });
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-shell-ink/45 px-4 py-8">
+    // eslint-disable-next-line jsx-a11y/no-static-element-interactions
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-shell-ink/45 px-4 py-8"
+      tabIndex={-1}
+      onKeyDown={(e) => { if (e.key === "Escape") onClose(); }}
+    >
       <button
         aria-label="Close export dialog"
         className="absolute inset-0"
