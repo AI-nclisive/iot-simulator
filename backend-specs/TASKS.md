@@ -151,6 +151,7 @@ Turn the in-memory worker into a real OPC UA simulator (the stated core risk).
 Make `Scan → Record → Replay` work against real instruments, not provided values.
 
 - [x] IS-042 [BE] ✅ [source] Credential handling (secrets, never persisted/exported) — 08/05
+- [x] IS-116 [BE] ✅ [source] Credential-handling test hardening (stale-update touches no secret, constructor secret normalization, mode mapping) — 08/05
 - [ ] IS-043 [BE] ⬜ [source] Create from scan (real-source discovery) — SPEC: Create From Scan
 - [ ] IS-044 [BE] ⬜ [schema] Scan-derived schema population — 01
 - [ ] IS-045 [BE] ⬜ [recording] Live capture from a running real source → recording — SPEC: Record Real Data

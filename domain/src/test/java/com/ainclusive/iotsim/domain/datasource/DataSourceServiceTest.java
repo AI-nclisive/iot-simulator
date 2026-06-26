@@ -158,6 +158,48 @@ class DataSourceServiceTest {
         assertThat(credentials.has(ds.id())).isFalse();
     }
 
+    @Test
+    void staleUpdateNeverStoresTheSecret() {
+        DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null, "a");
+        // A conflicting (stale) update carrying a password must fail the version check
+        // AND leave the store untouched: credentials are applied only after the check passes.
+        assertThatThrownBy(() -> service.update(PROJECT, ds.id(), "x", null, null, true,
+                ConnectionCredentials.password("operator", "s3cr3t"), ds.version() + 5))
+                .isInstanceOf(ConcurrencyConflictException.class);
+        assertThat(credentials.has(ds.id())).isFalse();
+    }
+
+    @Test
+    void createWithExternalRefIsSessionOnly() {
+        DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", null, null,
+                ConnectionCredentials.externalRef("vault://pump"), "a");
+        assertThat(ds.credentialState()).isEqualTo(CredentialState.SESSION_ONLY);
+        assertThat(credentials.find(ds.id())).map(ConnectionCredentials::mode)
+                .contains(ConnectionCredentials.Mode.EXTERNAL_REF);
+    }
+
+    @Test
+    void updateWithAnonymousClearsExistingCredentials() {
+        DataSource ds = service.create(
+                PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, ConnectionCredentials.password("u", "pw"), "a");
+        assertThat(credentials.has(ds.id())).isTrue();
+
+        DataSource cleared = service.update(PROJECT, ds.id(), null, null, null, null,
+                ConnectionCredentials.anonymous(), ds.version());
+        assertThat(cleared.credentialState()).isEqualTo(CredentialState.MISSING);
+        assertThat(credentials.has(ds.id())).isFalse();
+    }
+
+    @Test
+    void clearCredentialsFromWrongProjectThrowsNotFoundAndKeepsTheSecret() {
+        DataSource ds = service.create(
+                PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, ConnectionCredentials.password("u", "pw"), "a");
+        assertThatThrownBy(() -> service.clearCredentials("other-project", ds.id()))
+                .isInstanceOf(ResourceNotFoundException.class);
+        // A wrong-project request must not clear the real source's held secret.
+        assertThat(credentials.has(ds.id())).isTrue();
+    }
+
     private static final class InMemoryDataSourceRepository implements DataSourceRepository {
         private final List<DataSourceRow> rows = new ArrayList<>();
         private int seq;

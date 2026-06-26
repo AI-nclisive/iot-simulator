@@ -1,6 +1,7 @@
 package com.ainclusive.iotsim.platform.secret;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import org.junit.jupiter.api.Test;
 
@@ -35,5 +36,13 @@ class InMemoryCredentialStoreTest {
         store.put("ds-1", ConnectionCredentials.password("user", "pw"));
         store.clear("ds-1");
         assertThat(store.has("ds-1")).isFalse();
+    }
+
+    @Test
+    void putRejectsNullHandleOrCredentials() {
+        assertThatThrownBy(() -> store.put(null, ConnectionCredentials.anonymous()))
+                .isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> store.put("ds-1", null))
+                .isInstanceOf(NullPointerException.class);
     }
 }

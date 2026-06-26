@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import com.ainclusive.iotsim.api.datasource.DataSourceController;
@@ -149,5 +150,75 @@ class DataSourceControllerTest {
     @Test
     void deleteReturns204() {
         assertThat(controller.delete(PROJECT, "ds1").getStatusCode().value()).isEqualTo(204);
+    }
+
+    @Test
+    void createWithMissingBasisThrowsBadRequest() {
+        assertThatThrownBy(() -> controller.create(
+                PROJECT, new CreateDataSourceRequest("Pump", "OPC_UA", null, null, null, null)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void createMapsHyphenatedExternalRefModeToExternalRefCredentials() {
+        given(service.create(eq(PROJECT), any(), any(), any(), any(), any(), any(), any()))
+                .willReturn(sample(0, RuntimeState.STOPPED, CredentialState.SESSION_ONLY));
+        // The UI sends "external-ref" (hyphen); the controller normalizes it to EXTERNAL_REF.
+        ConnectionConfigRequest cfg = new ConnectionConfigRequest("external-ref", null, null, "vault://pump");
+
+        controller.create(PROJECT, new CreateDataSourceRequest("Pump", "OPC_UA", "MANUAL", null, null, cfg));
+
+        ArgumentCaptor<ConnectionCredentials> creds = ArgumentCaptor.forClass(ConnectionCredentials.class);
+        verify(service).create(eq(PROJECT), any(), any(), any(), any(), any(), creds.capture(), any());
+        assertThat(creds.getValue().mode()).isEqualTo(ConnectionCredentials.Mode.EXTERNAL_REF);
+        assertThat(creds.getValue().secretRef()).isEqualTo("vault://pump");
+    }
+
+    @Test
+    void createMapsBlankAndAnonymousModesToAnonymousCredentialsCaseInsensitively() {
+        given(service.create(eq(PROJECT), any(), any(), any(), any(), any(), any(), any()))
+                .willReturn(sample(0, RuntimeState.STOPPED));
+
+        // Empty mode and mixed-case "ANONYMOUS" both resolve to anonymous credentials.
+        controller.create(PROJECT, new CreateDataSourceRequest(
+                "Pump", "OPC_UA", "MANUAL", null, null, new ConnectionConfigRequest("", null, null, null)));
+        controller.create(PROJECT, new CreateDataSourceRequest(
+                "Pump", "OPC_UA", "MANUAL", null, null, new ConnectionConfigRequest("ANONYMOUS", null, null, null)));
+
+        ArgumentCaptor<ConnectionCredentials> creds = ArgumentCaptor.forClass(ConnectionCredentials.class);
+        verify(service, times(2)).create(eq(PROJECT), any(), any(), any(), any(), any(), creds.capture(), any());
+        assertThat(creds.getAllValues()).allSatisfy(c ->
+                assertThat(c.mode()).isEqualTo(ConnectionCredentials.Mode.ANONYMOUS));
+    }
+
+    @Test
+    void createMapsMixedCasePasswordMode() {
+        given(service.create(eq(PROJECT), any(), any(), any(), any(), any(), any(), any()))
+                .willReturn(sample(0, RuntimeState.STOPPED, CredentialState.SESSION_ONLY));
+        ConnectionConfigRequest cfg = new ConnectionConfigRequest("Password", "operator", "s3cr3t", null);
+
+        controller.create(PROJECT, new CreateDataSourceRequest("Pump", "OPC_UA", "MANUAL", null, null, cfg));
+
+        ArgumentCaptor<ConnectionCredentials> creds = ArgumentCaptor.forClass(ConnectionCredentials.class);
+        verify(service).create(eq(PROJECT), any(), any(), any(), any(), any(), creds.capture(), any());
+        assertThat(creds.getValue().mode()).isEqualTo(ConnectionCredentials.Mode.PASSWORD);
+        assertThat(creds.getValue().secret()).isEqualTo("s3cr3t");
+    }
+
+    @Test
+    void updatePassesCredentialsToServiceButResponseNeverEchoesTheSecret() {
+        given(service.update(eq(PROJECT), eq("ds1"), any(), any(), any(), any(), any(), eq(3L)))
+                .willReturn(sample(4, RuntimeState.STOPPED, CredentialState.SESSION_ONLY));
+        ConnectionConfigRequest cfg = new ConnectionConfigRequest("password", "operator", "s3cr3t", null);
+
+        ResponseEntity<DataSourceResponse> resp = controller.update(PROJECT, "ds1", "\"3\"",
+                new DataSourceController.UpdateDataSourceRequest(null, null, null, null, cfg));
+
+        ArgumentCaptor<ConnectionCredentials> creds = ArgumentCaptor.forClass(ConnectionCredentials.class);
+        verify(service).update(eq(PROJECT), eq("ds1"), any(), any(), any(), any(), creds.capture(), eq(3L));
+        assertThat(creds.getValue().secret()).isEqualTo("s3cr3t");
+        assertThat(resp.getBody()).isNotNull();
+        assertThat(resp.getBody().credentialState()).isEqualTo("SESSION_ONLY");
+        assertThat(resp.getBody().toString()).doesNotContain("s3cr3t");
     }
 }
