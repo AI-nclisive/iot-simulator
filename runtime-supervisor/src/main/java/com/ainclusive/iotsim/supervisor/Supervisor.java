@@ -24,17 +24,21 @@ import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Owns worker lifecycle: port allocation, launch, IPC handshake, start/stop,
- * tracking, and restart-with-backoff on unexpected failure. Protocol-agnostic —
- * adding a protocol means adding a worker, not changing the supervisor.
- * Implements the {@link RuntimeController} port so the domain can drive runtime
- * without depending on this module.
+ * tracking, restart-with-backoff on unexpected failure, and a periodic health
+ * monitoring loop that marks unresponsive workers as STALE (IS-041).
+ * Protocol-agnostic — adding a protocol means adding a worker, not changing
+ * the supervisor. Implements the {@link RuntimeController} port so the domain
+ * can drive runtime without depending on this module.
  *
  * <p>Only <em>unexpected</em> worker exits are restarted (exponential backoff up
  * to a cap, per {@link RestartPolicy}); an intentional {@code stop()} and worker
  * faults are never auto-healed. While a worker is recovering the source reports
- * {@code STARTING}; once the cap is exhausted it reports {@code ERROR}. The
- * health-monitoring loop and stale-state detection are a separate concern
- * (IS-041).
+ * {@code STARTING}; once the cap is exhausted it reports {@code ERROR}.
+ *
+ * <p>The health-monitoring loop (IS-041) polls each RUNNING worker via the
+ * {@code Health} RPC at the configured interval. A worker that misses
+ * {@link HealthMonitorPolicy#staleThreshold()} consecutive polls transitions to
+ * {@code STALE}; a successful poll clears STALE and restores {@code RUNNING}.
  *
  * <p>See backend-specs/02_WORKER_CONTRACT_AND_IPC.md §4.
  */
@@ -44,27 +48,36 @@ public final class Supervisor implements RuntimeController, AutoCloseable {
     private static final String STOPPED = "STOPPED";
     private static final String STARTING = "STARTING";
     private static final String ERROR = "ERROR";
+    private static final String STALE = "STALE";
     private static final Duration READY_TIMEOUT = Duration.ofSeconds(10);
 
     private final WorkerLauncher launcher;
     private final RestartPolicy restartPolicy;
+    private final HealthMonitorPolicy healthPolicy;
     private final ScheduledExecutorService scheduler;
     private final Map<String, ManagedWorker> running = new ConcurrentHashMap<>();
     private volatile boolean closed;
 
     public Supervisor(WorkerLauncher launcher) {
-        this(launcher, RestartPolicy.DEFAULT);
+        this(launcher, RestartPolicy.DEFAULT, HealthMonitorPolicy.DEFAULT);
     }
 
     public Supervisor(WorkerLauncher launcher, RestartPolicy restartPolicy) {
+        this(launcher, restartPolicy, HealthMonitorPolicy.DEFAULT);
+    }
+
+    public Supervisor(WorkerLauncher launcher, RestartPolicy restartPolicy,
+            HealthMonitorPolicy healthPolicy) {
         this.launcher = launcher;
         this.restartPolicy = restartPolicy;
+        this.healthPolicy = healthPolicy;
         AtomicInteger seq = new AtomicInteger();
         this.scheduler = Executors.newScheduledThreadPool(2, r -> {
             Thread t = new Thread(r, "worker-restart-" + seq.incrementAndGet());
             t.setDaemon(true);
             return t;
         });
+        scheduleHealthPolling();
     }
 
     @Override
@@ -132,6 +145,27 @@ public final class Supervisor implements RuntimeController, AutoCloseable {
         scheduler.shutdownNow();
         running.values().forEach(ManagedWorker::stop);
         running.clear();
+    }
+
+    /**
+     * Schedules the recurring health poll. One task fires for all workers so the
+     * number of scheduled tasks stays constant regardless of how many sources run.
+     */
+    private void scheduleHealthPolling() {
+        long intervalMs = healthPolicy.pollInterval().toMillis();
+        scheduler.scheduleAtFixedRate(
+                this::pollAllWorkerHealth,
+                intervalMs,
+                intervalMs,
+                TimeUnit.MILLISECONDS);
+    }
+
+    /** Polls every RUNNING or STALE worker; called on the scheduler thread. */
+    private void pollAllWorkerHealth() {
+        if (closed) {
+            return;
+        }
+        running.values().forEach(w -> w.pollHealth(healthPolicy.staleThreshold()));
     }
 
     private static Value toProto(NeutralValue nv) {
@@ -222,6 +256,7 @@ public final class Supervisor implements RuntimeController, AutoCloseable {
         private LaunchedWorker launched;
         private WorkerClient client;
         private int restarts;
+        private int missedPolls;
         private boolean stopping;
         private ScheduledFuture<?> pendingRestart;
         private volatile WorkerState state = WorkerState.SPAWNED;
@@ -272,6 +307,7 @@ public final class Supervisor implements RuntimeController, AutoCloseable {
             this.launched = conn.launched();
             this.client = conn.client();
             this.state = WorkerState.RUNNING;
+            this.missedPolls = 0;
             // Watch THIS launch; a stale notification from a superseded launch is ignored.
             conn.launched().onExit().whenComplete((v, t) -> onWorkerExit(conn.launched()));
         }
@@ -383,9 +419,53 @@ public final class Supervisor implements RuntimeController, AutoCloseable {
             return state != WorkerState.EXITED;
         }
 
+        /**
+         * Polls worker liveness via the {@code Health} RPC (IS-041). Called on the
+         * scheduler thread. Only polls workers that are RUNNING or STALE; workers that
+         * are starting, stopping, or already exited are skipped.
+         *
+         * <p>Successful poll → clears {@code missedPolls}, restores {@code RUNNING}.
+         * Failed poll → increments {@code missedPolls}; once the threshold is reached
+         * the worker transitions to {@code STALE} so the API/UI can surface it.
+         */
+        void pollHealth(int staleThreshold) {
+            WorkerClient current;
+            synchronized (this) {
+                if (state != WorkerState.RUNNING && state != WorkerState.STALE) {
+                    return; // not yet started, stopping, or already exited — skip
+                }
+                current = client;
+            }
+            if (current == null) {
+                return;
+            }
+            boolean healthy;
+            try {
+                var response = current.health();
+                healthy = response.getLive();
+            } catch (RuntimeException e) {
+                healthy = false;
+            }
+            synchronized (this) {
+                if (stopping || (state != WorkerState.RUNNING && state != WorkerState.STALE)) {
+                    return; // raced with stop() or process exit
+                }
+                if (healthy) {
+                    missedPolls = 0;
+                    state = WorkerState.RUNNING;
+                } else {
+                    missedPolls++;
+                    if (missedPolls >= staleThreshold) {
+                        state = WorkerState.STALE;
+                    }
+                }
+            }
+        }
+
         String stateName() {
             return switch (state) {
                 case RUNNING -> RUNNING;
+                case STALE -> STALE;
                 case EXITED -> ERROR;
                 case STOPPED -> STOPPED;
                 default -> STARTING; // SPAWNED / READY / CONFIGURED: starting or restarting
