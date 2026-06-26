@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { resolveAccess } from "../shell/access-policy";
-import { projects } from "../shell/mock-workspace";
+import { mockExportShouldFail, projects } from "../shell/mock-workspace";
 import { useShellStore } from "../shell/shell-store";
 import { SharedStatePanel } from "../ui/shared-state-panel";
 import { StatusBadge } from "../ui/status-badge";
@@ -27,7 +27,7 @@ function ExportProjectSection({
     setExportState({ phase: "exporting" });
 
     setTimeout(() => {
-      const shouldFail = false;
+      const shouldFail = mockExportShouldFail;
       if (shouldFail) {
         setExportState({ phase: "failed", reason: "Export service is temporarily unavailable." });
       } else {
@@ -164,11 +164,9 @@ export function SettingsPage() {
             Project name
             <input
               className="shell-field"
-              disabled={!access.isAdmin}
-              readOnly={!access.isAdmin}
+              readOnly
               type="text"
               value={currentProject.name}
-              onChange={() => undefined}
             />
           </label>
           <label className="flex flex-col gap-2 text-sm text-shell-muted">
