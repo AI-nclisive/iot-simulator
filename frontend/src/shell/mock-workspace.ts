@@ -105,6 +105,12 @@ export const activeRuns: ActiveRun[] = [
   },
 ];
 
+/**
+ * Set to true to simulate a source schema locked by another user.
+ * Used by DataSourceSchemaEditor to test lock states.
+ */
+export const mockSourceLock = false;
+
 export const topLevelNav = [
   { to: "/overview", label: "Overview" },
   { to: "/data-sources", label: "Data Sources" },

@@ -455,7 +455,7 @@ Parallel execution:
   Done when: prepared recording or sample input shows compatibility and preview
   before creation.
 
-- [ ] `UI-042` Full Schema Editor
+- [x] `UI-042` Full Schema Editor
   Surface: `Full Schema Editor`
   Depends: `UI-040`, `UI-005`
   Done when: structure tree or table, details panel, validation, unsaved
