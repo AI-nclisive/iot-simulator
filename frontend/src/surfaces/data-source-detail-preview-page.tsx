@@ -5,6 +5,7 @@ import { useDataSourcesStore } from "../shell/data-sources-store";
 import { useShellStore } from "../shell/shell-store";
 import { ConfirmationDialog } from "../ui/confirmation-dialog";
 import { DataSourceDetailOverviewTab } from "./data-source-detail-overview-tab";
+import { DataSourceSchemaEditor } from "./data-source-schema-editor";
 import { DataSourceDetailSettingsTab } from "./data-source-detail-settings-tab";
 import { DataSourceDetailValuesTab } from "./data-source-detail-values-tab";
 import { SharedStatePanel } from "../ui/shared-state-panel";
@@ -131,13 +132,7 @@ export function DataSourceDetailPreviewPage() {
     }
 
     if (activeTab === "schema") {
-      return (
-        <SharedStatePanel
-          message={`Schema work will open here for ${activeSource.parameterCount.toLocaleString()} parameters, with the deeper editor behavior added in the later schema task.`}
-          state="empty"
-          title="Schema surface is attached to the detail shell."
-        />
-      );
+      return <DataSourceSchemaEditor source={activeSource} />;
     }
 
     if (activeTab === "values") {
