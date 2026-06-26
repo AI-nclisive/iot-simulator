@@ -408,7 +408,7 @@ Parallel execution:
   Done when: automation-driven runs are clearly labeled and visible in the same
   places as equivalent manual runs.
 
-- [ ] `UI-045` Clients tab
+- [x] `UI-045` Clients tab
   Surface: `Data Source Detail`
   Depends: `UI-040`
   Done when: connected-client state and connection lifecycle are easy to inspect.
