@@ -51,6 +51,7 @@ export function AppShell() {
 
         <div className="flex min-h-0 flex-1 flex-col gap-3 lg:flex-row">
           <aside
+            aria-label="Project navigation"
             className={`shell-panel shrink-0 overflow-hidden transition-[width] duration-200 ${
               projectRailCollapsed ? "lg:w-[84px]" : "w-full lg:w-[280px]"
             }`}
@@ -73,7 +74,13 @@ export function AppShell() {
                   </div>
                 )}
 
-                <button className="shell-action px-2.5" type="button" onClick={toggleProjectRail}>
+                <button
+                  aria-expanded={!projectRailCollapsed}
+                  aria-label={projectRailCollapsed ? "Expand project rail" : "Collapse project rail"}
+                  className="shell-action px-2.5"
+                  type="button"
+                  onClick={toggleProjectRail}
+                >
                   {projectRailCollapsed ? "Open" : "Hide"}
                 </button>
               </div>
@@ -85,23 +92,24 @@ export function AppShell() {
                         access.canManageAdmin || item.to !== "/admin" ? (
                           <NavLink
                             key={item.to}
+                            aria-label={item.label}
+                            title={item.label}
                             className={({ isActive }) =>
                               `shell-nav-item-compact ${
                                 isActive ? "shell-nav-item-compact-active" : ""
                               }`
                             }
-                            title={item.label}
                             to={item.to}
                           >
-                            {navCompactLabel(item.label)}
+                            <span aria-hidden="true">{navCompactLabel(item.label)}</span>
                           </NavLink>
                         ) : (
                           <span
                             key={item.to}
+                            aria-label={`${item.label} — Admin only`}
                             className="shell-nav-item-compact shell-nav-item-compact-disabled"
-                            title="Admin only"
                           >
-                            {navCompactLabel(item.label)}
+                            <span aria-hidden="true">{navCompactLabel(item.label)}</span>
                           </span>
                         )
                       ))}
