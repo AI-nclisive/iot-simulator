@@ -7,17 +7,22 @@ export type ProjectSummary = {
   lastActivity: string;
 };
 
+export type RunSource = "manual" | "automation";
+export type RunState = "queued" | "running" | "failed" | "completed" | "stopped";
+
 export type ActiveRun = {
   id: string;
+  label: string;
   initiator: string;
+  runSource: RunSource;
+  runState: RunState;
   startedAt: string;
-  protocol: "OPC UA" | "Modbus TCP";
   processType?: "Recording" | "Replay" | "Scenario";
   parameterCount: number;
   previewParameters: string[];
   previewOverflowCount: number;
-  sourceName: string;
-  sourcePath: string;
+  relatedLabel: string;
+  relatedPath: string;
   evidence: "Ready" | "Assembling" | "Retry needed";
   evidencePath?: string;
 };
@@ -52,9 +57,11 @@ export const projects: ProjectSummary[] = [
 export const activeRuns: ActiveRun[] = [
   {
     id: "run-1",
+    label: "Batch replay / Line A telemetry",
     initiator: "Alex M.",
+    runSource: "manual",
+    runState: "running",
     startedAt: "14:31",
-    protocol: "OPC UA",
     processType: "Replay",
     parameterCount: 2480,
     previewParameters: [
@@ -63,16 +70,19 @@ export const activeRuns: ActiveRun[] = [
       "alarm.state",
     ],
     previewOverflowCount: 2477,
-    sourceName: "Line A telemetry",
-    sourcePath: "/data-sources/src-01",
+    relatedLabel: "Line A telemetry",
+    relatedPath: "/data-sources/src-01",
     evidence: "Assembling",
     evidencePath: "/evidence",
   },
   {
     id: "run-2",
-    initiator: "Automation",
+    label: "Nightly regression replay / Packaging cell stream",
+    initiator: "CI pipeline",
+    runSource: "automation",
+    runState: "running",
     startedAt: "14:27",
-    protocol: "Modbus TCP",
+    processType: "Replay",
     parameterCount: 640,
     previewParameters: [
       "register[120].state",
@@ -80,16 +90,18 @@ export const activeRuns: ActiveRun[] = [
       "jam.warning",
     ],
     previewOverflowCount: 637,
-    sourceName: "Packaging cell stream",
-    sourcePath: "/data-sources/src-02",
+    relatedLabel: "Packaging cell stream",
+    relatedPath: "/data-sources/src-02",
     evidence: "Ready",
     evidencePath: "/evidence",
   },
   {
     id: "run-3",
+    label: "Live capture / Field capture telemetry",
     initiator: "Jordan K.",
+    runSource: "manual",
+    runState: "running",
     startedAt: "14:14",
-    protocol: "OPC UA",
     processType: "Recording",
     parameterCount: 3120,
     previewParameters: [
@@ -98,10 +110,40 @@ export const activeRuns: ActiveRun[] = [
       "quality.flag",
     ],
     previewOverflowCount: 3117,
-    sourceName: "Field capture telemetry",
-    sourcePath: "/data-sources/src-03",
+    relatedLabel: "Field capture telemetry",
+    relatedPath: "/data-sources/src-03",
     evidence: "Retry needed",
     evidencePath: "/evidence",
+  },
+  {
+    id: "run-4",
+    label: "Smoke test replay / Line A telemetry",
+    initiator: "Scheduled job",
+    runSource: "automation",
+    runState: "queued",
+    startedAt: "14:45",
+    processType: "Replay",
+    parameterCount: 2480,
+    previewParameters: ["oven.zone[1].temp", "line.speed"],
+    previewOverflowCount: 2478,
+    relatedLabel: "Line A telemetry",
+    relatedPath: "/data-sources/src-01",
+    evidence: "Assembling",
+  },
+  {
+    id: "run-5",
+    label: "Validation replay / Packaging cell stream",
+    initiator: "CI pipeline",
+    runSource: "automation",
+    runState: "failed",
+    startedAt: "13:55",
+    processType: "Replay",
+    parameterCount: 640,
+    previewParameters: ["register[120].state"],
+    previewOverflowCount: 639,
+    relatedLabel: "Packaging cell stream",
+    relatedPath: "/data-sources/src-02",
+    evidence: "Retry needed",
   },
 ];
 

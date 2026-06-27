@@ -402,7 +402,7 @@ Parallel execution:
 1. After the required P0 detail and runtime tasks, run `UI-025`, `UI-045`, and
    `UI-046` in parallel.
 
-- [ ] `UI-025` Automated run visibility
+- [x] `UI-025` Automated run visibility
   Surface: `Automated Run Visibility`
   Depends: `UI-020`, `UI-022`
   Done when: automation-driven runs are clearly labeled and visible in the same
