@@ -8,20 +8,37 @@ import com.ainclusive.iotsim.workercontract.v1.HealthResponse;
 import com.ainclusive.iotsim.workercontract.v1.HelloRequest;
 import com.ainclusive.iotsim.workercontract.v1.HelloResponse;
 import com.ainclusive.iotsim.workercontract.v1.ProtocolDataSourceGrpc;
+import com.ainclusive.iotsim.workercontract.v1.ScanRequest;
+import com.ainclusive.iotsim.workercontract.v1.ScanResponse;
+import com.ainclusive.iotsim.workercontract.v1.SchemaNodeMsg;
 import com.ainclusive.iotsim.workercontract.v1.StartRequest;
 import com.ainclusive.iotsim.workercontract.v1.StopRequest;
+import com.ainclusive.iotsim.workercontract.v1.TestConnectionRequest;
+import com.ainclusive.iotsim.workercontract.v1.TestConnectionResponse;
 import com.ainclusive.iotsim.workercontract.v1.ValueBatch;
 import io.grpc.stub.StreamObserver;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 /** Minimal in-process worker that satisfies the handshake and counts what it receives. */
 final class TestProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSourceImplBase {
 
     private final AtomicLong applied = new AtomicLong();
     private final AtomicInteger configuredNodes = new AtomicInteger();
+    private final AtomicReference<ScanRequest> lastScan = new AtomicReference<>();
+    private final AtomicReference<TestConnectionRequest> lastTestConnection = new AtomicReference<>();
     private volatile boolean healthLive = true;
     private volatile boolean healthHang;
+
+    /** The scan request the supervisor sent, for asserting endpoint/credential mapping. */
+    ScanRequest lastScanRequest() {
+        return lastScan.get();
+    }
+
+    TestConnectionRequest lastTestConnectionRequest() {
+        return lastTestConnection.get();
+    }
 
     long appliedCount() {
         return applied.get();
@@ -65,6 +82,27 @@ final class TestProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSourc
     public void configure(ConfigureRequest request, StreamObserver<Ack> obs) {
         configuredNodes.set(request.getSchema().getNodesCount());
         ackOk(obs);
+    }
+
+    @Override
+    public void testConnection(TestConnectionRequest request, StreamObserver<TestConnectionResponse> obs) {
+        lastTestConnection.set(request);
+        obs.onNext(TestConnectionResponse.newBuilder().setStatus("OK").setMessage("ok").build());
+        obs.onCompleted();
+    }
+
+    @Override
+    public void scan(ScanRequest request, StreamObserver<ScanResponse> obs) {
+        lastScan.set(request);
+        obs.onNext(ScanResponse.newBuilder()
+                .setStatus("OK")
+                .addNodes(SchemaNodeMsg.newBuilder()
+                        .setNodeId("ns=2;s=temp").setPath("Temperature").setName("Temperature")
+                        .setKind("VARIABLE").setDataType("FLOAT64").setValueRank("SCALAR").setAccess("READ"))
+                .setDiscoveredCount(1)
+                .setMessage("discovered 1 nodes")
+                .build());
+        obs.onCompleted();
     }
 
     @Override

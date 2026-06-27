@@ -69,8 +69,11 @@ final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
                     .build();
             node.setValue(new DataValue(new Variant(OpcUaTypes.defaultValue(def.dataType()))));
             getNodeManager().addNode(node);
+            // Inverse Organizes (ObjectsFolder -> node) so the variable is browseable
+            // as a child of the Objects folder — how edge devices and create-from-scan
+            // discover the address space. isForward=false is the canonical Milo pattern.
             node.addReference(new Reference(
-                    node.getNodeId(), Identifiers.Organizes, Identifiers.ObjectsFolder.expanded(), true));
+                    node.getNodeId(), Identifiers.Organizes, Identifiers.ObjectsFolder.expanded(), false));
             nodes.put(def.nodeId(), node);
         }
     }

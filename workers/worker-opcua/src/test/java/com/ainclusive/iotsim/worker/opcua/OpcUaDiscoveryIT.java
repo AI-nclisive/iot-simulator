@@ -1,0 +1,105 @@
+package com.ainclusive.iotsim.worker.opcua;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import com.ainclusive.iotsim.workercontract.v1.SchemaNodeMsg;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.ServerSocket;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import org.junit.jupiter.api.Test;
+
+/**
+ * Drives {@link OpcUaDiscovery} as an OPC UA client against a real embedded Milo
+ * server (the same projection used by the runtime) as a stand-in for a real
+ * source. The core IS-043 check: scan browses the address space into neutral
+ * schema nodes with mapped types, honours the node cap, and classifies failures.
+ */
+class OpcUaDiscoveryIT {
+
+    private static final OpcUaDiscovery.Credentials ANON =
+            new OpcUaDiscovery.Credentials("ANONYMOUS", null, null);
+
+    @Test
+    void scanDiscoversVariablesWithMappedTypes() throws Exception {
+        int port = freePort();
+        OpcUaServerRuntime runtime = new OpcUaServerRuntime(port, List.of(
+                new VarDef("temp", "Temperature", "FLOAT64"),
+                new VarDef("count", "Count", "INT32"),
+                new VarDef("flag", "Flag", "BOOL"),
+                new VarDef("label", "Label", "STRING")));
+        runtime.start();
+        try {
+            OpcUaDiscovery.ScanOutcome outcome = OpcUaDiscovery.scan(runtime.endpointUrl(), ANON, 0);
+
+            assertThat(outcome.status()).isEqualTo(OpcUaDiscovery.OK);
+            assertThat(outcome.truncated()).isFalse();
+            assertThat(outcome.unknownCount()).isZero();
+            Map<String, SchemaNodeMsg> byName = outcome.nodes().stream()
+                    .collect(Collectors.toMap(SchemaNodeMsg::getName, Function.identity()));
+            assertThat(byName.keySet()).contains("Temperature", "Count", "Flag", "Label");
+            assertThat(byName.get("Temperature").getKind()).isEqualTo("VARIABLE");
+            assertThat(byName.get("Temperature").getDataType()).isEqualTo("FLOAT64");
+            assertThat(byName.get("Count").getDataType()).isEqualTo("INT32");
+            assertThat(byName.get("Flag").getDataType()).isEqualTo("BOOL");
+            assertThat(byName.get("Label").getDataType()).isEqualTo("STRING");
+            assertThat(byName.get("Temperature").getAccess()).isEqualTo("READ");
+            assertThat(byName.get("Temperature").getValueRank()).isEqualTo("SCALAR");
+        } finally {
+            runtime.stop();
+        }
+    }
+
+    @Test
+    void scanStopsAtNodeCapAndReportsPartial() throws Exception {
+        int port = freePort();
+        OpcUaServerRuntime runtime = new OpcUaServerRuntime(port, List.of(
+                new VarDef("a", "A", "INT32"),
+                new VarDef("b", "B", "INT32"),
+                new VarDef("c", "C", "INT32"),
+                new VarDef("d", "D", "INT32")));
+        runtime.start();
+        try {
+            OpcUaDiscovery.ScanOutcome outcome = OpcUaDiscovery.scan(runtime.endpointUrl(), ANON, 2);
+
+            assertThat(outcome.status()).isEqualTo(OpcUaDiscovery.PARTIAL);
+            assertThat(outcome.truncated()).isTrue();
+            assertThat(outcome.nodes()).hasSize(2);
+        } finally {
+            runtime.stop();
+        }
+    }
+
+    @Test
+    void testConnectionSucceedsAgainstRunningServer() throws Exception {
+        int port = freePort();
+        OpcUaServerRuntime runtime = new OpcUaServerRuntime(
+                port, List.of(new VarDef("temp", "Temperature", "FLOAT64")));
+        runtime.start();
+        try {
+            OpcUaDiscovery.ConnectionTest result =
+                    OpcUaDiscovery.testConnection(runtime.endpointUrl(), ANON);
+            assertThat(result.status()).isEqualTo(OpcUaDiscovery.OK);
+        } finally {
+            runtime.stop();
+        }
+    }
+
+    @Test
+    void testConnectionReportsUnreachableWhenNothingListens() throws Exception {
+        int port = freePort(); // nothing is bound here
+        OpcUaDiscovery.ConnectionTest result = OpcUaDiscovery.testConnection(
+                "opc.tcp://127.0.0.1:" + port + "/iotsim", ANON);
+        assertThat(result.status()).isEqualTo(OpcUaDiscovery.UNREACHABLE);
+    }
+
+    private static int freePort() throws Exception {
+        try (ServerSocket socket = new ServerSocket()) {
+            socket.bind(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0));
+            return socket.getLocalPort();
+        }
+    }
+}

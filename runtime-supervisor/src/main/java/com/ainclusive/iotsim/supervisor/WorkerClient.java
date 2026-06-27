@@ -8,9 +8,13 @@ import com.ainclusive.iotsim.workercontract.v1.HealthResponse;
 import com.ainclusive.iotsim.workercontract.v1.HelloRequest;
 import com.ainclusive.iotsim.workercontract.v1.HelloResponse;
 import com.ainclusive.iotsim.workercontract.v1.ProtocolDataSourceGrpc;
+import com.ainclusive.iotsim.workercontract.v1.ScanRequest;
+import com.ainclusive.iotsim.workercontract.v1.ScanResponse;
 import com.ainclusive.iotsim.workercontract.v1.Schema;
 import com.ainclusive.iotsim.workercontract.v1.StartRequest;
 import com.ainclusive.iotsim.workercontract.v1.StopRequest;
+import com.ainclusive.iotsim.workercontract.v1.TestConnectionRequest;
+import com.ainclusive.iotsim.workercontract.v1.TestConnectionResponse;
 import com.ainclusive.iotsim.workercontract.v1.Value;
 import com.ainclusive.iotsim.workercontract.v1.ValueBatch;
 import io.grpc.ManagedChannel;
@@ -28,6 +32,11 @@ import java.util.concurrent.atomic.AtomicReference;
  * See backend-specs/02_WORKER_CONTRACT_AND_IPC.md.
  */
 public final class WorkerClient implements AutoCloseable {
+
+    // Scan/test-connection reach an external endpoint; the worker bounds its own
+    // attempt, these deadlines just stop a hung worker from blocking the caller.
+    private static final long TEST_CONNECTION_TIMEOUT_SECONDS = 30;
+    private static final long SCAN_TIMEOUT_SECONDS = 120;
 
     private final ManagedChannel channel;
     private final ProtocolDataSourceGrpc.ProtocolDataSourceBlockingStub stub;
@@ -63,6 +72,21 @@ public final class WorkerClient implements AutoCloseable {
 
     public HealthResponse health() {
         return stub.health(HealthRequest.getDefaultInstance());
+    }
+
+    /**
+     * Probes a real source's reachability/auth via the worker (client mode). The
+     * worker bounds its own connect attempt; the deadline guards against a hung
+     * worker. See backend-specs/05_API_CONTRACT.md §Scan.
+     */
+    public TestConnectionResponse testConnection(TestConnectionRequest request) {
+        return stub.withDeadlineAfter(TEST_CONNECTION_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                .testConnection(request);
+    }
+
+    /** Browses a real source via the worker (client mode) into neutral schema nodes. */
+    public ScanResponse scan(ScanRequest request) {
+        return stub.withDeadlineAfter(SCAN_TIMEOUT_SECONDS, TimeUnit.SECONDS).scan(request);
     }
 
     /**

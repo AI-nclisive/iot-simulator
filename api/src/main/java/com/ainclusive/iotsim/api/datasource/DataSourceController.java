@@ -1,13 +1,13 @@
 package com.ainclusive.iotsim.api.datasource;
 
 import com.ainclusive.iotsim.api.error.PreconditionRequiredException;
+import com.ainclusive.iotsim.api.support.ConnectionConfigRequest;
+import com.ainclusive.iotsim.api.support.CredentialRequests;
 import com.ainclusive.iotsim.domain.datasource.DataSource;
 import com.ainclusive.iotsim.domain.datasource.DataSourceService;
-import com.ainclusive.iotsim.platform.secret.ConnectionCredentials;
 import java.net.URI;
 import java.time.Instant;
 import java.util.List;
-import java.util.Locale;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -47,7 +47,7 @@ public class DataSourceController {
         require(notBlank(req.basis()), "basis is required");
         DataSource ds = dataSources.create(
                 projectId, req.name(), req.protocol(), req.basis(),
-                req.endpoint(), req.runtimeConfig(), toCredentials(req.connectionConfig()), "local");
+                req.endpoint(), req.runtimeConfig(), CredentialRequests.toCredentials(req.connectionConfig()), "local");
         return ResponseEntity.created(
                         URI.create("/api/v1/projects/" + projectId + "/data-sources/" + ds.id()))
                 .eTag(etag(ds.version()))
@@ -70,7 +70,7 @@ public class DataSourceController {
         }
         DataSource ds = dataSources.update(
                 projectId, id, req.name(), req.endpoint(), req.runtimeConfig(),
-                req.enabled(), toCredentials(req.connectionConfig()), parseVersion(ifMatch));
+                req.enabled(), CredentialRequests.toCredentials(req.connectionConfig()), parseVersion(ifMatch));
         return ResponseEntity.ok().eTag(etag(ds.version())).body(DataSourceResponse.from(ds));
     }
 
@@ -98,24 +98,6 @@ public class DataSourceController {
     public ResponseEntity<DataSourceResponse> stop(@PathVariable String projectId, @PathVariable String id) {
         DataSource ds = dataSources.stop(projectId, id);
         return ResponseEntity.ok().eTag(etag(ds.version())).body(DataSourceResponse.from(ds));
-    }
-
-    /**
-     * Maps the write-only credential input to a {@link ConnectionCredentials}.
-     * {@code null} means "leave unchanged"; the mode string mirrors the UI
-     * (anonymous / password / external-ref). Secrets are never echoed back.
-     */
-    private static ConnectionCredentials toCredentials(ConnectionConfigRequest cfg) {
-        if (cfg == null) {
-            return null;
-        }
-        String mode = (cfg.mode() == null ? "" : cfg.mode().trim().toLowerCase(Locale.ROOT)).replace('-', '_');
-        return switch (mode) {
-            case "", "anonymous" -> ConnectionCredentials.anonymous();
-            case "password" -> ConnectionCredentials.password(cfg.username(), cfg.secret());
-            case "external_ref" -> ConnectionCredentials.externalRef(cfg.secretRef());
-            default -> throw new IllegalArgumentException("unknown credential mode: " + cfg.mode());
-        };
     }
 
     private static void require(boolean condition, String message) {
@@ -153,30 +135,13 @@ public class DataSourceController {
             String name, String endpoint, String runtimeConfig, Boolean enabled,
             ConnectionConfigRequest connectionConfig) {}
 
-    /**
-     * Write-only connection credentials. Accepted on create/update but never
-     * returned: the response carries only {@code credentialState}. Secrets are
-     * held session-only and never persisted/exported (backend-specs/08).
-     */
-    public record ConnectionConfigRequest(String mode, String username, String secret, String secretRef) {
-
-        /** Redacted: never renders the secret in logs, test output, or exception messages. */
-        @Override
-        public String toString() {
-            return "ConnectionConfigRequest[mode=" + mode
-                    + ", username=" + username
-                    + ", secret=" + (secret == null ? "null" : "***")
-                    + ", secretRef=" + secretRef + ']';
-        }
-    }
-
     public record DataSourceResponse(
             String id, String projectId, String name, String protocol, String basis,
             String schemaId, Integer schemaVersion, String endpoint, String runtimeConfig,
             boolean enabled, String runtimeState, String credentialState,
             Instant createdAt, Instant updatedAt, String createdBy, long version) {
 
-        static DataSourceResponse from(DataSource d) {
+        public static DataSourceResponse from(DataSource d) {
             return new DataSourceResponse(
                     d.id(), d.projectId(), d.name(), d.protocol().name(), d.basis().name(),
                     d.schemaId(), d.schemaVersion(), d.endpoint(), d.runtimeConfig(),
