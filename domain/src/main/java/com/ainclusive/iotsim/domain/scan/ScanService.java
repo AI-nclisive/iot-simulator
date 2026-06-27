@@ -21,8 +21,11 @@ import com.ainclusive.iotsim.protocolmodel.ValueRank;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
@@ -133,12 +136,17 @@ public class ScanService implements DisposableBean {
     }
 
     /**
-     * Creates a data source ({@code basis=SCAN}) from a completed scan, persisting
-     * the discovered structure as its schema. Folders and known-typed variables are
-     * kept; unknown-typed variables are dropped (their resolution UX is IS-044).
+     * Creates a data source ({@code basis=SCAN}) from a completed scan, persisting the
+     * discovered structure as its schema (IS-044). Folders and known-typed variables
+     * are kept as-is; each unknown-typed variable must be addressed by a
+     * {@link TypeResolution} — assigned a neutral type (kept) or excluded (dropped).
+     * An unknown-typed variable with no resolution rejects the create (400), per
+     * backend-specs/01 §2 "unknown types require user resolution before create".
+     *
+     * @param resolutions user decisions for unknown-typed nodes; may be {@code null}/empty
      */
-    public DataSource createFromScan(String projectId, String jobId, String name,
-            String endpoint, String actor) {
+    public DataSource createFromScan(String projectId, String jobId, String name, String endpoint,
+            List<TypeResolution> resolutions, String actor) {
         ScanJob job = getScan(projectId, jobId);
         if (job.isRunning()) {
             throw new IllegalArgumentException("scan job is still running: " + jobId);
@@ -146,9 +154,9 @@ public class ScanService implements DisposableBean {
         if (job.result() == null || job.result().nodes().isEmpty()) {
             throw new IllegalArgumentException("scan job has no discovered structure to create from");
         }
-        List<SchemaNode> nodes = toSchemaNodes(job.result().nodes());
+        List<SchemaNode> nodes = populateSchema(job.result().nodes(), resolutions);
         if (nodes.isEmpty()) {
-            throw new IllegalArgumentException("scan discovered no nodes with a known data type");
+            throw new IllegalArgumentException("scan produced an empty schema after resolution");
         }
         DataSource created = dataSources.create(
                 projectId, name, job.protocol(), "SCAN", endpoint, null, null, actor);
@@ -157,27 +165,71 @@ public class ScanService implements DisposableBean {
         return dataSources.get(projectId, created.id());
     }
 
-    /** Maps discovered nodes to neutral schema nodes, skipping unknown-typed variables. */
-    private static List<SchemaNode> toSchemaNodes(List<DiscoveredNode> discovered) {
+    /**
+     * Maps discovered nodes to neutral schema nodes, applying per-node type
+     * resolutions to unknown-typed variables. Folders and known-typed variables pass
+     * through. Throws if a resolution targets a node that is not an unknown-typed
+     * variable, or if any unknown-typed variable is left unresolved.
+     */
+    private static List<SchemaNode> populateSchema(
+            List<DiscoveredNode> discovered, List<TypeResolution> resolutions) {
+        Map<String, TypeResolution> byNodeId = indexResolutions(discovered, resolutions);
         List<SchemaNode> nodes = new ArrayList<>();
+        List<String> unresolved = new ArrayList<>();
         for (DiscoveredNode n : discovered) {
-            boolean variable = "VARIABLE".equals(n.kind());
-            if (variable && n.isUnknownType()) {
-                continue; // unknown type cannot become a persisted VARIABLE (IS-044 resolves these)
+            if ("VARIABLE".equals(n.kind()) && n.isUnknownType()) {
+                TypeResolution r = byNodeId.get(n.nodeId());
+                if (r == null) {
+                    unresolved.add(n.path() == null ? n.nodeId() : n.path());
+                } else if (!r.exclude()) {
+                    nodes.add(variableNode(n, DataType.valueOf(r.dataType()),
+                            r.valueRank() == null ? valueRank(n.valueRank()) : ValueRank.valueOf(r.valueRank()),
+                            r.access() == null ? access(n.access()) : Access.valueOf(r.access())));
+                }
+            } else if ("VARIABLE".equals(n.kind())) {
+                nodes.add(variableNode(n, DataType.valueOf(n.dataType()),
+                        valueRank(n.valueRank()), access(n.access())));
+            } else {
+                nodes.add(new SchemaNode(n.nodeId(), n.parentId(), n.path(), n.name(),
+                        NodeKind.FOLDER, null, null, null, n.unit(), n.description()));
             }
-            nodes.add(new SchemaNode(
-                    n.nodeId(),
-                    n.parentId(),
-                    n.path(),
-                    n.name(),
-                    variable ? NodeKind.VARIABLE : NodeKind.FOLDER,
-                    variable ? DataType.valueOf(n.dataType()) : null,
-                    variable ? valueRank(n.valueRank()) : null,
-                    variable ? access(n.access()) : null,
-                    n.unit(),
-                    n.description()));
+        }
+        if (!unresolved.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "scan has unknown-typed nodes requiring resolution before create: " + unresolved);
         }
         return nodes;
+    }
+
+    /** Indexes resolutions by nodeId, rejecting duplicates and non-unknown targets. */
+    private static Map<String, TypeResolution> indexResolutions(
+            List<DiscoveredNode> discovered, List<TypeResolution> resolutions) {
+        if (resolutions == null || resolutions.isEmpty()) {
+            return Map.of();
+        }
+        Set<String> unknownIds = new HashSet<>();
+        for (DiscoveredNode n : discovered) {
+            if (n.isUnknownType()) {
+                unknownIds.add(n.nodeId());
+            }
+        }
+        Map<String, TypeResolution> byNodeId = new HashMap<>();
+        for (TypeResolution r : resolutions) {
+            if (!unknownIds.contains(r.nodeId())) {
+                throw new IllegalArgumentException(
+                        "resolution target is not an unknown-typed node: " + r.nodeId());
+            }
+            if (byNodeId.put(r.nodeId(), r) != null) {
+                throw new IllegalArgumentException("duplicate resolution for node: " + r.nodeId());
+            }
+        }
+        return byNodeId;
+    }
+
+    private static SchemaNode variableNode(
+            DiscoveredNode n, DataType dataType, ValueRank valueRank, Access access) {
+        return new SchemaNode(n.nodeId(), n.parentId(), n.path(), n.name(),
+                NodeKind.VARIABLE, dataType, valueRank, access, n.unit(), n.description());
     }
 
     private static ValueRank valueRank(String raw) {

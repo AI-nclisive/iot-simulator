@@ -31,6 +31,13 @@ Always run this and confirm it is green before opening a PR.
 ## Branching
 - Branch off `master`. One task per branch/PR.
 - Name: `feat/IS-123-short-slug`, `fix/...`, `docs/...`, `chore/...`, `test/...`.
+- **Link the branch to its task issue on the board.** Create the branch with
+  `gh issue develop <issue#> --name feat/IS-123-short-slug --base master` (this
+  records the issue↔branch link, visible in org Project #1 against the task), then
+  `git branch --set-upstream-to=origin/feat/IS-123-short-slug`. Do this when you
+  start the task, alongside moving the board `Status` to **In Progress** — so
+  in-flight work is traceable on the board before a PR exists. Verify with
+  `gh issue develop --list <issue#>`.
 
 ## Commits & PRs
 - **Language: write all GitHub text in English** — commit messages, PR titles and
