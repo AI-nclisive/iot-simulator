@@ -1,9 +1,11 @@
 import { createPortal } from "react-dom";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { projects } from "../shell/mock-workspace";
+import { type ProjectSummary } from "../shell/mock-workspace";
 import { resolveAccess } from "../shell/access-policy";
+import { useProjectsStore } from "../shell/projects-store";
 import { useShellStore } from "../shell/shell-store";
+import { ConfirmationDialog } from "../ui/confirmation-dialog";
 import { SharedStatePanel } from "../ui/shared-state-panel";
 
 function summaryLabel(value: number, singular: string, plural: string) {
@@ -17,7 +19,13 @@ type ImportState =
   | { phase: "failed"; reason: string; fileName: string; overwriteTarget: string | null }
   | { phase: "done"; projectName: string };
 
-function ImportProjectDialog({ onClose }: { onClose: () => void }) {
+function ImportProjectDialog({
+  onClose,
+  projects,
+}: {
+  onClose: () => void;
+  projects: ProjectSummary[];
+}) {
   const [fileName, setFileName] = useState("");
   const [state, setState] = useState<ImportState>({ phase: "idle" });
 
@@ -169,17 +177,157 @@ function ImportProjectDialog({ onClose }: { onClose: () => void }) {
   );
 }
 
+type LifecycleRequest =
+  | { action: "rename"; projectId: string; currentName: string }
+  | { action: "archive"; projectId: string; name: string; runningSources: number }
+  | { action: "delete"; projectId: string; name: string; runningSources: number }
+  | null;
+
+function RenameProjectDialog({
+  currentName,
+  onClose,
+  onConfirm,
+}: {
+  currentName: string;
+  onClose: () => void;
+  onConfirm: (name: string) => void;
+}) {
+  const [name, setName] = useState(currentName);
+  const isValid = name.trim().length > 0 && name.trim() !== currentName;
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div
+        className="w-full max-w-sm rounded-lg border border-shell-line bg-white shadow-xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="rename-dialog-title"
+      >
+        <div className="border-b border-shell-line px-5 py-4">
+          <h2 id="rename-dialog-title" className="text-base font-semibold text-shell-ink">
+            Rename project
+          </h2>
+        </div>
+        <div className="px-5 py-5">
+          <label className="flex flex-col gap-2 text-sm text-shell-muted">
+            Project name
+            <input
+              autoFocus
+              className="shell-field"
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </label>
+        </div>
+        <div className="flex items-center justify-end gap-2 border-t border-shell-line px-5 py-4">
+          <button className="shell-action" type="button" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            className="shell-action"
+            disabled={!isValid}
+            type="button"
+            onClick={() => onConfirm(name.trim())}
+          >
+            Rename
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 export function ProjectEntryPage() {
   const navigate = useNavigate();
   const accessMode = useShellStore((state) => state.accessMode);
   const sharedRole = useShellStore((state) => state.sharedRole);
   const setCurrentProjectId = useShellStore((state) => state.setCurrentProjectId);
+  const projects = useProjectsStore((state) => state.projects);
+  const renameProject = useProjectsStore((state) => state.renameProject);
+  const duplicateProject = useProjectsStore((state) => state.duplicateProject);
+  const archiveProject = useProjectsStore((state) => state.archiveProject);
+  const deleteProject = useProjectsStore((state) => state.deleteProject);
   const access = resolveAccess(accessMode, sharedRole);
   const [importOpen, setImportOpen] = useState(false);
+  const [lifecycleRequest, setLifecycleRequest] = useState<LifecycleRequest>(null);
 
   function openProject(projectId: string) {
     setCurrentProjectId(projectId);
     navigate("/overview");
+  }
+
+  const confirmationModel = (() => {
+    if (!lifecycleRequest) return null;
+
+    if (lifecycleRequest.action === "archive") {
+      return {
+        title: "Archive this project?",
+        message: "Archiving removes the project from this view. Existing data is preserved.",
+        objectLabel: lifecycleRequest.name,
+        confirmLabel: "Archive project",
+        reversibilityLabel: "Archived projects can be restored from the admin area.",
+        tone: "warning" as const,
+        impacts: [
+          {
+            label: "Active sources",
+            value:
+              lifecycleRequest.runningSources > 0
+                ? `${lifecycleRequest.runningSources} source${lifecycleRequest.runningSources === 1 ? "" : "s"} are currently running. They will stop when the project is archived.`
+                : "No sources are currently running.",
+          },
+        ],
+      };
+    }
+
+    if (lifecycleRequest.action === "delete") {
+      return {
+        title: "Delete this project?",
+        message:
+          "Deleting a project removes all its saved configuration, sources, and data permanently.",
+        objectLabel: lifecycleRequest.name,
+        confirmLabel: "Delete project",
+        reversibilityLabel: "This action is not reversible. All project data will be lost.",
+        tone: "danger" as const,
+        impacts: [
+          {
+            label: "Active sources",
+            value:
+              lifecycleRequest.runningSources > 0
+                ? `${lifecycleRequest.runningSources} source${lifecycleRequest.runningSources === 1 ? "" : "s"} are currently running and will be stopped.`
+                : "No sources are currently running.",
+          },
+          {
+            label: "Shared impact",
+            value:
+              "Anyone working in this project will lose access immediately. This cannot be undone.",
+          },
+        ],
+      };
+    }
+
+    return null;
+  })();
+
+  function confirmLifecycleAction() {
+    if (!lifecycleRequest) return;
+
+    if (lifecycleRequest.action === "archive") {
+      archiveProject(lifecycleRequest.projectId);
+    } else if (lifecycleRequest.action === "delete") {
+      deleteProject(lifecycleRequest.projectId);
+    }
+
+    setLifecycleRequest(null);
   }
 
   return (
@@ -272,7 +420,61 @@ export function ProjectEntryPage() {
                     </div>
                   </dl>
 
-                  <div className="mt-5 flex items-center justify-end">
+                  <div className="mt-5 flex flex-wrap items-center justify-between gap-2 border-t border-shell-line pt-4">
+                    <div className="flex flex-wrap gap-2">
+                      {access.isAdmin ? (
+                        <>
+                          <button
+                            className="shell-text-action"
+                            type="button"
+                            onClick={() =>
+                              setLifecycleRequest({
+                                action: "rename",
+                                projectId: project.id,
+                                currentName: project.name,
+                              })
+                            }
+                          >
+                            Rename
+                          </button>
+                          <button
+                            className="shell-text-action"
+                            type="button"
+                            onClick={() => duplicateProject(project.id)}
+                          >
+                            Duplicate
+                          </button>
+                          <button
+                            className="shell-text-action"
+                            type="button"
+                            onClick={() =>
+                              setLifecycleRequest({
+                                action: "archive",
+                                projectId: project.id,
+                                name: project.name,
+                                runningSources: project.runningSources,
+                              })
+                            }
+                          >
+                            Archive
+                          </button>
+                          <button
+                            className="shell-text-action-danger"
+                            type="button"
+                            onClick={() =>
+                              setLifecycleRequest({
+                                action: "delete",
+                                projectId: project.id,
+                                name: project.name,
+                                runningSources: project.runningSources,
+                              })
+                            }
+                          >
+                            Delete
+                          </button>
+                        </>
+                      ) : null}
+                    </div>
                     <button
                       className="shell-action"
                       type="button"
@@ -288,7 +490,35 @@ export function ProjectEntryPage() {
         )}
       </div>
 
-      {importOpen ? <ImportProjectDialog onClose={() => setImportOpen(false)} /> : null}
+      {importOpen ? (
+        <ImportProjectDialog projects={projects} onClose={() => setImportOpen(false)} />
+      ) : null}
+
+      {lifecycleRequest?.action === "rename" ? (
+        <RenameProjectDialog
+          currentName={lifecycleRequest.currentName}
+          onClose={() => setLifecycleRequest(null)}
+          onConfirm={(name) => {
+            renameProject(lifecycleRequest.projectId, name);
+            setLifecycleRequest(null);
+          }}
+        />
+      ) : null}
+
+      {confirmationModel ? (
+        <ConfirmationDialog
+          confirmLabel={confirmationModel.confirmLabel}
+          impacts={confirmationModel.impacts}
+          message={confirmationModel.message}
+          objectLabel={confirmationModel.objectLabel}
+          open={Boolean(confirmationModel)}
+          reversibilityLabel={confirmationModel.reversibilityLabel}
+          title={confirmationModel.title}
+          tone={confirmationModel.tone}
+          onClose={() => setLifecycleRequest(null)}
+          onConfirm={confirmLifecycleAction}
+        />
+      ) : null}
     </div>
   );
 }
