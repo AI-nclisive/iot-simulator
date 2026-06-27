@@ -5,6 +5,7 @@ import { useDataSourcesStore } from "../shell/data-sources-store";
 import { useShellStore } from "../shell/shell-store";
 import { ConfirmationDialog } from "../ui/confirmation-dialog";
 import { DataSourceDetailClientsTab } from "./data-source-detail-clients-tab";
+import { DataSourceDetailEventsTab } from "./data-source-detail-events-tab";
 import { DataSourceDetailOverviewTab } from "./data-source-detail-overview-tab";
 import { DataSourceDetailSettingsTab } from "./data-source-detail-settings-tab";
 import { DataSourceDetailValuesTab } from "./data-source-detail-values-tab";
@@ -214,43 +215,7 @@ export function DataSourceDetailPreviewPage() {
     }
 
     if (activeTab === "events") {
-      if (!healthDiagnostic) {
-        return (
-          <SharedStatePanel
-            message="Runtime event history for this source will open here. No health diagnostics are currently required."
-            state="empty"
-            title="No health issues are shown for this source."
-          />
-        );
-      }
-
-      return (
-        <div className="rounded-md border border-shell-line bg-white px-4 py-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <StatusBadge label={activeSource.health} tone={healthTone(activeSource.health)} />
-            <p className="text-sm font-medium text-shell-ink">{healthDiagnostic.title}</p>
-          </div>
-          <p className="mt-3 text-sm leading-6 text-shell-muted">
-            {healthDiagnostic.message}
-          </p>
-          <ul className="mt-4 space-y-2 text-sm text-shell-ink">
-            {healthDiagnostic.checks.map((check) => (
-              <li key={check} className="rounded-md border border-shell-line/70 px-3 py-2">
-                {check}
-              </li>
-            ))}
-          </ul>
-          <div className="mt-4">
-            <button
-              className="shell-text-action"
-              type="button"
-              onClick={() => setActiveTab("settings")}
-            >
-              Open Settings
-            </button>
-          </div>
-        </div>
-      );
+      return <DataSourceDetailEventsTab source={activeSource} />;
     }
 
     return <DataSourceDetailSettingsTab source={activeSource} />;
