@@ -116,8 +116,13 @@ catalog checkbox itself is flipped inside the implementation PR (see "Task track
   GitHub Issues/Project** (org Project #1) keyed by ID — don't track those by
   editing catalog checkboxes. Move the board `Status` in lockstep with the work;
   these transitions are mandatory:
-  - **In Progress** — the moment you **start** the task (before/at the first
-    commit), so concurrent contributors see it is taken.
+  - **In Progress** — set this **first, before you write any code**. It is the
+    opening action of the task, **not** something you backfill after implementing.
+    The required order at task start is: verify the task is free → flip `Status` to
+    **In Progress** → create the linked branch (see "Branching") → only then begin
+    implementing. Flipping it postfactum (after the code is already written)
+    misleads concurrent contributors: the board still shows `Todo`, so someone may
+    pick up a task that is in fact already being worked on.
   - **In review** — as soon as you **open the PR**. The open PR *is* the trigger;
     do **not** wait for the AI reviewer's verdict to move it here.
   - **Done** — only **after the PR is merged** (then close the issue).

@@ -67,9 +67,13 @@ When you change tasks, change **both** the file and the Project:
   create a duplicate ID.
 - In-progress status (`In Progress` / `In review`) lives on the **board only**
   (`Status` field + open issue) — don't edit catalog checkboxes for those. Move it
-  in step with the work: **In Progress** the moment you start the task, **In review**
-  as soon as you **open the PR** (the open PR is the trigger — don't wait for the AI
-  reviewer's verdict).
+  in step with the work: **In Progress before you write any code** — it is the first
+  action of the task (verify the task is free → flip `Status` to **In Progress** →
+  create the linked branch → only then implement), **never** set postfactum after the
+  code is written, because a late flip leaves the board showing `Todo` and misleads
+  contributors into picking up a task that is already taken. **In review** as soon as
+  you **open the PR** (the open PR is the trigger — don't wait for the AI reviewer's
+  verdict).
 - **Done is recorded in two places:** flip the catalog checkbox to `[x]` ✅ **in
   the implementation PR itself** (the same PR that delivers the work — this avoids
   a separate catalog-only PR, which the no-direct-push-to-`master` rule would
@@ -117,8 +121,10 @@ Follow `CONTRIBUTING.md`. For agents specifically:
   merges itself once the Claude reviewer's APPROVE lands and `build` is green — no
   manual merge step (see `CONTRIBUTING.md`).
 - Add or update tests for every change.
-- Move the board `Status` in step with the work — **In Progress** when you start,
-  **In review** when you open the PR (see "Task Tracking" above for the full transitions).
+- Move the board `Status` in step with the work — **In Progress before you write any
+  code** (the first action of the task, not a backfill after implementing; a late flip
+  misleads contributors into taking an already-claimed task), **In review** when you
+  open the PR (see "Task Tracking" above for the full transitions).
 - After opening a PR, follow the **AI review loop** in `CONTRIBUTING.md`: wait for the
   Claude reviewer's verdict (it submits a formal APPROVE / REQUEST_CHANGES that gates
   merge), then for each finding either fix it and reply saying what you changed, or
