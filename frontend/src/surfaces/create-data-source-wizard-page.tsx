@@ -24,6 +24,8 @@ type BasisOption = {
 type WizardFormState = {
   basis: SourceBasis | null;
   importArtifactName: string;
+  importArtifactType: "recording" | "sample" | "schema-package";
+  importCompatStatus: "idle" | "compatible" | "incompatible" | "needs-review";
   manualTemplate: "empty" | "analog" | "discrete";
   modbusAddressBase: "0" | "1";
   modbusUnitId: string;
@@ -128,6 +130,14 @@ function suggestedEndpoint(protocol: ProtocolOption["id"] | null, basis: SourceB
   return "127.0.0.1:502";
 }
 
+function resolveImportCompat(name: string): WizardFormState["importCompatStatus"] {
+  const n = name.toLowerCase();
+  if (n.includes("incompatible")) return "incompatible";
+  if (n.includes("needs-review")) return "needs-review";
+  if (n.trim().length > 0) return "compatible";
+  return "idle";
+}
+
 function validationMessage(stepIndex: number, form: WizardFormState) {
   if (stepIndex === 0 && !form.protocol) {
     return "Choose a protocol to continue.";
@@ -154,8 +164,13 @@ function validationMessage(stepIndex: number, form: WizardFormState) {
       }
     }
 
-    if (form.basis === "import" && !form.importArtifactName.trim()) {
-      return "Enter the prepared artifact name before continuing.";
+    if (form.basis === "import") {
+      if (!form.importArtifactName.trim()) {
+        return "Enter the prepared artifact name before continuing.";
+      }
+      if (form.importCompatStatus === "incompatible") {
+        return "This artifact is not compatible. Choose a different artifact.";
+      }
     }
   }
 
@@ -318,6 +333,20 @@ function reviewLines(form: WizardFormState) {
           },
         ]
       : []),
+    ...(form.basis === "import"
+      ? [
+          { label: "Artifact type", value: form.importArtifactType.replaceAll("-", " ") },
+          {
+            label: "Compatibility",
+            value:
+              form.importCompatStatus === "compatible"
+                ? "Compatible"
+                : form.importCompatStatus === "needs-review"
+                  ? "Needs review"
+                  : "Not checked",
+          },
+        ]
+      : []),
     { label: "Runtime behavior", value: runtimeLabel },
     { label: "Schema note", value: form.schemaReviewNote.trim() || "No note" },
   ];
@@ -336,6 +365,8 @@ export function CreateDataSourceWizardPage() {
   const [form, setForm] = useState<WizardFormState>({
     basis: null,
     importArtifactName: "",
+    importArtifactType: "recording",
+    importCompatStatus: "idle",
     manualTemplate: "empty",
     modbusAddressBase: "0",
     modbusUnitId: "1",
@@ -754,18 +785,108 @@ export function CreateDataSourceWizardPage() {
           ) : null}
 
           {form.basis === "import" ? (
-            <label className="flex flex-col gap-2 text-sm text-shell-muted">
-              Prepared artifact
-              <input
-                className="shell-field"
-                placeholder="packaging-pressure.sample"
-                type="text"
-                value={form.importArtifactName}
-                onChange={(event) =>
-                  updateForm({ importArtifactName: event.target.value })
-                }
-              />
-            </label>
+            <div className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="flex flex-col gap-2 text-sm text-shell-muted">
+                  Artifact type
+                  <select
+                    className="shell-field"
+                    value={form.importArtifactType}
+                    onChange={(e) =>
+                      updateForm({
+                        importArtifactType: e.target.value as WizardFormState["importArtifactType"],
+                        importCompatStatus: "idle",
+                      })
+                    }
+                  >
+                    <option value="recording">Recording</option>
+                    <option value="sample">Sample</option>
+                    <option value="schema-package">Schema package</option>
+                  </select>
+                </label>
+                <label className="flex flex-col gap-2 text-sm text-shell-muted">
+                  Artifact name
+                  <input
+                    className="shell-field"
+                    placeholder="packaging-pressure.sample"
+                    type="text"
+                    value={form.importArtifactName}
+                    onChange={(e) =>
+                      updateForm({ importArtifactName: e.target.value, importCompatStatus: "idle" })
+                    }
+                  />
+                </label>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  className="shell-action"
+                  type="button"
+                  onClick={() =>
+                    updateForm({
+                      importCompatStatus: resolveImportCompat(form.importArtifactName),
+                    })
+                  }
+                >
+                  Check compatibility
+                </button>
+                {form.importCompatStatus === "compatible" ? (
+                  <StatusBadge label="Compatible" tone="accent" />
+                ) : null}
+                {form.importCompatStatus === "incompatible" ? (
+                  <StatusBadge label="Incompatible" tone="danger" />
+                ) : null}
+                {form.importCompatStatus === "needs-review" ? (
+                  <StatusBadge label="Needs review" tone="warning" />
+                ) : null}
+              </div>
+
+              {form.importCompatStatus === "incompatible" ? (
+                <section className="rounded-md border border-shell-danger/30 bg-red-50 px-4 py-3">
+                  <p className="text-sm font-medium text-shell-danger">
+                    This artifact is not compatible with the current simulator version.
+                  </p>
+                  <p className="mt-1 text-sm leading-6 text-shell-muted">
+                    Choose a different artifact or contact the owner to update the file format.
+                  </p>
+                </section>
+              ) : null}
+
+              {form.importCompatStatus === "needs-review" ? (
+                <section className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3">
+                  <p className="text-sm font-medium text-amber-700">
+                    Some structure in this artifact may need manual review after import.
+                  </p>
+                  <p className="mt-1 text-sm leading-6 text-shell-muted">
+                    You can continue, but check the Schema tab after creation.
+                  </p>
+                </section>
+              ) : null}
+
+              {form.importCompatStatus === "compatible" ? (
+                <section className="rounded-md border border-shell-line bg-white px-4 py-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
+                    What will be available after import
+                  </p>
+                  <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-3">
+                    <div>
+                      <dt className="text-shell-muted">Artifact type</dt>
+                      <dd className="mt-1 capitalize text-shell-ink">
+                        {form.importArtifactType.replaceAll("-", " ")}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-shell-muted">Parameters</dt>
+                      <dd className="mt-1 text-shell-ink">–</dd>
+                    </div>
+                    <div>
+                      <dt className="text-shell-muted">Excluded</dt>
+                      <dd className="mt-1 text-shell-ink">Credentials and secrets stripped</dd>
+                    </div>
+                  </dl>
+                </section>
+              ) : null}
+            </div>
           ) : null}
 
           {form.basis === "synthetic" ? (
