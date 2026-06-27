@@ -177,7 +177,7 @@ public class ScanService implements DisposableBean {
         List<SchemaNode> nodes = new ArrayList<>();
         List<String> unresolved = new ArrayList<>();
         for (DiscoveredNode n : discovered) {
-            if (n.isUnknownType()) {
+            if ("VARIABLE".equals(n.kind()) && n.isUnknownType()) {
                 TypeResolution r = byNodeId.get(n.nodeId());
                 if (r == null) {
                     unresolved.add(n.path() == null ? n.nodeId() : n.path());

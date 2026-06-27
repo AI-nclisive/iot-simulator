@@ -183,6 +183,14 @@ class ScanServiceTest {
     }
 
     @Test
+    void typeResolutionWithNullNodeIdThrowsIllegalArgumentNotNpe() {
+        // A client omitting nodeId must surface as a 400 (IllegalArgumentException), not a 500.
+        assertThatThrownBy(() -> new TypeResolution(null, "INT32", null, null, false))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("nodeId is required");
+    }
+
+    @Test
     void createFromScanRejectsRunningJob() {
         // An executor that never runs the task leaves the job RUNNING.
         ScanService pending = new ScanService(

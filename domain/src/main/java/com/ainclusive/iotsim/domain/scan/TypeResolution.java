@@ -1,7 +1,5 @@
 package com.ainclusive.iotsim.domain.scan;
 
-import java.util.Objects;
-
 /**
  * A user's decision for one discovered node whose data type a scan could not map to
  * the neutral set ("unknown type" — backend-specs/01 §2). Unknown-typed variables
@@ -23,11 +21,10 @@ public record TypeResolution(
         String nodeId, String dataType, String valueRank, String access, boolean exclude) {
 
     public TypeResolution {
-        Objects.requireNonNull(nodeId, "nodeId");
-        nodeId = nodeId.strip();
-        if (nodeId.isEmpty()) {
+        if (nodeId == null || nodeId.isBlank()) {
             throw new IllegalArgumentException("resolution nodeId is required");
         }
+        nodeId = nodeId.strip();
         if (!exclude && (dataType == null || dataType.isBlank())) {
             throw new IllegalArgumentException(
                     "resolution for " + nodeId + " needs a dataType unless it is excluded");
