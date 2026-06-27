@@ -378,7 +378,7 @@ Parallel execution:
   Done when: progress, failure, overwrite impact, and version compatibility are
   visible before import is committed.
 
-- [ ] `UI-013` Project lifecycle actions
+- [x] `UI-013` Project lifecycle actions
   Surface: `Project Entry` / `Settings`
   Depends: `UI-004`, `UI-006`, `UI-011`
   Done when: rename, duplicate, archive, and delete flows are clear and expose
