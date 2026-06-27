@@ -96,7 +96,9 @@ with catalog checkboxes. Move it in lockstep with the work:
 Each PR edits only its own task line, so conflicts are rare. CI enforces the pairing:
 a PR whose body has `Implements: IS-/UI-…` must edit that task's catalog line in the
 same PR (`.github/workflows/ci.yml` → `catalog-sync`), so a merged task never leaves a
-stale `[ ]`. **On conflict the board wins** — a task with a merged PR but an unchecked
+stale `[ ]`. (`Closes: #…` is not the trigger — it can reference non-task issues such
+as bug reports; only `Implements: IS-/UI-…` arms catalog-sync.) **On conflict the board
+wins** — a task with a merged PR but an unchecked
 box is done; fix the box in your next related PR, don't re-implement.
 
 File tasks with the **Task** issue form (labels in `.github/labels.yml`); board fields

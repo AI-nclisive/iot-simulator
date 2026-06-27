@@ -29,7 +29,8 @@ and only as a short durable note — never temporary task state.
 
 Source of truth for core product capabilities, grouped by epic (short name,
 explanation, status). Don't add implementation details, edge cases, acceptance
-criteria, or task breakdowns. Read it before recommending changes; explain any
+criteria, or task breakdowns unless the user explicitly confirms the detail is a
+product capability. Read it before recommending changes; explain any
 change and get confirmation before editing — never change it silently.
 
 ## Contributions and task tracking
