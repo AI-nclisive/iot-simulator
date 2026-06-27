@@ -23,7 +23,11 @@ import com.ainclusive.iotsim.platform.scan.ScanSpec;
 import com.ainclusive.iotsim.platform.scan.ScanStatus;
 import com.ainclusive.iotsim.platform.secret.ConnectionCredentials;
 import com.ainclusive.iotsim.platform.secret.InMemoryCredentialStore;
+import com.ainclusive.iotsim.protocolmodel.Access;
+import com.ainclusive.iotsim.protocolmodel.DataType;
+import com.ainclusive.iotsim.protocolmodel.NodeKind;
 import com.ainclusive.iotsim.protocolmodel.SchemaNode;
+import com.ainclusive.iotsim.protocolmodel.ValueRank;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -113,12 +117,13 @@ class ScanServiceTest {
     }
 
     @Test
-    void createFromScanPersistsBasisScanAndSchemaSkippingUnknownTypes() {
+    void createFromScanPersistsBasisScanAndDropsExcludedUnknownNode() {
         scanner.scanResult = okResult();
         ScanJob job = service.startScan(
                 PROJECT, "OPC_UA", "opc.tcp://h", ConnectionCredentials.password("op", "pw"), 0);
 
-        DataSource created = service.createFromScan(PROJECT, job.jobId(), "Scanned Pump", "{}", "alice");
+        DataSource created = service.createFromScan(PROJECT, job.jobId(), "Scanned Pump", "{}",
+                List.of(new TypeResolution("ns=2;s=x", null, null, null, true)), "alice");
 
         assertThat(created.basis()).isEqualTo(SourceBasis.SCAN);
         assertThat(created.schemaId()).isNotBlank();
@@ -127,9 +132,54 @@ class ScanServiceTest {
         assertThat(credentials.has(created.id())).isFalse();
 
         Schema schema = new SchemaService(schemaRepo, dataSourceRepo).get(PROJECT, created.id());
-        // Folder + the FLOAT64 variable persist; the unknown-typed variable is dropped.
+        // Folder + the FLOAT64 variable persist; the excluded unknown-typed variable is dropped.
         assertThat(schema.nodes()).hasSize(2);
         assertThat(schema.nodes()).noneMatch(n -> "unknownVar".equals(n.name()));
+    }
+
+    @Test
+    void createFromScanKeepsResolvedUnknownNodeWithAssignedType() {
+        scanner.scanResult = okResult();
+        ScanJob job = service.startScan(
+                PROJECT, "OPC_UA", "opc.tcp://h", ConnectionCredentials.anonymous(), 0);
+
+        DataSource created = service.createFromScan(PROJECT, job.jobId(), "Scanned", "{}",
+                List.of(new TypeResolution("ns=2;s=x", "INT32", null, null, false)), "alice");
+
+        Schema schema = new SchemaService(schemaRepo, dataSourceRepo).get(PROJECT, created.id());
+        assertThat(schema.nodes()).hasSize(3);
+        assertThat(schema.nodes())
+                .filteredOn(n -> "unknownVar".equals(n.name()))
+                .singleElement()
+                .satisfies(n -> {
+                    assertThat(n.kind()).isEqualTo(NodeKind.VARIABLE);
+                    assertThat(n.dataType()).isEqualTo(DataType.INT32);
+                    // valueRank/access default from the discovered node when not overridden.
+                    assertThat(n.valueRank()).isEqualTo(ValueRank.SCALAR);
+                    assertThat(n.access()).isEqualTo(Access.READ);
+                });
+    }
+
+    @Test
+    void createFromScanRejectsUnresolvedUnknownNode() {
+        scanner.scanResult = okResult();
+        ScanJob job = service.startScan(
+                PROJECT, "OPC_UA", "opc.tcp://h", ConnectionCredentials.anonymous(), 0);
+        assertThatThrownBy(() -> service.createFromScan(PROJECT, job.jobId(), "x", null, List.of(), "a"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("requiring resolution");
+    }
+
+    @Test
+    void createFromScanRejectsResolutionTargetingKnownNode() {
+        scanner.scanResult = okResult();
+        ScanJob job = service.startScan(
+                PROJECT, "OPC_UA", "opc.tcp://h", ConnectionCredentials.anonymous(), 0);
+        // ns=2;s=temp is a known FLOAT64 variable, so it cannot be a resolution target.
+        assertThatThrownBy(() -> service.createFromScan(PROJECT, job.jobId(), "x", null,
+                List.of(new TypeResolution("ns=2;s=temp", "INT32", null, null, false)), "a"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("not an unknown-typed node");
     }
 
     @Test
@@ -143,7 +193,7 @@ class ScanServiceTest {
                 new SchemaService(new InMemorySchemaRepository(dataSourceRepo), dataSourceRepo),
                 task -> { /* never executes */ });
         ScanJob job = pending.startScan(PROJECT, "OPC_UA", "opc.tcp://h", ConnectionCredentials.anonymous(), 0);
-        assertThatThrownBy(() -> pending.createFromScan(PROJECT, job.jobId(), "x", null, "a"))
+        assertThatThrownBy(() -> pending.createFromScan(PROJECT, job.jobId(), "x", null, List.of(), "a"))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -152,7 +202,7 @@ class ScanServiceTest {
         scanner.scanResult = ScanResult.failure(ScanStatus.UNREACHABLE, "down");
         ScanJob job = service.startScan(
                 PROJECT, "OPC_UA", "opc.tcp://h", ConnectionCredentials.anonymous(), 0);
-        assertThatThrownBy(() -> service.createFromScan(PROJECT, job.jobId(), "x", null, "a"))
+        assertThatThrownBy(() -> service.createFromScan(PROJECT, job.jobId(), "x", null, List.of(), "a"))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 

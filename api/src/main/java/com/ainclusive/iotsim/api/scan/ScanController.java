@@ -6,6 +6,7 @@ import com.ainclusive.iotsim.api.support.CredentialRequests;
 import com.ainclusive.iotsim.domain.datasource.DataSource;
 import com.ainclusive.iotsim.domain.scan.ScanJob;
 import com.ainclusive.iotsim.domain.scan.ScanService;
+import com.ainclusive.iotsim.domain.scan.TypeResolution;
 import com.ainclusive.iotsim.platform.scan.ConnectionTestResult;
 import com.ainclusive.iotsim.platform.scan.DiscoveredNode;
 import com.ainclusive.iotsim.platform.scan.ScanResult;
@@ -71,17 +72,32 @@ public class ScanController {
         return ScanJobResponse.from(scans.getScan(projectId, jobId));
     }
 
-    /** Creates a data source (basis=SCAN) from a completed scan. */
+    /**
+     * Creates a data source (basis=SCAN) from a completed scan. Unknown-typed
+     * discovered nodes must be addressed via {@code typeResolutions} (assign a type
+     * or exclude); an unresolved unknown node rejects the request (400).
+     */
     @PostMapping("/{jobId}/create")
     public ResponseEntity<DataSourceResponse> create(
             @PathVariable String projectId, @PathVariable String jobId,
             @RequestBody CreateFromScanRequest req) {
         require(req != null && notBlank(req.name()), "name is required");
-        DataSource ds = scans.createFromScan(projectId, jobId, req.name(), req.endpoint(), "local");
+        DataSource ds = scans.createFromScan(projectId, jobId, req.name(), req.endpoint(),
+                toResolutions(req.typeResolutions()), "local");
         return ResponseEntity.created(
                         URI.create("/api/v1/projects/" + projectId + "/data-sources/" + ds.id()))
                 .eTag("\"" + ds.version() + "\"")
                 .body(DataSourceResponse.from(ds));
+    }
+
+    private static List<TypeResolution> toResolutions(List<TypeResolutionRequest> reqs) {
+        if (reqs == null) {
+            return List.of();
+        }
+        return reqs.stream()
+                .map(r -> new TypeResolution(r.nodeId(), r.dataType(), r.valueRank(), r.access(),
+                        r.exclude() != null && r.exclude()))
+                .toList();
     }
 
     private static void require(boolean condition, String message) {
@@ -98,7 +114,16 @@ public class ScanController {
             String protocol, String endpointUrl, Integer maxNodes,
             ConnectionConfigRequest connectionConfig) {}
 
-    public record CreateFromScanRequest(String name, String endpoint) {}
+    public record CreateFromScanRequest(
+            String name, String endpoint, List<TypeResolutionRequest> typeResolutions) {}
+
+    /**
+     * A user's decision for one unknown-typed discovered node: assign {@code dataType}
+     * (optionally {@code valueRank}/{@code access}) to keep it, or {@code exclude=true}
+     * to drop it. Targets a node by {@code nodeId}.
+     */
+    public record TypeResolutionRequest(
+            String nodeId, String dataType, String valueRank, String access, Boolean exclude) {}
 
     public record ConnectionTestResponse(String status, String message) {}
 
@@ -125,11 +150,12 @@ public class ScanController {
 
     public record DiscoveredNodeResponse(
             String nodeId, String parentId, String path, String name, String kind,
-            String dataType, String valueRank, String access, String unit, String description) {
+            String dataType, String valueRank, String access, String unit, String description,
+            boolean unknownType) {
 
         static DiscoveredNodeResponse from(DiscoveredNode n) {
             return new DiscoveredNodeResponse(n.nodeId(), n.parentId(), n.path(), n.name(), n.kind(),
-                    n.dataType(), n.valueRank(), n.access(), n.unit(), n.description());
+                    n.dataType(), n.valueRank(), n.access(), n.unit(), n.description(), n.isUnknownType());
         }
     }
 }

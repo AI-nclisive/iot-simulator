@@ -21,6 +21,7 @@ import com.ainclusive.iotsim.domain.datasource.RuntimeState;
 import com.ainclusive.iotsim.domain.datasource.SourceBasis;
 import com.ainclusive.iotsim.domain.scan.ScanJob;
 import com.ainclusive.iotsim.domain.scan.ScanService;
+import com.ainclusive.iotsim.domain.scan.TypeResolution;
 import com.ainclusive.iotsim.platform.scan.ConnectionTestResult;
 import com.ainclusive.iotsim.platform.scan.DiscoveredNode;
 import com.ainclusive.iotsim.platform.scan.ScanResult;
@@ -91,7 +92,9 @@ class ScanControllerTest {
     void getMapsCompletedJobIncludingDiscoveredNodes() {
         ScanResult result = new ScanResult(ScanStatus.PARTIAL, List.of(
                 new DiscoveredNode("ns=2;s=t", null, "Temp", "Temp", "VARIABLE",
-                        "FLOAT64", "SCALAR", "READ", null, null)),
+                        "FLOAT64", "SCALAR", "READ", null, null),
+                new DiscoveredNode("ns=2;s=x", null, "Mystery", "Mystery", "VARIABLE",
+                        null, null, null, null, null)),
                 true, 2, "partial");
         given(service.getScan(PROJECT, "job-1")).willReturn(
                 new ScanJob("job-1", PROJECT, "OPC_UA", "opc.tcp://h", "PARTIAL", result,
@@ -102,17 +105,25 @@ class ScanControllerTest {
         assertThat(resp.status()).isEqualTo("PARTIAL");
         assertThat(resp.truncated()).isTrue();
         assertThat(resp.unknownCount()).isEqualTo(2);
-        assertThat(resp.nodes()).singleElement()
-                .satisfies(n -> assertThat(n.dataType()).isEqualTo("FLOAT64"));
+        // Known type → unknownType=false; null-typed variable → unknownType=true (UI resolution state).
+        assertThat(resp.nodes()).satisfiesExactly(
+                known -> {
+                    assertThat(known.dataType()).isEqualTo("FLOAT64");
+                    assertThat(known.unknownType()).isFalse();
+                },
+                unknown -> {
+                    assertThat(unknown.dataType()).isNull();
+                    assertThat(unknown.unknownType()).isTrue();
+                });
     }
 
     @Test
     void createReturns201WithEtagAndScanBasis() {
-        given(service.createFromScan(eq(PROJECT), eq("job-1"), eq("Scanned"), any(), any()))
+        given(service.createFromScan(eq(PROJECT), eq("job-1"), eq("Scanned"), any(), any(), any()))
                 .willReturn(scanned());
 
         ResponseEntity<DataSourceResponse> resp = controller.create(PROJECT, "job-1",
-                new CreateFromScanRequest("Scanned", "{}"));
+                new CreateFromScanRequest("Scanned", "{}", null));
 
         assertThat(resp.getStatusCode().value()).isEqualTo(201);
         assertThat(resp.getHeaders().getETag()).isEqualTo("\"0\"");
@@ -121,9 +132,27 @@ class ScanControllerTest {
     }
 
     @Test
+    void createMapsTypeResolutionsToDomain() {
+        given(service.createFromScan(eq(PROJECT), eq("job-1"), eq("Scanned"), any(), any(), any()))
+                .willReturn(scanned());
+
+        controller.create(PROJECT, "job-1", new CreateFromScanRequest("Scanned", "{}",
+                List.of(new ScanController.TypeResolutionRequest("ns=2;s=x", "INT32", null, null, false),
+                        new ScanController.TypeResolutionRequest("ns=2;s=y", null, null, null, true))));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<TypeResolution>> captor = ArgumentCaptor.forClass(List.class);
+        verify(service).createFromScan(eq(PROJECT), eq("job-1"), eq("Scanned"), any(),
+                captor.capture(), any());
+        assertThat(captor.getValue()).containsExactly(
+                new TypeResolution("ns=2;s=x", "INT32", null, null, false),
+                new TypeResolution("ns=2;s=y", null, null, null, true));
+    }
+
+    @Test
     void createWithBlankNameThrowsBadRequest() {
         assertThatThrownBy(() -> controller.create(PROJECT, "job-1",
-                new CreateFromScanRequest(" ", null)))
+                new CreateFromScanRequest(" ", null, null)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 

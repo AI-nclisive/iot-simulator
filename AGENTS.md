@@ -110,7 +110,9 @@ Follow `CONTRIBUTING.md`. For agents specifically:
 - Before reporting work done or opening a PR, run `./gradlew build` and confirm it
   is green; report the real result. Never claim done without building and testing.
 - Branch `feat/IS-xxx-...` or `feat/UI-xxx-...`; Conventional Commit titles;
-  squash merge into `master`.
+  squash merge into `master`. **Link the branch to its task issue on the board**
+  when you create it — `gh issue develop <issue#> --name feat/IS-xxx-... --base master`
+  (see `CONTRIBUTING.md` → "Branching"), so the board shows the branch against the task.
 - When you open the PR, arm auto-merge: `gh pr merge <n> --auto --squash`. The PR then
   merges itself once the Claude reviewer's APPROVE lands and `build` is green — no
   manual merge step (see `CONTRIBUTING.md`).
