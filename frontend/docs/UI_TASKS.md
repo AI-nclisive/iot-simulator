@@ -449,7 +449,7 @@ Parallel execution:
   Done when: pattern, range, update behavior, and repeatability controls are
   represented in one coherent path.
 
-- [ ] `UI-038` Prepared-data branch
+- [x] `UI-038` Prepared-data branch
   Surface: `Create Data Source Wizard`
   Depends: `UI-030`
   Done when: prepared recording or sample input shows compatibility and preview
