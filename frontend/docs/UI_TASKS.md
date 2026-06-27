@@ -413,7 +413,7 @@ Parallel execution:
   Depends: `UI-040`
   Done when: connected-client state and connection lifecycle are easy to inspect.
 
-- [ ] `UI-046` Events tab
+- [x] `UI-046` Events tab
   Surface: `Data Source Detail`
   Depends: `UI-040`, `UI-022`
   Done when: runtime events are filterable and remain distinct from user
