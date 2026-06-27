@@ -20,6 +20,7 @@ import org.eclipse.milo.opcua.stack.core.NamespaceTable;
 import org.eclipse.milo.opcua.stack.core.StatusCodes;
 import org.eclipse.milo.opcua.stack.core.UaException;
 import org.eclipse.milo.opcua.stack.core.security.SecurityPolicy;
+import org.eclipse.milo.opcua.stack.core.types.builtin.ByteString;
 import org.eclipse.milo.opcua.stack.core.types.builtin.DataValue;
 import org.eclipse.milo.opcua.stack.core.types.builtin.LocalizedText;
 import org.eclipse.milo.opcua.stack.core.types.builtin.NodeId;
@@ -182,8 +183,24 @@ final class OpcUaDiscovery {
                 uint(NodeClass.Object.getValue() | NodeClass.Variable.getValue()),
                 uint(BrowseResultMask.All.getValue()));
         BrowseResult result = client.browse(browse).get(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-        ReferenceDescription[] refs = result.getReferences();
-        return refs == null ? List.of() : List.of(refs);
+        List<ReferenceDescription> all = new ArrayList<>();
+        addRefs(all, result.getReferences());
+        // Servers cap references per node (maxReferencesPerNode); follow continuation
+        // points so a folder with many children isn't silently truncated.
+        ByteString continuation = result.getContinuationPoint();
+        while (continuation != null && continuation.isNotNull()) {
+            BrowseResult next = client.browseNext(false, continuation)
+                    .get(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            addRefs(all, next.getReferences());
+            continuation = next.getContinuationPoint();
+        }
+        return all;
+    }
+
+    private static void addRefs(List<ReferenceDescription> target, ReferenceDescription[] refs) {
+        if (refs != null) {
+            target.addAll(List.of(refs));
+        }
     }
 
     /** Reads a variable's DataType attribute and reverse-maps it; counts unknowns. */

@@ -18,6 +18,8 @@ import com.ainclusive.iotsim.protocolmodel.DataType;
 import com.ainclusive.iotsim.protocolmodel.NodeKind;
 import com.ainclusive.iotsim.protocolmodel.SchemaNode;
 import com.ainclusive.iotsim.protocolmodel.ValueRank;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +43,10 @@ import org.springframework.stereotype.Service;
  */
 @Service
 public class ScanService implements DisposableBean {
+
+    // Completed/failed jobs are evicted after this long so the in-memory registry
+    // cannot grow without bound in a long-running service. Running jobs are kept.
+    private static final Duration JOB_TTL = Duration.ofMinutes(30);
 
     private final SourceScanner scanner;
     private final ProjectRepository projects;
@@ -92,6 +98,7 @@ public class ScanService implements DisposableBean {
         requireProject(projectId);
         validateProtocol(protocol);
         requireEndpoint(endpointUrl);
+        evictExpired();
         String jobId = Ids.newId();
         ScanJob job = ScanJob.running(jobId, projectId, protocol, endpointUrl);
         jobs.put(jobId, job);
@@ -115,7 +122,14 @@ public class ScanService implements DisposableBean {
         if (job == null || !job.projectId().equals(projectId)) {
             throw new ResourceNotFoundException("ScanJob", jobId);
         }
+        evictExpired();
         return job;
+    }
+
+    /** Drops completed/failed jobs past their TTL so the registry stays bounded. */
+    private void evictExpired() {
+        Instant cutoff = Instant.now().minus(JOB_TTL);
+        jobs.values().removeIf(job -> !job.isRunning() && job.updatedAt().isBefore(cutoff));
     }
 
     /**

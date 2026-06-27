@@ -64,6 +64,9 @@ public final class Supervisor implements RuntimeController, SourceScanner, AutoC
     private static final String ERROR = "ERROR";
     private static final String STALE = "STALE";
     private static final String OPC_UA = "OPC_UA";
+    private static final String EXTERNAL_REF_UNSUPPORTED =
+            "external-ref credential resolution is not yet supported for scan (IS-082); "
+                    + "use anonymous or password credentials";
     private static final Duration READY_TIMEOUT = Duration.ofSeconds(10);
 
     private final WorkerLauncher launcher;
@@ -186,6 +189,9 @@ public final class Supervisor implements RuntimeController, SourceScanner, AutoC
         if (!OPC_UA.equals(spec.protocol())) {
             return new ConnectionTestResult(ScanStatus.UNSUPPORTED, unsupportedMessage(spec.protocol()));
         }
+        if (isExternalRef(spec)) {
+            return new ConnectionTestResult(ScanStatus.UNSUPPORTED, EXTERNAL_REF_UNSUPPORTED);
+        }
         return withWorker(spec.protocol(), client -> {
             TestConnectionResponse response = client.testConnection(TestConnectionRequest.newBuilder()
                     .setEndpointUrl(orEmpty(spec.endpointUrl()))
@@ -199,6 +205,9 @@ public final class Supervisor implements RuntimeController, SourceScanner, AutoC
     public ScanResult scan(ScanSpec spec) {
         if (!OPC_UA.equals(spec.protocol())) {
             return ScanResult.failure(ScanStatus.UNSUPPORTED, unsupportedMessage(spec.protocol()));
+        }
+        if (isExternalRef(spec)) {
+            return ScanResult.failure(ScanStatus.UNSUPPORTED, EXTERNAL_REF_UNSUPPORTED);
         }
         return withWorker(spec.protocol(), client -> {
             ScanResponse response = client.scan(ScanRequest.newBuilder()
@@ -230,6 +239,11 @@ public final class Supervisor implements RuntimeController, SourceScanner, AutoC
             closeQuietly(client);
             launched.close();
         }
+    }
+
+    private static boolean isExternalRef(ScanSpec spec) {
+        return spec.credentials() != null
+                && spec.credentials().mode() == ConnectionCredentials.Mode.EXTERNAL_REF;
     }
 
     private static ConnectionConfigMsg toCredentialMsg(ConnectionCredentials credentials) {

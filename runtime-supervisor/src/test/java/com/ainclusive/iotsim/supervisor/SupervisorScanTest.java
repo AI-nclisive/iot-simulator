@@ -85,4 +85,18 @@ class SupervisorScanTest {
         assertThat(result.status()).isEqualTo(ScanStatus.UNSUPPORTED);
         assertThat(launcher.launchCount()).isZero();
     }
+
+    @Test
+    void scanRejectsExternalRefCredentialsAsUnsupportedWithoutLaunching() {
+        Supervisor supervisor = supervisor();
+
+        // external-ref resolution isn't wired yet (IS-082); surface it clearly instead
+        // of silently attempting an anonymous connection that fails opaquely.
+        ScanResult result = supervisor.scan(new ScanSpec(
+                "OPC_UA", "opc.tcp://host:4840/x", ConnectionCredentials.externalRef("vault://x"), 0));
+
+        assertThat(result.status()).isEqualTo(ScanStatus.UNSUPPORTED);
+        assertThat(result.message()).contains("external-ref");
+        assertThat(launcher.launchCount()).isZero();
+    }
 }
