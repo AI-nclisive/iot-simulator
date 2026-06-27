@@ -15,6 +15,13 @@ service ProtocolDataSource {
   rpc Start (StartRequest) returns (Ack);
   rpc Stop (StopRequest) returns (Ack);
 
+  // Real-source discovery (create-from-scan). The worker acts as a protocol
+  // CLIENT against a real endpoint: TestConnection probes reachability/auth;
+  // Scan browses the address space into neutral schema nodes. Stateless, one-shot
+  // — no Configure/Start needed. See backend-specs/05_API_CONTRACT.md §Scan.
+  rpc TestConnection (TestConnectionRequest) returns (TestConnectionResponse);
+  rpc Scan (ScanRequest) returns (ScanResponse);
+
   // Supervisor pushes neutral value batches for the worker to project onto its
   // native protocol address space (replay / synthetic / live).
   rpc ApplyValues (stream ValueBatch) returns (Ack);
@@ -72,6 +79,43 @@ message StopRequest {}
 message StreamRequest {}
 message HealthRequest {}
 message ShutdownRequest {}
+
+// ---- Scan / real-source discovery ----
+
+// Connection secrets for reaching a real source. Session-only: the secret is held
+// in memory for the scan and is never persisted, exported, or logged
+// (backend-specs/08_AUTH_AND_MODES.md).
+message ConnectionConfigMsg {
+  string mode = 1;        // ANONYMOUS | PASSWORD | EXTERNAL_REF
+  string username = 2;
+  string secret = 3;      // present only for PASSWORD
+  string secret_ref = 4;  // present only for EXTERNAL_REF (the reference is not itself a secret)
+}
+
+message TestConnectionRequest {
+  string endpoint_url = 1;            // e.g. opc.tcp://host:4840/path
+  ConnectionConfigMsg credentials = 2;
+}
+
+message TestConnectionResponse {
+  string status = 1;  // OK | UNREACHABLE | AUTH_FAILURE
+  string message = 2;
+}
+
+message ScanRequest {
+  string endpoint_url = 1;
+  ConnectionConfigMsg credentials = 2;
+  int32 max_nodes = 3;  // cap on discovered nodes; 0 = worker default
+}
+
+message ScanResponse {
+  string status = 1;                  // OK | PARTIAL | UNREACHABLE | AUTH_FAILURE
+  repeated SchemaNodeMsg nodes = 2;   // discovered structure (empty data_type = unknown type)
+  bool truncated = 3;                 // hit max_nodes (large schema) -> PARTIAL
+  int32 discovered_count = 4;
+  int32 unknown_count = 5;            // VARIABLE nodes whose type could not be mapped
+  string message = 6;
+}
 
 // ---- Values ----
 

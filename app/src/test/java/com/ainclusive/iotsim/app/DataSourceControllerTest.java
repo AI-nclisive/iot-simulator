@@ -10,10 +10,10 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import com.ainclusive.iotsim.api.datasource.DataSourceController;
-import com.ainclusive.iotsim.api.datasource.DataSourceController.ConnectionConfigRequest;
 import com.ainclusive.iotsim.api.datasource.DataSourceController.CreateDataSourceRequest;
 import com.ainclusive.iotsim.api.datasource.DataSourceController.DataSourceResponse;
 import com.ainclusive.iotsim.api.error.PreconditionRequiredException;
+import com.ainclusive.iotsim.api.support.ConnectionConfigRequest;
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.domain.datasource.CredentialState;
 import com.ainclusive.iotsim.domain.datasource.DataSource;

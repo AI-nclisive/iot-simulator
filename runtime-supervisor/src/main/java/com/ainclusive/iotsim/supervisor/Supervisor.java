@@ -2,12 +2,24 @@ package com.ainclusive.iotsim.supervisor;
 
 import com.ainclusive.iotsim.platform.runtime.RuntimeController;
 import com.ainclusive.iotsim.platform.runtime.RuntimeStartSpec;
+import com.ainclusive.iotsim.platform.scan.ConnectionTestResult;
+import com.ainclusive.iotsim.platform.scan.DiscoveredNode;
+import com.ainclusive.iotsim.platform.scan.ScanResult;
+import com.ainclusive.iotsim.platform.scan.ScanSpec;
+import com.ainclusive.iotsim.platform.scan.ScanStatus;
+import com.ainclusive.iotsim.platform.scan.SourceScanner;
+import com.ainclusive.iotsim.platform.secret.ConnectionCredentials;
 import com.ainclusive.iotsim.protocolmodel.NeutralValue;
 import com.ainclusive.iotsim.protocolmodel.SchemaNode;
 import com.ainclusive.iotsim.protocolmodel.ValueCodec;
+import com.ainclusive.iotsim.workercontract.v1.ConnectionConfigMsg;
 import com.ainclusive.iotsim.workercontract.v1.Quality;
+import com.ainclusive.iotsim.workercontract.v1.ScanRequest;
+import com.ainclusive.iotsim.workercontract.v1.ScanResponse;
 import com.ainclusive.iotsim.workercontract.v1.Schema;
 import com.ainclusive.iotsim.workercontract.v1.SchemaNodeMsg;
+import com.ainclusive.iotsim.workercontract.v1.TestConnectionRequest;
+import com.ainclusive.iotsim.workercontract.v1.TestConnectionResponse;
 import com.ainclusive.iotsim.workercontract.v1.Value;
 import com.google.protobuf.ByteString;
 import java.time.Duration;
@@ -21,6 +33,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 
 /**
  * Owns worker lifecycle: port allocation, launch, IPC handshake, start/stop,
@@ -43,13 +56,14 @@ import java.util.concurrent.atomic.AtomicReference;
  *
  * <p>See backend-specs/02_WORKER_CONTRACT_AND_IPC.md §4.
  */
-public final class Supervisor implements RuntimeController, AutoCloseable {
+public final class Supervisor implements RuntimeController, SourceScanner, AutoCloseable {
 
     private static final String RUNNING = "RUNNING";
     private static final String STOPPED = "STOPPED";
     private static final String STARTING = "STARTING";
     private static final String ERROR = "ERROR";
     private static final String STALE = "STALE";
+    private static final String OPC_UA = "OPC_UA";
     private static final Duration READY_TIMEOUT = Duration.ofSeconds(10);
 
     private final WorkerLauncher launcher;
@@ -159,6 +173,110 @@ public final class Supervisor implements RuntimeController, AutoCloseable {
         }
         List<Value> protoValues = values.stream().map(Supervisor::toProto).toList();
         return worker.applyValues(protoValues);
+    }
+
+    /**
+     * Real-source discovery (create-from-scan). Spawns a one-shot worker in client
+     * mode, probes the endpoint, and tears the worker down — it is never adopted
+     * into the managed {@code running} map. Only OPC UA is supported today; Modbus
+     * discovery lands with worker-modbus. See backend-specs/02 §6 / 05 §Scan.
+     */
+    @Override
+    public ConnectionTestResult testConnection(ScanSpec spec) {
+        if (!OPC_UA.equals(spec.protocol())) {
+            return new ConnectionTestResult(ScanStatus.UNSUPPORTED, unsupportedMessage(spec.protocol()));
+        }
+        return withWorker(spec.protocol(), client -> {
+            TestConnectionResponse response = client.testConnection(TestConnectionRequest.newBuilder()
+                    .setEndpointUrl(orEmpty(spec.endpointUrl()))
+                    .setCredentials(toCredentialMsg(spec.credentials()))
+                    .build());
+            return new ConnectionTestResult(toStatus(response.getStatus()), response.getMessage());
+        });
+    }
+
+    @Override
+    public ScanResult scan(ScanSpec spec) {
+        if (!OPC_UA.equals(spec.protocol())) {
+            return ScanResult.failure(ScanStatus.UNSUPPORTED, unsupportedMessage(spec.protocol()));
+        }
+        return withWorker(spec.protocol(), client -> {
+            ScanResponse response = client.scan(ScanRequest.newBuilder()
+                    .setEndpointUrl(orEmpty(spec.endpointUrl()))
+                    .setCredentials(toCredentialMsg(spec.credentials()))
+                    .setMaxNodes(spec.maxNodes())
+                    .build());
+            return toScanResult(response);
+        });
+    }
+
+    /** Spawns a worker, runs one RPC against it, and always tears it back down. */
+    private <T> T withWorker(String protocol, Function<WorkerClient, T> call) {
+        if (closed) {
+            throw new IllegalStateException("supervisor is closed");
+        }
+        int controlPort = PortAllocator.freeLoopbackPort();
+        LaunchedWorker launched;
+        try {
+            launched = launcher.launch(protocol, controlPort);
+        } catch (Exception e) {
+            throw new WorkerLaunchException("failed to launch " + protocol + " worker", e);
+        }
+        WorkerClient client = new WorkerClient("127.0.0.1", controlPort);
+        try {
+            awaitReady(client);
+            return call.apply(client);
+        } finally {
+            closeQuietly(client);
+            launched.close();
+        }
+    }
+
+    private static ConnectionConfigMsg toCredentialMsg(ConnectionCredentials credentials) {
+        if (credentials == null) {
+            return ConnectionConfigMsg.newBuilder().setMode("ANONYMOUS").build();
+        }
+        ConnectionConfigMsg.Builder b = ConnectionConfigMsg.newBuilder().setMode(credentials.mode().name());
+        if (credentials.username() != null) {
+            b.setUsername(credentials.username());
+        }
+        if (credentials.secret() != null) {
+            b.setSecret(credentials.secret());
+        }
+        if (credentials.secretRef() != null) {
+            b.setSecretRef(credentials.secretRef());
+        }
+        return b.build();
+    }
+
+    private static ScanResult toScanResult(ScanResponse response) {
+        List<DiscoveredNode> nodes = response.getNodesList().stream()
+                .map(Supervisor::toDiscoveredNode).toList();
+        return new ScanResult(toStatus(response.getStatus()), nodes,
+                response.getTruncated(), response.getUnknownCount(), response.getMessage());
+    }
+
+    private static DiscoveredNode toDiscoveredNode(SchemaNodeMsg n) {
+        return new DiscoveredNode(
+                n.getNodeId(), emptyToNull(n.getParentId()), n.getPath(), n.getName(), n.getKind(),
+                emptyToNull(n.getDataType()), emptyToNull(n.getValueRank()), emptyToNull(n.getAccess()),
+                emptyToNull(n.getUnit()), emptyToNull(n.getDescription()));
+    }
+
+    private static ScanStatus toStatus(String wire) {
+        try {
+            return ScanStatus.valueOf(wire);
+        } catch (IllegalArgumentException | NullPointerException e) {
+            return ScanStatus.UNREACHABLE;
+        }
+    }
+
+    private static String unsupportedMessage(String protocol) {
+        return "scanning is not supported for protocol " + protocol;
+    }
+
+    private static String emptyToNull(String value) {
+        return value == null || value.isEmpty() ? null : value;
     }
 
     /** Stops every worker and the restart scheduler; safe to call on app shutdown. */

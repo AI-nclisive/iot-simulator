@@ -17,6 +17,45 @@ final class OpcUaTypes {
 
     private OpcUaTypes() {}
 
+    /**
+     * Reverse mapping used by scan/discovery: an OPC UA built-in DataType node id
+     * back to a protocol-neutral data type, or {@code null} when the type is
+     * outside the neutral intersection (surfaced as "unknown" in scan results, per
+     * backend-specs/01 §2). Only exact built-in matches map; subtypes/structs are
+     * left unknown for the user to resolve (IS-044).
+     */
+    static String neutralTypeOf(NodeId dataTypeId) {
+        if (dataTypeId == null) {
+            return null;
+        }
+        if (Identifiers.Boolean.equals(dataTypeId)) {
+            return "BOOL";
+        } else if (Identifiers.Int16.equals(dataTypeId)) {
+            return "INT16";
+        } else if (Identifiers.UInt16.equals(dataTypeId)) {
+            return "UINT16";
+        } else if (Identifiers.Int32.equals(dataTypeId)) {
+            return "INT32";
+        } else if (Identifiers.UInt32.equals(dataTypeId)) {
+            return "UINT32";
+        } else if (Identifiers.Int64.equals(dataTypeId)) {
+            return "INT64";
+        } else if (Identifiers.UInt64.equals(dataTypeId)) {
+            return "UINT64";
+        } else if (Identifiers.Float.equals(dataTypeId)) {
+            return "FLOAT32";
+        } else if (Identifiers.Double.equals(dataTypeId)) {
+            return "FLOAT64";
+        } else if (Identifiers.String.equals(dataTypeId)) {
+            return "STRING";
+        } else if (Identifiers.ByteString.equals(dataTypeId)) {
+            return "BYTES";
+        } else if (Identifiers.DateTime.equals(dataTypeId)) {
+            return "DATETIME";
+        }
+        return null;
+    }
+
     static NodeId dataTypeId(String dataType) {
         return switch (dataType) {
             case "BOOL" -> Identifiers.Boolean;

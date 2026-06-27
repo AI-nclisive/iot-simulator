@@ -4,14 +4,19 @@ import com.ainclusive.iotsim.protocolmodel.ValueCodec;
 import com.ainclusive.iotsim.workercontract.WorkerContract;
 import com.ainclusive.iotsim.workercontract.v1.Ack;
 import com.ainclusive.iotsim.workercontract.v1.ConfigureRequest;
+import com.ainclusive.iotsim.workercontract.v1.ConnectionConfigMsg;
 import com.ainclusive.iotsim.workercontract.v1.HealthRequest;
 import com.ainclusive.iotsim.workercontract.v1.HealthResponse;
 import com.ainclusive.iotsim.workercontract.v1.HelloRequest;
 import com.ainclusive.iotsim.workercontract.v1.HelloResponse;
 import com.ainclusive.iotsim.workercontract.v1.ProtocolDataSourceGrpc;
+import com.ainclusive.iotsim.workercontract.v1.ScanRequest;
+import com.ainclusive.iotsim.workercontract.v1.ScanResponse;
 import com.ainclusive.iotsim.workercontract.v1.SchemaNodeMsg;
 import com.ainclusive.iotsim.workercontract.v1.StartRequest;
 import com.ainclusive.iotsim.workercontract.v1.StopRequest;
+import com.ainclusive.iotsim.workercontract.v1.TestConnectionRequest;
+import com.ainclusive.iotsim.workercontract.v1.TestConnectionResponse;
 import com.ainclusive.iotsim.workercontract.v1.Value;
 import com.ainclusive.iotsim.workercontract.v1.ValueBatch;
 import io.grpc.stub.StreamObserver;
@@ -71,6 +76,44 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
         configuredNodes.set(request.getSchema().getNodesCount());
         state.set("CONFIGURED");
         ackOk(obs, "configured " + variables.size() + " variables");
+    }
+
+    @Override
+    public void testConnection(TestConnectionRequest request, StreamObserver<TestConnectionResponse> obs) {
+        OpcUaDiscovery.ConnectionTest result =
+                OpcUaDiscovery.testConnection(request.getEndpointUrl(), credentials(request.getCredentials()));
+        obs.onNext(TestConnectionResponse.newBuilder()
+                .setStatus(result.status())
+                .setMessage(orEmpty(result.message()))
+                .build());
+        obs.onCompleted();
+    }
+
+    @Override
+    public void scan(ScanRequest request, StreamObserver<ScanResponse> obs) {
+        OpcUaDiscovery.ScanOutcome outcome = OpcUaDiscovery.scan(
+                request.getEndpointUrl(), credentials(request.getCredentials()), request.getMaxNodes());
+        obs.onNext(ScanResponse.newBuilder()
+                .setStatus(outcome.status())
+                .addAllNodes(outcome.nodes())
+                .setTruncated(outcome.truncated())
+                .setDiscoveredCount(outcome.nodes().size())
+                .setUnknownCount(outcome.unknownCount())
+                .setMessage(orEmpty(outcome.message()))
+                .build());
+        obs.onCompleted();
+    }
+
+    /** Maps the wire credential message to the discovery's session-only form. */
+    private static OpcUaDiscovery.Credentials credentials(ConnectionConfigMsg cfg) {
+        if (cfg == null || cfg.getMode().isEmpty()) {
+            return new OpcUaDiscovery.Credentials("ANONYMOUS", null, null);
+        }
+        return new OpcUaDiscovery.Credentials(cfg.getMode(), cfg.getUsername(), cfg.getSecret());
+    }
+
+    private static String orEmpty(String value) {
+        return value == null ? "" : value;
     }
 
     @Override
