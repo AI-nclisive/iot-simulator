@@ -63,29 +63,42 @@ matching that verdict: **APPROVE** only when nothing blocks **and every review t
 is resolved** (including nits and any human's comments), **REQUEST_CHANGES** otherwise.
 This gates merge: the APPROVE supplies branch protection's required approving review,
 and a REQUEST_CHANGES blocks merge until a later push earns an APPROVE. The required
-status check stays `build`. Because it never approves while a thread is open, you must
-**resolve every comment and push** to earn the approval — resolving alone does not
-re-trigger the review.
+status check stays `build`.
+
+**Resolving review conversations is the reviewer's prerogative, never the PR author's.**
+As the PR author (human or agent) you do **not** click "Resolve conversation". For each
+comment you only **respond**: either fix the finding and reply saying what you changed,
+or leave the code as-is and reply with a rationale for why the comment is incorrect or
+not applicable. The reviewer then reads your replies and the new diff and resolves the
+threads it is satisfied with — it resolves its own thread when the issue is fixed, or
+when it agrees with your pushback; if it is not convinced it leaves the thread open. It
+never approves while any thread is open, so to earn the approval you must **respond to
+every comment and push** (a reply alone does not re-trigger the review) — you cannot,
+and must not, shortcut it by resolving threads yourself.
 
 By the time the review runs the task is already **In review** (moved there when the
-PR was opened — see "Task tracking"). Resolving the review is part of finishing the
-task, not an optional follow-up. After opening (or updating) a PR:
+PR was opened — see "Task tracking"). Working the review to completion is part of
+finishing the task, not an optional follow-up. After opening (or updating) a PR:
 1. **Wait for the verdict** and the inline comments to land.
-2. For each finding, either **fix it**, or **reply on the comment** explaining why
-   the current approach is the better choice; mark the thread **resolved** once it is
-   addressed. Then **push to the same branch** — each push re-triggers the review.
+2. For each finding, either **fix it and reply** on the comment saying what you
+   changed, or **reply with a rationale** for why the comment is incorrect or not
+   applicable and leave the code as-is. **Do not resolve the thread yourself** — that
+   is the reviewer's call. Then **push to the same branch** — each push re-triggers
+   the review.
 3. **Wait for the new verdict** and repeat until either:
-   - the verdict is `✅ Mergeable` with **no unresolved comments** — the reviewer's
-     **APPROVE** then lands and, with auto-merge armed and `build` green, the PR
-     squash-merges itself, or
+   - the verdict is `✅ Mergeable` with **no unresolved comments** (the reviewer has
+     resolved the threads it was satisfied with) — the reviewer's **APPROVE** then
+     lands and, with auto-merge armed and `build` green, the PR squash-merges itself, or
    - **3 review rounds** have completed (then summarize any still-open points for the
-     human reviewer in the PR description and leave each thread resolved-with-rationale).
+     human reviewer in the PR description, leaving each thread answered with a fix or a
+     rationale for the reviewer or a human to resolve).
 
-**A feature is finished only when every reviewer comment is resolved** — fixed or
-answered with a rationale — and `./gradlew build` is green. Do not consider the work
-done, or walk away from the PR, while review threads are still open. The board
-`Status` moves to **Done** only when the PR is merged; the catalog checkbox itself is
-flipped inside the implementation PR (see "Task tracking").
+**A feature is finished only when every reviewer comment has been responded to** —
+each one fixed-and-acknowledged or answered with a rationale — and `./gradlew build`
+is green. Resolving the threads themselves is the reviewer's step, not yours; do not
+consider the work done, or walk away from the PR, while any comment is still
+unanswered. The board `Status` moves to **Done** only when the PR is merged; the
+catalog checkbox itself is flipped inside the implementation PR (see "Task tracking").
 
 ## Definition of Done
 - `./gradlew build` green (tests added/updated for the change).
@@ -93,8 +106,9 @@ flipped inside the implementation PR (see "Task tracking").
 - No secrets/credentials/PKI committed; secrets come from env/secret store.
 - Generated code (jOOQ/proto) stays under `build/` — never committed.
 - Public behavior changes reflected in OpenAPI and, if needed, the specs.
-- **All AI-review comments resolved** (fixed or answered with a rationale) — see
-  "AI review loop". A task is not done while review threads are still open.
+- **All AI-review comments responded to** (fixed-and-acknowledged or answered with a
+  rationale) — see "AI review loop". Resolving the threads is the reviewer's
+  prerogative; a task is not done while any comment is still unanswered.
 
 ## Task tracking
 - `backend-specs/TASKS.md` / `frontend/docs/UI_TASKS.md` are the task

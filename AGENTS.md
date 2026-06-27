@@ -121,11 +121,14 @@ Follow `CONTRIBUTING.md`. For agents specifically:
   **In review** when you open the PR (see "Task Tracking" above for the full transitions).
 - After opening a PR, follow the **AI review loop** in `CONTRIBUTING.md`: wait for the
   Claude reviewer's verdict (it submits a formal APPROVE / REQUEST_CHANGES that gates
-  merge), fix each finding (or reply why the current choice is best), mark the thread
-  resolved, push, and wait for re-review. **The task is
-  finished only once every reviewer comment is resolved** (or after 3 review rounds —
-  see the full loop in `CONTRIBUTING.md`) and the build is green — don't treat the
-  work as done while review threads are still open.
+  merge), then for each finding either fix it and reply saying what you changed, or
+  reply with a rationale for why the comment is incorrect or not applicable; then push
+  and wait for re-review. **Never resolve review conversations yourself — that is the
+  reviewer's prerogative;** you only respond, and the reviewer resolves the threads it
+  is satisfied with. **The task is finished only once every reviewer comment has been
+  responded to** (or after 3 review rounds — see the full loop in `CONTRIBUTING.md`)
+  and the build is green — don't treat the work as done while comments are still
+  unanswered.
 - Keep tasks in sync with the GitHub Project (see "Task Tracking"): the board
   `Status` is the live source for `In Progress` / `In review`; mark the catalog
   checkbox `[x]` ✅ in the implementation PR and flip the board to **Done** only
