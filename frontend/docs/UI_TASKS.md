@@ -437,7 +437,7 @@ Parallel execution:
 5. After `UI-050`, run `UI-051`, `UI-052`, and `UI-053` in parallel.
 6. After `UI-035` and `UI-037`, run `UI-055`.
 
-- [ ] `UI-036` Manual source branch
+- [x] `UI-036` Manual source branch
   Surface: `Create Data Source Wizard`
   Depends: `UI-030`
   Done when: manual structure creation has a clear branch and a clean handoff
