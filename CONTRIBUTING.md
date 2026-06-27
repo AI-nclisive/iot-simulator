@@ -1,14 +1,13 @@
 # Contributing
 
-This repo is built in parallel by multiple people and agents via feature branches
-and pull requests. These rules keep that smooth.
+This repo is built in parallel by many people and agents via feature branches and
+pull requests. These rules keep that smooth.
 
 ## Prerequisites
-- JDK 25 (toolchain target). Gradle runs via the committed wrapper (`./gradlew`).
-- Node.js 20 for the frontend. Run `nvm use` from the repo root if you use
-  nvm/fnm/asdf; the expected version is recorded in `.nvmrc`.
-- Docker (Docker Desktop / colima) — required for Testcontainers integration
-  tests. Without Docker those ITs skip locally; CI always runs them.
+- JDK 25 (toolchain). Gradle runs via the committed wrapper (`./gradlew`).
+- Node.js 20 for the frontend (`nvm use`; version recorded in `.nvmrc`).
+- Docker for Testcontainers integration tests — they skip locally without it; CI
+  always runs them.
 
 ## Build & test
 ```bash
@@ -17,143 +16,105 @@ npm ci                 # install locked frontend dependencies
 npm run typecheck      # frontend TypeScript check
 npm run build          # production frontend build
 ```
-Always run this and confirm it is green before opening a PR.
+Run these and confirm green before opening a PR.
 
 ## Task IDs
-- Backend and repo/process tasks use **`IS-XXX [AREA] short name`** from
-  `backend-specs/TASKS.md`; `[AREA]` is `[BE]` or `[SDLC]`.
-- Frontend tasks use **`UI-XXX [FE] short name`** from
-  `frontend/docs/UI_TASKS.md`.
-- Reuse the ID everywhere: branch `feat/IS-038-...` or `feat/UI-022-...`, issue
-  `IS-038 short name` / `UI-022 short name` (area via the form's **Area** field),
-  PR `Implements: IS-038` or `Implements: UI-022`.
+- Backend / repo / process: **`IS-XXX [AREA] short name`** from
+  `backend-specs/TASKS.md` (`[AREA]` is `[BE]` or `[SDLC]`).
+- Frontend: **`UI-XXX [FE] short name`** from `frontend/docs/UI_TASKS.md`.
+- Reuse the ID everywhere: branch `feat/IS-038-...`, issue title `IS-038 short name`
+  (area via the form's **Area** field), PR `Implements: IS-038`.
 
 ## Branching
-- Branch off `master`. One task per branch/PR.
-- Name: `feat/IS-123-short-slug`, `fix/...`, `docs/...`, `chore/...`, `test/...`.
-- **Link the branch to its task issue on the board.** Create the branch with
-  `gh issue develop <issue#> --name feat/IS-123-short-slug --base master` (this
-  records the issue↔branch link, visible in org Project #1 against the task), then
-  `git branch --set-upstream-to=origin/feat/IS-123-short-slug`. Do this when you
-  start the task, alongside moving the board `Status` to **In Progress** — so
-  in-flight work is traceable on the board before a PR exists. Verify with
-  `gh issue develop --list <issue#>`.
+- Branch off `master`; one task per branch/PR. Name: `feat/IS-123-short-slug`
+  (also `fix/`, `docs/`, `chore/`, `test/`).
+- **Link the branch to its task issue** when you start, so in-flight work is
+  traceable on the board before a PR exists:
+  ```bash
+  gh issue develop <issue#> --name feat/IS-123-short-slug --base master
+  git branch --set-upstream-to=origin/feat/IS-123-short-slug
+  ```
+  Verify with `gh issue develop --list <issue#>`. Do this alongside moving the board
+  to **In Progress** (see "Task tracking").
 
 ## Commits & PRs
-- **Language: write all GitHub text in English** — commit messages, PR titles and
-  descriptions, issue text, and every comment (including replies to review findings).
+- **Write all GitHub text in English** — commits, PR titles/descriptions, issues,
+  and every review reply.
 - Conventional Commits: `type(scope): subject` (e.g. `feat(schema): ...`).
-- Reference the task in the PR: `Implements: IS-123` / `Implements: UI-123`,
-  `Closes: #<issue>`.
-- Keep PRs small and focused; fill in the PR template checklist.
-- Merge strategy: **squash merge**, linear history. CI must be green and at least
-  one approving review is required.
-- **Arm auto-merge when you open the PR**: `gh pr merge <n> --auto --squash`. GitHub
-  then merges the PR automatically once branch protection is satisfied — i.e. the
-  Claude reviewer's **APPROVE** plus a green `build` — with no manual merge click.
-  (Native auto-merge is enabled on the repo; see `.github/OWNER_SETUP.md`.)
+- Reference the task: `Implements: IS-123`, `Closes: #<issue>`. Keep PRs small and
+  focused; fill in the template checklist.
+- **Squash merge only**, linear history; green CI plus one approving review required.
+- **Arm auto-merge when you open the PR:** `gh pr merge <n> --auto --squash`. It then
+  merges itself once the Claude reviewer's APPROVE lands and `build` is green — no
+  manual merge. (Auto-merge is enabled on the repo; see `.github/OWNER_SETUP.md`.)
 
 ## AI review loop
-Every PR is reviewed automatically by a Claude reviewer (IS-112; see
-`.github/workflows/claude-review.yml`). It posts **inline comments on the specific
-lines** it thinks need rework (prefixed `[blocking]` / `[nit]`) and **one top-level
-verdict comment** — `## Claude review: ✅ Mergeable` or `## Claude review:
-❌ Changes requested` with the reasons. It then submits a **formal GitHub review**
-matching that verdict: **APPROVE** only when nothing blocks **and every review thread
-is resolved** (including nits and any human's comments), **REQUEST_CHANGES** otherwise.
-This gates merge: the APPROVE supplies branch protection's required approving review,
-and a REQUEST_CHANGES blocks merge until a later push earns an APPROVE. The required
-status check stays `build`.
+Every PR is reviewed by a Claude reviewer (IS-112; `.github/workflows/claude-review.yml`).
+It posts inline comments (`[blocking]` / `[nit]`) and one verdict comment, then submits
+a formal GitHub review: **APPROVE** only when nothing blocks and every thread is
+resolved, otherwise **REQUEST_CHANGES**. This gates merge (required status check: `build`).
 
-**Resolving review conversations is the reviewer's prerogative, never the PR author's.**
-As the PR author (human or agent) you do **not** click "Resolve conversation". For each
-comment you only **respond**: either fix the finding and reply saying what you changed,
-or leave the code as-is and reply with a rationale for why the comment is incorrect or
-not applicable. The reviewer then reads your replies and the new diff and resolves the
-threads it is satisfied with — it resolves its own thread when the issue is fixed, or
-when it agrees with your pushback; if it is not convinced it leaves the thread open. It
-never approves while any thread is open, so to earn the approval you must **respond to
-every comment and push** (a reply alone does not re-trigger the review) — you cannot,
-and must not, shortcut it by resolving threads yourself.
+By the time it runs, the task is already **In review** (moved when the PR opened).
+Work the review to completion:
+1. Wait for the verdict and inline comments.
+2. For each finding, either **fix it and reply** saying what you changed, or **reply
+   with a rationale** for leaving it. Then **push** — each push re-triggers the review
+   (a reply alone does not).
+3. Repeat until the verdict is `✅ Mergeable` with no unresolved comments (the APPROVE
+   then lands and the PR auto-merges), or **3 rounds** have completed (then summarize
+   any still-open points in the PR description for a human reviewer).
 
-By the time the review runs the task is already **In review** (moved there when the
-PR was opened — see "Task tracking"). Working the review to completion is part of
-finishing the task, not an optional follow-up. After opening (or updating) a PR:
-1. **Wait for the verdict** and the inline comments to land.
-2. For each finding, either **fix it and reply** on the comment saying what you
-   changed, or **reply with a rationale** for why the comment is incorrect or not
-   applicable and leave the code as-is. **Do not resolve the thread yourself** — that
-   is the reviewer's call. Then **push to the same branch** — each push re-triggers
-   the review.
-3. **Wait for the new verdict** and repeat until either:
-   - the verdict is `✅ Mergeable` with **no unresolved comments** (the reviewer has
-     resolved the threads it was satisfied with) — the reviewer's **APPROVE** then
-     lands and, with auto-merge armed and `build` green, the PR squash-merges itself, or
-   - **3 review rounds** have completed (then summarize any still-open points for the
-     human reviewer in the PR description, leaving each thread answered with a fix or a
-     rationale for the reviewer or a human to resolve).
-
-**A feature is finished only when every reviewer comment has been responded to** —
-each one fixed-and-acknowledged or answered with a rationale — and `./gradlew build`
-is green. Resolving the threads themselves is the reviewer's step, not yours; do not
-consider the work done, or walk away from the PR, while any comment is still
-unanswered. The board `Status` moves to **Done** only when the PR is merged; the
-catalog checkbox itself is flipped inside the implementation PR (see "Task tracking").
+**Resolving threads is the reviewer's prerogative, never the author's** — you only
+respond; the reviewer resolves the threads it is satisfied with and never approves
+while any thread is open. A feature is done only when every comment has been responded
+to and `./gradlew build` is green.
 
 ## Definition of Done
 - `./gradlew build` green (tests added/updated for the change).
-- `npm ci`, `npm run typecheck`, and `npm run build` green for frontend changes.
+- Frontend changes: `npm ci`, `npm run typecheck`, `npm run build` green.
 - No secrets/credentials/PKI committed; secrets come from env/secret store.
 - Generated code (jOOQ/proto) stays under `build/` — never committed.
 - Public behavior changes reflected in OpenAPI and, if needed, the specs.
-- **All AI-review comments responded to** (fixed-and-acknowledged or answered with a
-  rationale) — see "AI review loop". Resolving the threads is the reviewer's
-  prerogative; a task is not done while any comment is still unanswered.
+- Every AI-review comment responded to (see "AI review loop").
 
 ## Task tracking
-- `backend-specs/TASKS.md` / `frontend/docs/UI_TASKS.md` are the task
-  **catalogs** (IS-/UI-IDs). **Live `In Progress` / `In review` status lives in
-  GitHub Issues/Project** (org Project #1) keyed by ID — don't track those by
-  editing catalog checkboxes. Move the board `Status` in lockstep with the work;
-  these transitions are mandatory:
-  - **In Progress** — set this **first, before you write any code**. It is the
-    opening action of the task, **not** something you backfill after implementing.
-    The required order at task start is: verify the task is free → flip `Status` to
-    **In Progress** → create the linked branch (see "Branching") → only then begin
-    implementing. Flipping it postfactum (after the code is already written)
-    misleads concurrent contributors: the board still shows `Todo`, so someone may
-    pick up a task that is in fact already being worked on.
-  - **In review** — as soon as you **open the PR**. The open PR *is* the trigger;
-    do **not** wait for the AI reviewer's verdict to move it here.
-  - **Done** — only **after the PR is merged** (then close the issue).
-- **Marking a task Done:** flip its catalog checkbox to `[x]` ✅ **in the same PR
-  that implements it** — this keeps the catalog current without a separate
-  catalog-only PR, which branch protection on `master` would otherwise require.
-  Move the **board `Status` to Done and close the issue only after that PR is
-  merged**. Each PR edits only its own task's line, so conflicts are rare; only
-  the aggregate snapshot count line is periodically retallied.
-- File tasks with the **Task** issue form; labels are defined in
-  `.github/labels.yml`. The Project board (live status by task ID) is an admin
-  one-time setup: `gh project create` (needs the `project` token scope) or create
-  it in the GitHub UI with a `Task ID` field, an `Area` (BE/FE/SDLC) field, and a
-  status column.
+`backend-specs/TASKS.md` and `frontend/docs/UI_TASKS.md` are the task **catalogs**;
+org **Project #1** is their live mirror, **one issue per ID**. When you add, rename,
+remove, or re-scope a task, update **both** the catalog and the board (never duplicate
+an ID).
+
+Live `In Progress` / `In review` status lives on the **board only** — don't track it
+with catalog checkboxes. Move it in lockstep with the work:
+- **In Progress** — set **first, before any code**: verify the task is free → flip
+  `Status` → create the linked branch → then implement. Never backfill it after
+  coding, or the board still shows `Todo` and misleads other contributors.
+- **In review** — as soon as you **open the PR** (don't wait for the reviewer's verdict).
+- **Done** — flip the catalog checkbox to `[x]` ✅ **in the implementing PR** (this
+  avoids a catalog-only PR that branch protection on `master` would otherwise force),
+  then move the board to **Done** and close the issue **after the PR merges**.
+
+Each PR edits only its own task line, so conflicts are rare. CI enforces the pairing:
+a PR whose body has `Implements: IS-/UI-…` must edit that task's catalog line in the
+same PR (`.github/workflows/ci.yml` → `catalog-sync`), so a merged task never leaves a
+stale `[ ]`. **On conflict the board wins** — a task with a merged PR but an unchecked
+box is done; fix the box in your next related PR, don't re-implement.
+
+File tasks with the **Task** issue form (labels in `.github/labels.yml`); board fields
+are `Status`, `Task ID`, and `Area` (BE/FE/SDLC).
 
 ## Parallel-work conventions
-- **Flyway migrations**: never reuse a version number. Two open PRs adding
-  `V7__...` will both merge and break ordering. Use the next free `Vn` only if you
-  are sure it is unique, otherwise use a timestamped version
-  (`V20260623_1530__name.sql`). Migrations are append-only.
-- **Modules**: prefer changes scoped to one Gradle module to reduce conflicts.
-- **Versions**: add/bump dependencies only in `gradle/libs.versions.toml`.
+- **Flyway migrations** are append-only; never reuse a version number. If a `Vn` may
+  collide, use a timestamped version (`V20260623_1530__name.sql`).
+- Prefer changes scoped to one Gradle module to reduce conflicts.
+- Add/bump dependencies only in `gradle/libs.versions.toml`.
 
 ## Governance
-- `SPEC.md`, `ARCHITECTURE.md`, `STACK.md`, `backend-specs/` change only with
-  prior owner approval — propose first (see `AGENTS.md`). No new dependency
-  without approval.
+`SPEC.md`, `ARCHITECTURE.md`, `STACK.md`, and `backend-specs/` change only with prior
+owner approval — propose first (see `AGENTS.md`). No new dependency without approval.
 
 ## Branch protection (repo admin)
-Applied configuration record: [`.github/OWNER_SETUP.md`](.github/OWNER_SETUP.md). Requires
-**admin** on the repo. `master` is protected (status check `build` = the CI job name):
+Configuration record: [`.github/OWNER_SETUP.md`](.github/OWNER_SETUP.md). Requires
+repo **admin**. `master` is protected (status check `build` = the CI job name):
 ```bash
 gh api -X PUT repos/AI-nclisive/iot-simulator/branches/master/protection \
   --input - <<'JSON'
@@ -168,6 +129,5 @@ gh api -X PUT repos/AI-nclisive/iot-simulator/branches/master/protection \
 }
 JSON
 ```
-Also, in repo Settings: allow **squash merging only** and enable
-"Automatically delete head branches". (Set `enforce_admins` to `true` later for a
-stricter policy once more than one approver is available.)
+Also in repo Settings: allow **squash merging only** and "Automatically delete head
+branches". (Set `enforce_admins: true` later once more than one approver is available.)
