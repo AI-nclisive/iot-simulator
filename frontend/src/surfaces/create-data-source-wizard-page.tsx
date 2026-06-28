@@ -44,6 +44,11 @@ type WizardFormState = {
   scanUsername: string;
   schemaReviewNote: string;
   syntheticProfile: "steady" | "spike" | "cycle";
+  syntheticParameterCount: string;
+  syntheticValueMin: string;
+  syntheticValueMax: string;
+  syntheticUpdateInterval: string;
+  syntheticSeed: string;
 };
 
 const protocolOptions: ProtocolOption[] = [
@@ -170,6 +175,25 @@ function validationMessage(stepIndex: number, form: WizardFormState) {
       }
       if (form.importCompatStatus === "incompatible") {
         return "This artifact is not compatible. Choose a different artifact.";
+      }
+    }
+
+    if (form.basis === "synthetic") {
+      const min = Number(form.syntheticValueMin);
+      const max = Number(form.syntheticValueMax);
+      const count = Number(form.syntheticParameterCount);
+      const interval = Number(form.syntheticUpdateInterval);
+      if (!form.syntheticParameterCount.trim() || isNaN(count) || count < 1) {
+        return "Parameter count must be a positive number.";
+      }
+      if (isNaN(min) || isNaN(max)) {
+        return "Value range min and max must be numbers.";
+      }
+      if (min > max) {
+        return "Value range min must not be greater than max.";
+      }
+      if (!form.syntheticUpdateInterval.trim() || isNaN(interval) || interval < 1) {
+        return "Update interval must be a positive number (milliseconds).";
       }
     }
   }
@@ -349,6 +373,13 @@ function reviewLines(form: WizardFormState) {
       : []),
     { label: "Runtime behavior", value: runtimeLabel },
     { label: "Schema note", value: form.schemaReviewNote.trim() || "No note" },
+    ...(form.basis === "synthetic" ? [
+      { label: "Synthetic profile", value: form.syntheticProfile },
+      { label: "Parameters", value: form.syntheticParameterCount || "100" },
+      { label: "Value range", value: `${form.syntheticValueMin} – ${form.syntheticValueMax}` },
+      { label: "Update interval", value: `${form.syntheticUpdateInterval || "1000"} ms` },
+      { label: "Repeatability", value: form.syntheticSeed ? `Seed: ${form.syntheticSeed}` : "Non-deterministic" },
+    ] : []),
   ];
 }
 
@@ -385,6 +416,11 @@ export function CreateDataSourceWizardPage() {
     scanUsername: "",
     schemaReviewNote: "",
     syntheticProfile: "steady",
+    syntheticParameterCount: "100",
+    syntheticValueMin: "0",
+    syntheticValueMax: "100",
+    syntheticUpdateInterval: "1000",
+    syntheticSeed: "",
   });
 
   const currentValidationMessage = validationMessage(currentStep, form);
@@ -890,22 +926,83 @@ export function CreateDataSourceWizardPage() {
           ) : null}
 
           {form.basis === "synthetic" ? (
-            <label className="flex flex-col gap-2 text-sm text-shell-muted">
-              Synthetic profile
-              <select
-                className="shell-field"
-                value={form.syntheticProfile}
-                onChange={(event) =>
-                  updateForm({
-                    syntheticProfile: event.target.value as WizardFormState["syntheticProfile"],
-                  })
-                }
-              >
-                <option value="steady">Steady trend</option>
-                <option value="spike">Spike and recovery</option>
-                <option value="cycle">Cyclic pattern</option>
-              </select>
-            </label>
+            <div className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="flex flex-col gap-2 text-sm text-shell-muted">
+                  Profile
+                  <select
+                    className="shell-field"
+                    value={form.syntheticProfile}
+                    onChange={(event) =>
+                      updateForm({
+                        syntheticProfile: event.target.value as WizardFormState["syntheticProfile"],
+                      })
+                    }
+                  >
+                    <option value="steady">Steady trend</option>
+                    <option value="spike">Spike and recovery</option>
+                    <option value="cycle">Cyclic pattern</option>
+                  </select>
+                </label>
+                <label className="flex flex-col gap-2 text-sm text-shell-muted">
+                  Parameter count
+                  <input
+                    className="shell-field"
+                    inputMode="numeric"
+                    type="text"
+                    value={form.syntheticParameterCount}
+                    onChange={(e) => updateForm({ syntheticParameterCount: e.target.value })}
+                  />
+                </label>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="flex flex-col gap-2 text-sm text-shell-muted">
+                  Value range — min
+                  <input
+                    className="shell-field"
+                    inputMode="numeric"
+                    type="text"
+                    value={form.syntheticValueMin}
+                    onChange={(e) => updateForm({ syntheticValueMin: e.target.value })}
+                  />
+                </label>
+                <label className="flex flex-col gap-2 text-sm text-shell-muted">
+                  Value range — max
+                  <input
+                    className="shell-field"
+                    inputMode="numeric"
+                    type="text"
+                    value={form.syntheticValueMax}
+                    onChange={(e) => updateForm({ syntheticValueMax: e.target.value })}
+                  />
+                </label>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="flex flex-col gap-2 text-sm text-shell-muted">
+                  Update interval (ms)
+                  <input
+                    className="shell-field"
+                    inputMode="numeric"
+                    type="text"
+                    value={form.syntheticUpdateInterval}
+                    onChange={(e) => updateForm({ syntheticUpdateInterval: e.target.value })}
+                  />
+                </label>
+                <label className="flex flex-col gap-2 text-sm text-shell-muted">
+                  Repeatability seed
+                  <input
+                    className="shell-field"
+                    placeholder="Leave empty for non-deterministic"
+                    type="text"
+                    value={form.syntheticSeed}
+                    onChange={(e) => updateForm({ syntheticSeed: e.target.value })}
+                  />
+                </label>
+              </div>
+              <p className="text-xs text-shell-muted">
+                A seed makes runs repeatable with the same value sequence. Leave empty for non-deterministic output.
+              </p>
+            </div>
           ) : null}
         </div>
 
