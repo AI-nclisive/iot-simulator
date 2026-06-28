@@ -144,6 +144,12 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
                             }
                         }
                     }));
+            // Guard the connect window: if a cancel arrived while start() was
+            // connecting, the cancel handler ran with a null reference, so stop the
+            // now-started capture here instead of leaking the client and subscription.
+            if (serverObserver.isCancelled()) {
+                capture.get().stop();
+            }
         } catch (Exception e) {
             OpcUaClientSupport.reinterruptIfNeeded(e);
             responseObserver.onError(Status.UNAVAILABLE

@@ -28,10 +28,16 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(CaptureException.class)
-    public ProblemDetail captureConflict(CaptureException e) {
-        // The request is valid but the source cannot be captured right now (already
-        // capturing, unreachable, or unsupported in this runtime mode).
-        return problem(HttpStatus.CONFLICT, e.getMessage());
+    public ProblemDetail captureFailed(CaptureException e) {
+        // The request is valid, but the source cannot be captured — map by cause:
+        // a state conflict (already capturing), a capability the runtime lacks, or a
+        // real source that is temporarily unreachable.
+        HttpStatus status = switch (e.kind()) {
+            case CONFLICT -> HttpStatus.CONFLICT;
+            case UNSUPPORTED -> HttpStatus.NOT_IMPLEMENTED;
+            case UNAVAILABLE -> HttpStatus.SERVICE_UNAVAILABLE;
+        };
+        return problem(status, e.getMessage());
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

@@ -96,7 +96,8 @@ public class RecordingService {
             return new ActiveCapture(recording.id(), session);
         });
         if (!started[0]) {
-            throw new CaptureException("a capture is already running for this data source");
+            throw new CaptureException(
+                    CaptureException.Kind.CONFLICT, "a capture is already running for this data source");
         }
         return get(projectId, capture.recordingId());
     }

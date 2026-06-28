@@ -59,7 +59,8 @@ class RecordingCaptureControllerTest {
     @Test
     void startPropagatesCaptureConflict() {
         given(service.startCapture("p1", "ds1", "local"))
-                .willThrow(new CaptureException("a capture is already running for this data source"));
+                .willThrow(new CaptureException(
+                        CaptureException.Kind.CONFLICT, "a capture is already running for this data source"));
 
         assertThatThrownBy(() -> controller.start("p1", "ds1"))
                 .isInstanceOf(CaptureException.class);

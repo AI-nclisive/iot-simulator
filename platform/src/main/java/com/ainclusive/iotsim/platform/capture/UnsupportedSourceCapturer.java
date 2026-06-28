@@ -17,6 +17,6 @@ public class UnsupportedSourceCapturer implements SourceCapturer {
 
     @Override
     public CaptureSession startCapture(CaptureSpec spec, Consumer<List<NeutralValue>> sink) {
-        throw new CaptureException(MESSAGE);
+        throw new CaptureException(CaptureException.Kind.UNSUPPORTED, MESSAGE);
     }
 }

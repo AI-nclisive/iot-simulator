@@ -106,6 +106,10 @@ final class OpcUaCapture {
     }
 
     private static long sourceMicros(DataValue dv) {
+        // Prefer the source's own timestamp (the authoritative ordering key). When a
+        // server supplies none, fall back to the worker's wall clock so the change is
+        // still recorded with a sensible time — intentional, but note the recording
+        // may show jitter if the worker and source clocks differ.
         DateTime t = dv.getSourceTime();
         long millis = (t == null || t.getJavaTime() <= 0) ? System.currentTimeMillis() : t.getJavaTime();
         return millis * 1_000L;

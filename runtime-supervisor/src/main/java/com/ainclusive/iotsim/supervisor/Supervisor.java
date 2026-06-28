@@ -245,10 +245,10 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
             throw new IllegalStateException("supervisor is closed");
         }
         if (!OPC_UA.equals(spec.protocol())) {
-            throw new CaptureException(unsupportedMessage(spec.protocol()));
+            throw new CaptureException(CaptureException.Kind.UNSUPPORTED, unsupportedMessage(spec.protocol()));
         }
         if (isExternalRef(spec.credentials())) {
-            throw new CaptureException(EXTERNAL_REF_UNSUPPORTED);
+            throw new CaptureException(CaptureException.Kind.UNSUPPORTED, EXTERNAL_REF_UNSUPPORTED);
         }
         Map<String, ValueCodec.Kind> kinds = new HashMap<>();
         for (SchemaNode n : spec.schemaNodes()) {
@@ -267,7 +267,8 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
         try {
             launched = launcher.launch(spec.protocol(), controlPort);
         } catch (Exception e) {
-            throw new CaptureException("failed to launch " + spec.protocol() + " worker", e);
+            throw new CaptureException(
+                    CaptureException.Kind.UNAVAILABLE, "failed to launch " + spec.protocol() + " worker", e);
         }
         WorkerClient client = new WorkerClient("127.0.0.1", controlPort);
         try {
@@ -288,7 +289,7 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
         } catch (RuntimeException e) {
             closeQuietly(client);
             launched.close();
-            throw new CaptureException("failed to start capture", e);
+            throw new CaptureException(CaptureException.Kind.UNAVAILABLE, "failed to start capture", e);
         }
     }
 
