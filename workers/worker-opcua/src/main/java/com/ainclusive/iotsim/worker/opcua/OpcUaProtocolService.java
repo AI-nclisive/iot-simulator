@@ -3,6 +3,7 @@ package com.ainclusive.iotsim.worker.opcua;
 import com.ainclusive.iotsim.protocolmodel.ValueCodec;
 import com.ainclusive.iotsim.workercontract.WorkerContract;
 import com.ainclusive.iotsim.workercontract.v1.Ack;
+import com.ainclusive.iotsim.workercontract.v1.CaptureRequest;
 import com.ainclusive.iotsim.workercontract.v1.ConfigureRequest;
 import com.ainclusive.iotsim.workercontract.v1.ConnectionConfigMsg;
 import com.ainclusive.iotsim.workercontract.v1.HealthRequest;
@@ -19,6 +20,8 @@ import com.ainclusive.iotsim.workercontract.v1.TestConnectionRequest;
 import com.ainclusive.iotsim.workercontract.v1.TestConnectionResponse;
 import com.ainclusive.iotsim.workercontract.v1.Value;
 import com.ainclusive.iotsim.workercontract.v1.ValueBatch;
+import io.grpc.Status;
+import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
 import java.util.ArrayList;
 import java.util.List;
@@ -102,6 +105,57 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
                 .setMessage(orEmpty(outcome.message()))
                 .build());
         obs.onCompleted();
+    }
+
+    /**
+     * Live capture (IS-045): client-mode subscription to a real source. Streams every
+     * observed value change back as neutral {@link ValueBatch}es until the supervisor
+     * cancels the call. The request schema names the variables to subscribe to and
+     * carries each one's data type so values are encoded neutrally. No Configure/Start
+     * — this is stateless client mode, like Scan. See backend-specs/02 §6.
+     */
+    @Override
+    public void capture(CaptureRequest request, StreamObserver<ValueBatch> responseObserver) {
+        List<OpcUaCapture.NodeSpec> nodes = new ArrayList<>();
+        for (SchemaNodeMsg node : request.getSchema().getNodesList()) {
+            if ("VARIABLE".equals(node.getKind())) {
+                nodes.add(new OpcUaCapture.NodeSpec(node.getNodeId(), node.getDataType()));
+            }
+        }
+        ServerCallStreamObserver<ValueBatch> serverObserver =
+                (ServerCallStreamObserver<ValueBatch>) responseObserver;
+        // Register the cancel handler before starting so a cancel that races the
+        // connect still tears the capture down. onNext is serialized on the observer.
+        AtomicReference<OpcUaCapture> capture = new AtomicReference<>();
+        serverObserver.setOnCancelHandler(() -> {
+            OpcUaCapture c = capture.get();
+            if (c != null) {
+                c.stop();
+            }
+        });
+        OpcUaDiscovery.Credentials creds = credentials(request.getCredentials());
+        try {
+            capture.set(OpcUaCapture.start(
+                    request.getEndpointUrl(), creds.mode(), creds.username(), creds.secret(), nodes,
+                    batch -> {
+                        synchronized (serverObserver) {
+                            if (!serverObserver.isCancelled()) {
+                                responseObserver.onNext(ValueBatch.newBuilder().addAllValues(batch).build());
+                            }
+                        }
+                    }));
+            // Guard the connect window: if a cancel arrived while start() was
+            // connecting, the cancel handler ran with a null reference, so stop the
+            // now-started capture here instead of leaking the client and subscription.
+            if (serverObserver.isCancelled()) {
+                capture.get().stop();
+            }
+        } catch (Exception e) {
+            OpcUaClientSupport.reinterruptIfNeeded(e);
+            responseObserver.onError(Status.UNAVAILABLE
+                    .withDescription(OpcUaClientSupport.rootMessage(e))
+                    .asRuntimeException());
+        }
     }
 
     /** Maps the wire credential message to the discovery's session-only form. */

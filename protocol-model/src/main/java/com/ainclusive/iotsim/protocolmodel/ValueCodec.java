@@ -44,6 +44,22 @@ public final class ValueCodec {
         return new Encoded(Kind.TEXT, text(value.toString()));
     }
 
+    /**
+     * The {@link Kind} a value of the given neutral {@link DataType} encodes to.
+     * Lets a caller that holds a node's schema type (rather than a live value)
+     * decode timeline/IPC bytes — e.g. the supervisor decoding captured values
+     * (IS-045). Consistent with {@link #encode} for every type.
+     */
+    public static Kind kindOf(DataType type) {
+        return switch (type) {
+            case BOOL -> Kind.BOOL;
+            case STRING -> Kind.TEXT;
+            case BYTES -> Kind.BYTES;
+            case FLOAT32, FLOAT64 -> Kind.NUM;
+            case INT16, UINT16, INT32, UINT32, INT64, UINT64, DATETIME -> Kind.INT;
+        };
+    }
+
     public static Object decode(Kind kind, byte[] bytes) {
         if (bytes == null) {
             return null;

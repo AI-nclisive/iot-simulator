@@ -1,5 +1,9 @@
 package com.ainclusive.iotsim.supervisor;
 
+import com.ainclusive.iotsim.platform.capture.CaptureException;
+import com.ainclusive.iotsim.platform.capture.CaptureSession;
+import com.ainclusive.iotsim.platform.capture.CaptureSpec;
+import com.ainclusive.iotsim.platform.capture.SourceCapturer;
 import com.ainclusive.iotsim.platform.runtime.RuntimeController;
 import com.ainclusive.iotsim.platform.runtime.RuntimeStartSpec;
 import com.ainclusive.iotsim.platform.scan.ConnectionTestResult;
@@ -10,8 +14,10 @@ import com.ainclusive.iotsim.platform.scan.ScanStatus;
 import com.ainclusive.iotsim.platform.scan.SourceScanner;
 import com.ainclusive.iotsim.platform.secret.ConnectionCredentials;
 import com.ainclusive.iotsim.protocolmodel.NeutralValue;
+import com.ainclusive.iotsim.protocolmodel.NodeKind;
 import com.ainclusive.iotsim.protocolmodel.SchemaNode;
 import com.ainclusive.iotsim.protocolmodel.ValueCodec;
+import com.ainclusive.iotsim.workercontract.v1.CaptureRequest;
 import com.ainclusive.iotsim.workercontract.v1.ConnectionConfigMsg;
 import com.ainclusive.iotsim.workercontract.v1.Quality;
 import com.ainclusive.iotsim.workercontract.v1.ScanRequest;
@@ -21,8 +27,12 @@ import com.ainclusive.iotsim.workercontract.v1.SchemaNodeMsg;
 import com.ainclusive.iotsim.workercontract.v1.TestConnectionRequest;
 import com.ainclusive.iotsim.workercontract.v1.TestConnectionResponse;
 import com.ainclusive.iotsim.workercontract.v1.Value;
+import com.ainclusive.iotsim.workercontract.v1.ValueBatch;
 import com.google.protobuf.ByteString;
 import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -31,8 +41,10 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
@@ -56,7 +68,7 @@ import java.util.function.Function;
  *
  * <p>See backend-specs/02_WORKER_CONTRACT_AND_IPC.md §4.
  */
-public final class Supervisor implements RuntimeController, SourceScanner, AutoCloseable {
+public final class Supervisor implements RuntimeController, SourceScanner, SourceCapturer, AutoCloseable {
 
     private static final String RUNNING = "RUNNING";
     private static final String STOPPED = "STOPPED";
@@ -65,7 +77,7 @@ public final class Supervisor implements RuntimeController, SourceScanner, AutoC
     private static final String STALE = "STALE";
     private static final String OPC_UA = "OPC_UA";
     private static final String EXTERNAL_REF_UNSUPPORTED =
-            "external-ref credential resolution is not yet supported for scan (IS-082); "
+            "external-ref credential resolution is not yet supported for real-source access (IS-082); "
                     + "use anonymous or password credentials";
     private static final Duration READY_TIMEOUT = Duration.ofSeconds(10);
 
@@ -219,6 +231,68 @@ public final class Supervisor implements RuntimeController, SourceScanner, AutoC
         });
     }
 
+    /**
+     * Live capture from a running real source (record real data, IS-045). Spawns a
+     * long-lived worker in client mode that subscribes to the source's schema
+     * variables and streams observed value changes back; each batch is decoded
+     * against the schema's types and handed to {@code sink}. The returned session
+     * stops the stream (firing the worker's cancel handler) and tears the worker
+     * down. Only OPC UA is supported today. See backend-specs/02 §6.
+     */
+    @Override
+    public CaptureSession startCapture(CaptureSpec spec, Consumer<List<NeutralValue>> sink) {
+        if (closed) {
+            throw new IllegalStateException("supervisor is closed");
+        }
+        if (!OPC_UA.equals(spec.protocol())) {
+            throw new CaptureException(CaptureException.Kind.UNSUPPORTED, unsupportedMessage(spec.protocol()));
+        }
+        if (isExternalRef(spec.credentials())) {
+            throw new CaptureException(CaptureException.Kind.UNSUPPORTED, EXTERNAL_REF_UNSUPPORTED);
+        }
+        Map<String, ValueCodec.Kind> kinds = new HashMap<>();
+        for (SchemaNode n : spec.schemaNodes()) {
+            if (n.kind() == NodeKind.VARIABLE && n.dataType() != null) {
+                kinds.put(n.nodeId(), ValueCodec.kindOf(n.dataType()));
+            }
+        }
+        CaptureRequest request = CaptureRequest.newBuilder()
+                .setEndpointUrl(orEmpty(spec.endpointUrl()))
+                .setCredentials(toCredentialMsg(spec.credentials()))
+                .setSchema(toProtoSchema(spec.schemaVersion(), spec.schemaNodes()))
+                .build();
+
+        int controlPort = PortAllocator.freeLoopbackPort();
+        LaunchedWorker launched;
+        try {
+            launched = launcher.launch(spec.protocol(), controlPort);
+        } catch (Exception e) {
+            throw new CaptureException(
+                    CaptureException.Kind.UNAVAILABLE, "failed to launch " + spec.protocol() + " worker", e);
+        }
+        WorkerClient client = new WorkerClient("127.0.0.1", controlPort);
+        try {
+            awaitReady(client);
+            WorkerClient.CaptureHandle handle = client.capture(
+                    request,
+                    batch -> {
+                        List<NeutralValue> values = toNeutralValues(batch, kinds);
+                        if (!values.isEmpty()) {
+                            sink.accept(values);
+                        }
+                    },
+                    error -> {
+                        // Stream errors (incl. CANCELLED on stop) end the session; the
+                        // session owner tears the worker down via stop().
+                    });
+            return new SupervisorCaptureSession(handle, client, launched);
+        } catch (RuntimeException e) {
+            closeQuietly(client);
+            launched.close();
+            throw new CaptureException(CaptureException.Kind.UNAVAILABLE, "failed to start capture", e);
+        }
+    }
+
     /** Spawns a worker, runs one RPC against it, and always tears it back down. */
     private <T> T withWorker(String protocol, Function<WorkerClient, T> call) {
         if (closed) {
@@ -242,8 +316,63 @@ public final class Supervisor implements RuntimeController, SourceScanner, AutoC
     }
 
     private static boolean isExternalRef(ScanSpec spec) {
-        return spec.credentials() != null
-                && spec.credentials().mode() == ConnectionCredentials.Mode.EXTERNAL_REF;
+        return isExternalRef(spec.credentials());
+    }
+
+    private static boolean isExternalRef(ConnectionCredentials credentials) {
+        return credentials != null && credentials.mode() == ConnectionCredentials.Mode.EXTERNAL_REF;
+    }
+
+    /** Decodes a captured value batch into neutral values using the schema's types. */
+    private static List<NeutralValue> toNeutralValues(
+            ValueBatch batch, Map<String, ValueCodec.Kind> kinds) {
+        List<NeutralValue> out = new ArrayList<>(batch.getValuesCount());
+        for (Value v : batch.getValuesList()) {
+            ValueCodec.Kind kind = kinds.get(v.getNodeId());
+            if (kind == null) {
+                continue; // a value for a node not in the recording's schema; skip
+            }
+            Object value = ValueCodec.decode(kind, v.getValueEnc().toByteArray());
+            long micros = v.getSourceTimeMicros();
+            Instant sourceTime = Instant.ofEpochSecond(
+                    Math.floorDiv(micros, 1_000_000L), Math.floorMod(micros, 1_000_000L) * 1_000L);
+            String reason = v.getQualityReason().isEmpty() ? null : v.getQualityReason();
+            out.add(new NeutralValue(v.getNodeId(), sourceTime, value, neutralQuality(v.getQuality()), reason));
+        }
+        return out;
+    }
+
+    private static com.ainclusive.iotsim.protocolmodel.Quality neutralQuality(Quality wire) {
+        return switch (wire) {
+            case UNCERTAIN -> com.ainclusive.iotsim.protocolmodel.Quality.UNCERTAIN;
+            case BAD -> com.ainclusive.iotsim.protocolmodel.Quality.BAD;
+            default -> com.ainclusive.iotsim.protocolmodel.Quality.GOOD; // GOOD, UNSPECIFIED, UNRECOGNIZED
+        };
+    }
+
+    /** One live-capture session: cancels the worker stream and tears the worker down on stop. */
+    private static final class SupervisorCaptureSession implements CaptureSession {
+
+        private final WorkerClient.CaptureHandle handle;
+        private final WorkerClient client;
+        private final LaunchedWorker launched;
+        private final AtomicBoolean stopped = new AtomicBoolean();
+
+        SupervisorCaptureSession(
+                WorkerClient.CaptureHandle handle, WorkerClient client, LaunchedWorker launched) {
+            this.handle = handle;
+            this.client = client;
+            this.launched = launched;
+        }
+
+        @Override
+        public void stop() {
+            if (stopped.compareAndSet(false, true)) {
+                handle.cancel();
+                closeQuietly(client);
+                launched.close();
+            }
+        }
     }
 
     private static ConnectionConfigMsg toCredentialMsg(ConnectionCredentials credentials) {
@@ -314,9 +443,9 @@ public final class Supervisor implements RuntimeController, SourceScanner, AutoC
                 .build();
     }
 
-    private static Schema toProtoSchema(RuntimeStartSpec spec) {
-        Schema.Builder schema = Schema.newBuilder().setVersion(spec.schemaVersion());
-        for (SchemaNode n : spec.schemaNodes()) {
+    private static Schema toProtoSchema(int version, List<SchemaNode> nodes) {
+        Schema.Builder schema = Schema.newBuilder().setVersion(version);
+        for (SchemaNode n : nodes) {
             schema.addNodes(SchemaNodeMsg.newBuilder()
                     .setNodeId(n.nodeId())
                     .setParentId(orEmpty(n.parentId()))
@@ -427,7 +556,8 @@ public final class Supervisor implements RuntimeController, SourceScanner, AutoC
             WorkerClient newClient = new WorkerClient("127.0.0.1", controlPort);
             try {
                 awaitReady(newClient);
-                newClient.configure(toProtoSchema(spec), spec.listenPort());
+                newClient.configure(
+                        toProtoSchema(spec.schemaVersion(), spec.schemaNodes()), spec.listenPort());
                 newClient.start();
             } catch (RuntimeException e) {
                 newClient.close();

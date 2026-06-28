@@ -1,13 +1,16 @@
 package com.ainclusive.iotsim.supervisor;
 
+import com.ainclusive.iotsim.protocolmodel.ValueCodec;
 import com.ainclusive.iotsim.workercontract.WorkerContract;
 import com.ainclusive.iotsim.workercontract.v1.Ack;
+import com.ainclusive.iotsim.workercontract.v1.CaptureRequest;
 import com.ainclusive.iotsim.workercontract.v1.ConfigureRequest;
 import com.ainclusive.iotsim.workercontract.v1.HealthRequest;
 import com.ainclusive.iotsim.workercontract.v1.HealthResponse;
 import com.ainclusive.iotsim.workercontract.v1.HelloRequest;
 import com.ainclusive.iotsim.workercontract.v1.HelloResponse;
 import com.ainclusive.iotsim.workercontract.v1.ProtocolDataSourceGrpc;
+import com.ainclusive.iotsim.workercontract.v1.Quality;
 import com.ainclusive.iotsim.workercontract.v1.ScanRequest;
 import com.ainclusive.iotsim.workercontract.v1.ScanResponse;
 import com.ainclusive.iotsim.workercontract.v1.SchemaNodeMsg;
@@ -15,8 +18,13 @@ import com.ainclusive.iotsim.workercontract.v1.StartRequest;
 import com.ainclusive.iotsim.workercontract.v1.StopRequest;
 import com.ainclusive.iotsim.workercontract.v1.TestConnectionRequest;
 import com.ainclusive.iotsim.workercontract.v1.TestConnectionResponse;
+import com.ainclusive.iotsim.workercontract.v1.Value;
 import com.ainclusive.iotsim.workercontract.v1.ValueBatch;
+import com.google.protobuf.ByteString;
+import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -28,6 +36,8 @@ final class TestProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSourc
     private final AtomicInteger configuredNodes = new AtomicInteger();
     private final AtomicReference<ScanRequest> lastScan = new AtomicReference<>();
     private final AtomicReference<TestConnectionRequest> lastTestConnection = new AtomicReference<>();
+    private final AtomicReference<CaptureRequest> lastCapture = new AtomicReference<>();
+    private final CountDownLatch captureCancelled = new CountDownLatch(1);
     private volatile boolean healthLive = true;
     private volatile boolean healthHang;
 
@@ -38,6 +48,16 @@ final class TestProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSourc
 
     TestConnectionRequest lastTestConnectionRequest() {
         return lastTestConnection.get();
+    }
+
+    /** The capture request the supervisor sent, for asserting endpoint/credential/schema mapping. */
+    CaptureRequest lastCaptureRequest() {
+        return lastCapture.get();
+    }
+
+    /** Waits until the supervisor cancels the capture stream (stop()). */
+    boolean awaitCaptureCancelled(long timeoutSeconds) throws InterruptedException {
+        return captureCancelled.await(timeoutSeconds, TimeUnit.SECONDS);
     }
 
     long appliedCount() {
@@ -103,6 +123,22 @@ final class TestProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSourc
                 .setMessage("discovered 1 nodes")
                 .build());
         obs.onCompleted();
+    }
+
+    @Override
+    public void capture(CaptureRequest request, StreamObserver<ValueBatch> obs) {
+        lastCapture.set(request);
+        ((ServerCallStreamObserver<ValueBatch>) obs).setOnCancelHandler(captureCancelled::countDown);
+        // Emit one value the supervisor must decode against the request schema's types.
+        ValueCodec.Encoded enc = ValueCodec.encode(21.5);
+        obs.onNext(ValueBatch.newBuilder()
+                .addValues(Value.newBuilder()
+                        .setNodeId("temp")
+                        .setSourceTimeMicros(1_000_000L)
+                        .setValueEnc(ByteString.copyFrom(enc.bytes()))
+                        .setQuality(Quality.GOOD))
+                .build());
+        // Stream stays open until the supervisor cancels (stop()).
     }
 
     @Override

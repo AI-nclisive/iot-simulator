@@ -41,6 +41,9 @@ used so values and events flow continuously.
 | `Configure` | sup→wkr | Provide schema (neutral model), protocol bindings, listen port, runtime options. |
 | `Start` | sup→wkr | Begin serving the protocol endpoint. |
 | `Stop` | sup→wkr | Stop serving; keep process alive for reuse or shutdown. |
+| `TestConnection` | sup→wkr | Probe a real endpoint's reachability/auth (client mode); for create-from-scan. |
+| `Scan` | sup→wkr | Browse a real endpoint's address space into neutral schema nodes (client mode); for create-from-scan. |
+| `Capture` | sup→wkr (resp stream) | Subscribe to a real endpoint's schema variables (client mode) and stream every observed value change back as neutral batches until cancelled; the recording-in path. |
 | `ApplyValues` | sup→wkr (stream) | Push neutral value batches to project onto the protocol address space (replay/synthetic/live). |
 | `ClientEvents` | wkr→sup (stream) | Client connect/disconnect, subscription activity. |
 | `RuntimeEvents` | wkr→sup (stream) | Source start/stop, errors, fault state changes. |
@@ -78,10 +81,13 @@ States: `SPAWNED → READY (Hello ok) → CONFIGURED → RUNNING → STOPPED →
 
 - **Live/replay/synthetic out**: supervisor → `ApplyValues` stream → worker
   projects onto protocol address space.
-- **Recording in**: when recording a *real* source, the scan/record path reads
-  the real endpoint (a worker may act as client, or a dedicated reader) and
-  produces neutral values into the recording timeline. The two data paths
-  (full-fidelity recording vs conflated live) stay distinct per
+- **Recording in**: when recording a *real* source, the supervisor drives a
+  worker in **client mode** via the `Capture` RPC (IS-045) — symmetric with
+  `Scan`. The worker connects to the real endpoint, subscribes to the schema's
+  variable nodes (every change, no sampling, per `01 §`), and streams neutral
+  `ValueBatch`es back; the supervisor decodes them against the schema's types and
+  appends them to the recording timeline. Cancelling the call stops capture. The
+  two data paths (full-fidelity recording vs conflated live) stay distinct per
   `ARCHITECTURE.md`.
 
 ## 7. What lives where
@@ -97,5 +103,7 @@ States: `SPAWNED → READY (Hello ok) → CONFIGURED → RUNNING → STOPPED →
 - Approve gRPC + protobuf as new dependencies (D1).
 - Confirm one-process-per-source (vs. a worker hosting multiple sources). Default
   proposal: one source per process for clean isolation.
-- Confirm whether real-source reading during scan/record is done by a worker in
-  "client mode" or a separate in-backend reader.
+- ~~Confirm whether real-source reading during scan/record is done by a worker in
+  "client mode" or a separate in-backend reader.~~ **Resolved:** worker in client
+  mode (`Scan`/`TestConnection`, IS-043; `Capture`, IS-045) — keeps all
+  protocol-specific code in workers (§7).

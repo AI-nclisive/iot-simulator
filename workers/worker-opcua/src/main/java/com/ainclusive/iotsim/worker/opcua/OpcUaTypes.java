@@ -1,5 +1,6 @@
 package com.ainclusive.iotsim.worker.opcua;
 
+import com.ainclusive.iotsim.protocolmodel.DataType;
 import com.ainclusive.iotsim.protocolmodel.ValueCodec;
 import java.util.Date;
 import org.eclipse.milo.opcua.stack.core.Identifiers;
@@ -75,13 +76,11 @@ final class OpcUaTypes {
     }
 
     static ValueCodec.Kind codecKind(String dataType) {
-        return switch (dataType) {
-            case "BOOL" -> ValueCodec.Kind.BOOL;
-            case "STRING" -> ValueCodec.Kind.TEXT;
-            case "BYTES" -> ValueCodec.Kind.BYTES;
-            case "FLOAT32", "FLOAT64" -> ValueCodec.Kind.NUM;
-            default -> ValueCodec.Kind.INT; // integers + DATETIME (epoch millis)
-        };
+        try {
+            return ValueCodec.kindOf(DataType.valueOf(dataType));
+        } catch (IllegalArgumentException unknownOrEmpty) {
+            return ValueCodec.Kind.INT; // unknown/empty -> default (integers + DATETIME)
+        }
     }
 
     static Object defaultValue(String dataType) {
@@ -99,6 +98,32 @@ final class OpcUaTypes {
             case "BYTES" -> ByteString.of(new byte[0]);
             case "DATETIME" -> new DateTime();
             default -> "";
+        };
+    }
+
+    /**
+     * Converts a value read from a real OPC UA source (Milo Java type) into the
+     * protocol-neutral Java value that {@link ValueCodec#encode} expects for the
+     * node's data type — the reverse of {@link #toOpcUaValue}, used by live capture
+     * (IS-045). Unsigned/integer types collapse to {@code Long}, floats to
+     * {@code Double}, {@code DateTime} to epoch millis, so the encoded
+     * {@link ValueCodec.Kind} matches {@link #codecKind}. Returns {@code null} for a
+     * null/absent value (recorded as a missing value, never coerced to a wrong type).
+     */
+    static Object fromOpcUaValue(String dataType, Object value) {
+        if (value == null) {
+            return null;
+        }
+        return switch (codecKind(dataType)) {
+            case BOOL -> value instanceof Boolean b ? b : Boolean.parseBoolean(value.toString());
+            case NUM -> ((Number) value).doubleValue();
+            case INT -> "DATETIME".equals(dataType) && value instanceof DateTime dt
+                    ? dt.getJavaTime()
+                    : ((Number) value).longValue();
+            case BYTES -> value instanceof ByteString bs
+                    ? (bs.bytes() == null ? new byte[0] : bs.bytes())
+                    : (byte[]) value;
+            case TEXT -> value.toString();
         };
     }
 
