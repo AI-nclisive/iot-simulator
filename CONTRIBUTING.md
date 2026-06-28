@@ -18,6 +18,31 @@ npm run build          # production frontend build
 ```
 Run these and confirm green before opening a PR.
 
+## Claude Code skills
+
+This workflow is encoded as **Claude Code project skills** under `.claude/skills/`
+so every contributor/agent runs it the same way. The skills hold the executable
+steps (and `gh` commands); the rules below remain the source of truth. Invoke a
+skill by typing its slash command.
+
+| Skill | Use it to |
+| --- | --- |
+| `/start-task IS-XXX` | Claim a task before coding: verify free → board **In Progress** → linked branch. |
+| `/open-pr` | Run DoD checks, flip the catalog box in-PR, open the PR, arm auto-merge, board **In review**. |
+| `/review-loop` | Work the Claude PR review to completion (fix/rebut → push → repeat). |
+| `/new-worker <proto>` | Scaffold a new out-of-process protocol worker (contract impl; no supervisor change). |
+| `/flyway-migration <name>` | Add a collision-safe, append-only DB migration. |
+| `/board-sync` | Reconcile org Project #1 with the task catalogs. |
+
+Recommended **built-in** skills, by stage (run locally to cut review rounds):
+- Before `/open-pr`: **`/code-review`** (correctness + cleanup) and
+  **`/security-review`** (no secrets/PKI, authz, exportable artifacts) — the CI
+  Claude reviewer runs anyway, but local passes shorten the loop.
+- For behavior-affecting changes: **`/verify`** or **`/run`** to confirm it works,
+  not just compiles.
+- Environment: **`/fewer-permission-prompts`** to trim repeated `gh`/Gradle/npm
+  prompts; **`update-config`** to wire any team-agreed hooks into `settings.json`.
+
 ## Task IDs
 - Backend / repo / process: **`IS-XXX [AREA] short name`** from
   `backend-specs/TASKS.md` (`[AREA]` is `[BE]` or `[SDLC]`).
