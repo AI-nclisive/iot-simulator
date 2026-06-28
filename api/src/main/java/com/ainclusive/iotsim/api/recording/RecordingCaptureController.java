@@ -1,0 +1,52 @@
+package com.ainclusive.iotsim.api.recording;
+
+import com.ainclusive.iotsim.api.recording.RecordingController.RecordingResponse;
+import com.ainclusive.iotsim.domain.recording.Recording;
+import com.ainclusive.iotsim.domain.recording.RecordingService;
+import java.net.URI;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+/**
+ * Live capture of real data into a recording (IS-045): start/stop recording a
+ * running real source. Mirrors backend-specs/05_API_CONTRACT.md §Recordings
+ * ({@code POST .../data-sources/{id}/recording/start|stop}). Start connects to the
+ * source's real endpoint in client mode and streams observed value changes into a
+ * new recording; stop ends the capture and finalizes the recording.
+ */
+@RestController
+@RequestMapping("/api/v1/projects/{projectId}/data-sources/{dataSourceId}/recording")
+public class RecordingCaptureController {
+
+    private final RecordingService recordings;
+
+    public RecordingCaptureController(RecordingService recordings) {
+        this.recordings = recordings;
+    }
+
+    /** Starts capturing the real source into a new recording; 201 with the recording. */
+    @PostMapping("/start")
+    public ResponseEntity<RecordingResponse> start(
+            @PathVariable String projectId, @PathVariable String dataSourceId) {
+        Recording recording = recordings.startCapture(projectId, dataSourceId, "local");
+        return ResponseEntity.created(
+                        URI.create("/api/v1/projects/" + projectId + "/recordings/" + recording.id()))
+                .eTag(etag(recording.version()))
+                .body(RecordingResponse.from(recording));
+    }
+
+    /** Stops the active capture and finalizes its recording; 200 with the recording. */
+    @PostMapping("/stop")
+    public ResponseEntity<RecordingResponse> stop(
+            @PathVariable String projectId, @PathVariable String dataSourceId) {
+        Recording recording = recordings.stopCapture(projectId, dataSourceId);
+        return ResponseEntity.ok().eTag(etag(recording.version())).body(RecordingResponse.from(recording));
+    }
+
+    private static String etag(long version) {
+        return "\"" + version + "\"";
+    }
+}

@@ -2,6 +2,7 @@ package com.ainclusive.iotsim.supervisor;
 
 import com.ainclusive.iotsim.workercontract.WorkerContract;
 import com.ainclusive.iotsim.workercontract.v1.Ack;
+import com.ainclusive.iotsim.workercontract.v1.CaptureRequest;
 import com.ainclusive.iotsim.workercontract.v1.ConfigureRequest;
 import com.ainclusive.iotsim.workercontract.v1.HealthRequest;
 import com.ainclusive.iotsim.workercontract.v1.HealthResponse;
@@ -19,12 +20,15 @@ import com.ainclusive.iotsim.workercontract.v1.Value;
 import com.ainclusive.iotsim.workercontract.v1.ValueBatch;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import io.grpc.stub.ClientCallStreamObserver;
+import io.grpc.stub.ClientResponseObserver;
 import io.grpc.stub.StreamObserver;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 /**
  * Supervisor-side IPC client to one worker over loopback gRPC. The {@code hello}
@@ -104,6 +108,56 @@ public final class WorkerClient implements AutoCloseable {
         } catch (RuntimeException e) {
             return false;
         }
+    }
+
+    /**
+     * Opens a live-capture stream: the worker subscribes to the real source and
+     * streams observed value batches back until the returned handle is cancelled
+     * (server-streaming, IS-045). {@code onBatch} is called per published batch;
+     * {@code onError} on a non-cancel stream failure. The handle's
+     * {@link CaptureHandle#cancel() cancel} ends the stream, which fires the
+     * worker's cancel handler so it stops the subscription.
+     */
+    public CaptureHandle capture(CaptureRequest request, Consumer<ValueBatch> onBatch,
+            Consumer<Throwable> onError) {
+        ProtocolDataSourceGrpc.ProtocolDataSourceStub async = ProtocolDataSourceGrpc.newStub(channel);
+        AtomicReference<ClientCallStreamObserver<CaptureRequest>> requestStream = new AtomicReference<>();
+        ClientResponseObserver<CaptureRequest, ValueBatch> observer = new ClientResponseObserver<>() {
+            @Override
+            public void beforeStart(ClientCallStreamObserver<CaptureRequest> stream) {
+                requestStream.set(stream);
+            }
+
+            @Override
+            public void onNext(ValueBatch batch) {
+                onBatch.accept(batch);
+            }
+
+            @Override
+            public void onError(Throwable t) {
+                if (onError != null) {
+                    onError.accept(t);
+                }
+            }
+
+            @Override
+            public void onCompleted() {
+                // server-streaming ends only via cancel; nothing to do
+            }
+        };
+        async.capture(request, observer);
+        return () -> {
+            ClientCallStreamObserver<CaptureRequest> stream = requestStream.get();
+            if (stream != null) {
+                stream.cancel("capture stopped", null);
+            }
+        };
+    }
+
+    /** Cancels an in-progress {@link #capture} stream. */
+    @FunctionalInterface
+    public interface CaptureHandle {
+        void cancel();
     }
 
     /** Streams values to the worker (client-streaming) and waits for the ack. */

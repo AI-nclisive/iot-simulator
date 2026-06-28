@@ -2,6 +2,7 @@ package com.ainclusive.iotsim.api.error;
 
 import com.ainclusive.iotsim.domain.common.ConcurrencyConflictException;
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
+import com.ainclusive.iotsim.platform.capture.CaptureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -24,6 +25,13 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(PreconditionRequiredException.class)
     public ProblemDetail preconditionRequired(PreconditionRequiredException e) {
         return problem(HttpStatus.PRECONDITION_REQUIRED, e.getMessage());
+    }
+
+    @ExceptionHandler(CaptureException.class)
+    public ProblemDetail captureConflict(CaptureException e) {
+        // The request is valid but the source cannot be captured right now (already
+        // capturing, unreachable, or unsupported in this runtime mode).
+        return problem(HttpStatus.CONFLICT, e.getMessage());
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

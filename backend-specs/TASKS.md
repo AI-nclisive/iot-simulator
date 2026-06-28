@@ -21,8 +21,8 @@ dependency-ordered. (Optimized for "make the simulator real end to end, then
 broaden, then harden for teams" — can be re-weighted if the near-term goal
 differs.)
 
-Snapshot: **build green, 124 tests / 32 suites, 0 skipped.** 64 done · 1 partial ·
-50 todo (115 total). Live status is the board; this line is a periodic snapshot.
+Snapshot: **build green, 182 tests / 39 suites, 0 skipped.** 65 done · 1 partial ·
+49 todo (115 total). Live status is the board; this line is a periodic snapshot.
 
 <details>
 <summary>ID crosswalk — legacy <code>BE-*</code> / <code>SDLC-*</code> → <code>IS-XXX</code></summary>
@@ -154,7 +154,7 @@ Make `Scan → Record → Replay` work against real instruments, not provided va
 - [x] IS-116 [BE] ✅ [source] Credential-handling test hardening (stale-update touches no secret, constructor secret normalization, mode mapping) — 08/05
 - [x] IS-043 [BE] ✅ [source] Create from scan (real-source discovery) — SPEC: Create From Scan
 - [x] IS-044 [BE] ✅ [schema] Scan-derived schema population — 01
-- [ ] IS-045 [BE] ⬜ [recording] Live capture from a running real source → recording — SPEC: Record Real Data
+- [x] IS-045 [BE] ✅ [recording] Live capture from a running real source → recording — SPEC: Record Real Data
 
 ## Wave C — Observability & evidence · P0
 
@@ -223,8 +223,9 @@ Make runs observable and produce the P0 evidence artifact.
 
 ## Recommended immediate next
 
-**Wave B, `IS-043 → IS-044 → IS-045`** (create-from-scan → scan-derived schema →
-live capture): Wave A runtime fidelity is complete and credential handling
-(`IS-042`) is in place, so the primary `Scan → Record → Replay` flow can now be
-built against a *real* source. Start with `IS-043` (real-source discovery), which
-the credential mechanism from `IS-042` unblocks.
+**Wave C — observability & evidence.** Wave B is complete: the primary
+`Scan → Record → Replay` flow now works against a *real* source
+(`IS-043 → IS-044 → IS-045`). Next, make runs observable and produce the P0
+evidence artifact, starting with the SSE/event plumbing
+(`IS-046 → IS-047 → IS-048 → IS-049`) that live values, client/health observation,
+and runtime-event history build on.

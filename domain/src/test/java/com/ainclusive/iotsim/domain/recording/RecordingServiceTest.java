@@ -8,8 +8,20 @@ import com.ainclusive.iotsim.persistence.datasource.DataSourceRepository;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRow;
 import com.ainclusive.iotsim.persistence.recording.RecordingRepository;
 import com.ainclusive.iotsim.persistence.recording.RecordingRow;
+import com.ainclusive.iotsim.persistence.schema.SchemaRepository;
+import com.ainclusive.iotsim.persistence.schema.SchemaWithNodes;
 import com.ainclusive.iotsim.persistence.timeline.ValueTimelineRepository;
+import com.ainclusive.iotsim.platform.capture.CaptureException;
+import com.ainclusive.iotsim.platform.capture.CaptureSession;
+import com.ainclusive.iotsim.platform.capture.CaptureSpec;
+import com.ainclusive.iotsim.platform.capture.SourceCapturer;
+import com.ainclusive.iotsim.platform.secret.InMemoryCredentialStore;
+import com.ainclusive.iotsim.protocolmodel.Access;
+import com.ainclusive.iotsim.protocolmodel.DataType;
 import com.ainclusive.iotsim.protocolmodel.NeutralValue;
+import com.ainclusive.iotsim.protocolmodel.NodeKind;
+import com.ainclusive.iotsim.protocolmodel.SchemaNode;
+import com.ainclusive.iotsim.protocolmodel.ValueRank;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -18,6 +30,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -25,15 +39,25 @@ class RecordingServiceTest {
 
     private static final String PROJECT = "proj-1";
     private static final String SOURCE = "ds-1";
+    private static final String ENDPOINT = "opc.tcp://real:4840/iotsim";
 
     private RecordingService service;
+    private FakeDataSourceRepository sources;
+    private FakeSchemaRepository schemas;
+    private FakeCapturer capturer;
 
     @BeforeEach
     void setUp() {
+        sources = new FakeDataSourceRepository(SOURCE, PROJECT, ENDPOINT);
+        schemas = new FakeSchemaRepository();
+        capturer = new FakeCapturer();
         service = new RecordingService(
                 new InMemoryRecordingRepository(),
                 new InMemoryValueTimelineRepository(),
-                new FakeDataSourceRepository(SOURCE, PROJECT));
+                sources,
+                schemas,
+                new InMemoryCredentialStore(),
+                capturer);
     }
 
     @Test
@@ -68,6 +92,110 @@ class RecordingServiceTest {
     void getMissingThrowsNotFound() {
         assertThatThrownBy(() -> service.get(PROJECT, "nope"))
                 .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void startCaptureCreatesRecordingAndStreamsValuesUntilStop() {
+        schemas.set(2, List.of(variable("temp", DataType.FLOAT64)));
+
+        Recording started = service.startCapture(PROJECT, SOURCE, "alice");
+        assertThat(started.origin()).isEqualTo("SCAN_RECORD");
+        assertThat(started.schemaVersion()).isEqualTo(2);
+        // The capturer was driven against the real endpoint with the source schema.
+        assertThat(capturer.spec.endpointUrl()).isEqualTo(ENDPOINT);
+        assertThat(capturer.spec.schemaVersion()).isEqualTo(2);
+
+        // A live value batch arriving from the source is appended to the recording.
+        Instant t = Instant.parse("2026-01-01T00:00:00Z");
+        capturer.emit(List.of(
+                NeutralValue.good("temp", t, 21.5),
+                NeutralValue.good("temp", t.plusSeconds(1), 22.0)));
+
+        Recording stopped = service.stopCapture(PROJECT, SOURCE);
+        assertThat(stopped.id()).isEqualTo(started.id());
+        assertThat(stopped.valueCount()).isEqualTo(2);
+        assertThat(capturer.stopped).isTrue();
+    }
+
+    @Test
+    void startCaptureWhileAlreadyCapturingIsRejected() {
+        schemas.set(1, List.of(variable("temp", DataType.FLOAT64)));
+        service.startCapture(PROJECT, SOURCE, "alice");
+
+        assertThatThrownBy(() -> service.startCapture(PROJECT, SOURCE, "bob"))
+                .isInstanceOf(CaptureException.class)
+                .hasMessageContaining("already running");
+    }
+
+    @Test
+    void startCaptureWithoutSchemaIsRejected() {
+        schemas.clear();
+        assertThatThrownBy(() -> service.startCapture(PROJECT, SOURCE, "a"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("no schema");
+    }
+
+    @Test
+    void startCaptureWithoutEndpointIsRejected() {
+        sources.endpoint = null;
+        schemas.set(1, List.of(variable("temp", DataType.FLOAT64)));
+        assertThatThrownBy(() -> service.startCapture(PROJECT, SOURCE, "a"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("endpoint");
+    }
+
+    @Test
+    void stopCaptureWithoutActiveCaptureIsRejected() {
+        assertThatThrownBy(() -> service.stopCapture(PROJECT, SOURCE))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("no active capture");
+    }
+
+    private static SchemaNode variable(String nodeId, DataType type) {
+        return new SchemaNode(nodeId, null, "/" + nodeId, nodeId, NodeKind.VARIABLE,
+                type, ValueRank.SCALAR, Access.READ, null, null);
+    }
+
+    /** Captures the sink so a test can emit live value batches, and records stop(). */
+    private static final class FakeCapturer implements SourceCapturer {
+        private CaptureSpec spec;
+        private Consumer<List<NeutralValue>> sink;
+        private boolean stopped;
+
+        @Override
+        public CaptureSession startCapture(CaptureSpec spec, Consumer<List<NeutralValue>> sink) {
+            this.spec = spec;
+            this.sink = sink;
+            return () -> stopped = true;
+        }
+
+        void emit(List<NeutralValue> values) {
+            sink.accept(values);
+        }
+    }
+
+    private static final class FakeSchemaRepository implements SchemaRepository {
+        private Supplier<Optional<SchemaWithNodes>> current = Optional::empty;
+
+        void set(int version, List<SchemaNode> nodes) {
+            SchemaWithNodes schema = new SchemaWithNodes(
+                    "sch-1", SOURCE, version, OffsetDateTime.now(ZoneOffset.UTC), nodes);
+            current = () -> Optional.of(schema);
+        }
+
+        void clear() {
+            current = Optional::empty;
+        }
+
+        @Override
+        public Optional<SchemaWithNodes> findCurrent(String dataSourceId) {
+            return current.get();
+        }
+
+        @Override
+        public SchemaWithNodes saveNewVersion(String dataSourceId, List<SchemaNode> nodes) {
+            throw new UnsupportedOperationException();
+        }
     }
 
     private static final class InMemoryRecordingRepository implements RecordingRepository {
@@ -136,10 +264,12 @@ class RecordingServiceTest {
     private static final class FakeDataSourceRepository implements DataSourceRepository {
         private final String id;
         private final String projectId;
+        private String endpoint;
 
-        FakeDataSourceRepository(String id, String projectId) {
+        FakeDataSourceRepository(String id, String projectId, String endpoint) {
             this.id = id;
             this.projectId = projectId;
+            this.endpoint = endpoint;
         }
 
         @Override
@@ -148,8 +278,8 @@ class RecordingServiceTest {
                 return Optional.empty();
             }
             OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-            return Optional.of(new DataSourceRow(id, projectId, "src", "OPC_UA", "MANUAL",
-                    null, 2, "{}", "{}", false, now, now, "local", 0));
+            return Optional.of(new DataSourceRow(id, projectId, "src", "OPC_UA", "SCAN",
+                    "sch-1", 2, endpoint, "{}", false, now, now, "local", 0));
         }
 
         @Override

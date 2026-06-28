@@ -1,5 +1,7 @@
 package com.ainclusive.iotsim.app.config;
 
+import com.ainclusive.iotsim.platform.capture.SourceCapturer;
+import com.ainclusive.iotsim.platform.capture.UnsupportedSourceCapturer;
 import com.ainclusive.iotsim.platform.runtime.InMemoryRuntimeController;
 import com.ainclusive.iotsim.platform.runtime.RuntimeController;
 import com.ainclusive.iotsim.platform.scan.SourceScanner;
@@ -41,5 +43,19 @@ public class RuntimeConfig {
             return scanner;
         }
         return new UnsupportedSourceScanner();
+    }
+
+    /**
+     * Reuses the supervisor as the live capturer when in supervisor mode (it drives a
+     * worker in client mode to record a real source); otherwise capture is
+     * unsupported. Depends on the runtime-controller bean so exactly one supervisor
+     * is created.
+     */
+    @Bean
+    public SourceCapturer sourceCapturer(RuntimeController runtimeController) {
+        if (runtimeController instanceof SourceCapturer capturer) {
+            return capturer;
+        }
+        return new UnsupportedSourceCapturer();
     }
 }

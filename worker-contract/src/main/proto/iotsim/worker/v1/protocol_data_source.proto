@@ -22,6 +22,14 @@ service ProtocolDataSource {
   rpc TestConnection (TestConnectionRequest) returns (TestConnectionResponse);
   rpc Scan (ScanRequest) returns (ScanResponse);
 
+  // Live capture (record real data). Like Scan, the worker acts as a protocol
+  // CLIENT against a real endpoint — but instead of one-shot browsing it
+  // subscribes to the schema's variable nodes and streams every observed value
+  // change back as neutral ValueBatches until the supervisor cancels the call.
+  // Stateless/client mode — no Configure/Start needed. The recording-in path,
+  // kept distinct from the conflated live-out path. See backend-specs/02 §6.
+  rpc Capture (CaptureRequest) returns (stream ValueBatch);
+
   // Supervisor pushes neutral value batches for the worker to project onto its
   // native protocol address space (replay / synthetic / live).
   rpc ApplyValues (stream ValueBatch) returns (Ack);
@@ -115,6 +123,17 @@ message ScanResponse {
   int32 discovered_count = 4;
   int32 unknown_count = 5;            // VARIABLE nodes whose type could not be mapped
   string message = 6;
+}
+
+// ---- Live capture / record real data ----
+
+message CaptureRequest {
+  string endpoint_url = 1;            // the real source to record from
+  ConnectionConfigMsg credentials = 2;
+  // The data-source schema: its VARIABLE nodes are subscribed to, and each node's
+  // data_type tells the worker how to encode observed values into neutral
+  // value_enc bytes (so the supervisor can decode them without re-reading types).
+  Schema schema = 3;
 }
 
 // ---- Values ----

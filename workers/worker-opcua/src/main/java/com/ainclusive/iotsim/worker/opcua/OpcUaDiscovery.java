@@ -11,15 +11,9 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.eclipse.milo.opcua.sdk.client.OpcUaClient;
-import org.eclipse.milo.opcua.sdk.client.api.identity.AnonymousProvider;
-import org.eclipse.milo.opcua.sdk.client.api.identity.IdentityProvider;
-import org.eclipse.milo.opcua.sdk.client.api.identity.UsernameProvider;
 import org.eclipse.milo.opcua.stack.core.AttributeId;
 import org.eclipse.milo.opcua.stack.core.Identifiers;
 import org.eclipse.milo.opcua.stack.core.NamespaceTable;
-import org.eclipse.milo.opcua.stack.core.StatusCodes;
-import org.eclipse.milo.opcua.stack.core.UaException;
-import org.eclipse.milo.opcua.stack.core.security.SecurityPolicy;
 import org.eclipse.milo.opcua.stack.core.types.builtin.ByteString;
 import org.eclipse.milo.opcua.stack.core.types.builtin.DataValue;
 import org.eclipse.milo.opcua.stack.core.types.builtin.LocalizedText;
@@ -49,15 +43,13 @@ import org.eclipse.milo.opcua.stack.core.types.structured.ReferenceDescription;
  */
 final class OpcUaDiscovery {
 
-    static final String OK = "OK";
+    static final String OK = OpcUaClientSupport.OK;
     static final String PARTIAL = "PARTIAL";
-    static final String UNREACHABLE = "UNREACHABLE";
-    static final String AUTH_FAILURE = "AUTH_FAILURE";
+    static final String UNREACHABLE = OpcUaClientSupport.UNREACHABLE;
+    static final String AUTH_FAILURE = OpcUaClientSupport.AUTH_FAILURE;
 
     private static final int DEFAULT_MAX_NODES = 5_000;
-    private static final long CONNECT_TIMEOUT_SECONDS = 15;
     private static final long READ_TIMEOUT_SECONDS = 10;
-    private static final int REQUEST_TIMEOUT_MILLIS = 10_000;
 
     private OpcUaDiscovery() {}
 
@@ -76,10 +68,10 @@ final class OpcUaDiscovery {
             client = connect(endpointUrl, credentials);
             return new ConnectionTest(OK, "connection succeeded");
         } catch (Exception e) {
-            reinterruptIfNeeded(e);
-            return new ConnectionTest(classify(e), rootMessage(e));
+            OpcUaClientSupport.reinterruptIfNeeded(e);
+            return new ConnectionTest(OpcUaClientSupport.classify(e), OpcUaClientSupport.rootMessage(e));
         } finally {
-            disconnectQuietly(client);
+            OpcUaClientSupport.disconnectQuietly(client);
         }
     }
 
@@ -91,39 +83,20 @@ final class OpcUaDiscovery {
             client = connect(endpointUrl, credentials);
             return browse(client, cap);
         } catch (Exception e) {
-            reinterruptIfNeeded(e);
-            return new ScanOutcome(classify(e), List.of(), false, 0, rootMessage(e));
+            OpcUaClientSupport.reinterruptIfNeeded(e);
+            return new ScanOutcome(
+                    OpcUaClientSupport.classify(e), List.of(), false, 0, OpcUaClientSupport.rootMessage(e));
         } finally {
-            disconnectQuietly(client);
+            OpcUaClientSupport.disconnectQuietly(client);
         }
     }
 
     private static OpcUaClient connect(String endpointUrl, Credentials credentials) throws Exception {
-        IdentityProvider identity = identityProvider(credentials);
-        OpcUaClient client = OpcUaClient.create(
+        return OpcUaClientSupport.connect(
                 endpointUrl,
-                endpoints -> endpoints.stream()
-                        .filter(e -> SecurityPolicy.None.getUri().equals(e.getSecurityPolicyUri()))
-                        .findFirst()
-                        .or(() -> endpoints.stream().findFirst()),
-                cfg -> cfg
-                        .setApplicationName(LocalizedText.english("IoT Simulator Scanner"))
-                        .setApplicationUri("urn:iotsim:opcua:scanner")
-                        .setIdentityProvider(identity)
-                        .setRequestTimeout(uint(REQUEST_TIMEOUT_MILLIS))
-                        .build());
-        client.connect().get(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-        return client;
-    }
-
-    private static IdentityProvider identityProvider(Credentials credentials) {
-        if (credentials != null && "PASSWORD".equals(credentials.mode())) {
-            return new UsernameProvider(
-                    credentials.username() == null ? "" : credentials.username(),
-                    credentials.secret() == null ? "" : credentials.secret());
-        }
-        // ANONYMOUS, or EXTERNAL_REF which cannot be resolved here yet (IS-082).
-        return new AnonymousProvider();
+                credentials == null ? "ANONYMOUS" : credentials.mode(),
+                credentials == null ? null : credentials.username(),
+                credentials == null ? null : credentials.secret());
     }
 
     private static ScanOutcome browse(OpcUaClient client, int cap) throws Exception {
@@ -248,53 +221,4 @@ final class OpcUaDiscovery {
         return ref.getNodeId().toParseableString();
     }
 
-    /**
-     * Classifies a failure by unwrapping the cause chain to the underlying
-     * {@link UaException} (connect/browse failures surface wrapped in
-     * {@code ExecutionException}). Authentication/authorization status codes map to
-     * {@code AUTH_FAILURE}; anything else (server down, timeout, refused) is
-     * {@code UNREACHABLE}.
-     */
-    private static String classify(Throwable t) {
-        for (Throwable c = t; c != null; c = (c.getCause() == c ? null : c.getCause())) {
-            if (c instanceof UaException ua) {
-                long code = ua.getStatusCode().getValue();
-                if (code == StatusCodes.Bad_UserAccessDenied
-                        || code == StatusCodes.Bad_IdentityTokenInvalid
-                        || code == StatusCodes.Bad_IdentityTokenRejected) {
-                    return AUTH_FAILURE;
-                }
-                return UNREACHABLE;
-            }
-        }
-        return UNREACHABLE;
-    }
-
-    private static void reinterruptIfNeeded(Throwable t) {
-        if (t instanceof InterruptedException) {
-            Thread.currentThread().interrupt();
-        }
-    }
-
-    private static String rootMessage(Throwable t) {
-        Throwable cause = t;
-        while (cause.getCause() != null && cause.getCause() != cause) {
-            cause = cause.getCause();
-        }
-        if (cause instanceof UaException ua) {
-            return ua.getMessage();
-        }
-        String message = cause.getMessage();
-        return message == null ? cause.getClass().getSimpleName() : message;
-    }
-
-    private static void disconnectQuietly(OpcUaClient client) {
-        if (client != null) {
-            try {
-                client.disconnect().get(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-            } catch (Exception ignored) {
-                // best effort; we are tearing down a one-shot scan client
-            }
-        }
-    }
 }
