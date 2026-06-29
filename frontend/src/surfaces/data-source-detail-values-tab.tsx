@@ -18,14 +18,6 @@ function freshnessTone(freshness: SourceValueRow["freshness"]) {
 }
 
 function currentModeLabel(source: DataSourceRow) {
-  if (source.process === "Recording") {
-    return "Recording";
-  }
-
-  if (source.process === "Replay") {
-    return "Replay";
-  }
-
   return source.status === "Active" ? "Run" : "Off";
 }
 
