@@ -29,6 +29,6 @@ public interface RuntimeEventRepository {
     /** Events for a run, newest first (index-backed: run_id, at). */
     List<RuntimeEventRow> findByRun(String runId);
 
-    /** Events for a single data source, newest first. */
+    /** Events for a single data source, newest first (index-backed: data_source_id, at). */
     List<RuntimeEventRow> findByDataSource(String dataSourceId);
 }
