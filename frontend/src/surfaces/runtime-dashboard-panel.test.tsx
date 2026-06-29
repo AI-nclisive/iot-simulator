@@ -76,31 +76,31 @@ describe("RuntimeDashboardPanel — run states", () => {
   it("shows Running label for running state", () => {
     mockActiveRuns.mockReturnValue([baseRun({ runState: "running" })]);
     renderPanel();
-    expect(screen.getByText("Running")).toBeTruthy();
+    expect(screen.getByText("Replay in progress")).toBeTruthy();
   });
 
   it("shows Failed label for failed state", () => {
     mockActiveRuns.mockReturnValue([baseRun({ runState: "failed", evidence: "Retry needed" })]);
     renderPanel();
-    expect(screen.getByText("Failed")).toBeTruthy();
+    expect(screen.getByText("Replay failed")).toBeTruthy();
   });
 
   it("shows Queued label for queued state", () => {
     mockActiveRuns.mockReturnValue([baseRun({ runState: "queued" })]);
     renderPanel();
-    expect(screen.getByText("Queued")).toBeTruthy();
+    expect(screen.getByText("Replay waiting")).toBeTruthy();
   });
 
   it("shows Completed label for completed state", () => {
     mockActiveRuns.mockReturnValue([baseRun({ runState: "completed" })]);
     renderPanel();
-    expect(screen.getByText("Completed")).toBeTruthy();
+    expect(screen.getByText("Replay completed")).toBeTruthy();
   });
 
   it("shows Stopped label for stopped state", () => {
     mockActiveRuns.mockReturnValue([baseRun({ runState: "stopped" })]);
     renderPanel();
-    expect(screen.getByText("Stopped")).toBeTruthy();
+    expect(screen.getByText("Replay stopped")).toBeTruthy();
   });
 });
 
