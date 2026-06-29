@@ -35,6 +35,12 @@ iotsim:
     #   multiplier: 2.0
     #   max-backoff: 30s
     #   max-restarts: 5
+  # Object storage for large artifacts (evidence exports, prepared-data imports).
+  # Filesystem adapter is the local default; no blobs live in Postgres. The
+  # S3-compatible adapter for shared mode lands later. See backend-specs/08_AUTH_AND_MODES.md.
+  storage:
+    filesystem:
+      base-dir: ${IOTSIM_STORAGE_DIR:data/objects}
 
 server:
   port: ${SERVER_PORT:8080}

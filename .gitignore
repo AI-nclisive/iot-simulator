@@ -20,6 +20,9 @@ frontend/.vite/
 out/
 bin/
 
+# Local object store (filesystem ObjectStore default root; large artifacts)
+data/
+
 # OS / logs
 .DS_Store
 *.log
