@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { EditLockBanner, EditLockState } from "../ui/edit-lock-banner";
 import { StatusBadge } from "../ui/status-badge";
+import { ConfirmationDialog } from "../ui/confirmation-dialog";
 import { mockSourceLock } from "../shell/mock-workspace";
 import { getParametersForSource, SchemaParameter } from "./mock-schema-parameters";
 import type { DataSourceRow } from "./mock-data-sources";
@@ -21,8 +22,55 @@ function bufferFromParam(param: SchemaParameter): EditBuffer {
   };
 }
 
+export function detectDependencyWarnings(
+  param: SchemaParameter,
+  buffer: EditBuffer,
+  original: EditBuffer,
+): string[] {
+  const warnings: string[] = [];
+
+  // 1. Identifier rename — proxy: description changed
+  if (buffer.description !== original.description) {
+    warnings.push(
+      "Renaming this parameter may break existing recordings, replay configurations, or scenarios that reference it by its current identifier.",
+    );
+  }
+
+  // 2. Type change impact — unit changed on a referenced parameter (hasDependent)
+  if (buffer.unit !== original.unit && param.hasDependent) {
+    warnings.push(
+      "Changing the unit of a parameter referenced by active recordings or scenarios may cause replay mismatches.",
+    );
+  }
+
+  // 3. Range narrowing — new min higher than old, or new max lower than old
+  const origMinNum = original.min !== "" ? Number(original.min) : null;
+  const origMaxNum = original.max !== "" ? Number(original.max) : null;
+  const newMinNum = buffer.min !== "" ? Number(buffer.min) : null;
+  const newMaxNum = buffer.max !== "" ? Number(buffer.max) : null;
+
+  const minNarrowed =
+    origMinNum !== null && newMinNum !== null && newMinNum > origMinNum;
+  const maxNarrowed =
+    origMaxNum !== null && newMaxNum !== null && newMaxNum < origMaxNum;
+
+  if (minNarrowed || maxNarrowed) {
+    warnings.push(
+      "Narrowing the value range may exclude values present in existing recordings.",
+    );
+  }
+
+  return warnings;
+}
+
 export function DataSourceSchemaEditor({ source }: { source: DataSourceRow }) {
   const [selectedParam, setSelectedParam] = useState<SchemaParameter | null>(null);
+  const [originalBuffer, setOriginalBuffer] = useState<EditBuffer>({
+    description: "",
+    unit: "",
+    min: "",
+    max: "",
+  });
   const [searchQuery, setSearchQuery] = useState("");
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [editBuffer, setEditBuffer] = useState<EditBuffer>({
@@ -32,6 +80,7 @@ export function DataSourceSchemaEditor({ source }: { source: DataSourceRow }) {
     max: "",
   });
   const [saving, setSaving] = useState(false);
+  const [confirmSaveOpen, setConfirmSaveOpen] = useState(false);
 
   const lockState: EditLockState =
     mockSourceLock === "locked-by-other"
@@ -69,9 +118,16 @@ export function DataSourceSchemaEditor({ source }: { source: DataSourceRow }) {
     }
   }
 
+  const dependencyWarnings: string[] =
+    hasUnsavedChanges && selectedParam
+      ? detectDependencyWarnings(selectedParam, editBuffer, originalBuffer)
+      : [];
+
   function handleSelectParam(param: SchemaParameter) {
     setSelectedParam(param);
-    setEditBuffer(bufferFromParam(param));
+    const buf = bufferFromParam(param);
+    setEditBuffer(buf);
+    setOriginalBuffer(buf);
     setHasUnsavedChanges(false);
   }
 
@@ -79,17 +135,31 @@ export function DataSourceSchemaEditor({ source }: { source: DataSourceRow }) {
     setEditBuffer((curr) => ({ ...curr, ...patch }));
   }
 
-  function handleSave() {
+  function executeSave() {
     setSaving(true);
     setTimeout(() => {
       setSaving(false);
       setHasUnsavedChanges(false);
+      setOriginalBuffer(editBuffer);
     }, 800);
+  }
+
+  function handleSave() {
+    if (dependencyWarnings.length > 0) {
+      setConfirmSaveOpen(true);
+    } else {
+      executeSave();
+    }
+  }
+
+  function handleConfirmSave() {
+    setConfirmSaveOpen(false);
+    executeSave();
   }
 
   function handleDiscard() {
     if (selectedParam) {
-      setEditBuffer(bufferFromParam(selectedParam));
+      setEditBuffer(originalBuffer);
     }
     setHasUnsavedChanges(false);
   }
@@ -282,6 +352,22 @@ export function DataSourceSchemaEditor({ source }: { source: DataSourceRow }) {
                     downstream references.
                   </p>
                 ) : null}
+
+                {dependencyWarnings.length > 0 ? (
+                  <section className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.08em] text-amber-700">
+                      Dependency impact
+                    </p>
+                    <ul className="mt-2 space-y-2">
+                      {dependencyWarnings.map((warning, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm text-shell-muted">
+                          <span className="shrink-0 text-amber-600" aria-hidden="true">⚠</span>
+                          <span>{warning}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                ) : null}
               </div>
             </section>
           </div>
@@ -298,6 +384,18 @@ export function DataSourceSchemaEditor({ source }: { source: DataSourceRow }) {
         Schema changes take effect after the source is restarted. Type changes may
         break dependent parameters.
       </p>
+
+      <ConfirmationDialog
+        open={confirmSaveOpen}
+        tone="warning"
+        title="Save with dependency impact"
+        message="This change may affect dependent artifacts. Confirm to save anyway."
+        reversibilityLabel="Schema changes take effect after the source is restarted. They can be reverted by restoring previous values."
+        confirmLabel="Confirm"
+        cancelLabel="Cancel"
+        onConfirm={handleConfirmSave}
+        onClose={() => setConfirmSaveOpen(false)}
+      />
     </div>
   );
 }
