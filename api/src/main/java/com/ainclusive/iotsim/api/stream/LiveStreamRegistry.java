@@ -76,18 +76,24 @@ public final class LiveStreamRegistry
 
     @Override
     public SseEmitter subscribe(StreamKey key, String lastEventId) {
-        LiveStream stream = streams.computeIfAbsent(key, k -> new LiveStream(bufferCapacity));
-        SseEmitter emitter = new SseEmitter(0L); // no server-side timeout
+        SseEmitter emitter = new SseEmitter(0L);
         Subscriber sub = new Subscriber(new SseEmitterSink(emitter, json), queueCapacity, sender);
-        Runnable remove = () -> {
-            stream.removeSubscriber(sub);
+        // Register atomically with the prune path (same-key compute lambdas are
+        // mutually exclusive), so a concurrent last-subscriber prune cannot evict
+        // the stream between fetching it and registering this subscriber.
+        streams.compute(key, (k, existing) -> {
+            LiveStream stream = (existing != null) ? existing : new LiveStream(bufferCapacity);
+            stream.addSubscriber(sub, lastEventId);
+            return stream;
+        });
+        Runnable remove = () -> streams.computeIfPresent(key, (k, s) -> {
+            s.removeSubscriber(sub);
             sub.close();
-            streams.computeIfPresent(key, (k, s) -> s.subscriberCount() == 0 ? null : s);
-        };
+            return s.subscriberCount() == 0 ? null : s;
+        });
         emitter.onCompletion(remove);
         emitter.onTimeout(remove);
         emitter.onError(e -> remove.run());
-        stream.addSubscriber(sub, lastEventId);
         return emitter;
     }
 
