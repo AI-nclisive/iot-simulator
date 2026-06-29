@@ -62,8 +62,6 @@ function currentTabId(searchValue: string | null): DetailTabId {
 function healthDiagnosticCopy(source: {
   endpoint: string;
   health: "Healthy" | "Warning" | "Error";
-  process?: "Recording" | "Replay";
-  clients: number;
 }) {
   if (source.health === "Healthy") {
     return null;
@@ -73,12 +71,8 @@ function healthDiagnosticCopy(source: {
     return {
       checks: [
         `Check recent reconnects or slow responses from ${source.endpoint}.`,
-        source.clients > 0
-          ? "Review connected clients for partial delivery or backpressure."
-          : "No clients are connected; confirm whether that is expected.",
-        source.process
-          ? `Review the active ${source.process.toLowerCase()} process before changing source settings.`
-          : "Open Settings if the endpoint or protocol setup needs correction.",
+        "No clients are connected; confirm whether that is expected.",
+        "Open Settings if the endpoint or protocol setup needs correction.",
       ],
       message:
         "The source is still usable, but recent runtime events need review before relying on its values.",
@@ -137,8 +131,6 @@ export function DataSourceDetailPreviewPage() {
   const healthDiagnostic = healthDiagnosticCopy(activeSource);
   const activeState = stateMeta(activeSource);
   const sourceStarted = activeSource.status === "Active";
-  const recordingActive = activeSource.process === "Recording";
-  const replayActive = activeSource.process === "Replay";
   const sourceControlAction =
     sourceStarted && access.canStopSource
       ? {
@@ -157,12 +149,7 @@ export function DataSourceDetailPreviewPage() {
       return null;
     }
 
-    const runtimeImpact =
-      activeSource.process === "Recording"
-        ? "Recording stops immediately and the current capture ends on this source."
-        : activeSource.process === "Replay"
-          ? "Replay stops immediately for this source."
-          : "The source stops serving values until someone starts it again.";
+    const runtimeImpact = "The source stops serving values until someone starts it again.";
 
     const copy = stopActionCopy;
 
@@ -171,13 +158,6 @@ export function DataSourceDetailPreviewPage() {
       impacts: [
         { label: "Endpoint", value: activeSource.endpoint },
         { label: "Runtime impact", value: runtimeImpact },
-        {
-          label: "Connected clients",
-          value:
-            activeSource.clients > 0
-              ? `${activeSource.clients} connected client${activeSource.clients === 1 ? "" : "s"} may notice the interruption.`
-              : "No connected clients are currently shown for this source.",
-        },
       ],
       message: copy.message,
       objectLabel: `${activeSource.name} (${activeSource.protocol})`,
@@ -261,34 +241,10 @@ export function DataSourceDetailPreviewPage() {
               {activeSource.parameterCount.toLocaleString()} in Schema
             </dd>
           </div>
-          <div>
-            <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
-              Clients
-            </dt>
-            <dd className="mt-2 text-sm text-shell-ink">{activeSource.clients}</dd>
-          </div>
-          {activeSource.process ? (
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
-                Process
-              </dt>
-              <dd className="mt-2 text-sm text-shell-ink">{activeSource.process}</dd>
-            </div>
-          ) : null}
-          <div>
-            <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
-              Last operator
-            </dt>
-            <dd className="mt-2 text-sm text-shell-ink">{activeSource.lastOperator}</dd>
-          </div>
         </dl>
 
         <div className="mt-6 flex flex-wrap items-center gap-2">
-          {recordingActive ? (
-            <Link className="shell-action" to={`/data-sources/${activeSource.id}/record`}>
-              Open recording
-            </Link>
-          ) : access.canRecordSource && sourceStarted && !replayActive ? (
+          {access.canRecordSource && sourceStarted ? (
             <Link className="shell-action" to={`/data-sources/${activeSource.id}/record`}>
               Start recording
             </Link>
@@ -297,11 +253,7 @@ export function DataSourceDetailPreviewPage() {
               Start recording
             </button>
           )}
-          {replayActive ? (
-            <Link className="shell-action" to={`/data-sources/${activeSource.id}/replay`}>
-              Open replay
-            </Link>
-          ) : access.canConfigureReplay && sourceStarted && !recordingActive ? (
+          {access.canConfigureReplay && sourceStarted ? (
             <Link className="shell-action" to={`/data-sources/${activeSource.id}/replay`}>
               Set up replay
             </Link>

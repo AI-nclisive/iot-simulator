@@ -73,40 +73,19 @@ export function RecordingFlowPage() {
   const accessMode = useShellStore((state) => state.accessMode);
   const sharedRole = useShellStore((state) => state.sharedRole);
   const createRecording = useArtifactsStore((state) => state.createRecording);
-  const finishRecording = useDataSourcesStore((state) => state.finishRecording);
   const source = useDataSourcesStore((state) =>
     state.dataSources.find((row) => row.id === sourceId),
   );
-  const startRecording = useDataSourcesStore((state) => state.startRecording);
   const access = resolveAccess(accessMode, sharedRole);
   const captureAllowed = access.canRecordSource;
-  const [recordingState, setRecordingState] = useState<RecordingUiState>(
-    source?.process === "Recording" ? "recording" : "ready",
-  );
-  const [durationSeconds, setDurationSeconds] = useState(
-    source?.process === "Recording" ? 46 : 0,
-  );
-  const [valueCount, setValueCount] = useState(source?.process === "Recording" ? 124 : 0);
-  const [lastReceivedHint, setLastReceivedHint] = useState(
-    source?.process === "Recording" ? "Just now" : "No values received yet",
-  );
-  const [recordingName, setRecordingName] = useState(
-    source ? `${source.name} capture` : "New recording",
-  );
+  const [recordingState, setRecordingState] = useState<RecordingUiState>("ready");
+  const [durationSeconds, setDurationSeconds] = useState(0);
+  const [valueCount, setValueCount] = useState(0);
+  const [lastReceivedHint, setLastReceivedHint] = useState("No values received yet");
   const [savedArtifactId, setSavedArtifactId] = useState<string | null>(null);
 
   const captureActive =
     recordingState === "recording" || recordingState === "no-values-yet";
-  const replayBlockedByProcess =
-    source?.process === "Replay" && recordingState === "ready";
-
-  useEffect(() => {
-    if (!source) {
-      return;
-    }
-
-    setRecordingName(`${source.name} capture`);
-  }, [source?.id]);
 
   useEffect(() => {
     if (!captureActive) {
@@ -142,8 +121,6 @@ export function RecordingFlowPage() {
     return {
       createdBy: "You",
       duration: formatDuration(durationSeconds),
-      protocol: source.protocol,
-      sourceName: source.name,
       valueCount,
     };
   }, [durationSeconds, source, valueCount]);
@@ -170,7 +147,6 @@ export function RecordingFlowPage() {
   const activeSource = source;
 
   function resetCapture() {
-    finishRecording(activeSource.id);
     setDurationSeconds(0);
     setValueCount(0);
     setLastReceivedHint("No values received yet");
@@ -179,11 +155,10 @@ export function RecordingFlowPage() {
   }
 
   function handleStartRecording() {
-    if (!captureAllowed || replayBlockedByProcess) {
+    if (!captureAllowed) {
       return;
     }
 
-    startRecording(activeSource.id, "You");
     setDurationSeconds(0);
     setValueCount(0);
     setLastReceivedHint("Waiting for the first value");
@@ -192,8 +167,6 @@ export function RecordingFlowPage() {
   }
 
   function handleStopRecording() {
-    finishRecording(activeSource.id, "You");
-
     if (valueCount === 0) {
       setRecordingState("ready");
       setLastReceivedHint("No values were captured");
@@ -205,21 +178,14 @@ export function RecordingFlowPage() {
   }
 
   function handleDisconnect() {
-    finishRecording(activeSource.id, "You");
     setRecordingState("disconnected");
     setLastReceivedHint("Connection dropped before capture finished");
   }
 
   function saveReadyRecording() {
-    const trimmedName = recordingName.trim() || `${activeSource.name} capture`;
     const artifactId = createRecording({
       createdBy: "You",
-      durationSeconds,
-      name: trimmedName,
-      protocol: activeSource.protocol,
       sourceId: activeSource.id,
-      sourceName: activeSource.name,
-      status: "Ready",
       valueCount,
     });
 
@@ -227,15 +193,9 @@ export function RecordingFlowPage() {
   }
 
   function savePartialRecording() {
-    const trimmedName = recordingName.trim() || `${activeSource.name} partial capture`;
     const artifactId = createRecording({
       createdBy: "You",
-      durationSeconds,
-      name: trimmedName,
-      protocol: activeSource.protocol,
       sourceId: activeSource.id,
-      sourceName: activeSource.name,
-      status: "Partial",
       valueCount,
     });
 
@@ -276,7 +236,7 @@ export function RecordingFlowPage() {
           {!captureActive ? (
             <button
               className="shell-action"
-              disabled={!captureAllowed || replayBlockedByProcess}
+              disabled={!captureAllowed}
               type="button"
               onClick={handleStartRecording}
             >
@@ -307,16 +267,6 @@ export function RecordingFlowPage() {
           </Link>
         </div>
 
-        {replayBlockedByProcess ? (
-          <div className="mt-6">
-            <SharedStatePanel
-              message="This source is already busy with replay. Stop replay first, then start a new recording."
-              state="warning"
-              title="Recording is blocked while replay is active."
-            />
-          </div>
-        ) : null}
-
         {!captureAllowed ? (
           <div className="mt-6">
             <SharedStatePanel
@@ -334,8 +284,7 @@ export function RecordingFlowPage() {
             <div className="min-w-0 max-w-3xl">
               <h3 className="text-lg font-semibold text-shell-ink">Save recording</h3>
               <p className="mt-2 text-sm leading-6 text-shell-muted">
-                Capture completed. Review the reusable artifact name, then continue into
-                replay.
+                Capture completed. Review the summary, then continue into replay.
               </p>
               <p className="mt-2 text-sm leading-6 text-shell-muted">
                 This recording represents activity across{" "}
@@ -345,17 +294,7 @@ export function RecordingFlowPage() {
             <StatusBadge label="Save ready" tone="accent" />
           </div>
 
-          <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-            <label className="flex flex-col gap-2 text-sm text-shell-muted">
-              Recording name
-              <input
-                className="shell-field"
-                type="text"
-                value={recordingName}
-                onChange={(event) => setRecordingName(event.target.value)}
-              />
-            </label>
-
+          <div className="mt-5">
             <div className="rounded-md border border-shell-line bg-white px-4 py-4">
               <p className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
                 Save result
@@ -402,17 +341,7 @@ export function RecordingFlowPage() {
 
           {valueCount > 0 ? (
             <>
-              <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-                <label className="flex flex-col gap-2 text-sm text-shell-muted">
-                  Partial recording name
-                  <input
-                    className="shell-field"
-                    type="text"
-                    value={recordingName}
-                    onChange={(event) => setRecordingName(event.target.value)}
-                  />
-                </label>
-
+              <div className="mt-5">
                 <div className="rounded-md border border-shell-line bg-white px-4 py-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
                     Partial result
