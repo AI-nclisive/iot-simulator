@@ -185,7 +185,12 @@ export function RecordingFlowPage() {
   function saveReadyRecording() {
     const artifactId = createRecording({
       createdBy: "You",
+      durationSeconds,
+      name: `${activeSource.name} capture`,
+      protocol: activeSource.protocol,
       sourceId: activeSource.id,
+      sourceName: activeSource.name,
+      status: "Ready",
       valueCount,
     });
 
@@ -195,7 +200,12 @@ export function RecordingFlowPage() {
   function savePartialRecording() {
     const artifactId = createRecording({
       createdBy: "You",
+      durationSeconds,
+      name: `${activeSource.name} capture`,
+      protocol: activeSource.protocol,
       sourceId: activeSource.id,
+      sourceName: activeSource.name,
+      status: "Partial",
       valueCount,
     });
 
