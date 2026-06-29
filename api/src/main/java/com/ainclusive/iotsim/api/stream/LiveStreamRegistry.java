@@ -56,8 +56,8 @@ public final class LiveStreamRegistry
                 this::heartbeatTick, HEARTBEAT_SECONDS, HEARTBEAT_SECONDS, TimeUnit.SECONDS);
     }
 
-    /** Test constructor: explicit sizes, caller-supplied executor, no heartbeat thread. */
-    LiveStreamRegistry(ObjectMapper json, int bufferCapacity, int queueCapacity, Executor sender) {
+    /** Visible for tests and custom wiring: explicit sizes + caller-supplied sender, no heartbeat thread. */
+    public LiveStreamRegistry(ObjectMapper json, int bufferCapacity, int queueCapacity, Executor sender) {
         this.json = json;
         this.bufferCapacity = bufferCapacity;
         this.queueCapacity = queueCapacity;

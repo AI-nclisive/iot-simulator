@@ -1,6 +1,7 @@
 package com.ainclusive.iotsim.app.stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -33,7 +34,7 @@ class RuntimeStreamEndToEndTest {
 
         @Bean
         LiveStreamRegistry liveStreamRegistry(ObjectMapper json) {
-            return new LiveStreamRegistry(json);
+            return new LiveStreamRegistry(json, 256, 256, Runnable::run);
         }
     }
 
@@ -53,15 +54,10 @@ class RuntimeStreamEndToEndTest {
         registry.publish(StreamKey.runtime("p1"), "SOURCE_START",
                 Map.of("dataSourceId", "d1"), Instant.EPOCH);
 
-        // Allow the sender thread pool to drain the event queue before closing.
-        // The registry uses an async executor to send events; a brief wait ensures the
-        // event is flushed to the SseEmitter before close() completes the emitter.
-        Thread.sleep(200);
-
         // Complete the emitter so the async response body is finalized, then dispatch.
         registry.close();
-        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
-                .asyncDispatch(result));
+        mvc.perform(asyncDispatch(result))
+                .andExpect(status().isOk());
 
         String body = result.getResponse().getContentAsString();
         // Spring emits: "event:SOURCE_START\ndata:{...}\nid:0\n\n"
