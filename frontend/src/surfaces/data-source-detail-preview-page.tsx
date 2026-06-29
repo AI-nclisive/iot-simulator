@@ -7,6 +7,7 @@ import { ConfirmationDialog } from "../ui/confirmation-dialog";
 import { DataSourceDetailClientsTab } from "./data-source-detail-clients-tab";
 import { DataSourceDetailEventsTab } from "./data-source-detail-events-tab";
 import { DataSourceDetailOverviewTab } from "./data-source-detail-overview-tab";
+import { DataSourceSchemaEditor } from "./data-source-schema-editor";
 import { DataSourceDetailSettingsTab } from "./data-source-detail-settings-tab";
 import { DataSourceDetailValuesTab } from "./data-source-detail-values-tab";
 import { SharedStatePanel } from "../ui/shared-state-panel";
@@ -197,13 +198,7 @@ export function DataSourceDetailPreviewPage() {
     }
 
     if (activeTab === "schema") {
-      return (
-        <SharedStatePanel
-          message={`Parameters for this source are managed in Schema. The full editor will open here for ${activeSource.parameterCount.toLocaleString()} parameters, with deeper editor behavior added in the later schema task.`}
-          state="empty"
-          title="Schema manages source parameters."
-        />
-      );
+      return <DataSourceSchemaEditor source={activeSource} />;
     }
 
     if (activeTab === "values") {
