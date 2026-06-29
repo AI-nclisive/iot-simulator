@@ -443,7 +443,7 @@ Parallel execution:
   Done when: manual structure creation has a clear branch and a clean handoff
   into the full schema editor where needed.
 
-- [ ] `UI-037` Synthetic source branch
+- [x] `UI-037` Synthetic source branch
   Surface: `Create Data Source Wizard`
   Depends: `UI-030`
   Done when: pattern, range, update behavior, and repeatability controls are
@@ -467,7 +467,7 @@ Parallel execution:
   Depends: `UI-042`, `UI-004`
   Done when: identifier, type, and dependency impact is visible before save.
 
-- [ ] `UI-050` Recordings & Samples list
+- [x] `UI-050` Recordings & Samples list
   Surface: `Recordings & Samples`
   Depends: `UI-003`
   Done when: reusable artifacts are easy to browse by name, source, type,

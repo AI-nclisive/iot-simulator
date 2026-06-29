@@ -11,6 +11,12 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: [],
+    exclude: [
+      "**/node_modules/**",
+      "**/.claude/worktrees/**",
+      "**/dist/**",
+      "frontend/test/**/*.mjs",
+    ],
   },
 });
 
