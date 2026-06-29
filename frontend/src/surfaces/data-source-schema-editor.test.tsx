@@ -13,8 +13,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { detectDependencyWarnings } from "./data-source-schema-editor";
-import { DataSourceSchemaEditor } from "./data-source-schema-editor";
+import { detectDependencyWarnings, DataSourceSchemaEditor } from "./data-source-schema-editor";
 import type { SchemaParameter } from "./mock-schema-parameters";
 import type { DataSourceRow } from "./mock-data-sources";
 
@@ -184,5 +183,87 @@ describe("DataSourceSchemaEditor — dependency warnings in UI", () => {
 
     // No Dependency impact section without changes
     expect(screen.queryByText("Dependency impact")).toBeNull();
+  });
+});
+describe("DataSourceSchemaEditor — ConfirmationDialog flow when saving with warnings", () => {
+  it("clicking Save when dependency warnings are active opens the ConfirmationDialog", async () => {
+    render(<DataSourceSchemaEditor source={mockSource} />);
+
+    // Select zone1.temp (hasDependent=true, unit=°C) to trigger unit warning
+    await userEvent.click(screen.getByText("oven/zone[1]/temp"));
+
+    // Change unit to trigger dependency warning
+    const unitInputs = screen.getAllByRole("textbox");
+    const unitInput = unitInputs.find(
+      (el) => (el as HTMLInputElement).value === "°C",
+    ) as HTMLInputElement;
+    await userEvent.clear(unitInput);
+    await userEvent.type(unitInput, "K");
+
+    // Dependency impact warning should be visible
+    expect(screen.getByText("Dependency impact")).toBeTruthy();
+
+    // Click Save schema
+    const saveButton = screen.getByRole("button", { name: "Save schema" });
+    await userEvent.click(saveButton);
+
+    // ConfirmationDialog should appear with its title
+    expect(screen.getByText("Save with dependency impact")).toBeTruthy();
+  });
+
+  it("confirming the ConfirmationDialog proceeds to save and closes the dialog", async () => {
+    render(<DataSourceSchemaEditor source={mockSource} />);
+
+    // Select zone1.temp and trigger a unit warning
+    await userEvent.click(screen.getByText("oven/zone[1]/temp"));
+    const unitInputs = screen.getAllByRole("textbox");
+    const unitInput = unitInputs.find(
+      (el) => (el as HTMLInputElement).value === "°C",
+    ) as HTMLInputElement;
+    await userEvent.clear(unitInput);
+    await userEvent.type(unitInput, "K");
+
+    // Open ConfirmationDialog
+    const saveButton = screen.getByRole("button", { name: "Save schema" });
+    await userEvent.click(saveButton);
+    expect(screen.getByText("Save with dependency impact")).toBeTruthy();
+
+    // Click Confirm
+    const confirmButton = screen.getByRole("button", { name: "Confirm" });
+    await userEvent.click(confirmButton);
+
+    // Dialog should close (title no longer in DOM)
+    expect(screen.queryByText("Save with dependency impact")).toBeNull();
+  });
+
+  it("cancelling the ConfirmationDialog does NOT save and leaves the form dirty", async () => {
+    render(<DataSourceSchemaEditor source={mockSource} />);
+
+    // Select zone1.temp and trigger a unit warning
+    await userEvent.click(screen.getByText("oven/zone[1]/temp"));
+    const unitInputs = screen.getAllByRole("textbox");
+    const unitInput = unitInputs.find(
+      (el) => (el as HTMLInputElement).value === "°C",
+    ) as HTMLInputElement;
+    await userEvent.clear(unitInput);
+    await userEvent.type(unitInput, "K");
+
+    // Open ConfirmationDialog
+    const saveButton = screen.getByRole("button", { name: "Save schema" });
+    await userEvent.click(saveButton);
+    expect(screen.getByText("Save with dependency impact")).toBeTruthy();
+
+    // Click Cancel
+    const cancelButton = screen.getByRole("button", { name: "Cancel" });
+    await userEvent.click(cancelButton);
+
+    // Dialog should close
+    expect(screen.queryByText("Save with dependency impact")).toBeNull();
+
+    // Form is still dirty — "Unsaved changes" badge should still be visible
+    expect(screen.getByText("Unsaved changes")).toBeTruthy();
+
+    // Dependency warnings still active — parameter was not reset
+    expect(screen.getByText("Dependency impact")).toBeTruthy();
   });
 });
