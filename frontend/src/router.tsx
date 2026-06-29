@@ -11,6 +11,7 @@ import { NotificationDemoPage } from "./surfaces/notification-demo-page";
 import { OverviewPage } from "./surfaces/overview-page";
 import { ProjectEntryPage } from "./surfaces/project-entry-page";
 import { RecordingFlowPage } from "./surfaces/recording-flow-page";
+import { RecordingsPage } from "./surfaces/recordings-page";
 import { ReplayFlowPage } from "./surfaces/replay-flow-page";
 import { SettingsPage } from "./surfaces/settings-page";
 import { SurfaceStubPage } from "./surfaces/surface-stub-page";
@@ -120,7 +121,7 @@ export const router = createBrowserRouter([
       },
       {
         path: "recordings",
-        element: <SurfaceStubPage {...surfaceContent.recordings} />,
+        element: <RecordingsPage />,
       },
       {
         path: "scenarios",
