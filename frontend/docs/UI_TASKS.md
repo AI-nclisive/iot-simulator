@@ -724,6 +724,12 @@ Parallel execution:
   Surfaces: Recordings page, Recording Export dialog, Recording Import dialog, Replay Flow.
   Done when: both types contain only fields present in RecordingResponse; recordings page, export/import dialogs, and replay flow work without removed fields; no TypeScript errors.
 
+- [x] `UI-102` Align SourceValueRow mock shape to backend DataType enum
+  Goal: remove `"enum"` from `SourceValueRow.dataType` and replace with `"string"` to match backend contract.
+  Fields changed: `dataType` union `"float" | "int" | "bool" | "enum"` → `"float" | "int" | "bool" | "string"`; all mock rows updated.
+  Surfaces: Data Source Detail — Values tab.
+  Done when: `SourceValueRow.dataType` contains only values present in backend `DataType` contract (`FLOAT32/64→float`, `INT*→int`, `BOOL→bool`, `STRING→string`); no `"enum"` in mock data; no TypeScript errors.
+
 ## Recommended Sequence
 
 1. Complete the P0 shell and shared-pattern tasks first.
