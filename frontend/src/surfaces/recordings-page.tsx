@@ -5,6 +5,7 @@ import { SharedStatePanel } from "../ui/shared-state-panel";
 import { StatusBadge } from "../ui/status-badge";
 import { mockRecordings, type RecordingRow } from "./mock-recordings";
 import { RecordingExportDialog } from "./recording-export-dialog";
+import { RecordingImportDialog } from "./recording-import-dialog";
 
 type TypeFilter = "all" | "recording" | "sample";
 type OriginFilter = "all" | "captured" | "imported" | "synthetic";
@@ -283,12 +284,13 @@ export function RecordingsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [importDialogOpen, setImportDialogOpen] = useState<boolean>(false);
   const [exportDialogOpen, setExportDialogOpen] = useState<boolean>(false);
+  const [localRecordings, setLocalRecordings] = useState<RecordingRow[]>(mockRecordings);
 
   const uniqueSources = Array.from(
-    new Map(mockRecordings.map((r) => [r.sourceId, r.sourceName])).entries(),
+    new Map(localRecordings.map((r) => [r.sourceId, r.sourceName])).entries(),
   );
 
-  const filtered = mockRecordings.filter((row) => {
+  const filtered = localRecordings.filter((row) => {
     if (typeFilter !== "all" && row.type !== typeFilter) return false;
     if (originFilter !== "all" && row.origin !== originFilter) return false;
     if (sourceFilter !== "all" && row.sourceId !== sourceFilter) return false;
@@ -302,7 +304,7 @@ export function RecordingsPage() {
   });
 
   const selected: RecordingRow | null =
-    mockRecordings.find((r) => r.id === selectedId) ?? null;
+    localRecordings.find((r) => r.id === selectedId) ?? null;
 
   return (
     <div className="flex h-full flex-col gap-3">
@@ -314,8 +316,8 @@ export function RecordingsPage() {
             </h2>
             <p className="mt-2 text-sm leading-6 text-shell-muted">
               Reusable captured data for replay and comparison.{" "}
-              {mockRecordings.length} artifact
-              {mockRecordings.length !== 1 ? "s" : ""} in this project.
+              {localRecordings.length} artifact
+              {localRecordings.length !== 1 ? "s" : ""} in this project.
             </p>
           </div>
           {access.canCreateSource ? (
@@ -509,29 +511,15 @@ export function RecordingsPage() {
         />
       ) : null}
 
-      {/* Import dialog stub (mock) */}
-      {importDialogOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <section className="w-full max-w-md rounded-md border border-shell-line bg-white px-6 py-6 shadow-lg">
-            <h3 className="text-lg font-semibold text-shell-ink">
-              Import artifact
-            </h3>
-            <p className="mt-2 text-sm text-shell-muted">
-              Import a recording, sample, or schema package from a file. Full
-              import flow is implemented in UI-051.
-            </p>
-            <div className="mt-5 flex justify-end gap-2">
-              <button
-                className="shell-action"
-                type="button"
-                onClick={() => setImportDialogOpen(false)}
-              >
-                Cancel
-              </button>
-            </div>
-          </section>
-        </div>
-      ) : null}
+      <RecordingImportDialog
+        canImport={access.canCreateSource}
+        open={importDialogOpen}
+        onClose={() => setImportDialogOpen(false)}
+        onImported={(artifact) => {
+          setLocalRecordings((prev) => [artifact, ...prev]);
+          setImportDialogOpen(false);
+        }}
+      />
     </div>
   );
 }
