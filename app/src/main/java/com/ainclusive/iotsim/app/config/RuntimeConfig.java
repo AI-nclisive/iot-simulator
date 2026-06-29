@@ -12,7 +12,7 @@ import com.ainclusive.iotsim.platform.scan.SourceScanner;
 import com.ainclusive.iotsim.platform.scan.UnsupportedSourceScanner;
 import com.ainclusive.iotsim.supervisor.ProcessWorkerLauncher;
 import com.ainclusive.iotsim.supervisor.Supervisor;
-import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -32,21 +32,33 @@ public class RuntimeConfig {
 
     @Bean
     public RuntimeController runtimeController(RuntimeProperties props,
-            DataSourceRepository dataSources, RuntimeEventRepository runtimeEvents, ObjectMapper json) {
+            DataSourceRepository dataSources, RuntimeEventRepository runtimeEvents, ObjectMapper json,
+            ExecutorService runtimeEventExecutor) {
         if (props.isSupervisorMode()) {
             // Persist runtime events off the IPC delivery thread (IS-048): the listener
             // is called on a gRPC thread that must stay non-blocking.
-            Executor executor = Executors.newSingleThreadExecutor(r -> {
-                Thread t = new Thread(r, "runtime-event-persist");
-                t.setDaemon(true);
-                return t;
-            });
             RuntimeActivityListener listener = new PersistingRuntimeActivityListener(
-                    dataSources, runtimeEvents, json, executor);
+                    dataSources, runtimeEvents, json, runtimeEventExecutor);
             return new Supervisor(
                     new ProcessWorkerLauncher(props.workers()), props.restartPolicy(), listener);
         }
         return new InMemoryRuntimeController();
+    }
+
+    /**
+     * Single-thread executor that drains the {@link PersistingRuntimeActivityListener}'s
+     * persist queue off the IPC delivery thread (IS-048). Spring owns its lifecycle and
+     * calls {@code close()} on context shutdown, which performs an orderly drain
+     * (awaits in-flight inserts) so queued events are not silently dropped. Daemon
+     * thread so it never blocks JVM exit if a drain is interrupted.
+     */
+    @Bean(destroyMethod = "close")
+    public ExecutorService runtimeEventExecutor() {
+        return Executors.newSingleThreadExecutor(r -> {
+            Thread t = new Thread(r, "runtime-event-persist");
+            t.setDaemon(true);
+            return t;
+        });
     }
 
     /**
