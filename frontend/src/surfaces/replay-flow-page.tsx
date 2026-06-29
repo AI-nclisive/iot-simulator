@@ -6,6 +6,7 @@ import { useDataSourcesStore } from "../shell/data-sources-store";
 import { useShellStore } from "../shell/shell-store";
 import { SharedStatePanel } from "../ui/shared-state-panel";
 import { StatusBadge, type StatusTone } from "../ui/status-badge";
+import { DeterministicRunSettings, type DeterministicSettings } from "./deterministic-run-settings";
 
 type ReplayUiState = "idle" | "running" | "completed" | "failed";
 
@@ -73,6 +74,8 @@ export function ReplayFlowPage() {
     "Ready",
   );
   const [runStartedAt, setRunStartedAt] = useState("Not started");
+  const [deterministicSettings, setDeterministicSettings] = useState<DeterministicSettings | null>(null);
+  const [deterministicOpen, setDeterministicOpen] = useState(false);
 
   const selectedArtifact = useMemo(
     () => artifacts.find((artifact) => artifact.id === selectedArtifactId),
@@ -238,7 +241,11 @@ export function ReplayFlowPage() {
       return;
     }
 
-    startReplay(activeSource.id, "You");
+    startReplay(
+      activeSource.id,
+      "You",
+      deterministicSettings as Record<string, unknown> | null,
+    );
     setEvidenceState("Assembling");
     setProgress(0);
     setReplayState("running");
@@ -431,6 +438,29 @@ export function ReplayFlowPage() {
           <MetricCard label="Started at" value={runStartedAt} />
         </div>
 
+        <div className="mt-6 rounded-md border border-shell-line bg-shell-base/55 px-4 py-4">
+          <button
+            aria-expanded={deterministicOpen}
+            className="flex w-full items-center justify-between gap-2 text-left"
+            type="button"
+            onClick={() =>
+              setDeterministicOpen((open) => {
+                if (open) setDeterministicSettings(null);
+                return !open;
+              })
+            }
+          >
+            <span className="text-sm font-medium text-shell-ink">Deterministic settings</span>
+            <span className="text-xs text-shell-muted">{deterministicOpen ? "Hide" : "Show"}</span>
+          </button>
+
+          {deterministicOpen ? (
+            <div className="mt-4">
+              <DeterministicRunSettings onChange={setDeterministicSettings} />
+            </div>
+          ) : null}
+        </div>
+
         <div className="mt-6 flex flex-wrap items-center gap-2">
           {replayState !== "running" ? (
             <button
@@ -452,6 +482,14 @@ export function ReplayFlowPage() {
           <Link className="shell-text-action" to={`/data-sources/${source.id}`}>
             Back to source
           </Link>
+
+          {deterministicSettings ? (
+            <p className="text-xs text-shell-muted">
+              {deterministicSettings.mode === "seed"
+                ? `Repeatability: seed ${deterministicSettings.seed}, ${deterministicSettings.ordering === "original" ? "original order" : "alphabetical order"}`
+                : `Repeatability: ${deterministicSettings.preset} preset, ${deterministicSettings.ordering === "original" ? "original order" : "alphabetical order"}`}
+            </p>
+          ) : null}
         </div>
 
         {!canConfigureReplay ? (

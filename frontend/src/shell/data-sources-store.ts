@@ -16,7 +16,11 @@ type DataSourcesState = {
   deleteDataSource: (rowId: string) => void;
   duplicateDataSource: (rowId: string) => void;
   startRecording: (rowId: string, operator?: string) => void;
-  startReplay: (rowId: string, operator?: string) => void;
+  startReplay: (
+    rowId: string,
+    operator?: string,
+    deterministicSettings?: Record<string, unknown> | null,
+  ) => void;
   startDataSource: (rowId: string) => void;
   stopDataSource: (rowId: string) => void;
   updateSourceConfiguration: (
@@ -149,7 +153,7 @@ export const useDataSourcesStore = create<DataSourcesState>((set) => ({
           : row,
       ),
     })),
-  startReplay: (rowId, operator) =>
+  startReplay: (rowId, operator, _deterministicSettings) =>
     set((state) => ({
       dataSources: state.dataSources.map((row) =>
         row.id === rowId
