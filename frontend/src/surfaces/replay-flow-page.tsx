@@ -57,12 +57,9 @@ export function ReplayFlowPage() {
   const accessMode = useShellStore((state) => state.accessMode);
   const sharedRole = useShellStore((state) => state.sharedRole);
   const artifacts = useArtifactsStore((state) => state.artifacts);
-  const assignReplayArtifact = useDataSourcesStore((state) => state.assignReplayArtifact);
-  const finishReplay = useDataSourcesStore((state) => state.finishReplay);
   const source = useDataSourcesStore((state) =>
     state.dataSources.find((row) => row.id === sourceId),
   );
-  const startReplay = useDataSourcesStore((state) => state.startReplay);
   const access = resolveAccess(accessMode, sharedRole);
   const [selectedArtifactId, setSelectedArtifactId] = useState(
     searchParams.get("artifactId") ?? artifacts[0]?.id ?? "",
@@ -81,26 +78,11 @@ export function ReplayFlowPage() {
     () => artifacts.find((artifact) => artifact.id === selectedArtifactId),
     [artifacts, selectedArtifactId],
   );
-  const assignedArtifact = useMemo(
-    () =>
-      artifacts.find((artifact) => artifact.id === source?.assignedReplayArtifactId) ?? null,
-    [artifacts, source?.assignedReplayArtifactId],
-  );
 
-  const compatibleArtifact =
-    selectedArtifact && source
-      ? selectedArtifact.protocol === source.protocol
-      : false;
-  const sourceBusyWithAnotherProcess =
-    source?.process === "Recording" ||
-    (source?.process === "Replay" && replayState !== "running");
+  const compatibleArtifact = Boolean(selectedArtifact && source);
+
   const canConfigureReplay = access.canConfigureReplay;
-  const hasPendingAssignment =
-    Boolean(selectedArtifact) && selectedArtifact?.id !== source?.assignedReplayArtifactId;
-  const replayReady =
-    Boolean(selectedArtifact) &&
-    selectedArtifact?.id === source?.assignedReplayArtifactId &&
-    compatibleArtifact;
+  const replayReady = Boolean(selectedArtifact) && compatibleArtifact;
 
   useEffect(() => {
     if (!source || replayState !== "running") {
@@ -113,7 +95,6 @@ export function ReplayFlowPage() {
 
         if (nextProgress >= 100) {
           window.clearInterval(intervalId);
-          finishReplay(source.id, "You");
           setReplayState("completed");
           setEvidenceState("Ready");
         }
@@ -123,34 +104,19 @@ export function ReplayFlowPage() {
     }, 900);
 
     return () => window.clearInterval(intervalId);
-  }, [finishReplay, replayState, source]);
+  }, [replayState, source]);
 
   const runtimeEvents = useMemo(() => {
     if (!selectedArtifact) {
-      return ["Choose a recording or sample to prepare replay."];
+      return ["Choose a recording to prepare replay."];
     }
 
     const events = [
-      `${selectedArtifact.type} selected: ${selectedArtifact.name}`,
-      selectedArtifact.id === source?.assignedReplayArtifactId
-        ? "Selected artifact is already assigned to this replay target."
-        : "Selected artifact still needs explicit assignment before replay starts.",
+      `Artifact ${selectedArtifact.id} selected`,
       compatibleArtifact
         ? `Protocol matches ${source?.protocol}.`
         : "Protocol mismatch blocks replay on this source.",
     ];
-
-    if (source?.clients === 0) {
-      events.push("No active client is connected right now.");
-    } else {
-      events.push(
-        `${source?.clients ?? 0} client${source?.clients === 1 ? "" : "s"} can receive replay.`,
-      );
-    }
-
-    if (sourceBusyWithAnotherProcess) {
-      events.push("Target is already busy with another runtime process.");
-    }
 
     if (replayState === "running") {
       events.push(`Replay is running at ${speed}.`);
@@ -171,10 +137,7 @@ export function ReplayFlowPage() {
     progress,
     replayState,
     selectedArtifact,
-    source?.assignedReplayArtifactId,
-    source?.clients,
     source?.protocol,
-    sourceBusyWithAnotherProcess,
     speed,
   ]);
 
@@ -204,7 +167,7 @@ export function ReplayFlowPage() {
           <SharedStatePanel
             message="Save a recording first, then come back here to attach it to this source."
             state="empty"
-            title="No recordings or samples are available yet."
+            title="No recordings are available yet."
           />
           <div className="mt-4">
             <Link className="shell-text-action" to={`/data-sources/${source.id}/record`}>
@@ -218,34 +181,15 @@ export function ReplayFlowPage() {
 
   const activeSource = source;
 
-  function assignArtifactToReplay() {
-    if (
-      !selectedArtifact ||
-      !compatibleArtifact ||
-      !canConfigureReplay ||
-      sourceBusyWithAnotherProcess
-    ) {
-      return;
-    }
-
-    assignReplayArtifact(activeSource.id, selectedArtifact.id, "You");
-  }
-
   function handleStartReplay() {
     if (
       !selectedArtifact ||
       !replayReady ||
-      sourceBusyWithAnotherProcess ||
       !canConfigureReplay
     ) {
       return;
     }
 
-    startReplay(
-      activeSource.id,
-      "You",
-      deterministicSettings as Record<string, unknown> | null,
-    );
     setEvidenceState("Assembling");
     setProgress(0);
     setReplayState("running");
@@ -258,7 +202,6 @@ export function ReplayFlowPage() {
   }
 
   function handleStopReplay() {
-    finishReplay(activeSource.id, "You");
     setReplayState("failed");
     setEvidenceState("Retry needed");
   }
@@ -283,7 +226,7 @@ export function ReplayFlowPage() {
         <div className="mt-6 grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
           <div className="grid gap-4">
             <label className="flex flex-col gap-2 text-sm text-shell-muted">
-              Recording or sample
+              Recording
               <select
                 className="shell-field"
                 disabled={!canConfigureReplay || replayState === "running"}
@@ -292,7 +235,7 @@ export function ReplayFlowPage() {
               >
                 {artifacts.map((artifact) => (
                   <option key={artifact.id} value={artifact.id}>
-                    {artifact.name} · {artifact.type} · {artifact.protocol}
+                    Artifact {artifact.id}
                   </option>
                 ))}
               </select>
@@ -327,68 +270,10 @@ export function ReplayFlowPage() {
                 <p className="mt-2 text-sm leading-6 text-shell-muted">
                   {selectedArtifact
                     ? compatibleArtifact
-                      ? `${selectedArtifact.type} can replay through ${source.protocol}.`
-                      : `${selectedArtifact.protocol} cannot replay through ${source.protocol}.`
-                    : "Select a recording or sample to review impact before starting."}
+                      ? `Artifact ${selectedArtifact.id} can replay through ${source.protocol}.`
+                      : `Source protocol does not match. Cannot replay through ${source.protocol}.`
+                    : "Select a recording to review impact before starting."}
                 </p>
-              </div>
-            </div>
-
-            <div className="rounded-md border border-shell-line bg-white px-4 py-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
-                Replay assignment
-              </p>
-              <dl className="mt-3 space-y-3 text-sm text-shell-muted">
-                <div className="flex items-center justify-between gap-3">
-                  <dt>Current</dt>
-                  <dd className="font-medium text-shell-ink">
-                    {assignedArtifact ? assignedArtifact.name : "No artifact assigned"}
-                  </dd>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <dt>Selected</dt>
-                  <dd className="font-medium text-shell-ink">
-                    {selectedArtifact ? selectedArtifact.name : "Nothing selected"}
-                  </dd>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <dt>Impact</dt>
-                  <dd className="max-w-[16rem] text-right font-medium text-shell-ink">
-                    {!selectedArtifact
-                      ? "Select an artifact first"
-                      : !compatibleArtifact
-                        ? "Assignment is blocked by protocol mismatch"
-                        : assignedArtifact && assignedArtifact.id !== selectedArtifact.id
-                          ? "This replaces the current replay assignment before runtime starts"
-                          : assignedArtifact && assignedArtifact.id === selectedArtifact.id
-                            ? "This artifact is already assigned to the target source"
-                            : "This attaches the first replay artifact to the target source"}
-                  </dd>
-                </div>
-              </dl>
-
-              <p className="mt-4 text-sm leading-6 text-shell-muted">
-                {activeSource.clients > 0
-                  ? "Connected clients will receive values from the assigned artifact after replay starts."
-                  : "No connected client is shown right now, but the assignment will be used the next time replay starts."}
-              </p>
-
-              <div className="mt-4 flex flex-wrap items-center gap-2">
-                <button
-                  className="shell-action"
-                  disabled={
-                    !selectedArtifact ||
-                    !compatibleArtifact ||
-                    !canConfigureReplay ||
-                    sourceBusyWithAnotherProcess ||
-                    !hasPendingAssignment
-                  }
-                  type="button"
-                  onClick={assignArtifactToReplay}
-                >
-                  Assign artifact
-                </button>
-                {replayReady ? <StatusBadge label="Assigned" tone="accent" /> : null}
               </div>
             </div>
           </div>
@@ -399,10 +284,6 @@ export function ReplayFlowPage() {
             </p>
             {selectedArtifact ? (
               <dl className="mt-3 space-y-3 text-sm text-shell-muted">
-                <div className="flex items-center justify-between gap-3">
-                  <dt>Type</dt>
-                  <dd className="font-medium text-shell-ink">{selectedArtifact.type}</dd>
-                </div>
                 <div className="flex items-center justify-between gap-3">
                   <dt>Author</dt>
                   <dd className="font-medium text-shell-ink">{selectedArtifact.createdBy}</dd>
@@ -424,16 +305,15 @@ export function ReplayFlowPage() {
           </div>
         </div>
 
-        <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <MetricCard
             label="Target source"
-            value={sourceBusyWithAnotherProcess ? "Already active" : "Ready"}
+            value="Ready"
           />
           <MetricCard
             label="Parameters"
             value={source.parameterCount.toLocaleString()}
           />
-          <MetricCard label="Client activity" value={source.clients} />
           <MetricCard label="Replay progress" value={`${progress}%`} />
           <MetricCard label="Started at" value={runStartedAt} />
         </div>
@@ -466,7 +346,7 @@ export function ReplayFlowPage() {
             <button
               className="shell-action"
               disabled={
-                !canConfigureReplay || !selectedArtifact || !replayReady || sourceBusyWithAnotherProcess
+                !canConfigureReplay || !selectedArtifact || !replayReady
               }
               type="button"
               onClick={handleStartReplay}
@@ -498,36 +378,6 @@ export function ReplayFlowPage() {
               message="Shared User can observe replay setup, but only Admin can choose artifacts and start replay."
               state="locked"
               title="Replay is read-only in this role."
-            />
-          </div>
-        ) : null}
-
-        {selectedArtifact && compatibleArtifact && hasPendingAssignment ? (
-          <div className="mt-6">
-            <SharedStatePanel
-              message="Assign the selected recording or sample to this source first. Replay start stays disabled until the target assignment is explicit."
-              state="warning"
-              title="Replay assignment is still pending."
-            />
-          </div>
-        ) : null}
-
-        {sourceBusyWithAnotherProcess ? (
-          <div className="mt-6">
-            <SharedStatePanel
-              message="This target is already occupied by another runtime action. Stop the current process before launching replay."
-              state="warning"
-              title="Target is already active."
-            />
-          </div>
-        ) : null}
-
-        {source.clients === 0 ? (
-          <div className="mt-6">
-            <SharedStatePanel
-              message="Replay can still start, but there is no connected client to observe the output yet."
-              state="warning"
-              title="No clients are currently attached."
             />
           </div>
         ) : null}

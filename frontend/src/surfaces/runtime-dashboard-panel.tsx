@@ -37,12 +37,16 @@ function runStateTone(state: RunState): StatusTone {
   return "accent";
 }
 
-function runStateLabel(state: RunState): string {
-  if (state === "queued") return "Queued";
-  if (state === "running") return "Running";
-  if (state === "failed") return "Failed";
-  if (state === "completed") return "Completed";
-  return "Stopped";
+function runProcessLabel(
+  state: RunState,
+  processType?: "Recording" | "Replay" | "Scenario",
+): string {
+  const proc = processType ?? "Run";
+  if (state === "queued") return `${proc} waiting`;
+  if (state === "running") return `${proc} in progress`;
+  if (state === "failed") return `${proc} failed`;
+  if (state === "completed") return `${proc} completed`;
+  return `${proc} stopped`;
 }
 
 export function RuntimeDashboardPanel() {
@@ -73,7 +77,10 @@ export function RuntimeDashboardPanel() {
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="text-sm font-medium text-shell-ink">{run.label}</p>
                     {run.runSource === "automation" ? (
-                      <span className="inline-flex items-center rounded-full border border-shell-accent/30 bg-shell-accent/10 px-2 py-0.5 text-xs font-medium text-shell-accent">
+                      <span
+                        className="inline-flex items-center rounded-full border border-shell-accent/30 bg-shell-accent/10 px-2 py-0.5 text-xs font-medium text-shell-accent"
+                        title="Triggered by an external automation process, not a manual user action"
+                      >
                         Automated
                       </span>
                     ) : null}
@@ -85,15 +92,9 @@ export function RuntimeDashboardPanel() {
 
                 <div className="flex flex-wrap items-center gap-2">
                   <StatusBadge
-                    label={runStateLabel(run.runState)}
+                    label={runProcessLabel(run.runState, run.processType)}
                     tone={runStateTone(run.runState)}
                   />
-                  {run.processType ? (
-                    <StatusBadge
-                      label={run.processType}
-                      tone={processTone(run.processType)}
-                    />
-                  ) : null}
                   {run.runState !== "queued" ? (
                     <StatusBadge
                       label={`Evidence: ${run.evidence}`}
@@ -117,26 +118,6 @@ export function RuntimeDashboardPanel() {
                 </p>
               ) : null}
 
-              {run.runState !== "queued" && run.runState !== "failed" ? (
-                <div className="mt-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
-                    Pinned preview
-                  </p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {run.previewParameters.map((parameter) => (
-                      <span
-                        key={parameter}
-                        className="shell-chip border-shell-line bg-white text-shell-muted"
-                      >
-                        {parameter}
-                      </span>
-                    ))}
-                    <span className="shell-chip border-shell-line bg-white text-shell-muted">
-                      +{run.previewOverflowCount.toLocaleString()} more
-                    </span>
-                  </div>
-                </div>
-              ) : null}
 
               {run.runState === "failed" ? (
                 <div className="mt-3 rounded-md border border-shell-danger/30 bg-shell-danger/10 px-3 py-2 text-sm text-shell-danger">
@@ -146,7 +127,7 @@ export function RuntimeDashboardPanel() {
 
               <div className="mt-4 flex flex-wrap items-center gap-3">
                 <Link className="shell-text-action" to={run.relatedPath}>
-                  Open {run.relatedLabel}
+                  Open source: {run.relatedLabel}
                 </Link>
                 {run.evidencePath && run.runState !== "queued" ? (
                   <Link className="shell-text-action" to={run.evidencePath}>

@@ -87,7 +87,7 @@ export function DataSourcesListPage() {
     return rows.filter((row) => {
       const searchMatches =
         searchValue.trim().length === 0 ||
-        [row.name, row.protocol, row.endpoint, row.lastOperator]
+        [row.name, row.protocol, row.endpoint]
           .join(" ")
           .toLowerCase()
           .includes(searchValue.trim().toLowerCase());
@@ -110,27 +110,13 @@ export function DataSourcesListPage() {
     }
 
     if (confirmationRequest.action === "stop") {
-      const runtimeImpact =
-        row.process === "Recording"
-          ? "Recording stops immediately and the current capture ends on this source."
-          : row.process === "Replay"
-            ? "Replay stops immediately for this source."
-            : "The source stops serving values until someone starts it again.";
-
       const copy = stopActionCopy;
 
       return {
         confirmLabel: copy.confirmLabel,
         impacts: [
           { label: "Endpoint", value: row.endpoint },
-          { label: "Runtime impact", value: runtimeImpact },
-          {
-            label: "Connected clients",
-            value:
-              row.clients > 0
-                ? `${row.clients} connected client${row.clients === 1 ? "" : "s"} may notice the interruption.`
-                : "No connected clients are currently shown for this source.",
-          },
+          { label: "Runtime impact", value: "The source stops serving values until someone starts it again." },
         ],
         message: copy.message,
         objectLabel: `${row.name} (${row.protocol})`,
@@ -151,13 +137,6 @@ export function DataSourcesListPage() {
       impacts: [
         { label: "Endpoint", value: row.endpoint },
         { label: "Shared impact", value: sharedImpact },
-        {
-          label: "Connected clients",
-          value:
-            row.clients > 0
-              ? `${row.clients} connected client${row.clients === 1 ? "" : "s"} lose this source when it is removed.`
-              : "No connected clients are currently shown for this source.",
-        },
       ],
       message:
         "Deleting a source removes it from the project and breaks direct access to its saved simulator configuration.",
@@ -278,28 +257,19 @@ export function DataSourcesListPage() {
       className: "w-[8rem]",
     },
     {
-      id: "clients",
-      header: "Clients",
-      sortable: true,
-      sortValue: (row) => row.clients,
-      cell: (row) => <span className="text-sm text-shell-ink">{row.clients}</span>,
-      className: "w-[7rem]",
-    },
-    {
       id: "health",
       header: "Health",
       sortable: true,
       sortValue: (row) => row.health,
-      cell: (row) => <StatusBadge label={row.health} tone={healthTone(row.health)} />,
+      cell: (row) => (
+        <div className="min-w-0">
+          <StatusBadge label={row.health} tone={healthTone(row.health)} />
+          {row.health === "Error" ? (
+            <p className="mt-1 text-xs text-shell-muted">See Events tab</p>
+          ) : null}
+        </div>
+      ),
       className: "w-[9rem]",
-    },
-    {
-      id: "operator",
-      header: "Last operator",
-      sortable: true,
-      sortValue: (row) => row.lastOperator,
-      cell: (row) => <span className="text-sm text-shell-ink">{row.lastOperator}</span>,
-      className: "w-[10rem]",
     },
   ];
 
@@ -339,7 +309,7 @@ export function DataSourcesListPage() {
             access.canCreateSource ? () => navigate("/data-sources/new") : undefined
           }
           primaryActionLabel={access.canCreateSource ? "Create source" : undefined}
-          searchPlaceholder="Search by source, protocol, endpoint, or operator"
+          searchPlaceholder="Search by source, protocol, or endpoint"
           searchValue={searchValue}
         />
 
@@ -361,24 +331,14 @@ export function DataSourcesListPage() {
                 },
               ];
 
-              if (row.process === "Recording") {
-                actions.push({
-                  label: "Open recording",
-                  onClick: () => navigate(`/data-sources/${row.id}/record`),
-                });
-              } else if (access.canRecordSource && sourceStarted && row.process !== "Replay") {
+              if (access.canRecordSource && sourceStarted) {
                 actions.push({
                   label: "Start recording",
                   onClick: () => navigate(`/data-sources/${row.id}/record`),
                 });
               }
 
-              if (row.process === "Replay") {
-                actions.push({
-                  label: "Open replay",
-                  onClick: () => navigate(`/data-sources/${row.id}/replay`),
-                });
-              } else if (access.canConfigureReplay && sourceStarted && row.process !== "Recording") {
+              if (access.canConfigureReplay && sourceStarted) {
                 actions.push({
                   label: "Set up replay",
                   onClick: () => navigate(`/data-sources/${row.id}/replay`),

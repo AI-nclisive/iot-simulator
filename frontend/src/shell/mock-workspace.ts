@@ -57,7 +57,7 @@ export const projects: ProjectSummary[] = [
 export const activeRuns: ActiveRun[] = [
   {
     id: "run-1",
-    label: "Batch replay / Line A telemetry",
+    label: "Batch replay",
     initiator: "Alex M.",
     runSource: "manual",
     runState: "running",
@@ -77,7 +77,7 @@ export const activeRuns: ActiveRun[] = [
   },
   {
     id: "run-2",
-    label: "Nightly regression replay / Packaging cell stream",
+    label: "Nightly regression replay",
     initiator: "CI pipeline",
     runSource: "automation",
     runState: "running",
@@ -97,7 +97,7 @@ export const activeRuns: ActiveRun[] = [
   },
   {
     id: "run-3",
-    label: "Live capture / Field capture telemetry",
+    label: "Live capture",
     initiator: "Jordan K.",
     runSource: "manual",
     runState: "running",
@@ -117,7 +117,7 @@ export const activeRuns: ActiveRun[] = [
   },
   {
     id: "run-4",
-    label: "Smoke test replay / Line A telemetry",
+    label: "Smoke test replay",
     initiator: "Scheduled job",
     runSource: "automation",
     runState: "queued",
@@ -132,7 +132,7 @@ export const activeRuns: ActiveRun[] = [
   },
   {
     id: "run-5",
-    label: "Validation replay / Packaging cell stream",
+    label: "Validation replay",
     initiator: "CI pipeline",
     runSource: "automation",
     runState: "failed",

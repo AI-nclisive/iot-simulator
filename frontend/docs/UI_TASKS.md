@@ -705,6 +705,31 @@ Parallel execution:
   Done when: live tabs and the runtime dashboard reflect real-time backend state
   with graceful reconnect, and no mock live data remains on those surfaces.
 
+- [x] `UI-099` Align SchemaParameter mock shape to NodeDto
+  Goal: remove fields not in NodeDto from SchemaParameter and fix all consumers.
+  Fields removed: `min`, `max`, `hasDependent`.
+  Surfaces: Schema editor.
+  Done when: SchemaParameter has only fields present in NodeDto; schema editor shows type/unit/description only; detectDependencyWarnings reduced to description-change only; no TypeScript errors.
+
+- [x] `UI-100` Align DataSourceRow mock shape to DataSourceResponse
+  Goal: remove fields not in DataSourceResponse from DataSourceRow and fix all consumers.
+  Fields removed: `process`, `clients`, `lastOperator`, `assignedReplayArtifactId`.
+  Surfaces: Data Sources List, Data Source Detail (Overview, header), Recording Flow, Replay Flow.
+  Done when: DataSourceRow has only fields present in DataSourceResponse; all list/detail/flow surfaces work without those fields; store methods that only mutated removed fields are deleted; no TypeScript errors.
+
+- [x] `UI-101` Align RecordingRow and ReusableArtifact mock shapes to RecordingResponse
+  Goal: remove fields not in RecordingResponse from RecordingRow and ReusableArtifact and fix all consumers.
+  Fields removed from RecordingRow: `name`, `type` (ArtifactType), `sourceName`, `protocol`, `duration`, `tags`, `lastUsedAt`, `sizeKb`; origin reduced to `"captured" | "imported"` (remove "synthetic"). Added: `valueCount`.
+  Fields removed from ReusableArtifact: `name`, `type`, `protocol`, `sourceName`, `durationLabel`, `status`.
+  Surfaces: Recordings page, Recording Export dialog, Recording Import dialog, Replay Flow.
+  Done when: both types contain only fields present in RecordingResponse; recordings page, export/import dialogs, and replay flow work without removed fields; no TypeScript errors.
+
+- [x] `UI-102` Align SourceValueRow mock shape to backend DataType enum
+  Goal: remove `"enum"` from `SourceValueRow.dataType` and replace with `"string"` to match backend contract.
+  Fields changed: `dataType` union `"float" | "int" | "bool" | "enum"` → `"float" | "int" | "bool" | "string"`; all mock rows updated.
+  Surfaces: Data Source Detail — Values tab.
+  Done when: `SourceValueRow.dataType` contains only values present in backend `DataType` contract (`FLOAT32/64→float`, `INT*→int`, `BOOL→bool`, `STRING→string`); no `"enum"` in mock data; no TypeScript errors.
+
 ## Recommended Sequence
 
 1. Complete the P0 shell and shared-pattern tasks first.
@@ -717,3 +742,4 @@ Parallel execution:
 
 The task order above already follows this sequence. The section is kept only as
 the short executive summary.
+

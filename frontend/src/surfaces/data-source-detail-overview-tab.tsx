@@ -1,22 +1,6 @@
 import { Link } from "react-router-dom";
 import type { DataSourceRow } from "./mock-data-sources";
 
-function runtimeBehaviorText(source: DataSourceRow) {
-  if (source.process === "Replay") {
-    return "Replay process is running. The Values tab reflects current output, while saved recordings remain separate artifacts.";
-  }
-
-  if (source.process === "Recording") {
-    return "Recording process is running. The Values tab shows current values while the capture is being assembled separately.";
-  }
-
-  if (source.status === "Active") {
-    return "Run means the source is available. No recording or replay process is running.";
-  }
-
-  return "Off. Start the source before starting recording or replay.";
-}
-
 function stateLabel(source: DataSourceRow) {
   return source.status === "Active" ? "Run" : "Off";
 }
@@ -59,14 +43,13 @@ export function DataSourceDetailOverviewTab({
 
   return (
     <div className="space-y-5">
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         <SummaryBlock label="State" value={stateLabel(source)} />
         <SummaryBlock label="Health" value={source.health} />
         <SummaryBlock
           label="Parameters"
           value={`${source.parameterCount.toLocaleString()} in Schema`}
         />
-        <SummaryBlock label="Clients" value={source.clients} />
       </div>
 
       {healthGuidance ? (
@@ -80,11 +63,9 @@ export function DataSourceDetailOverviewTab({
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <div>
-          <p className="text-sm font-medium text-shell-ink">
-            {source.process ? "Current process" : "Source"}
-          </p>
+          <p className="text-sm font-medium text-shell-ink">Source</p>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-shell-muted">
-            {runtimeBehaviorText(source)}
+            The source is available. Open Schema to review parameters, or Values to see current readings.
           </p>
 
           <dl className="mt-5 grid gap-3 text-sm text-shell-muted sm:grid-cols-2">
@@ -94,25 +75,11 @@ export function DataSourceDetailOverviewTab({
               </dt>
               <dd className="mt-2 text-sm text-shell-ink">{source.endpoint}</dd>
             </div>
-            {source.process ? (
-              <div>
-                <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
-                  Process
-                </dt>
-                <dd className="mt-2 text-sm text-shell-ink">{source.process}</dd>
-              </div>
-            ) : null}
             <div>
               <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
                 Protocol
               </dt>
               <dd className="mt-2 text-sm text-shell-ink">{source.protocol}</dd>
-            </div>
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
-                Last operator
-              </dt>
-              <dd className="mt-2 text-sm text-shell-ink">{source.lastOperator}</dd>
             </div>
           </dl>
         </div>
@@ -122,17 +89,7 @@ export function DataSourceDetailOverviewTab({
             Next action
           </p>
           <div className="mt-3 flex flex-col items-start gap-2">
-            {source.process === "Recording" ? (
-              <Link className="shell-text-action" to={`/data-sources/${source.id}/record`}>
-                Open recording
-              </Link>
-            ) : null}
-            {source.process === "Replay" ? (
-              <Link className="shell-text-action" to={`/data-sources/${source.id}/replay`}>
-                Open replay
-              </Link>
-            ) : null}
-            {source.status === "Active" && !source.process ? (
+            {source.status === "Active" ? (
               <>
                 <Link className="shell-text-action" to={`/data-sources/${source.id}/record`}>
                   Start recording
@@ -141,7 +98,9 @@ export function DataSourceDetailOverviewTab({
                   Set up replay
                 </Link>
               </>
-            ) : null}
+            ) : (
+              <p className="text-sm text-shell-muted">Start the source to begin recording or replay.</p>
+            )}
             <Link className="shell-text-action" to="?tab=values">
               Open Values
             </Link>

@@ -1,4 +1,4 @@
-export type EvidenceStatus = "Capturing" | "Ready" | "Partial" | "Exported" | "Export failed";
+export type EvidenceStatus = "In progress" | "Ready" | "Incomplete" | "Exported" | "Export failed";
 
 export type EvidenceFormat = "PDF" | "JSON" | "CSV bundle";
 
@@ -233,7 +233,7 @@ export const evidenceArtifacts: EvidenceArtifact[] = [
     startedAt: "Jun 25, 2026 13:58",
     completedAt: "Jun 25, 2026 14:04",
     duration: "06:09",
-    status: "Partial",
+    status: "Incomplete",
     exportState: "Not exported",
     completeness: "Scenario evidence is partial because one fault step ended early.",
     valueCount: 18840,
@@ -302,7 +302,7 @@ export const evidenceArtifacts: EvidenceArtifact[] = [
     initiator: "Alex M.",
     startedAt: "Jun 25, 2026 14:40",
     duration: "Running",
-    status: "Capturing",
+    status: "In progress",
     exportState: "Not ready",
     completeness: "Evidence is still assembling while capture continues.",
     valueCount: 860,

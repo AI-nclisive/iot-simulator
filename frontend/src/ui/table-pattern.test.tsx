@@ -10,6 +10,7 @@
  */
 
 import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { OperationalTable } from "./table-pattern";
 
@@ -107,5 +108,91 @@ describe("OperationalTable — sort direction indicator", () => {
     const { container } = renderTable({ columnId: "name", direction: "asc" });
     const indicators = container.querySelectorAll('[aria-hidden="true"]');
     expect(indicators.length).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Pagination tests
+// ---------------------------------------------------------------------------
+
+function makeRows(count: number): Row[] {
+  return Array.from({ length: count }, (_, i) => ({
+    id: String(i + 1),
+    name: `Row ${i + 1}`,
+    value: i + 1,
+  }));
+}
+
+function renderPaged(rowData: Row[], pageSize?: number) {
+  return render(
+    <OperationalTable
+      columns={columns}
+      rows={rowData}
+      rowKey={(r) => r.id}
+      sortState={null}
+      onSortChange={vi.fn()}
+      hasQueryState={false}
+      emptyTitle="No rows"
+      emptyMessage="Table is empty"
+      noResultsTitle="No results"
+      noResultsMessage="No matching rows"
+      pageSize={pageSize}
+    />,
+  );
+}
+
+describe("OperationalTable — pagination not shown for small sets", () => {
+  it("no pagination controls when rows fit on one page", () => {
+    renderPaged(makeRows(3), 5);
+    expect(screen.queryByRole("button", { name: "Next" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Previous" })).toBeNull();
+  });
+});
+
+describe("OperationalTable — pagination controls appear for large sets", () => {
+  it("shows Previous and Next buttons when rows exceed pageSize", () => {
+    renderPaged(makeRows(10), 3);
+    expect(screen.getByRole("button", { name: "Previous" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Next" })).toBeTruthy();
+  });
+
+  it("Previous is disabled on the first page", () => {
+    renderPaged(makeRows(10), 3);
+    expect((screen.getByRole("button", { name: "Previous" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Next" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("shows only the first page of rows initially", () => {
+    renderPaged(makeRows(10), 3);
+    expect(screen.getByText("Row 1")).toBeTruthy();
+    expect(screen.getByText("Row 3")).toBeTruthy();
+    expect(screen.queryByText("Row 4")).toBeNull();
+  });
+
+  it("clicking Next shows the next page", async () => {
+    renderPaged(makeRows(10), 3);
+    await userEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByText("Row 4")).toBeTruthy();
+    expect(screen.queryByText("Row 1")).toBeNull();
+  });
+
+  it("Next is disabled on the last page", async () => {
+    renderPaged(makeRows(6), 3);
+    await userEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect((screen.getByRole("button", { name: "Next" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Previous" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("clicking Previous returns to the previous page", async () => {
+    renderPaged(makeRows(10), 3);
+    await userEvent.click(screen.getByRole("button", { name: "Next" }));
+    await userEvent.click(screen.getByRole("button", { name: "Previous" }));
+    expect(screen.getByText("Row 1")).toBeTruthy();
+    expect(screen.queryByText("Row 4")).toBeNull();
+  });
+
+  it("shows correct row range label", () => {
+    renderPaged(makeRows(10), 3);
+    expect(screen.getByText("1–3 of 10")).toBeTruthy();
   });
 });
