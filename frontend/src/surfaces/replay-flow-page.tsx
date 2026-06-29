@@ -439,7 +439,12 @@ export function ReplayFlowPage() {
             aria-expanded={deterministicOpen}
             className="flex w-full items-center justify-between gap-2 text-left"
             type="button"
-            onClick={() => setDeterministicOpen((open) => !open)}
+            onClick={() =>
+              setDeterministicOpen((open) => {
+                if (open) setDeterministicSettings(null);
+                return !open;
+              })
+            }
           >
             <span className="text-sm font-medium text-shell-ink">Deterministic settings</span>
             <span className="text-xs text-shell-muted">{deterministicOpen ? "Hide" : "Show"}</span>
