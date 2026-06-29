@@ -462,7 +462,7 @@ Parallel execution:
   changes, and shared-edit protection work together as one editor surface for
   small and very large schemas.
 
-- [ ] `UI-043` Schema dependency warnings
+- [x] `UI-043` Schema dependency warnings
   Surface: `Full Schema Editor`
   Depends: `UI-042`, `UI-004`
   Done when: identifier, type, and dependency impact is visible before save.
