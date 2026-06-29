@@ -13,6 +13,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   computeFitnessWarnings,
   FitnessWarning,
+  parseDurationMinutes,
 } from "./recordings-page";
 import type { RecordingRow } from "./mock-recordings";
 
@@ -45,6 +46,26 @@ const baseRow: RecordingRow = {
   sizeKb: 500,
 };
 
+// ─── parseDurationMinutes unit tests ─────────────────────────────────────────
+
+describe("parseDurationMinutes", () => {
+  it("parses a simple minutes-only string: '30m' → 30", () => {
+    expect(parseDurationMinutes("30m")).toBe(30);
+  });
+
+  it("parses hours and minutes: '4h 12m' → 252", () => {
+    expect(parseDurationMinutes("4h 12m")).toBe(252);
+  });
+
+  it("strips seconds and returns only minutes: '8m 05s' → 8", () => {
+    expect(parseDurationMinutes("8m 05s")).toBe(8);
+  });
+
+  it("parses hours and minutes: '1h 44m' → 104", () => {
+    expect(parseDurationMinutes("1h 44m")).toBe(104);
+  });
+});
+
 // ─── computeFitnessWarnings unit tests ───────────────────────────────────────
 
 describe("computeFitnessWarnings — synthetic origin", () => {
@@ -66,7 +87,7 @@ describe("computeFitnessWarnings — synthetic origin", () => {
 });
 
 describe("computeFitnessWarnings — large artifact", () => {
-  it("emits an info-level warning when sizeKb > 10000", () => {
+  it("emits an info-level warning when sizeKb > 10240", () => {
     const row: RecordingRow = { ...baseRow, sizeKb: 18400 };
     const warnings = computeFitnessWarnings(row);
     const sizeWarning = warnings.find((w) =>
@@ -76,7 +97,7 @@ describe("computeFitnessWarnings — large artifact", () => {
     expect(sizeWarning?.level).toBe("info");
   });
 
-  it("does not emit large artifact warning when sizeKb <= 10000", () => {
+  it("does not emit large artifact warning when sizeKb <= 10240", () => {
     const row: RecordingRow = { ...baseRow, sizeKb: 8000 };
     const warnings = computeFitnessWarnings(row);
     expect(warnings.find((w) => w.message.includes("Large artifact"))).toBeUndefined();
