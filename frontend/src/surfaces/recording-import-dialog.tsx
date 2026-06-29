@@ -557,7 +557,7 @@ export function RecordingImportDialog({
         role="dialog"
       >
         <h3 className="text-lg font-semibold text-shell-ink">
-          {titles[step]}
+          {canImport ? titles[step] : "Import artifact"}
         </h3>
 
         {!canImport

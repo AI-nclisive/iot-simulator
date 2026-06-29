@@ -148,6 +148,33 @@ describe("RecordingImportDialog — ready to import", () => {
 
     expect(screen.getByTestId("confirm-import-btn")).toBeTruthy();
   });
+
+  it("calls onImported with the artifact after confirming import", async () => {
+    const onImported = vi.fn();
+    render(
+      <RecordingImportDialog
+        canImport={true}
+        open={true}
+        onClose={vi.fn()}
+        onImported={onImported}
+      />,
+    );
+    // 'r'.charCodeAt(0) = 114; 114 % 3 = 0 → ok branch
+    await selectFile(makeFile("result-ok.json"));
+    await userEvent.click(screen.getByRole("button", { name: "Next" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Import" })).toBeTruthy();
+    }, { timeout: 2000 });
+
+    await userEvent.click(screen.getByRole("button", { name: "Import" }));
+    await userEvent.click(screen.getByTestId("confirm-import-btn"));
+
+    expect(onImported).toHaveBeenCalledOnce();
+    expect(onImported).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "result-ok", type: "recording", origin: "imported" }),
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------
