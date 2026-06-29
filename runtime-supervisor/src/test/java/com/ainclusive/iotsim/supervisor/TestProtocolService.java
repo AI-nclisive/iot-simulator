@@ -12,6 +12,7 @@ import com.ainclusive.iotsim.workercontract.v1.HelloRequest;
 import com.ainclusive.iotsim.workercontract.v1.HelloResponse;
 import com.ainclusive.iotsim.workercontract.v1.ProtocolDataSourceGrpc;
 import com.ainclusive.iotsim.workercontract.v1.Quality;
+import com.ainclusive.iotsim.workercontract.v1.RuntimeEvent;
 import com.ainclusive.iotsim.workercontract.v1.ScanRequest;
 import com.ainclusive.iotsim.workercontract.v1.ScanResponse;
 import com.ainclusive.iotsim.workercontract.v1.SchemaNodeMsg;
@@ -41,6 +42,7 @@ final class TestProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSourc
     private final AtomicReference<CaptureRequest> lastCapture = new AtomicReference<>();
     private final CountDownLatch captureCancelled = new CountDownLatch(1);
     private final CountDownLatch clientEventsCancelled = new CountDownLatch(1);
+    private final CountDownLatch runtimeEventsCancelled = new CountDownLatch(1);
     private volatile boolean healthLive = true;
     private volatile boolean healthHang;
 
@@ -66,6 +68,11 @@ final class TestProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSourc
     /** Waits until the supervisor cancels the client-events stream (stop()/teardown). */
     boolean awaitClientEventsCancelled(long timeoutSeconds) throws InterruptedException {
         return clientEventsCancelled.await(timeoutSeconds, TimeUnit.SECONDS);
+    }
+
+    /** Waits until the supervisor cancels the runtime-events stream (stop()/teardown). */
+    boolean awaitRuntimeEventsCancelled(long timeoutSeconds) throws InterruptedException {
+        return runtimeEventsCancelled.await(timeoutSeconds, TimeUnit.SECONDS);
     }
 
     long appliedCount() {
@@ -159,6 +166,20 @@ final class TestProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSourc
                 .setKind(ClientEvent.Kind.CONNECTED)
                 .setClientId("client-1")
                 .setAtMicros(2_000_000L)
+                .build());
+        // Stream stays open until the supervisor cancels (stop()).
+    }
+
+    @Override
+    public void runtimeEvents(StreamRequest request, StreamObserver<RuntimeEvent> obs) {
+        ServerCallStreamObserver<RuntimeEvent> server = (ServerCallStreamObserver<RuntimeEvent>) obs;
+        server.setOnCancelHandler(runtimeEventsCancelled::countDown);
+        // Emit one event the moment the supervisor subscribes, so a test can assert it
+        // is forwarded (tagged with the data-source id) to the listener.
+        server.onNext(RuntimeEvent.newBuilder()
+                .setType("SOURCE_START")
+                .setAtMicros(2_000_000L)
+                .setDetail("started")
                 .build());
         // Stream stays open until the supervisor cancels (stop()).
     }

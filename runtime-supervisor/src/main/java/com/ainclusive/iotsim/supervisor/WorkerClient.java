@@ -10,6 +10,7 @@ import com.ainclusive.iotsim.workercontract.v1.HealthResponse;
 import com.ainclusive.iotsim.workercontract.v1.HelloRequest;
 import com.ainclusive.iotsim.workercontract.v1.HelloResponse;
 import com.ainclusive.iotsim.workercontract.v1.ProtocolDataSourceGrpc;
+import com.ainclusive.iotsim.workercontract.v1.RuntimeEvent;
 import com.ainclusive.iotsim.workercontract.v1.ScanRequest;
 import com.ainclusive.iotsim.workercontract.v1.ScanResponse;
 import com.ainclusive.iotsim.workercontract.v1.Schema;
@@ -196,6 +197,50 @@ public final class WorkerClient implements AutoCloseable {
             ClientCallStreamObserver<StreamRequest> stream = requestStream.get();
             if (stream != null) {
                 stream.cancel("client events stopped", null);
+            }
+        };
+    }
+
+    /**
+     * Opens the worker → supervisor {@code RuntimeEvents} stream: the worker pushes a
+     * {@link RuntimeEvent} for source start/stop and runtime errors until the returned
+     * handle is cancelled (server-streaming, IS-048). {@code onEvent} is called per
+     * event; {@code onError} on a non-cancel stream failure (a worker that does not
+     * implement the stream fails here with {@code UNIMPLEMENTED} — the caller treats
+     * that as "no runtime events", never fatal).
+     * See backend-specs/02_WORKER_CONTRACT_AND_IPC.md.
+     */
+    public StreamHandle runtimeEvents(Consumer<RuntimeEvent> onEvent, Consumer<Throwable> onError) {
+        ProtocolDataSourceGrpc.ProtocolDataSourceStub async = ProtocolDataSourceGrpc.newStub(channel);
+        AtomicReference<ClientCallStreamObserver<StreamRequest>> requestStream = new AtomicReference<>();
+        ClientResponseObserver<StreamRequest, RuntimeEvent> observer = new ClientResponseObserver<>() {
+            @Override
+            public void beforeStart(ClientCallStreamObserver<StreamRequest> stream) {
+                requestStream.set(stream);
+            }
+
+            @Override
+            public void onNext(RuntimeEvent event) {
+                onEvent.accept(event);
+            }
+
+            @Override
+            public void onError(Throwable t) {
+                if (onError != null) {
+                    onError.accept(t);
+                }
+            }
+
+            @Override
+            public void onCompleted() {
+                // server-streaming ends only via cancel; nothing to do
+            }
+        };
+        async.runtimeEvents(StreamRequest.getDefaultInstance(), observer);
+        return () -> {
+            ClientCallStreamObserver<StreamRequest> stream = requestStream.get();
+            if (stream != null) {
+                stream.cancel("runtime events stopped", null);
             }
         };
     }
