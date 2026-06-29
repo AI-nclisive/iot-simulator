@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { resolveAccess } from "../shell/access-policy";
 import { mockExportShouldFail, projects } from "../shell/mock-workspace";
 import { useShellStore } from "../shell/shell-store";
@@ -11,6 +12,98 @@ type ExportState =
   | { phase: "exporting" }
   | { phase: "done"; fileName: string }
   | { phase: "failed"; reason: string };
+
+type SaveState = "idle" | "saving" | "saved" | "error";
+
+function ProjectNameField({
+  initialName,
+  canEdit,
+}: {
+  initialName: string;
+  canEdit: boolean;
+}) {
+  const [name, setName] = useState(initialName);
+  const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [validationError, setValidationError] = useState("");
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+    };
+  }, []);
+
+  function handleSave() {
+    if (!canEdit) return;
+    const trimmed = name.trim();
+    if (!trimmed) {
+      setValidationError("Project name cannot be empty.");
+      return;
+    }
+    setValidationError("");
+    setSaveState("saving");
+    savedTimerRef.current = setTimeout(() => {
+      setSaveState("saved");
+      savedTimerRef.current = setTimeout(() => setSaveState("idle"), 2500);
+    }, 600);
+  }
+
+  if (!canEdit) {
+    return (
+      <div className="flex flex-col gap-1">
+        <dt className="text-sm text-shell-muted">Project name</dt>
+        <dd className="text-sm font-medium text-shell-ink">{initialName}</dd>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <label className="flex flex-col gap-2 text-sm text-shell-muted">
+        Project name
+        <input
+          className="shell-field"
+          disabled={saveState === "saving"}
+          maxLength={80}
+          type="text"
+          value={name}
+          onChange={(e) => {
+            setName(e.target.value);
+            setValidationError("");
+            if (saveState === "saved") setSaveState("idle");
+          }}
+        />
+      </label>
+
+      {validationError ? (
+        <p className="text-sm text-red-600" role="alert">
+          {validationError}
+        </p>
+      ) : null}
+
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          className="shell-action"
+          disabled={saveState === "saving" || name.trim() === initialName}
+          type="button"
+          onClick={handleSave}
+        >
+          {saveState === "saving" ? "Saving…" : "Save name"}
+        </button>
+
+        {saveState === "saved" ? (
+          <StatusBadge label="Saved" tone="accent" />
+        ) : null}
+
+        {saveState === "error" ? (
+          <span className="text-sm text-red-600" role="alert">
+            Save failed. Try again.
+          </span>
+        ) : null}
+      </div>
+    </div>
+  );
+}
 
 function ExportProjectSection({
   projectName,
@@ -27,16 +120,12 @@ function ExportProjectSection({
     setExportState({ phase: "exporting" });
 
     setTimeout(() => {
-      const shouldFail = mockExportShouldFail;
-      if (shouldFail) {
+      if (mockExportShouldFail) {
         setExportState({ phase: "failed", reason: "Export service is temporarily unavailable." });
       } else {
         const scopeSuffix = scope === "config-only" ? "-config" : "-full";
         const safeName = projectName.toLowerCase().replace(/\s+/g, "-");
-        setExportState({
-          phase: "done",
-          fileName: `${safeName}${scopeSuffix}.iotsim`,
-        });
+        setExportState({ phase: "done", fileName: `${safeName}${scopeSuffix}.iotsim` });
       }
     }, 1000);
   }
@@ -143,45 +232,101 @@ export function SettingsPage() {
   const access = resolveAccess(accessMode, sharedRole);
 
   const currentProject = projects.find((p) => p.id === currentProjectId) ?? projects[0];
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080 (dev proxy)";
 
   return (
     <div className="flex h-full flex-col gap-5">
+      {/* Project settings */}
       <section className="shell-panel px-5 py-5">
-        <div className="mb-4">
-          <h2 className="text-sm font-semibold text-shell-ink">Project settings</h2>
-          <p className="mt-1 text-sm text-shell-muted">
-            Configuration for <span className="font-medium">{currentProject.name}</span>.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <StatusBadge label={access.modeLabel} tone="neutral" />
-          <StatusBadge label={access.effectiveRoleLabel} tone="neutral" />
-        </div>
-
-        <dl className="mt-5 grid gap-4 xl:grid-cols-2">
-          <div className="flex flex-col gap-1">
-            <dt className="text-sm text-shell-muted">Project name</dt>
-            <dd className="text-sm font-medium text-shell-ink">{currentProject.name}</dd>
+        <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-shell-ink">Project settings</h2>
+            <p className="mt-1 text-sm text-shell-muted">
+              Configuration scoped to{" "}
+              <span className="font-medium">{currentProject.name}</span>.
+            </p>
           </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusBadge label={access.modeLabel} tone="neutral" />
+            <StatusBadge label={access.effectiveRoleLabel} tone="neutral" />
+          </div>
+        </div>
+
+        <dl className="grid gap-6 lg:grid-cols-2">
+          <ProjectNameField
+            key={currentProjectId}
+            canEdit={access.isAdmin}
+            initialName={currentProject.name}
+          />
           <div className="flex flex-col gap-1">
-            <dt className="text-sm text-shell-muted">Environment mode</dt>
-            <dd className="text-sm font-medium text-shell-ink">{access.modeLabel}</dd>
+            <dt className="text-sm text-shell-muted">Project ID</dt>
+            <dd className="font-mono text-sm text-shell-ink">{currentProject.id}</dd>
           </div>
         </dl>
 
         {!access.isAdmin ? (
-          <p className="mt-4 text-sm text-shell-muted">
-            Project settings are read-only in the current role.
-          </p>
+          <div className="mt-5">
+            <SharedStatePanel
+              message="Project settings are read-only in the current role. Contact Admin to make changes."
+              state="locked"
+              title="Settings are read-only."
+            />
+          </div>
+        ) : null}
+
+        {access.canImportProject ? (
+          <div className="mt-5 border-t border-shell-line pt-5">
+            <h3 className="text-sm font-semibold text-shell-ink">Import project</h3>
+            <p className="mt-1 text-sm text-shell-muted">
+              Replace or merge this project from an <code>.iotsim</code> archive.
+            </p>
+            <div className="mt-3">
+              <Link className="shell-action inline-block" to="/projects/import">
+                Import project
+              </Link>
+            </div>
+          </div>
         ) : null}
       </section>
 
+      {/* Export */}
       <section className="shell-panel px-5 py-5">
         <ExportProjectSection
           canExport={access.isAdmin}
           projectName={currentProject.name}
         />
+      </section>
+
+      {/* Environment settings */}
+      <section className="shell-panel px-5 py-5">
+        <div className="mb-5">
+          <h2 className="text-lg font-semibold text-shell-ink">Environment settings</h2>
+          <p className="mt-1 text-sm text-shell-muted">
+            System-level configuration. These values are set at deployment time and
+            cannot be changed here.
+          </p>
+        </div>
+
+        <dl className="grid gap-4 lg:grid-cols-2">
+          <div className="flex flex-col gap-1">
+            <dt className="text-sm text-shell-muted">API endpoint</dt>
+            <dd className="font-mono text-sm text-shell-ink">{apiBaseUrl}</dd>
+          </div>
+          <div className="flex flex-col gap-1">
+            <dt className="text-sm text-shell-muted">Environment mode</dt>
+            <dd className="text-sm font-medium text-shell-ink">{access.modeLabel}</dd>
+          </div>
+          <div className="flex flex-col gap-1">
+            <dt className="text-sm text-shell-muted">App version</dt>
+            <dd className="font-mono text-sm text-shell-ink">0.1.0</dd>
+          </div>
+          {access.isShared ? (
+            <div className="flex flex-col gap-1">
+              <dt className="text-sm text-shell-muted">Your role</dt>
+              <dd className="text-sm font-medium text-shell-ink">{access.sharedRoleLabel}</dd>
+            </div>
+          ) : null}
+        </dl>
       </section>
     </div>
   );

@@ -29,6 +29,8 @@ history.
 ## Frontend
 - React + TypeScript + Vite + React Router + TanStack Query/Table + Zustand +
   Radix UI + Tailwind.
+- openapi-typescript (devDependency) — generates TypeScript types from the backend
+  OpenAPI spec (`/openapi.json`); run via `npm run generate:api`.
 
 ## Platform and tooling
 - Auth: OAuth2/OIDC (e.g. Keycloak, AWS Cognito, Azure Entra ID).
