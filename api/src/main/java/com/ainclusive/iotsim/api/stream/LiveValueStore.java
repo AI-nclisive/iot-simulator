@@ -12,12 +12,12 @@ import java.util.concurrent.ConcurrentHashMap;
  * set of nodes changed since the last flush. Lock-free; a benign race may re-emit a
  * value on the next flush (idempotent for a latest-value view).
  */
-final class LiveValueStore {
+public final class LiveValueStore {
 
     private final Map<String, Map<String, NeutralValue>> latest = new ConcurrentHashMap<>();
     private final Map<String, Set<String>> dirty = new ConcurrentHashMap<>();
 
-    void record(String dataSourceId, List<NeutralValue> values) {
+    public void record(String dataSourceId, List<NeutralValue> values) {
         Map<String, NeutralValue> bySource =
                 latest.computeIfAbsent(dataSourceId, k -> new ConcurrentHashMap<>());
         Set<String> dirtyNodes =

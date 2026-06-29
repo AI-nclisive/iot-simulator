@@ -2,6 +2,7 @@ package com.ainclusive.iotsim.api.stream;
 
 import java.time.Instant;
 import java.util.List;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -21,6 +22,7 @@ public class ValuesStreamController {
     private final LiveStreamSubscriptions subscriptions;
     private final LiveValueStore store;
 
+    @Autowired
     public ValuesStreamController(LiveStreamSubscriptions subscriptions, LiveValuesHub valuesHub) {
         this(subscriptions, valuesHub.store());
     }

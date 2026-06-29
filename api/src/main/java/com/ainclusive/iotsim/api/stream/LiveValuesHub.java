@@ -39,14 +39,14 @@ public final class LiveValuesHub implements LiveValueListener, AutoCloseable {
                 this::flushTick, FLUSH_MILLIS, FLUSH_MILLIS, TimeUnit.MILLISECONDS);
     }
 
-    /** Test ctor: caller-driven {@link #flushTick()}, no scheduler thread. */
-    LiveValuesHub(LiveEventPublisher publisher, LiveValueStore store) {
+    /** Test ctor: caller-driven {@link #flushTick()}, no scheduler thread. Public for cross-package test wiring. */
+    public LiveValuesHub(LiveEventPublisher publisher, LiveValueStore store) {
         this.publisher = publisher;
         this.store = store;
         this.flusher = null;
     }
 
-    LiveValueStore store() {
+    public LiveValueStore store() {
         return store;
     }
 
@@ -55,7 +55,7 @@ public final class LiveValuesHub implements LiveValueListener, AutoCloseable {
         store.record(dataSourceId, values);
     }
 
-    void flushTick() {
+    public void flushTick() {
         for (String dataSourceId : store.dirtySources()) {
             List<NeutralValue> changed = store.drainChanged(dataSourceId);
             if (!changed.isEmpty()) {
