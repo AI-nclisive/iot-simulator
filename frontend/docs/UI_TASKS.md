@@ -717,6 +717,13 @@ Parallel execution:
   Surfaces: Data Sources List, Data Source Detail (Overview, header), Recording Flow, Replay Flow.
   Done when: DataSourceRow has only fields present in DataSourceResponse; all list/detail/flow surfaces work without those fields; store methods that only mutated removed fields are deleted; no TypeScript errors.
 
+- [x] `UI-101` Align RecordingRow and ReusableArtifact mock shapes to RecordingResponse
+  Goal: remove fields not in RecordingResponse from RecordingRow and ReusableArtifact and fix all consumers.
+  Fields removed from RecordingRow: `name`, `type` (ArtifactType), `sourceName`, `protocol`, `duration`, `tags`, `lastUsedAt`, `sizeKb`; origin reduced to `"captured" | "imported"` (remove "synthetic"). Added: `valueCount`.
+  Fields removed from ReusableArtifact: `name`, `type`, `protocol`, `sourceName`, `durationLabel`, `status`.
+  Surfaces: Recordings page, Recording Export dialog, Recording Import dialog, Replay Flow.
+  Done when: both types contain only fields present in RecordingResponse; recordings page, export/import dialogs, and replay flow work without removed fields; no TypeScript errors.
+
 ## Recommended Sequence
 
 1. Complete the P0 shell and shared-pattern tasks first.
