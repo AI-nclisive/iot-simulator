@@ -91,7 +91,7 @@ export function computeFitnessWarnings(row: RecordingRow): WarningEntry[] {
     });
   }
 
-  if (row.sizeKb > 10000) {
+  if (row.sizeKb > 10240) {
     const mb = (row.sizeKb / 1024).toFixed(1);
     warnings.push({
       level: "info",
