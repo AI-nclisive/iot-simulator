@@ -46,7 +46,14 @@ final class LiveStream {
     }
 
     void addSubscriber(Subscriber sub, String lastEventId) {
+        addSubscriber(sub, lastEventId, List.of());
+    }
+
+    void addSubscriber(Subscriber sub, String lastEventId, List<LiveEvent> initial) {
         synchronized (lock) {
+            for (LiveEvent e : initial) {
+                sub.enqueue(e);
+            }
             for (LiveEvent replay : backlogFor(lastEventId)) {
                 sub.enqueue(replay);
             }

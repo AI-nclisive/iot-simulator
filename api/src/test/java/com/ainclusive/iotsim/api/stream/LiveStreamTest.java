@@ -73,4 +73,18 @@ class LiveStreamTest {
         assertThat(bad.sent).extracting(LiveEvent::type).containsExactly(LiveStream.RESYNC);
         assertThat(bad.sent.get(0).hasSeq()).isFalse();
     }
+
+    @Test
+    void initialSnapshotIsEnqueuedBeforeLiveEvents() {
+        LiveStream stream = new LiveStream(8);
+        RecordingSink sink = new RecordingSink();
+        Subscriber sub = new Subscriber(sink, 64, Runnable::run);
+        LiveEvent snap = new LiveEvent(LiveEvent.NO_SEQ, "values-snapshot", "S", Instant.EPOCH);
+
+        stream.addSubscriber(sub, null, java.util.List.of(snap)); // 3-arg with initial
+        stream.publish("values", "L", Instant.EPOCH);             // a live event after
+
+        assertThat(sink.sent).extracting(LiveEvent::type)
+                .containsExactly("values-snapshot", "values"); // snapshot first, then live
+    }
 }
