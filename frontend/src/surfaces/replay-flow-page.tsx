@@ -57,7 +57,6 @@ export function ReplayFlowPage() {
   const accessMode = useShellStore((state) => state.accessMode);
   const sharedRole = useShellStore((state) => state.sharedRole);
   const artifacts = useArtifactsStore((state) => state.artifacts);
-  const dataSources = useDataSourcesStore((state) => state.dataSources);
   const source = useDataSourcesStore((state) =>
     state.dataSources.find((row) => row.id === sourceId),
   );
@@ -80,14 +79,9 @@ export function ReplayFlowPage() {
     [artifacts, selectedArtifactId],
   );
 
-  const artifactSourceProtocol = useMemo(
-    () => dataSources.find((s) => s.id === selectedArtifact?.sourceId)?.protocol,
-    [dataSources, selectedArtifact?.sourceId],
-  );
-
   const compatibleArtifact =
-    artifactSourceProtocol !== undefined && source
-      ? artifactSourceProtocol === source.protocol
+    selectedArtifact && source
+      ? selectedArtifact.protocol === source.protocol
       : false;
 
   const canConfigureReplay = access.canConfigureReplay;
@@ -121,7 +115,7 @@ export function ReplayFlowPage() {
     }
 
     const events = [
-      `Recording selected: ${selectedArtifact.id}`,
+      `Recording selected: ${selectedArtifact.name}`,
       compatibleArtifact
         ? `Protocol matches ${source?.protocol}.`
         : "Protocol mismatch blocks replay on this source.",
@@ -244,7 +238,7 @@ export function ReplayFlowPage() {
               >
                 {artifacts.map((artifact) => (
                   <option key={artifact.id} value={artifact.id}>
-                    {artifact.createdBy} · {artifact.createdAt}
+                    {artifact.name}
                   </option>
                 ))}
               </select>
