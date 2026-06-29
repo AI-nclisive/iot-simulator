@@ -45,7 +45,7 @@ public final class PersistingClientActivityListener implements ClientActivityLis
                 }
             }
         } catch (RuntimeException e) {
-            log.warn("failed to persist client {} for {}", event.kind(), event.dataSourceId(), e);
+            log.warn("failed to persist {} event for source {}", event.kind(), event.dataSourceId(), e);
         }
     }
 }

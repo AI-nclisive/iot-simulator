@@ -32,10 +32,13 @@ public class ClientStreamController {
             produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamClients(@PathVariable String id,
             @RequestHeader(value = "Last-Event-ID", required = false) String lastEventId) {
-        List<ClientConnectionDto> snapshot =
-                clients.current(id).stream().map(ClientConnectionDto::from).toList();
-        LiveEvent snapshotEvent =
-                new LiveEvent(LiveEvent.NO_SEQ, "clients-snapshot", snapshot, Instant.now());
-        return subscriptions.subscribe(StreamKey.clients(id), null, List.of(snapshotEvent));
+        // The snapshot is computed at registration (inside the stream lock), not here,
+        // so a connect/disconnect between snapshot and subscribe can't be lost — there is
+        // no Last-Event-ID replay on this stream to recover it.
+        return subscriptions.subscribe(StreamKey.clients(id), null, () -> {
+            List<ClientConnectionDto> snapshot =
+                    clients.current(id).stream().map(ClientConnectionDto::from).toList();
+            return List.of(new LiveEvent(LiveEvent.NO_SEQ, "clients-snapshot", snapshot, Instant.now()));
+        });
     }
 }

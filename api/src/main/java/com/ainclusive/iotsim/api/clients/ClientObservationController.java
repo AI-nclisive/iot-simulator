@@ -22,6 +22,9 @@ public class ClientObservationController {
         this.clients = clients;
     }
 
+    // An unknown {id} returns 200 with empty lists rather than 404: this mirrors the
+    // sibling SSE observability endpoints (/stream/{values,clients,runtime}), spec 05
+    // does not require 404 here, and empty lists are an unambiguous "no clients" answer.
     @GetMapping("/api/v1/data-sources/{id}/clients")
     public ClientsResponse clients(@PathVariable String id) {
         List<ClientConnectionDto> connected =

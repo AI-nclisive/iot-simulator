@@ -87,4 +87,20 @@ class LiveStreamTest {
         assertThat(sink.sent).extracting(LiveEvent::type)
                 .containsExactly("values-snapshot", "values"); // snapshot first, then live
     }
+
+    @Test
+    void supplierSnapshotIsComputedAtRegistrationAndPrecedesLiveEvents() {
+        LiveStream stream = new LiveStream(8);
+        RecordingSink sink = new RecordingSink();
+        Subscriber sub = new Subscriber(sink, 64, Runnable::run);
+        LiveEvent snap = new LiveEvent(LiveEvent.NO_SEQ, "clients-snapshot", "S", Instant.EPOCH);
+
+        // The supplier runs under the lock as the subscriber joins; a publish cannot
+        // interleave between snapshot and registration, and the snapshot is sent first.
+        stream.addSubscriber(sub, null, () -> java.util.List.of(snap));
+        stream.publish("CONNECTED", "L", Instant.EPOCH);
+
+        assertThat(sink.sent).extracting(LiveEvent::type)
+                .containsExactly("clients-snapshot", "CONNECTED");
+    }
 }
