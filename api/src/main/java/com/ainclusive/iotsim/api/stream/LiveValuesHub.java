@@ -57,10 +57,15 @@ public final class LiveValuesHub implements LiveValueListener, AutoCloseable {
 
     public void flushTick() {
         for (String dataSourceId : store.dirtySources()) {
-            List<NeutralValue> changed = store.drainChanged(dataSourceId);
-            if (!changed.isEmpty()) {
-                List<StreamValue> payload = changed.stream().map(StreamValue::from).toList();
-                publisher.publish(StreamKey.values(dataSourceId), "values", payload, Instant.now());
+            try {
+                List<NeutralValue> changed = store.drainChanged(dataSourceId);
+                if (!changed.isEmpty()) {
+                    List<StreamValue> payload = changed.stream().map(StreamValue::from).toList();
+                    publisher.publish(StreamKey.values(dataSourceId), "values", payload, Instant.now());
+                }
+            } catch (RuntimeException e) {
+                // Guard: a publish failure for one source must not kill the scheduled flush loop
+                // (scheduleAtFixedRate silently cancels the task on any uncaught exception).
             }
         }
     }

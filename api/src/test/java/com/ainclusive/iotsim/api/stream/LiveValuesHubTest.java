@@ -48,4 +48,16 @@ class LiveValuesHubTest {
         hub.flushTick();
         assertThat(pub.events).isEmpty();
     }
+
+    @Test
+    void flushSurvivesAPublisherThatThrows() {
+        LiveValueStore store = new LiveValueStore();
+        LiveEventPublisher throwing = (key, type, data, at) -> {
+            throw new RuntimeException("publish boom");
+        };
+        LiveValuesHub hub = new LiveValuesHub(throwing, store);
+        hub.onValues("d1", List.of(v("n1", 1)), Instant.EPOCH);
+
+        org.assertj.core.api.Assertions.assertThatCode(hub::flushTick).doesNotThrowAnyException();
+    }
 }
