@@ -127,7 +127,7 @@ export function RuntimeDashboardPanel() {
 
               <div className="mt-4 flex flex-wrap items-center gap-3">
                 <Link className="shell-text-action" to={run.relatedPath}>
-                  Open source: {run.relatedLabel}
+                  Open source
                 </Link>
                 {run.evidencePath && run.runState !== "queued" ? (
                   <Link className="shell-text-action" to={run.evidencePath}>

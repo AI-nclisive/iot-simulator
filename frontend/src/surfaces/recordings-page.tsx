@@ -9,6 +9,10 @@ import { RecordingImportDialog } from "./recording-import-dialog";
 
 type OriginFilter = "all" | "captured" | "imported";
 
+function originLabel(origin: "captured" | "imported"): string {
+  return origin === "captured" ? "Recorded" : "Imported";
+}
+
 // ─── Fitness warning component ────────────────────────────────────────────────
 
 type FitnessWarningProps = {
@@ -60,15 +64,15 @@ function RecordingPreviewPanel({
             <dd className="mt-1 text-shell-ink">{selected.sourceId}</dd>
           </div>
           <div>
-            <dt className="text-shell-muted">Origin</dt>
-            <dd className="mt-1 text-shell-ink">{selected.origin}</dd>
+            <dt className="text-shell-muted">Type</dt>
+            <dd className="mt-1 text-shell-ink">{originLabel(selected.origin)}</dd>
           </div>
           <div>
-            <dt className="text-shell-muted">Captured by</dt>
+            <dt className="text-shell-muted">Recorded by</dt>
             <dd className="mt-1 text-shell-ink">{selected.capturedBy}</dd>
           </div>
           <div>
-            <dt className="text-shell-muted">Captured at</dt>
+            <dt className="text-shell-muted">Recorded at</dt>
             <dd className="mt-1 text-shell-ink">{selected.capturedAt}</dd>
           </div>
           <div>
@@ -151,7 +155,7 @@ export function RecordingsPage() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h2 className="text-2xl font-semibold text-shell-ink">
-              Recordings
+              Recordings &amp; Samples
             </h2>
             <p className="mt-2 text-sm leading-6 text-shell-muted">
               Reusable captured data for replay and comparison.{" "}
@@ -191,7 +195,7 @@ export function RecordingsPage() {
               }
             >
               <option value="all">All origins</option>
-              <option value="captured">Captured</option>
+              <option value="captured">Recorded</option>
               <option value="imported">Imported</option>
             </select>
           </label>
@@ -253,7 +257,7 @@ export function RecordingsPage() {
                             </p>
                           </div>
                           <div className="flex flex-wrap gap-1 shrink-0">
-                            <StatusBadge label={row.origin} tone="neutral" />
+                            <StatusBadge label={originLabel(row.origin)} tone="neutral" />
                           </div>
                         </div>
                         <dl className="mt-3 grid grid-cols-2 gap-2 text-xs text-shell-muted">
@@ -267,7 +271,7 @@ export function RecordingsPage() {
                           </div>
                           <div>
                             <dt className="font-semibold uppercase tracking-wide">
-                              Captured
+                              Date
                             </dt>
                             <dd className="mt-1 text-shell-ink">
                               {row.capturedAt}

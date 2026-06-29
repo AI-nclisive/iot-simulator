@@ -521,7 +521,7 @@ Parallel execution:
   Done when: size, age, last use, dependency impact, and cleanup-failure states
   are visible before destructive cleanup.
 
-- [ ] `UI-080` Settings page
+- [x] `UI-080` Settings page
   Surface: `Settings`
   Depends: `UI-001`, `UI-006`
   Done when: project settings and environment settings are separated and
