@@ -1,15 +1,18 @@
 package com.ainclusive.iotsim.app.config;
 
+import com.ainclusive.iotsim.api.stream.LiveEventHub;
 import com.ainclusive.iotsim.app.runtime.PersistingRuntimeActivityListener;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRepository;
 import com.ainclusive.iotsim.persistence.runtimeevent.RuntimeEventRepository;
 import com.ainclusive.iotsim.platform.capture.SourceCapturer;
 import com.ainclusive.iotsim.platform.capture.UnsupportedSourceCapturer;
+import com.ainclusive.iotsim.platform.runtime.CompositeRuntimeActivityListener;
 import com.ainclusive.iotsim.platform.runtime.InMemoryRuntimeController;
 import com.ainclusive.iotsim.platform.runtime.RuntimeActivityListener;
 import com.ainclusive.iotsim.platform.runtime.RuntimeController;
 import com.ainclusive.iotsim.platform.scan.SourceScanner;
 import com.ainclusive.iotsim.platform.scan.UnsupportedSourceScanner;
+import com.ainclusive.iotsim.supervisor.HealthPolicy;
 import com.ainclusive.iotsim.supervisor.ProcessWorkerLauncher;
 import com.ainclusive.iotsim.supervisor.Supervisor;
 import java.util.concurrent.ExecutorService;
@@ -33,14 +36,18 @@ public class RuntimeConfig {
     @Bean
     public RuntimeController runtimeController(RuntimeProperties props,
             DataSourceRepository dataSources, RuntimeEventRepository runtimeEvents, ObjectMapper json,
-            ExecutorService runtimeEventExecutor) {
+            ExecutorService runtimeEventExecutor, LiveEventHub liveEventHub) {
         if (props.isSupervisorMode()) {
-            // Persist runtime events off the IPC delivery thread (IS-048): the listener
-            // is called on a gRPC thread that must stay non-blocking.
-            RuntimeActivityListener listener = new PersistingRuntimeActivityListener(
+            // Persist runtime events off the IPC delivery thread (IS-048), and fan the
+            // same events to the live SSE hub (IS-046). Client-activity events feed the
+            // hub directly (previously dropped via ClientActivityListener.NONE).
+            RuntimeActivityListener persister = new PersistingRuntimeActivityListener(
                     dataSources, runtimeEvents, json, runtimeEventExecutor);
+            RuntimeActivityListener runtimeListener =
+                    new CompositeRuntimeActivityListener(persister, liveEventHub);
             return new Supervisor(
-                    new ProcessWorkerLauncher(props.workers()), props.restartPolicy(), listener);
+                    new ProcessWorkerLauncher(props.workers()), props.restartPolicy(),
+                    HealthPolicy.DEFAULT, liveEventHub, runtimeListener);
         }
         return new InMemoryRuntimeController();
     }
