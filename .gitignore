@@ -30,3 +30,6 @@ data/
 # Local env / secrets (never commit)
 .env
 *.local
+
+# Generated API types (produced by npm run generate:api — not committed)
+frontend/src/generated/

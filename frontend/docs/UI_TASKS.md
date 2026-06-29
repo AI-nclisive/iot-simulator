@@ -663,7 +663,7 @@ Parallel execution:
 2. After `UI-096`, run `UI-097` (ready-core REST) and — once backend SSE lands —
    `UI-098` (live streams) in parallel.
 
-- [ ] `UI-096` Backend API client and contract alignment
+- [x] `UI-096` Backend API client and contract alignment
   Goal: replace mock fixtures with a typed client generated from the backend
   OpenAPI, and resolve the naming/enum gaps documented in the contract map.
   Surface: cross-surface foundation
