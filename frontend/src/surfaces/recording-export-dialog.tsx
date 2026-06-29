@@ -46,8 +46,6 @@ export function RecordingExportDialog({
     }, 800);
   }
 
-  const sizeMb = (recording.sizeKb / 1024).toFixed(1);
-
   return createPortal(
     // eslint-disable-next-line jsx-a11y/no-static-element-interactions
     <div
@@ -74,7 +72,7 @@ export function RecordingExportDialog({
         {/* Header */}
         <div className="border-b border-shell-line px-5 py-4">
           <h2 id={titleId} className="text-lg font-semibold text-shell-ink">
-            Export {recording.name}
+            Export recording
           </h2>
           <p
             id={descriptionId}
@@ -93,31 +91,27 @@ export function RecordingExportDialog({
                 Artifact
               </p>
               <p className="mt-2 text-sm font-medium text-shell-ink">
-                {recording.name}
+                {recording.id}
               </p>
-              <p className="mt-1 text-sm text-shell-muted">
-                {recording.type} · {recording.origin}
-              </p>
+              <p className="mt-1 text-sm text-shell-muted">{recording.origin}</p>
               <dl className="mt-3 grid grid-cols-2 gap-2 text-xs text-shell-muted">
                 <div>
                   <dt className="font-semibold uppercase tracking-wide">
-                    Size
+                    Values
                   </dt>
-                  <dd className="mt-1 text-shell-ink">{sizeMb} MB</dd>
+                  <dd className="mt-1 text-shell-ink">{recording.valueCount.toLocaleString()}</dd>
                 </div>
                 <div>
                   <dt className="font-semibold uppercase tracking-wide">
-                    Duration
+                    Captured by
                   </dt>
-                  <dd className="mt-1 text-shell-ink">{recording.duration}</dd>
+                  <dd className="mt-1 text-shell-ink">{recording.capturedBy}</dd>
                 </div>
                 <div>
                   <dt className="font-semibold uppercase tracking-wide">
-                    Parameters
+                    Captured at
                   </dt>
-                  <dd className="mt-1 text-shell-ink">
-                    {recording.parameterCount.toLocaleString()}
-                  </dd>
+                  <dd className="mt-1 text-shell-ink">{recording.capturedAt}</dd>
                 </div>
               </dl>
             </div>

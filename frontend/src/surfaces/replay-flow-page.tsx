@@ -79,10 +79,7 @@ export function ReplayFlowPage() {
     [artifacts, selectedArtifactId],
   );
 
-  const compatibleArtifact =
-    selectedArtifact && source
-      ? selectedArtifact.protocol === source.protocol
-      : false;
+  const compatibleArtifact = Boolean(selectedArtifact && source);
 
   const canConfigureReplay = access.canConfigureReplay;
   const replayReady = Boolean(selectedArtifact) && compatibleArtifact;
@@ -115,7 +112,7 @@ export function ReplayFlowPage() {
     }
 
     const events = [
-      `Recording selected: ${selectedArtifact.name}`,
+      `Artifact ${selectedArtifact.id} selected`,
       compatibleArtifact
         ? `Protocol matches ${source?.protocol}.`
         : "Protocol mismatch blocks replay on this source.",
@@ -238,7 +235,7 @@ export function ReplayFlowPage() {
               >
                 {artifacts.map((artifact) => (
                   <option key={artifact.id} value={artifact.id}>
-                    {artifact.name}
+                    Artifact {artifact.id}
                   </option>
                 ))}
               </select>
@@ -273,7 +270,7 @@ export function ReplayFlowPage() {
                 <p className="mt-2 text-sm leading-6 text-shell-muted">
                   {selectedArtifact
                     ? compatibleArtifact
-                      ? `Recording can replay through ${source.protocol}.`
+                      ? `Artifact ${selectedArtifact.id} can replay through ${source.protocol}.`
                       : `Source protocol does not match. Cannot replay through ${source.protocol}.`
                     : "Select a recording to review impact before starting."}
                 </p>

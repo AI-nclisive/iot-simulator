@@ -65,22 +65,14 @@ export function simulateImportValidation(file: File): Promise<ValidationResult> 
       }
 
       // Default: success with a mock artifact preview
-      const sizeKb = Math.round(file.size / 1024) || 512;
+      const estimatedValueCount = Math.round((file.size / 1024) || 512) * 20;
       const artifact: RecordingRow = {
         id: `imported-${Date.now()}`,
-        name: file.name.replace(/\.(json|iotsim)$/i, ""),
-        type: "recording",
         origin: "imported",
         sourceId: "src-01",
-        sourceName: "Line A controller",
-        protocol: "OPC UA",
-        parameterCount: 1240,
-        duration: "2h 05m",
+        valueCount: estimatedValueCount,
         capturedAt: new Date().toISOString().slice(0, 16).replace("T", " "),
         capturedBy: "Import",
-        tags: ["imported"],
-        lastUsedAt: null,
-        sizeKb,
       };
       resolve({ status: "ok", artifact });
     }, 800);
@@ -401,35 +393,23 @@ export function RecordingImportDialog({
           <p className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
             Ready to import
           </p>
-          <p className="mt-2 font-medium text-shell-ink">{artifact.name}</p>
+          <p className="mt-2 font-medium text-shell-ink">{artifact.id}</p>
           <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
             <div>
-              <dt className="text-shell-muted">Type</dt>
-              <dd className="mt-1 text-shell-ink capitalize">{artifact.type}</dd>
-            </div>
-            <div>
               <dt className="text-shell-muted">Origin</dt>
-              <dd className="mt-1 text-shell-ink capitalize">
-                {artifact.origin}
-              </dd>
+              <dd className="mt-1 text-shell-ink capitalize">{artifact.origin}</dd>
             </div>
             <div>
-              <dt className="text-shell-muted">Source</dt>
-              <dd className="mt-1 text-shell-ink">{artifact.sourceName}</dd>
+              <dt className="text-shell-muted">Values</dt>
+              <dd className="mt-1 text-shell-ink">{artifact.valueCount.toLocaleString()}</dd>
             </div>
             <div>
-              <dt className="text-shell-muted">Protocol</dt>
-              <dd className="mt-1 text-shell-ink">{artifact.protocol}</dd>
+              <dt className="text-shell-muted">Captured by</dt>
+              <dd className="mt-1 text-shell-ink">{artifact.capturedBy}</dd>
             </div>
             <div>
-              <dt className="text-shell-muted">Duration</dt>
-              <dd className="mt-1 text-shell-ink">{artifact.duration}</dd>
-            </div>
-            <div>
-              <dt className="text-shell-muted">Parameters</dt>
-              <dd className="mt-1 text-shell-ink">
-                {artifact.parameterCount.toLocaleString()}
-              </dd>
+              <dt className="text-shell-muted">Captured at</dt>
+              <dd className="mt-1 text-shell-ink">{artifact.capturedAt}</dd>
             </div>
           </dl>
         </div>
@@ -466,25 +446,23 @@ export function RecordingImportDialog({
           <p className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
             Summary
           </p>
-          <p className="mt-2 font-medium text-shell-ink">{artifact.name}</p>
+          <p className="mt-2 font-medium text-shell-ink">{artifact.id}</p>
           <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
             <div>
-              <dt className="text-shell-muted">Type</dt>
-              <dd className="mt-1 text-shell-ink capitalize">{artifact.type}</dd>
+              <dt className="text-shell-muted">Origin</dt>
+              <dd className="mt-1 text-shell-ink capitalize">{artifact.origin}</dd>
             </div>
             <div>
-              <dt className="text-shell-muted">Protocol</dt>
-              <dd className="mt-1 text-shell-ink">{artifact.protocol}</dd>
+              <dt className="text-shell-muted">Values</dt>
+              <dd className="mt-1 text-shell-ink">{artifact.valueCount.toLocaleString()}</dd>
             </div>
             <div>
-              <dt className="text-shell-muted">Source</dt>
-              <dd className="mt-1 text-shell-ink">{artifact.sourceName}</dd>
+              <dt className="text-shell-muted">Captured by</dt>
+              <dd className="mt-1 text-shell-ink">{artifact.capturedBy}</dd>
             </div>
             <div>
-              <dt className="text-shell-muted">Size</dt>
-              <dd className="mt-1 text-shell-ink">
-                {(artifact.sizeKb / 1024).toFixed(1)} MB
-              </dd>
+              <dt className="text-shell-muted">Captured at</dt>
+              <dd className="mt-1 text-shell-ink">{artifact.capturedAt}</dd>
             </div>
           </dl>
         </div>

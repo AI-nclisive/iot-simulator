@@ -31,6 +31,6 @@ describe("RecordingsPage route", () => {
         <RecordingsPage />
       </MemoryRouter>,
     );
-    expect(screen.getByPlaceholderText(/Search by name or tag/i)).toBeTruthy();
+    expect(screen.getByPlaceholderText(/Search by source or author/i)).toBeTruthy();
   });
 });
