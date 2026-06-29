@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { SharedStatePanel } from "../ui/shared-state-panel";
-import { getEventsForSource, type RuntimeEventLevel } from "./mock-source-events";
+import { getEventsForSource, type RuntimeEvent, type RuntimeEventLevel } from "./mock-source-events";
 import type { DataSourceRow } from "./mock-data-sources";
 
 function levelIcon(level: RuntimeEventLevel) {
@@ -34,6 +34,7 @@ export function DataSourceDetailEventsTab({ source }: { source: DataSourceRow })
   const allEvents = getEventsForSource(source.id);
   const [categoryFilter, setCategoryFilter] = useState<typeof categoryOptions[number]["value"]>("all");
   const [levelFilter, setLevelFilter] = useState<typeof levelOptions[number]["value"]>("all");
+  const [expandedId, setExpandedId] = useState<RuntimeEvent["id"] | null>(null);
 
   const visibleEvents = allEvents.filter((event) => {
     const categoryMatch = categoryFilter === "all" || event.category === categoryFilter;
@@ -98,27 +99,62 @@ export function DataSourceDetailEventsTab({ source }: { source: DataSourceRow })
       ) : (
         <div className="overflow-hidden rounded-md border border-shell-line bg-white">
           <ul className="divide-y divide-shell-line">
-            {visibleEvents.map((event) => (
-              <li key={event.id} className="flex items-start gap-3 px-4 py-3">
-                <span
-                  className={`mt-0.5 shrink-0 font-mono text-base leading-none ${levelClass(event.level)}`}
-                  aria-hidden="true"
-                >
-                  {levelIcon(event.level)}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm text-shell-ink">{event.message}</p>
-                  <p className="mt-1 text-xs text-shell-muted">
-                    {event.timestamp} · {event.category}
-                  </p>
-                </div>
-                <span
-                  className={`shrink-0 text-xs font-medium uppercase tracking-wide ${levelClass(event.level)}`}
-                >
-                  {event.level}
-                </span>
-              </li>
-            ))}
+            {visibleEvents.map((event) => {
+              const isExpanded = expandedId === event.id;
+              const detailId = `event-detail-${event.id}`;
+              return (
+                <li key={event.id}>
+                  <button
+                    className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-shell-base/40 transition"
+                    type="button"
+                    aria-expanded={isExpanded}
+                    aria-controls={detailId}
+                    onClick={() => setExpandedId(isExpanded ? null : event.id)}
+                  >
+                    <span
+                      className={`mt-0.5 shrink-0 font-mono text-base leading-none ${levelClass(event.level)}`}
+                      aria-hidden="true"
+                    >
+                      {levelIcon(event.level)}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm text-shell-ink">{event.message}</p>
+                      <p className="mt-1 text-xs text-shell-muted">
+                        {event.timestamp} · {event.category}
+                      </p>
+                    </div>
+                    <span
+                      className={`shrink-0 text-xs font-medium uppercase tracking-wide ${levelClass(event.level)}`}
+                    >
+                      {event.level}
+                    </span>
+                  </button>
+                  {isExpanded ? (
+                    <dl
+                      id={detailId}
+                      className="mx-4 mb-3 grid grid-cols-2 gap-2 rounded-md border border-shell-line bg-shell-base/30 px-3 py-2 text-xs"
+                    >
+                      <div>
+                        <dt className="font-semibold uppercase tracking-wide text-shell-muted">Timestamp</dt>
+                        <dd className="mt-0.5 font-mono text-shell-ink">{event.timestamp}</dd>
+                      </div>
+                      <div>
+                        <dt className="font-semibold uppercase tracking-wide text-shell-muted">Category</dt>
+                        <dd className="mt-0.5 text-shell-ink capitalize">{event.category}</dd>
+                      </div>
+                      <div>
+                        <dt className="font-semibold uppercase tracking-wide text-shell-muted">Level</dt>
+                        <dd className={`mt-0.5 font-medium uppercase ${levelClass(event.level)}`}>{event.level}</dd>
+                      </div>
+                      <div>
+                        <dt className="font-semibold uppercase tracking-wide text-shell-muted">Event ID</dt>
+                        <dd className="mt-0.5 font-mono text-shell-muted">{event.id}</dd>
+                      </div>
+                    </dl>
+                  ) : null}
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}

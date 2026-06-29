@@ -37,7 +37,6 @@ export function DataSourceDetailValuesTab({
   const allValues = useSourceValuesStore((state) => state.values);
   const togglePinnedValue = useSourceValuesStore((state) => state.togglePinnedValue);
   const [searchValue, setSearchValue] = useState("");
-  const [groupFilter, setGroupFilter] = useState("all");
   const [freshnessFilter, setFreshnessFilter] = useState("all");
   const [pinFilter, setPinFilter] = useState("all");
   const [sortState, setSortState] = useState<TableSortState>({
@@ -55,46 +54,30 @@ export function DataSourceDetailValuesTab({
       const normalizedSearch = searchValue.trim().toLowerCase();
       const searchMatches =
         normalizedSearch.length === 0 ||
-        [row.path, row.group, row.dataType, row.currentValue, row.updatedAt]
+        [row.path, row.dataType, row.currentValue, row.updatedAt]
           .join(" ")
           .toLowerCase()
           .includes(normalizedSearch);
 
-      const groupMatches = groupFilter === "all" || row.group === groupFilter;
       const freshnessMatches =
         freshnessFilter === "all" || row.freshness === freshnessFilter;
       const pinMatches =
         pinFilter === "all" || (pinFilter === "pinned" ? row.pinned : !row.pinned);
 
-      return searchMatches && groupMatches && freshnessMatches && pinMatches;
+      return searchMatches && freshnessMatches && pinMatches;
     });
-  }, [freshnessFilter, groupFilter, pinFilter, searchValue, values]);
+  }, [freshnessFilter, pinFilter, searchValue, values]);
 
   const filters: TableFilterControl[] = [
     {
-      id: "group",
-      label: "Group",
-      value: groupFilter,
-      onChange: setGroupFilter,
-      options: [
-        { label: "All groups", value: "all" },
-        { label: "Thermal", value: "Thermal" },
-        { label: "Motion", value: "Motion" },
-        { label: "Status", value: "Status" },
-        { label: "Quality", value: "Quality" },
-        { label: "Power", value: "Power" },
-        { label: "Flow", value: "Flow" },
-      ],
-    },
-    {
       id: "freshness",
-      label: "Freshness",
+      label: "State",
       value: freshnessFilter,
       onChange: setFreshnessFilter,
       options: [
         { label: "All rows", value: "all" },
         { label: "Live", value: "Live" },
-        { label: "Stale", value: "Stale" },
+        { label: "No updates", value: "No updates" },
       ],
     },
     {
@@ -121,21 +104,11 @@ export function DataSourceDetailValuesTab({
           },
         ]
       : []),
-    ...(groupFilter !== "all"
-      ? [
-          {
-            id: "group",
-            label: "Group",
-            value: groupFilter,
-            onClear: () => setGroupFilter("all"),
-          },
-        ]
-      : []),
     ...(freshnessFilter !== "all"
       ? [
           {
             id: "freshness",
-            label: "Freshness",
+            label: "State",
             value: freshnessFilter,
             onClear: () => setFreshnessFilter("all"),
           },
@@ -162,10 +135,11 @@ export function DataSourceDetailValuesTab({
       cell: (row) => (
         <div className="min-w-0">
           <p className="text-sm font-medium text-shell-ink">{row.path}</p>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <StatusBadge label={row.group} tone="neutral" />
-            {row.pinned ? <StatusBadge label="Pinned" tone="accent" /> : null}
-          </div>
+          {row.pinned ? (
+            <div className="mt-2">
+              <StatusBadge label="Pinned" tone="accent" />
+            </div>
+          ) : null}
         </div>
       ),
     },
@@ -201,13 +175,12 @@ export function DataSourceDetailValuesTab({
       cell: (row) => (
         <StatusBadge label={row.freshness} tone={freshnessTone(row.freshness)} />
       ),
-      className: "w-[7rem]",
+      className: "w-[8rem]",
     },
   ];
 
   const hasQueryState =
     searchValue.trim().length > 0 ||
-    groupFilter !== "all" ||
     freshnessFilter !== "all" ||
     pinFilter !== "all";
 
@@ -237,12 +210,11 @@ export function DataSourceDetailValuesTab({
         filters={filters}
         onClearAll={() => {
           setSearchValue("");
-          setGroupFilter("all");
           setFreshnessFilter("all");
           setPinFilter("all");
         }}
         onSearchChange={setSearchValue}
-        searchPlaceholder="Search by parameter, group, type, value, or timestamp"
+        searchPlaceholder="Search by parameter, type, value, or timestamp"
         searchValue={searchValue}
       />
 

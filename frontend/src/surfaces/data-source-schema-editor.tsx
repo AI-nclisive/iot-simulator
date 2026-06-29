@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { EditLockBanner, EditLockState } from "../ui/edit-lock-banner";
 import { StatusBadge } from "../ui/status-badge";
 import { ConfirmationDialog } from "../ui/confirmation-dialog";
@@ -63,7 +63,13 @@ export function detectDependencyWarnings(
   return warnings;
 }
 
-export function DataSourceSchemaEditor({ source }: { source: DataSourceRow }) {
+export function DataSourceSchemaEditor({
+  source,
+  onUnsavedChanges,
+}: {
+  source: DataSourceRow;
+  onUnsavedChanges?: (has: boolean) => void;
+}) {
   const [selectedParam, setSelectedParam] = useState<SchemaParameter | null>(null);
   const [originalBuffer, setOriginalBuffer] = useState<EditBuffer>({
     description: "",
@@ -81,6 +87,10 @@ export function DataSourceSchemaEditor({ source }: { source: DataSourceRow }) {
   });
   const [saving, setSaving] = useState(false);
   const [confirmSaveOpen, setConfirmSaveOpen] = useState(false);
+
+  useEffect(() => {
+    onUnsavedChanges?.(hasUnsavedChanges);
+  }, [hasUnsavedChanges, onUnsavedChanges]);
 
   const lockState: EditLockState =
     mockSourceLock === "locked-by-other"
@@ -233,7 +243,7 @@ export function DataSourceSchemaEditor({ source }: { source: DataSourceRow }) {
               {filteredParams.length} of {allParams.length}
             </span>
           </div>
-          <div className="overflow-hidden rounded-md border border-shell-line bg-white">
+          <div className="overflow-hidden rounded-md border border-shell-line bg-white max-h-[32rem] overflow-y-auto">
             {filteredParams.length === 0 ? (
               <p className="px-4 py-6 text-center text-sm text-shell-muted">
                 No parameters match the search.
@@ -256,13 +266,11 @@ export function DataSourceSchemaEditor({ source }: { source: DataSourceRow }) {
                           {param.path}
                         </span>
                         <span className="shrink-0 text-xs text-shell-muted">
-                          {param.type}
+                          {param.type.charAt(0).toUpperCase() + param.type.slice(1)}
                         </span>
                       </div>
                       {param.hasDependent ? (
-                        <span className="mt-1 text-xs text-amber-600">
-                          Has dependents
-                        </span>
+                        <span className="mt-1 text-xs text-amber-600">Has dependents</span>
                       ) : null}
                     </button>
                   </li>
@@ -312,7 +320,7 @@ export function DataSourceSchemaEditor({ source }: { source: DataSourceRow }) {
                   <div className="flex flex-col gap-2 text-sm text-shell-muted">
                     Type
                     <div className="shell-field cursor-not-allowed bg-shell-base/30 text-shell-ink">
-                      {selectedParam.type}
+                      {selectedParam.type.charAt(0).toUpperCase() + selectedParam.type.slice(1)}
                     </div>
                   </div>
                 </div>
@@ -348,8 +356,8 @@ export function DataSourceSchemaEditor({ source }: { source: DataSourceRow }) {
                 ) : null}
                 {selectedParam.hasDependent ? (
                   <p className="text-xs text-amber-600">
-                    This parameter has dependents. Renaming or retyping it may break
-                    downstream references.
+                    This parameter is referenced by other parameters. Renaming or
+                    retyping it may break downstream configurations.
                   </p>
                 ) : null}
 

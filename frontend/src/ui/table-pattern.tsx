@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from "react";
+import { useMemo, useState, useEffect, type ReactNode } from "react";
 import { SharedStatePanel } from "./shared-state-panel";
 
 type TableSortDirection = "asc" | "desc";
@@ -55,6 +55,7 @@ type OperationalTableProps<T> = {
   emptyMessage: string;
   noResultsTitle: string;
   noResultsMessage: string;
+  pageSize?: number;
 };
 
 type TableToolbarProps = {
@@ -78,7 +79,7 @@ function compareValues(left: string | number, right: string | number) {
 }
 
 function sortLabel(direction: TableSortDirection) {
-  return direction === "asc" ? "asc" : "desc";
+  return direction === "asc" ? "↑" : "↓";
 }
 
 function nextSortState(columnId: string, sortState: TableSortState): TableSortState {
@@ -181,7 +182,14 @@ export function OperationalTable<T>({
   emptyMessage,
   noResultsTitle,
   noResultsMessage,
+  pageSize = 50,
 }: OperationalTableProps<T>) {
+  const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    setPage(1);
+  }, [rows]);
+
   const sortedRows = useMemo(() => {
     if (!sortState) {
       return rows;
@@ -200,6 +208,10 @@ export function OperationalTable<T>({
     return sorted;
   }, [columns, rows, sortState]);
 
+  const totalPages = Math.max(1, Math.ceil(sortedRows.length / pageSize));
+  const clampedPage = Math.min(page, totalPages);
+  const pagedRows = sortedRows.slice((clampedPage - 1) * pageSize, clampedPage * pageSize);
+
   if (sortedRows.length === 0) {
     return (
       <SharedStatePanel
@@ -211,6 +223,7 @@ export function OperationalTable<T>({
   }
 
   return (
+    <div className="space-y-3">
     <div className="overflow-hidden rounded-md border border-shell-line bg-white">
       <div className="overflow-x-auto">
         <table className="min-w-full border-collapse">
@@ -258,7 +271,7 @@ export function OperationalTable<T>({
             </tr>
           </thead>
           <tbody>
-            {sortedRows.map((row) => {
+            {pagedRows.map((row) => {
               const actions = rowActions?.(row) ?? [];
 
               return (
@@ -290,6 +303,36 @@ export function OperationalTable<T>({
           </tbody>
         </table>
       </div>
+    </div>
+
+    {totalPages > 1 ? (
+      <div className="flex items-center justify-between text-sm text-shell-muted">
+        <span>
+          {(clampedPage - 1) * pageSize + 1}–{Math.min(clampedPage * pageSize, sortedRows.length)} of {sortedRows.length}
+        </span>
+        <div className="flex items-center gap-2">
+          <button
+            className="shell-action"
+            disabled={clampedPage <= 1}
+            type="button"
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+          >
+            Previous
+          </button>
+          <span className="px-1">
+            Page {clampedPage} of {totalPages}
+          </span>
+          <button
+            className="shell-action"
+            disabled={clampedPage >= totalPages}
+            type="button"
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+          >
+            Next
+          </button>
+        </div>
+      </div>
+    ) : null}
     </div>
   );
 }

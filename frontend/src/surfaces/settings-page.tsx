@@ -98,7 +98,7 @@ function ExportProjectSection({
 
       {exportState.phase === "done" ? (
         <div className="flex items-center gap-3 rounded-md border border-shell-line bg-shell-base/50 px-4 py-3">
-          <StatusBadge label="Export ready" tone="accent" />
+          <StatusBadge label="Saved" tone="accent" />
           <span className="text-sm text-shell-ink">{exportState.fileName}</span>
           <button
             className="shell-text-action ml-auto"
@@ -159,27 +159,16 @@ export function SettingsPage() {
           <StatusBadge label={access.effectiveRoleLabel} tone="neutral" />
         </div>
 
-        <div className="mt-5 grid gap-4 xl:grid-cols-2">
-          <label className="flex flex-col gap-2 text-sm text-shell-muted">
-            Project name
-            <input
-              className="shell-field"
-              readOnly
-              type="text"
-              value={currentProject.name}
-            />
-          </label>
-          <label className="flex flex-col gap-2 text-sm text-shell-muted">
-            Environment mode
-            <input
-              className="shell-field"
-              disabled
-              readOnly
-              type="text"
-              value={access.modeLabel}
-            />
-          </label>
-        </div>
+        <dl className="mt-5 grid gap-4 xl:grid-cols-2">
+          <div className="flex flex-col gap-1">
+            <dt className="text-sm text-shell-muted">Project name</dt>
+            <dd className="text-sm font-medium text-shell-ink">{currentProject.name}</dd>
+          </div>
+          <div className="flex flex-col gap-1">
+            <dt className="text-sm text-shell-muted">Environment mode</dt>
+            <dd className="text-sm font-medium text-shell-ink">{access.modeLabel}</dd>
+          </div>
+        </dl>
 
         {!access.isAdmin ? (
           <p className="mt-4 text-sm text-shell-muted">

@@ -445,7 +445,7 @@ export function EvidenceDetailPage() {
             <SharedStatePanel
               message="No client delivery was captured for this evidence artifact."
               state={
-                evidence.status === "Partial" || evidence.status === "Export failed"
+                evidence.status === "Incomplete" || evidence.status === "Export failed"
                   ? "warning"
                   : "empty"
               }

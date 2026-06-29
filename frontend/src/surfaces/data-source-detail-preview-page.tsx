@@ -111,6 +111,8 @@ export function DataSourceDetailPreviewPage() {
   const access = resolveAccess(accessMode, sharedRole);
   const activeTab = currentTabId(searchParams.get("tab"));
   const [stopConfirmationOpen, setStopConfirmationOpen] = useState(false);
+  const [schemaUnsaved, setSchemaUnsaved] = useState(false);
+  const [pendingTab, setPendingTab] = useState<DetailTabId | null>(null);
 
   if (!source) {
     return (
@@ -187,9 +189,22 @@ export function DataSourceDetailPreviewPage() {
   }, [activeSource, sourceStarted]);
 
   function setActiveTab(tabId: DetailTabId) {
+    if (activeTab === "schema" && schemaUnsaved && tabId !== "schema") {
+      setPendingTab(tabId);
+      return;
+    }
     const nextParams = new URLSearchParams(searchParams);
     nextParams.set("tab", tabId);
     setSearchParams(nextParams, { replace: true });
+  }
+
+  function confirmTabSwitch() {
+    if (!pendingTab) return;
+    setSchemaUnsaved(false);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set("tab", pendingTab);
+    setSearchParams(nextParams, { replace: true });
+    setPendingTab(null);
   }
 
   function renderTabContent() {
@@ -198,7 +213,7 @@ export function DataSourceDetailPreviewPage() {
     }
 
     if (activeTab === "schema") {
-      return <DataSourceSchemaEditor source={activeSource} />;
+      return <DataSourceSchemaEditor source={activeSource} onUnsavedChanges={setSchemaUnsaved} />;
     }
 
     if (activeTab === "values") {
@@ -357,6 +372,20 @@ export function DataSourceDetailPreviewPage() {
             stopDataSource(activeSource.id);
             setStopConfirmationOpen(false);
           }}
+        />
+      ) : null}
+
+      {pendingTab ? (
+        <ConfirmationDialog
+          confirmLabel="Leave tab"
+          message="You have unsaved schema changes. Leaving this tab will discard them."
+          objectLabel={activeSource.name}
+          open={Boolean(pendingTab)}
+          reversibilityLabel="This action is not reversible. Unsaved schema changes will be lost."
+          title="Leave without saving?"
+          tone="warning"
+          onClose={() => setPendingTab(null)}
+          onConfirm={confirmTabSwitch}
         />
       ) : null}
     </div>

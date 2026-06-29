@@ -142,13 +142,19 @@ function RecordingPreviewPanel({
           Preview
         </p>
         <p className="mt-2 font-medium text-shell-ink">{selected.name}</p>
-        <div className="mt-2 flex flex-wrap gap-1">
-          <StatusBadge label={selected.type} tone="neutral" />
-          <StatusBadge
-            label={selected.origin}
-            tone={selected.origin === "synthetic" ? "warning" : "neutral"}
-          />
-        </div>
+        <dl className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-shell-muted">
+          <div className="flex items-center gap-1">
+            <dt>Type</dt>
+            <dd><StatusBadge label={selected.type} tone="neutral" /></dd>
+          </div>
+          <div className="flex items-center gap-1">
+            <dt>Origin</dt>
+            <dd><StatusBadge
+              label={selected.origin}
+              tone={selected.origin === "synthetic" ? "warning" : "neutral"}
+            /></dd>
+          </div>
+        </dl>
 
         <dl className="mt-4 space-y-3 text-sm">
           <div>
@@ -221,28 +227,21 @@ function RecordingPreviewPanel({
         </dl>
       </section>
 
-      {/* Fitness warnings */}
-      {warnings.length > 0 ? (
-        <section className="rounded-md border border-shell-line bg-white px-4 py-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
-            Fitness
-          </p>
+      {/* Replay readiness */}
+      <section className="rounded-md border border-shell-line bg-white px-4 py-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
+          Replay readiness
+        </p>
+        <p className="mt-2 text-xs text-shell-muted">{compatibilityHint(selected.protocol)}</p>
+        {warnings.length > 0 ? (
           <div className="mt-3 space-y-2">
             {warnings.map((w, i) => (
               <FitnessWarning key={i} level={w.level} message={w.message} />
             ))}
           </div>
-        </section>
-      ) : null}
-
-      {/* Compatibility hint */}
-      <section className="rounded-md border border-shell-line bg-white px-4 py-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
-          Compatibility
-        </p>
-        <p className="mt-2 text-sm text-shell-ink">
-          {compatibilityHint(selected.protocol)}
-        </p>
+        ) : (
+          <p className="mt-2 text-xs text-shell-muted">No issues detected.</p>
+        )}
       </section>
 
       {/* Action buttons */}

@@ -25,7 +25,7 @@ type ConfirmationDialogProps = {
 };
 
 function toneLabel(tone: ConfirmationTone) {
-  return tone === "danger" ? "Destructive action" : "Confirmation required";
+  return tone === "danger" ? "Cannot be undone" : "Confirmation required";
 }
 
 function toneBadge(tone: ConfirmationTone): StatusTone {

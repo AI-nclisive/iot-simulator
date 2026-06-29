@@ -61,5 +61,5 @@ export function filterEvidenceArtifacts(
 }
 
 export function canExportEvidenceArtifact(artifact: EvidenceArtifact) {
-  return artifact.status !== "Capturing" && artifact.exportState !== "Not ready";
+  return artifact.status !== "In progress" && artifact.exportState !== "Not ready";
 }
