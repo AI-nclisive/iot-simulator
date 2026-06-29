@@ -473,7 +473,7 @@ Parallel execution:
   Done when: reusable artifacts are easy to browse by name, source, type,
   origin, duration, tags, and last use.
 
-- [ ] `UI-051` Recording and sample import
+- [x] `UI-051` Recording and sample import
   Surface: `Recordings & Samples`
   Depends: `UI-050`
   Done when: validation, preview, unsupported artifact handling, and
