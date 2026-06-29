@@ -9,7 +9,5 @@ public interface LiveStreamSubscriptions {
     SseEmitter subscribe(StreamKey key, String lastEventId);
 
     /** Subscribe and deliver {@code initial} events to this subscriber before live events. */
-    default SseEmitter subscribe(StreamKey key, String lastEventId, List<LiveEvent> initial) {
-        return subscribe(key, lastEventId);
-    }
+    SseEmitter subscribe(StreamKey key, String lastEventId, List<LiveEvent> initial);
 }

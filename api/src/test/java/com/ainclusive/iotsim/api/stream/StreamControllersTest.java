@@ -19,6 +19,11 @@ class StreamControllersTest {
             calls.add(new Sub(key, lastEventId));
             return new SseEmitter(0L);
         }
+
+        @Override
+        public SseEmitter subscribe(StreamKey key, String lastEventId, java.util.List<LiveEvent> initial) {
+            return subscribe(key, lastEventId);
+        }
     }
 
     @Test
