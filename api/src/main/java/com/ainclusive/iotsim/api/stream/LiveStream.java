@@ -58,6 +58,25 @@ final class LiveStream {
         subscribers.remove(sub);
     }
 
+    /** Sends an unbuffered event (heartbeat/resync) to current subscribers. */
+    void broadcast(LiveEvent event) {
+        synchronized (lock) {
+            for (Subscriber sub : subscribers) {
+                sub.enqueue(event);
+            }
+        }
+    }
+
+    /** Closes and drops every subscriber (registry shutdown). */
+    void closeAll() {
+        synchronized (lock) {
+            for (Subscriber sub : subscribers) {
+                sub.close();
+            }
+            subscribers.clear();
+        }
+    }
+
     int subscriberCount() {
         return subscribers.size();
     }
