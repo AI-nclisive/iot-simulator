@@ -87,10 +87,7 @@ export function ReplayFlowPage() {
     [artifacts, source?.assignedReplayArtifactId],
   );
 
-  const compatibleArtifact =
-    selectedArtifact && source
-      ? selectedArtifact.protocol === source.protocol
-      : false;
+  const compatibleArtifact = Boolean(selectedArtifact && source);
   const sourceBusyWithAnotherProcess =
     source?.process === "Recording" ||
     (source?.process === "Replay" && replayState !== "running");
@@ -131,7 +128,7 @@ export function ReplayFlowPage() {
     }
 
     const events = [
-      `${selectedArtifact.type} selected: ${selectedArtifact.name}`,
+      `Artifact ${selectedArtifact.id} selected`,
       selectedArtifact.id === source?.assignedReplayArtifactId
         ? "Selected artifact is already assigned to this replay target."
         : "Selected artifact still needs explicit assignment before replay starts.",
@@ -292,7 +289,7 @@ export function ReplayFlowPage() {
               >
                 {artifacts.map((artifact) => (
                   <option key={artifact.id} value={artifact.id}>
-                    {artifact.name} · {artifact.type} · {artifact.protocol}
+                    Artifact {artifact.id}
                   </option>
                 ))}
               </select>
@@ -327,8 +324,8 @@ export function ReplayFlowPage() {
                 <p className="mt-2 text-sm leading-6 text-shell-muted">
                   {selectedArtifact
                     ? compatibleArtifact
-                      ? `${selectedArtifact.type} can replay through ${source.protocol}.`
-                      : `${selectedArtifact.protocol} cannot replay through ${source.protocol}.`
+                      ? `Artifact ${selectedArtifact.id} can replay through ${source.protocol}.`
+                      : "Protocol mismatch: this artifact cannot replay through this source."
                     : "Select a recording or sample to review impact before starting."}
                 </p>
               </div>
@@ -342,13 +339,13 @@ export function ReplayFlowPage() {
                 <div className="flex items-center justify-between gap-3">
                   <dt>Current</dt>
                   <dd className="font-medium text-shell-ink">
-                    {assignedArtifact ? assignedArtifact.name : "No artifact assigned"}
+                    {assignedArtifact ? `Artifact ${assignedArtifact.id}` : "No artifact assigned"}
                   </dd>
                 </div>
                 <div className="flex items-center justify-between gap-3">
                   <dt>Selected</dt>
                   <dd className="font-medium text-shell-ink">
-                    {selectedArtifact ? selectedArtifact.name : "Nothing selected"}
+                    {selectedArtifact ? `Artifact ${selectedArtifact.id}` : "Nothing selected"}
                   </dd>
                 </div>
                 <div className="flex items-center justify-between gap-3">
@@ -399,10 +396,6 @@ export function ReplayFlowPage() {
             </p>
             {selectedArtifact ? (
               <dl className="mt-3 space-y-3 text-sm text-shell-muted">
-                <div className="flex items-center justify-between gap-3">
-                  <dt>Type</dt>
-                  <dd className="font-medium text-shell-ink">{selectedArtifact.type}</dd>
-                </div>
                 <div className="flex items-center justify-between gap-3">
                   <dt>Author</dt>
                   <dd className="font-medium text-shell-ink">{selectedArtifact.createdBy}</dd>

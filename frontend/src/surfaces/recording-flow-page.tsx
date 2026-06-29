@@ -211,15 +211,9 @@ export function RecordingFlowPage() {
   }
 
   function saveReadyRecording() {
-    const trimmedName = recordingName.trim() || `${activeSource.name} capture`;
     const artifactId = createRecording({
       createdBy: "You",
-      durationSeconds,
-      name: trimmedName,
-      protocol: activeSource.protocol,
       sourceId: activeSource.id,
-      sourceName: activeSource.name,
-      status: "Ready",
       valueCount,
     });
 
@@ -227,15 +221,9 @@ export function RecordingFlowPage() {
   }
 
   function savePartialRecording() {
-    const trimmedName = recordingName.trim() || `${activeSource.name} partial capture`;
     const artifactId = createRecording({
       createdBy: "You",
-      durationSeconds,
-      name: trimmedName,
-      protocol: activeSource.protocol,
       sourceId: activeSource.id,
-      sourceName: activeSource.name,
-      status: "Partial",
       valueCount,
     });
 
