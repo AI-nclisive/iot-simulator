@@ -2,6 +2,7 @@ package com.ainclusive.iotsim.persistence.run;
 
 import static java.util.Comparator.comparing;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.ainclusive.iotsim.persistence.datasource.JooqDataSourceRepository;
 import com.ainclusive.iotsim.persistence.evidence.EvidenceRow;
@@ -48,7 +49,7 @@ class RunRepositoryIT {
     }
 
     private String source(String name) {
-        return sources.insert(projectId, name, "OPC_UA", "PROVIDED", null, null, "it").id();
+        return sources.insert(projectId, name, "OPC_UA", "MANUAL", null, null, "it").id();
     }
 
     @Test
@@ -114,6 +115,12 @@ class RunRepositoryIT {
 
         assertThat(linked.evidenceId()).isEqualTo(ev.id());
         assertThat(evidence.findByRun(run.id())).map(EvidenceRow::id).contains(ev.id());
+    }
+
+    @Test
+    void mutatingUnknownRunThrowsNotFound() {
+        assertThatThrownBy(() -> runs.start("missing", OffsetDateTime.parse("2026-04-01T10:00:00Z")))
+                .isInstanceOf(org.jooq.exception.NoDataFoundException.class);
     }
 
     @Test

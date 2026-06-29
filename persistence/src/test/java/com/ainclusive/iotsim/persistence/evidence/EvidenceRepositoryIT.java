@@ -2,6 +2,7 @@ package com.ainclusive.iotsim.persistence.evidence;
 
 import static java.util.Comparator.comparing;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.ainclusive.iotsim.persistence.project.JooqProjectRepository;
 import java.util.List;
@@ -77,6 +78,12 @@ class EvidenceRepositoryIT {
         EvidenceRow failed = evidence.updateStatus(ev.id(), "EXPORT_FAILED", null);
         assertThat(failed.status()).isEqualTo("EXPORT_FAILED");
         assertThat(failed.objectRef()).isNull();
+    }
+
+    @Test
+    void updatingUnknownEvidenceThrowsNotFound() {
+        assertThatThrownBy(() -> evidence.updateStatus("missing", "READY", null))
+                .isInstanceOf(org.jooq.exception.NoDataFoundException.class);
     }
 
     @Test

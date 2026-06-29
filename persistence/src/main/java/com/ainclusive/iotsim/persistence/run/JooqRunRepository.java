@@ -92,7 +92,7 @@ public class JooqRunRepository implements RunRepository {
                 .set(RUNS.STARTED_AT, startedAt)
                 .where(RUNS.ID.eq(id))
                 .returning()
-                .fetchOne());
+                .fetchSingle());
     }
 
     @Override
@@ -102,7 +102,7 @@ public class JooqRunRepository implements RunRepository {
                 .set(RUNS.ENDED_AT, endedAt)
                 .where(RUNS.ID.eq(id))
                 .returning()
-                .fetchOne());
+                .fetchSingle());
     }
 
     @Override
@@ -111,7 +111,7 @@ public class JooqRunRepository implements RunRepository {
                 .set(RUNS.EVIDENCE_ID, evidenceId)
                 .where(RUNS.ID.eq(runId))
                 .returning()
-                .fetchOne());
+                .fetchSingle());
     }
 
     private List<String> sourceIds(String runId) {

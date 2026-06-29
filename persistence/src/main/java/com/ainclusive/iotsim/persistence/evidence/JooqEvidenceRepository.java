@@ -64,7 +64,7 @@ public class JooqEvidenceRepository implements EvidenceRepository {
                 .set(EVIDENCE.MANIFEST, json(manifestJson))
                 .where(EVIDENCE.ID.eq(id))
                 .returning()
-                .fetchOne());
+                .fetchSingle());
     }
 
     @Override
@@ -74,7 +74,7 @@ public class JooqEvidenceRepository implements EvidenceRepository {
                 .set(EVIDENCE.OBJECT_REF, objectRef)
                 .where(EVIDENCE.ID.eq(id))
                 .returning()
-                .fetchOne());
+                .fetchSingle());
     }
 
     private static JSONB json(String value) {
