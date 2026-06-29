@@ -3,5 +3,8 @@
     "allow": [
       "Bash(gh pr merge * --auto*)"
     ]
+  },
+  "enabledPlugins": {
+    "superpowers@claude-plugins-official": true
   }
 }
