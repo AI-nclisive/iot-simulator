@@ -9,6 +9,269 @@ import { RecordingExportDialog } from "./recording-export-dialog";
 type TypeFilter = "all" | "recording" | "sample";
 type OriginFilter = "all" | "captured" | "imported" | "synthetic";
 
+// ─── Fitness warning component ────────────────────────────────────────────────
+
+type FitnessWarningProps = {
+  level: "warn" | "info";
+  message: string;
+};
+
+export function FitnessWarning({ level, message }: FitnessWarningProps) {
+  const isWarn = level === "warn";
+  return (
+    <div
+      className={`flex items-start gap-2 rounded px-3 py-2 text-xs ${
+        isWarn
+          ? "bg-yellow-50 border border-yellow-200 text-yellow-800"
+          : "bg-blue-50 border border-blue-200 text-blue-800"
+      }`}
+      role={isWarn ? "alert" : "status"}
+    >
+      <span className="shrink-0 font-semibold">
+        {isWarn ? "Warning:" : "Note:"}
+      </span>
+      <span>{message}</span>
+    </div>
+  );
+}
+
+// ─── Timeline helpers ─────────────────────────────────────────────────────────
+
+/** Parse a duration string like "4h 12m", "8m 05s", "30m" into total minutes */
+export function parseDurationMinutes(duration: string): number {
+  const hourMatch = duration.match(/(\d+)h/);
+  const minMatch = duration.match(/(\d+)m/);
+  const hours = hourMatch ? parseInt(hourMatch[1], 10) : 0;
+  const mins = minMatch ? parseInt(minMatch[1], 10) : 0;
+  return hours * 60 + mins;
+}
+
+/** Format a sample rate like "9.8 values/min" or "0.5 values/min" */
+function formatSampleRate(
+  parameterCount: number,
+  durationMinutes: number,
+): string {
+  if (durationMinutes === 0) return "—";
+  const rate = parameterCount / durationMinutes;
+  if (rate >= 1) return `${rate.toFixed(1)} values/min`;
+  return `${(rate * 60).toFixed(1)} values/hr`;
+}
+
+/** Derive end timestamp from capturedAt string and duration in minutes */
+function deriveEndTimestamp(
+  capturedAt: string,
+  durationMinutes: number,
+): string {
+  const date = new Date(capturedAt.replace(" ", "T"));
+  if (isNaN(date.getTime())) return "—";
+  date.setMinutes(date.getMinutes() + durationMinutes);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+// ─── Fitness warning logic ────────────────────────────────────────────────────
+
+type WarningEntry = { level: "warn" | "info"; message: string };
+
+export function computeFitnessWarnings(row: RecordingRow): WarningEntry[] {
+  const warnings: WarningEntry[] = [];
+
+  if (row.origin === "synthetic") {
+    warnings.push({
+      level: "warn",
+      message:
+        "Synthetic data — not captured from a real source. Replay behavior may differ from real-device patterns.",
+    });
+  }
+
+  if (row.lastUsedAt === null) {
+    warnings.push({
+      level: "info",
+      message: "Never used in replay. No compatibility history.",
+    });
+  }
+
+  if (row.sizeKb > 10000) {
+    const mb = (row.sizeKb / 1024).toFixed(1);
+    warnings.push({
+      level: "info",
+      message: `Large artifact (${mb} MB) — replay may take longer to initialise.`,
+    });
+  }
+
+  if (row.parameterCount > 2000) {
+    warnings.push({
+      level: "info",
+      message:
+        "High parameter count — verify target source schema matches before assigning.",
+    });
+  }
+
+  return warnings;
+}
+
+// ─── Compatibility hint ───────────────────────────────────────────────────────
+
+function compatibilityHint(protocol: RecordingRow["protocol"]): string {
+  return `Compatible with: ${protocol} sources`;
+}
+
+// ─── Preview panel ────────────────────────────────────────────────────────────
+
+function RecordingPreviewPanel({
+  selected,
+  isAdmin,
+  onExport,
+}: {
+  selected: RecordingRow;
+  isAdmin: boolean;
+  onExport: () => void;
+}) {
+  const durationMinutes = parseDurationMinutes(selected.duration);
+  const sampleRate = formatSampleRate(selected.parameterCount, durationMinutes);
+  const endTimestamp = deriveEndTimestamp(selected.capturedAt, durationMinutes);
+  const warnings = computeFitnessWarnings(selected);
+  const sizeMb = (selected.sizeKb / 1024).toFixed(1);
+
+  return (
+    <div className="space-y-4">
+      {/* Header + metadata */}
+      <section className="rounded-md border border-shell-line bg-white px-4 py-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
+          Preview
+        </p>
+        <p className="mt-2 font-medium text-shell-ink">{selected.name}</p>
+        <div className="mt-2 flex flex-wrap gap-1">
+          <StatusBadge label={selected.type} tone="neutral" />
+          <StatusBadge
+            label={selected.origin}
+            tone={selected.origin === "synthetic" ? "warning" : "neutral"}
+          />
+        </div>
+
+        <dl className="mt-4 space-y-3 text-sm">
+          <div>
+            <dt className="text-shell-muted">Source</dt>
+            <dd className="mt-1 text-shell-ink">{selected.sourceName}</dd>
+          </div>
+          <div>
+            <dt className="text-shell-muted">Protocol</dt>
+            <dd className="mt-1 text-shell-ink">{selected.protocol}</dd>
+          </div>
+          <div>
+            <dt className="text-shell-muted">Captured by</dt>
+            <dd className="mt-1 text-shell-ink">{selected.capturedBy}</dd>
+          </div>
+          <div>
+            <dt className="text-shell-muted">Captured at</dt>
+            <dd className="mt-1 text-shell-ink">{selected.capturedAt}</dd>
+          </div>
+          <div>
+            <dt className="text-shell-muted">Last used</dt>
+            <dd className="mt-1 text-shell-ink">
+              {selected.lastUsedAt ?? "Not yet used"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-shell-muted">Size</dt>
+            <dd className="mt-1 text-shell-ink">{sizeMb} MB</dd>
+          </div>
+        </dl>
+      </section>
+
+      {/* Timeline summary */}
+      <section className="rounded-md border border-shell-line bg-white px-4 py-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
+          Timeline
+        </p>
+        <div className="mt-3">
+          <div className="relative h-3 w-full overflow-hidden rounded-full bg-shell-base">
+            <div
+              className="absolute left-0 top-0 h-full w-full rounded-full bg-shell-accent"
+              aria-hidden="true"
+            />
+          </div>
+          <div className="mt-1 flex justify-between text-xs text-shell-muted">
+            <span>{selected.capturedAt}</span>
+            <span>{endTimestamp}</span>
+          </div>
+        </div>
+        <dl className="mt-3 grid grid-cols-3 gap-2 text-xs">
+          <div>
+            <dt className="font-semibold uppercase tracking-wide text-shell-muted">
+              Duration
+            </dt>
+            <dd className="mt-1 text-shell-ink">{selected.duration}</dd>
+          </div>
+          <div>
+            <dt className="font-semibold uppercase tracking-wide text-shell-muted">
+              Values recorded
+            </dt>
+            <dd className="mt-1 text-shell-ink">
+              ~{selected.parameterCount.toLocaleString()}
+            </dd>
+          </div>
+          <div>
+            <dt className="font-semibold uppercase tracking-wide text-shell-muted">
+              Sample rate
+            </dt>
+            <dd className="mt-1 text-shell-ink">{sampleRate}</dd>
+          </div>
+        </dl>
+      </section>
+
+      {/* Fitness warnings */}
+      {warnings.length > 0 ? (
+        <section className="rounded-md border border-shell-line bg-white px-4 py-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
+            Fitness
+          </p>
+          <div className="mt-3 space-y-2">
+            {warnings.map((w, i) => (
+              <FitnessWarning key={i} level={w.level} message={w.message} />
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {/* Compatibility hint */}
+      <section className="rounded-md border border-shell-line bg-white px-4 py-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
+          Compatibility
+        </p>
+        <p className="mt-2 text-sm text-shell-ink">
+          {compatibilityHint(selected.protocol)}
+        </p>
+      </section>
+
+      {/* Action buttons */}
+      <section className="rounded-md border border-shell-line bg-white px-4 py-4">
+        <div className="flex flex-wrap gap-2">
+          <button className="shell-action" disabled={!isAdmin} type="button">
+            Assign to replay
+          </button>
+          <button
+            className="shell-action"
+            disabled={!isAdmin}
+            type="button"
+            onClick={isAdmin ? onExport : undefined}
+          >
+            Export
+          </button>
+        </div>
+        {!isAdmin ? (
+          <p className="mt-3 text-xs text-shell-muted">
+            Export and assign actions are available to Admins only in shared
+            mode.
+          </p>
+        ) : null}
+      </section>
+    </div>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export function RecordingsPage() {
   const { accessMode, sharedRole } = useShellStore();
   const access = resolveAccess(accessMode, sharedRole);
@@ -221,62 +484,11 @@ export function RecordingsPage() {
 
           {/* Preview panel */}
           {selected ? (
-            <div className="space-y-4">
-              <section className="rounded-md border border-shell-line bg-white px-4 py-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
-                  Preview
-                </p>
-                <p className="mt-2 font-medium text-shell-ink">
-                  {selected.name}
-                </p>
-                <dl className="mt-4 space-y-3 text-sm">
-                  <div>
-                    <dt className="text-shell-muted">Source</dt>
-                    <dd className="mt-1 text-shell-ink">
-                      {selected.sourceName}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-shell-muted">Captured by</dt>
-                    <dd className="mt-1 text-shell-ink">
-                      {selected.capturedBy}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-shell-muted">Last used</dt>
-                    <dd className="mt-1 text-shell-ink">
-                      {selected.lastUsedAt ?? "Not yet used"}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-shell-muted">Size</dt>
-                    <dd className="mt-1 text-shell-ink">
-                      {(selected.sizeKb / 1024).toFixed(1)} MB
-                    </dd>
-                  </div>
-                </dl>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <button className="shell-action" disabled={!access.isAdmin} type="button">
-                    Assign to replay
-                  </button>
-                  {access.isAdmin ? (
-                    <button
-                      className="shell-action"
-                      type="button"
-                      onClick={() => setExportDialogOpen(true)}
-                    >
-                      Export
-                    </button>
-                  ) : null}
-                </div>
-                {!access.isAdmin ? (
-                  <p className="mt-3 text-xs text-shell-muted">
-                    Export and assign actions are available to Admins only in
-                    shared mode.
-                  </p>
-                ) : null}
-              </section>
-            </div>
+            <RecordingPreviewPanel
+              selected={selected}
+              isAdmin={access.isAdmin}
+              onExport={() => setExportDialogOpen(true)}
+            />
           ) : (
             <section className="hidden rounded-md border border-shell-line bg-white px-4 py-6 xl:block">
               <p className="text-sm text-center text-shell-muted">
