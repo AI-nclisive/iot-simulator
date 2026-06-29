@@ -137,3 +137,58 @@ describe("DataSourceDetailEventsTab — combined filters", () => {
     expect(screen.getByText(/No matching events/)).toBeTruthy();
   });
 });
+
+describe("DataSourceDetailEventsTab — expand/collapse", () => {
+  it("detail panel is hidden by default", () => {
+    mockGetEvents.mockReturnValue([makeEvent({ id: "ev-1", message: "Test event" })]);
+    render(<DataSourceDetailEventsTab source={mockSource} />);
+    expect(screen.queryByText("Timestamp")).toBeNull();
+    expect(screen.queryByText("Event ID")).toBeNull();
+  });
+
+  it("clicking a row expands the detail panel", async () => {
+    mockGetEvents.mockReturnValue([makeEvent({ id: "ev-1", message: "Test event", timestamp: "10:00:00" })]);
+    render(<DataSourceDetailEventsTab source={mockSource} />);
+    const button = screen.getByRole("button", { name: /Test event/i });
+    expect(button.getAttribute("aria-expanded")).toBe("false");
+    await userEvent.click(button);
+    expect(button.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByText("Timestamp")).toBeTruthy();
+    expect(screen.getByText("Event ID")).toBeTruthy();
+  });
+
+  it("clicking the expanded row collapses the detail panel", async () => {
+    mockGetEvents.mockReturnValue([makeEvent({ id: "ev-1", message: "Test event" })]);
+    render(<DataSourceDetailEventsTab source={mockSource} />);
+    const button = screen.getByRole("button", { name: /Test event/i });
+    await userEvent.click(button);
+    expect(screen.getByText("Timestamp")).toBeTruthy();
+    await userEvent.click(button);
+    expect(screen.queryByText("Timestamp")).toBeNull();
+    expect(button.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("expanding a second row collapses the first", async () => {
+    mockGetEvents.mockReturnValue([
+      makeEvent({ id: "ev-1", message: "First event" }),
+      makeEvent({ id: "ev-2", message: "Second event" }),
+    ]);
+    render(<DataSourceDetailEventsTab source={mockSource} />);
+    const buttons = screen.getAllByRole("button");
+    await userEvent.click(buttons[0]);
+    expect(buttons[0].getAttribute("aria-expanded")).toBe("true");
+    await userEvent.click(buttons[1]);
+    expect(buttons[1].getAttribute("aria-expanded")).toBe("true");
+    expect(buttons[0].getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("detail panel is linked to button via aria-controls", async () => {
+    mockGetEvents.mockReturnValue([makeEvent({ id: "ev-42", message: "Test event" })]);
+    render(<DataSourceDetailEventsTab source={mockSource} />);
+    const button = screen.getByRole("button", { name: /Test event/i });
+    await userEvent.click(button);
+    const controlsId = button.getAttribute("aria-controls");
+    expect(controlsId).toBe("event-detail-ev-42");
+    expect(document.getElementById(controlsId!)).not.toBeNull();
+  });
+});

@@ -253,7 +253,6 @@ export function RecordingFlowPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <StatusBadge label="Record" tone="warning" />
             <StatusBadge label={source.protocol} tone="neutral" />
             <StatusBadge
               label={recordingLabel(recordingState)}

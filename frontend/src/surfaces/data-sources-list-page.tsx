@@ -290,7 +290,14 @@ export function DataSourcesListPage() {
       header: "Health",
       sortable: true,
       sortValue: (row) => row.health,
-      cell: (row) => <StatusBadge label={row.health} tone={healthTone(row.health)} />,
+      cell: (row) => (
+        <div className="min-w-0">
+          <StatusBadge label={row.health} tone={healthTone(row.health)} />
+          {row.health === "Error" ? (
+            <p className="mt-1 text-xs text-shell-muted">See Events tab</p>
+          ) : null}
+        </div>
+      ),
       className: "w-[9rem]",
     },
     {

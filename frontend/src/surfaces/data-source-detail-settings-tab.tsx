@@ -79,7 +79,9 @@ export function DataSourceDetailSettingsTab({
       <EditLockBanner lock={lockState} />
 
       <div className="flex flex-wrap items-center gap-2">
-        <StatusBadge label={access.isAdmin && !isLockedByOther ? "Editable" : "Read-only"} tone="neutral" />
+        {(!access.isAdmin || isLockedByOther) ? (
+          <StatusBadge label="Read-only" tone="neutral" />
+        ) : null}
         {hasChanges ? <StatusBadge label="Unsaved changes" tone="warning" /> : null}
         {savedMessage ? <StatusBadge label={savedMessage} tone="accent" /> : null}
       </div>

@@ -21,7 +21,7 @@ function statusTone(status: EvidenceStatus): StatusTone {
     return "danger";
   }
 
-  if (status === "Capturing" || status === "Partial") {
+  if (status === "In progress" || status === "Incomplete") {
     return "warning";
   }
 
@@ -122,9 +122,9 @@ export function EvidenceListPage() {
   ];
   const stateOptions = [
     { label: "All states", value: "all" },
-    { label: "Capturing", value: "Capturing" },
+    { label: "In progress", value: "In progress" },
     { label: "Ready", value: "Ready" },
-    { label: "Partial", value: "Partial" },
+    { label: "Incomplete", value: "Incomplete" },
     { label: "Exported", value: "Exported" },
     { label: "Export failed", value: "Export failed" },
   ];
@@ -222,7 +222,9 @@ export function EvidenceListPage() {
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <StatusBadge label={row.status} tone={statusTone(row.status)} />
-            <StatusBadge label={row.exportState} tone={exportTone(row.exportState)} />
+            {row.exportState !== row.status && row.exportState !== "Not exported" && row.exportState !== "Not ready" ? (
+              <StatusBadge label={row.exportState} tone={exportTone(row.exportState)} />
+            ) : null}
           </div>
         </div>
       ),

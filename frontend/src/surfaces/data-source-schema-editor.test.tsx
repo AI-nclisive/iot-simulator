@@ -185,6 +185,50 @@ describe("DataSourceSchemaEditor — dependency warnings in UI", () => {
     expect(screen.queryByText("Dependency impact")).toBeNull();
   });
 });
+describe("DataSourceSchemaEditor — onUnsavedChanges callback", () => {
+  it("calls onUnsavedChanges(true) when a field is edited", async () => {
+    const onUnsavedChanges = vi.fn();
+    render(<DataSourceSchemaEditor source={mockSource} onUnsavedChanges={onUnsavedChanges} />);
+
+    await userEvent.click(screen.getByText("oven/zone[1]/temp"));
+    const unitInputs = screen.getAllByRole("textbox");
+    const unitInput = unitInputs.find(
+      (el) => (el as HTMLInputElement).value === "°C",
+    ) as HTMLInputElement;
+
+    await userEvent.clear(unitInput);
+    await userEvent.type(unitInput, "K");
+
+    expect(onUnsavedChanges).toHaveBeenCalledWith(true);
+  });
+
+  it("calls onUnsavedChanges(false) after discarding changes", async () => {
+    const onUnsavedChanges = vi.fn();
+    render(<DataSourceSchemaEditor source={mockSource} onUnsavedChanges={onUnsavedChanges} />);
+
+    await userEvent.click(screen.getByText("oven/zone[1]/temp"));
+    const unitInputs = screen.getAllByRole("textbox");
+    const unitInput = unitInputs.find(
+      (el) => (el as HTMLInputElement).value === "°C",
+    ) as HTMLInputElement;
+    await userEvent.clear(unitInput);
+    await userEvent.type(unitInput, "K");
+
+    expect(onUnsavedChanges).toHaveBeenCalledWith(true);
+
+    const discardButton = screen.getByRole("button", { name: "Discard changes" });
+    await userEvent.click(discardButton);
+
+    expect(onUnsavedChanges).toHaveBeenCalledWith(false);
+  });
+
+  it("does not require onUnsavedChanges to be provided", async () => {
+    expect(() =>
+      render(<DataSourceSchemaEditor source={mockSource} />),
+    ).not.toThrow();
+  });
+});
+
 describe("DataSourceSchemaEditor — ConfirmationDialog flow when saving with warnings", () => {
   it("clicking Save when dependency warnings are active opens the ConfirmationDialog", async () => {
     render(<DataSourceSchemaEditor source={mockSource} />);

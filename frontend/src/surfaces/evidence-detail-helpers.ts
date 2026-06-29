@@ -3,7 +3,7 @@ import type { EvidenceArtifact, EvidenceFormat, EvidenceStatus } from "./mock-ev
 
 export function evidenceStatusTone(status: EvidenceStatus): StatusTone {
   if (status === "Export failed") return "danger";
-  if (status === "Capturing" || status === "Partial") return "warning";
+  if (status === "In progress" || status === "Incomplete") return "warning";
   if (status === "Ready" || status === "Exported") return "accent";
   return "neutral";
 }
@@ -38,7 +38,7 @@ export function evidenceDeliveryTone(
 }
 
 export function isEvidenceExportAvailable(evidence: EvidenceArtifact): boolean {
-  return evidence.status !== "Capturing" && evidence.exportState !== "Not ready";
+  return evidence.status !== "In progress" && evidence.exportState !== "Not ready";
 }
 
 export type ExportScope = {
