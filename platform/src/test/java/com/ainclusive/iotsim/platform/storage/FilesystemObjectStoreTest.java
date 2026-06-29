@@ -98,6 +98,11 @@ class FilesystemObjectStoreTest {
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> store.delete("a/../../outside"))
                 .isInstanceOf(IllegalArgumentException.class);
+        // Absolute-path keys must be rejected too: Path.resolve discards the root for an
+        // absolute key (e.g. POSIX "/etc/passwd"), so the startsWith(root) guard is what
+        // catches it.
+        assertThatThrownBy(() -> store.put("/etc/passwd", bytes("v"), 1, "text/plain"))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test

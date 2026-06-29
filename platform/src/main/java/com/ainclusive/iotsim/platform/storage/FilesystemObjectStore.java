@@ -3,6 +3,7 @@ package com.ainclusive.iotsim.platform.storage;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -90,8 +91,9 @@ public final class FilesystemObjectStore implements ObjectStore {
     private void moveIntoPlace(Path tmp, Path target) throws IOException {
         try {
             Files.move(tmp, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-        } catch (IOException atomicUnsupported) {
-            // Not every filesystem supports an atomic replace; fall back to a plain move.
+        } catch (AtomicMoveNotSupportedException atomicUnsupported) {
+            // Only this filesystem can't do an atomic replace; fall back to a plain move.
+            // Genuine I/O errors (disk full, permissions) are not caught here and propagate.
             Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
         }
     }
