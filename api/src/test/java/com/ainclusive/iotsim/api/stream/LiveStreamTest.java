@@ -33,10 +33,9 @@ class LiveStreamTest {
         for (int i = 0; i < 5; i++) {
             assertThat(stream.publish("X", i, Instant.EPOCH).seq()).isEqualTo((long) i);
         }
-        // Buffer holds only the last 2 (seq 3,4); a fresh subscriber from seq 2
-        // therefore cannot be served contiguously -> resync.
+        // Buffer holds only the last 2 (seq 3,4); a subscriber from seq 1 needs the evicted seq 2 -> resync.
         RecordingSink late = new RecordingSink();
-        stream.addSubscriber(sub(late), "2");
+        stream.addSubscriber(sub(late), "1");
         assertThat(late.sent).extracting(LiveEvent::type).containsExactly(LiveStream.RESYNC);
     }
 

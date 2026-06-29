@@ -78,7 +78,7 @@ final class LiveStream {
             return List.of();
         }
         long oldest = buffer.isEmpty() ? latest + 1 : buffer.peekFirst().seq();
-        if (lid > latest || lid < oldest) {
+        if (lid > latest || lid < oldest - 1) {
             return List.of(resync());
         }
         List<LiveEvent> tail = new ArrayList<>();
