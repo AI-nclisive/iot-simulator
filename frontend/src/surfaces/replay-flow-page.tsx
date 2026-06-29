@@ -241,7 +241,11 @@ export function ReplayFlowPage() {
       return;
     }
 
-    startReplay(activeSource.id, "You");
+    startReplay(
+      activeSource.id,
+      "You",
+      deterministicSettings as Record<string, unknown> | null,
+    );
     setEvidenceState("Assembling");
     setProgress(0);
     setReplayState("running");
