@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.function.Supplier;
 
 /**
  * One stream (one {@link StreamKey}). Holds a bounded ring buffer of recent events
@@ -50,8 +51,21 @@ final class LiveStream {
     }
 
     void addSubscriber(Subscriber sub, String lastEventId, List<LiveEvent> initial) {
+        addSubscriber(sub, lastEventId, () -> initial);
+    }
+
+    /**
+     * Registers {@code sub} for live events and seeds it with a snapshot computed by
+     * {@code initialSupplier} <em>under the lock</em>. Computing the snapshot inside the
+     * lock closes the gap between "read the snapshot" and "start receiving live events":
+     * no {@code publish} can interleave, so any event published after this subscriber
+     * joins is delivered live and none is lost (matters when {@code Last-Event-ID} replay
+     * is disabled, as for the clients stream). The snapshot is still enqueued first, so
+     * the subscriber sees it before any live event.
+     */
+    void addSubscriber(Subscriber sub, String lastEventId, Supplier<List<LiveEvent>> initialSupplier) {
         synchronized (lock) {
-            for (LiveEvent e : initial) {
+            for (LiveEvent e : initialSupplier.get()) {
                 sub.enqueue(e);
             }
             for (LiveEvent replay : backlogFor(lastEventId)) {

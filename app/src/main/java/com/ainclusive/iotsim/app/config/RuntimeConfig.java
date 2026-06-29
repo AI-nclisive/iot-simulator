@@ -2,11 +2,15 @@ package com.ainclusive.iotsim.app.config;
 
 import com.ainclusive.iotsim.api.stream.LiveEventHub;
 import com.ainclusive.iotsim.api.stream.LiveValuesHub;
+import com.ainclusive.iotsim.app.runtime.PersistingClientActivityListener;
 import com.ainclusive.iotsim.app.runtime.PersistingRuntimeActivityListener;
+import com.ainclusive.iotsim.persistence.clientconnection.ClientConnectionRepository;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRepository;
 import com.ainclusive.iotsim.persistence.runtimeevent.RuntimeEventRepository;
 import com.ainclusive.iotsim.platform.capture.SourceCapturer;
 import com.ainclusive.iotsim.platform.capture.UnsupportedSourceCapturer;
+import com.ainclusive.iotsim.platform.runtime.ClientActivityListener;
+import com.ainclusive.iotsim.platform.runtime.CompositeClientActivityListener;
 import com.ainclusive.iotsim.platform.runtime.CompositeRuntimeActivityListener;
 import com.ainclusive.iotsim.platform.runtime.InMemoryRuntimeController;
 import com.ainclusive.iotsim.platform.runtime.RuntimeActivityListener;
@@ -36,20 +40,26 @@ public class RuntimeConfig {
 
     @Bean
     public RuntimeController runtimeController(RuntimeProperties props,
-            DataSourceRepository dataSources, RuntimeEventRepository runtimeEvents, ObjectMapper json,
+            DataSourceRepository dataSources, RuntimeEventRepository runtimeEvents,
+            ClientConnectionRepository clientConnections, ObjectMapper json,
             ExecutorService runtimeEventExecutor, LiveEventHub liveEventHub,
             LiveValuesHub liveValuesHub) {
         if (props.isSupervisorMode()) {
             // Persist runtime events off the IPC delivery thread (IS-048), and fan the
-            // same events to the live SSE hub (IS-046). Client-activity events feed the
-            // hub directly (previously dropped via ClientActivityListener.NONE).
+            // same events to the live SSE hub (IS-046).
             RuntimeActivityListener persister = new PersistingRuntimeActivityListener(
                     dataSources, runtimeEvents, json, runtimeEventExecutor);
             RuntimeActivityListener runtimeListener =
                     new CompositeRuntimeActivityListener(persister, liveEventHub);
+            // Client connect/disconnect: persist into the connection log (IS-052) and
+            // fan to the live SSE hub (IS-046), both off the IPC delivery thread.
+            ClientActivityListener clientPersister =
+                    new PersistingClientActivityListener(clientConnections, runtimeEventExecutor);
+            ClientActivityListener clientListener =
+                    new CompositeClientActivityListener(clientPersister, liveEventHub);
             return new Supervisor(
                     new ProcessWorkerLauncher(props.workers()), props.restartPolicy(),
-                    HealthPolicy.DEFAULT, liveEventHub, runtimeListener, liveValuesHub);
+                    HealthPolicy.DEFAULT, clientListener, runtimeListener, liveValuesHub);
         }
         return new InMemoryRuntimeController();
     }

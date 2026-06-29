@@ -83,14 +83,22 @@ public final class LiveStreamRegistry
 
     @Override
     public SseEmitter subscribe(StreamKey key, String lastEventId, java.util.List<LiveEvent> initial) {
+        return subscribe(key, lastEventId, () -> initial);
+    }
+
+    @Override
+    public SseEmitter subscribe(StreamKey key, String lastEventId,
+            java.util.function.Supplier<java.util.List<LiveEvent>> initialSupplier) {
         SseEmitter emitter = new SseEmitter(0L);
         Subscriber sub = new Subscriber(new SseEmitterSink(emitter, json), queueCapacity, sender);
         // Register atomically with the prune path (same-key compute lambdas are
         // mutually exclusive), so a concurrent last-subscriber prune cannot evict
-        // the stream between fetching it and registering this subscriber.
+        // the stream between fetching it and registering this subscriber. The snapshot
+        // supplier is invoked under the stream lock so no publish slips between the
+        // snapshot and this subscriber going live.
         streams.compute(key, (k, existing) -> {
             LiveStream stream = (existing != null) ? existing : new LiveStream(bufferCapacity);
-            stream.addSubscriber(sub, lastEventId, initial);
+            stream.addSubscriber(sub, lastEventId, initialSupplier);
             return stream;
         });
         Runnable remove = () -> streams.computeIfPresent(key, (k, s) -> {
