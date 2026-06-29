@@ -245,7 +245,10 @@ public final class WorkerClient implements AutoCloseable {
         };
     }
 
-    /** Cancels an in-progress worker stream opened by {@link #capture} or {@link #clientEvents}. */
+    /**
+     * Cancels an in-progress worker stream opened by {@link #capture}, {@link #clientEvents}, or
+     * {@link #runtimeEvents}.
+     */
     @FunctionalInterface
     public interface StreamHandle {
         void cancel();

@@ -34,7 +34,7 @@ final class OpcUaServerRuntime {
     private final OpcUaServer server;
     private final SchemaNamespace namespace;
     private final String endpointUrl;
-    private final java.util.function.Consumer<RuntimeEvent> runtimeEventSink;
+    private final Consumer<RuntimeEvent> runtimeEventSink;
 
     OpcUaServerRuntime(int port, List<VarDef> variables) {
         this(port, variables, event -> {}, event -> {});
