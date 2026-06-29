@@ -39,8 +39,6 @@ const mockSource: DataSourceRow = {
   parameterCount: 10,
   status: "Active",
   health: "Healthy",
-  clients: 0,
-  lastOperator: "tester",
 };
 
 function makeEvent(overrides: Partial<RuntimeEvent> = {}): RuntimeEvent {
