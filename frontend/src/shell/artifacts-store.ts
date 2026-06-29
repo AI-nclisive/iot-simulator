@@ -6,12 +6,7 @@ import {
 
 type CreateRecordingInput = {
   createdBy: string;
-  durationSeconds: number;
-  name: string;
-  protocol: ReusableArtifact["protocol"];
   sourceId?: string;
-  sourceName: string;
-  status: ReusableArtifact["status"];
   valueCount: number;
 };
 
@@ -33,13 +28,6 @@ function nextArtifactId(currentArtifacts: ReusableArtifact[]) {
   return `artifact-${String(highestId + 1).padStart(2, "0")}`;
 }
 
-function formatDurationLabel(durationSeconds: number) {
-  const minutes = Math.floor(durationSeconds / 60);
-  const seconds = durationSeconds % 60;
-
-  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-}
-
 function formatCreatedAt() {
   return new Intl.DateTimeFormat("en-US", {
     day: "2-digit",
@@ -52,16 +40,7 @@ function formatCreatedAt() {
 
 export const useArtifactsStore = create<ArtifactsState>((set) => ({
   artifacts: reusableArtifacts,
-  createRecording: ({
-    createdBy,
-    durationSeconds,
-    name,
-    protocol,
-    sourceId,
-    sourceName,
-    status,
-    valueCount,
-  }) => {
+  createRecording: ({ createdBy, sourceId, valueCount }) => {
     let createdId = "";
 
     set((state) => {
@@ -72,14 +51,8 @@ export const useArtifactsStore = create<ArtifactsState>((set) => ({
           {
             createdAt: formatCreatedAt(),
             createdBy,
-            durationLabel: formatDurationLabel(durationSeconds),
             id: createdId,
-            name,
-            protocol,
             sourceId,
-            sourceName,
-            status,
-            type: "Recording",
             valueCount,
           },
           ...state.artifacts,

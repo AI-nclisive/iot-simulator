@@ -6,19 +6,11 @@ import type { RecordingRow } from "./mock-recordings";
 
 const mockRecording: RecordingRow = {
   id: "rec-001",
-  name: "line-a-baseline",
-  type: "recording",
   origin: "captured",
   sourceId: "src-01",
-  sourceName: "Line A controller",
-  protocol: "OPC UA",
-  parameterCount: 2480,
-  duration: "4h 12m",
+  valueCount: 18400,
   capturedAt: "2026-06-24 09:15",
   capturedBy: "Jordan K.",
-  tags: ["baseline", "line-a"],
-  lastUsedAt: "2026-06-25 14:31",
-  sizeKb: 18400,
 };
 
 afterEach(() => {
@@ -41,7 +33,7 @@ describe("RecordingExportDialog — format options", () => {
     expect(screen.getByText("CSV summary")).toBeTruthy();
   });
 
-  it("renders the artifact name in the dialog header", () => {
+  it("renders the static dialog header", () => {
     render(
       <RecordingExportDialog
         open
@@ -50,7 +42,7 @@ describe("RecordingExportDialog — format options", () => {
       />,
     );
 
-    expect(screen.getByText(`Export ${mockRecording.name}`)).toBeTruthy();
+    expect(screen.getByText("Export recording")).toBeTruthy();
   });
 });
 
