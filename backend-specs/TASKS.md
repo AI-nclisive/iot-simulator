@@ -163,7 +163,7 @@ Make runs observable and produce the P0 evidence artifact.
 
 - [ ] IS-046 [BE] ⬜ [api] SSE infrastructure (live endpoints) — 05
 - [x] IS-047 [BE] ✅ [ipc] ClientEvents stream (worker → supervisor) — 02
-- [ ] IS-048 [BE] ⬜ [ipc] RuntimeEvents stream (worker → supervisor) — 02
+- [x] IS-048 [BE] ✅ [ipc] RuntimeEvents stream (worker → supervisor) — 02
 - [x] IS-049 [BE] ✅ [persist] runtime_events repository (activity_events in Wave E) — 04
 - [ ] IS-050 [BE] ⬜ [persist] Repos: Evidence, Run (Sample/Fault/Scenario as those land) — 04
 - [ ] IS-051 [BE] ⬜ [observ] Live values + runtime state over SSE — SPEC: Observe Live Values
