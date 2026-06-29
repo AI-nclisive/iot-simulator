@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
@@ -26,6 +27,7 @@ public final class LiveEventHub implements ClientActivityListener, RuntimeActivi
     private final Executor dispatch;
     private final Map<String, String> projectByDataSource = new ConcurrentHashMap<>();
 
+    @Autowired
     public LiveEventHub(LiveEventPublisher publisher, DataSourceProjectResolver resolver) {
         this(publisher, resolver, Executors.newSingleThreadExecutor(r -> {
             Thread t = new Thread(r, "sse-hub-dispatch");

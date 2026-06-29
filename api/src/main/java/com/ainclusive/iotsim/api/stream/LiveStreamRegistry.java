@@ -9,6 +9,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import tools.jackson.databind.ObjectMapper;
@@ -36,6 +37,7 @@ public final class LiveStreamRegistry
     private final ScheduledExecutorService heartbeat;   // null in test ctor
     private final Map<StreamKey, LiveStream> streams = new ConcurrentHashMap<>();
 
+    @Autowired
     public LiveStreamRegistry(ObjectMapper json) {
         this.json = json;
         this.bufferCapacity = DEFAULT_BUFFER;
