@@ -21,14 +21,12 @@ export function RecordingExportDialog({
 
   const [format, setFormat] = useState<ExportFormat>("iotsim");
   const [includeSchema, setIncludeSchema] = useState(true);
-  const [excludeCredentials, setExcludeCredentials] = useState(true);
   const [phase, setPhase] = useState<ExportPhase>("idle");
 
   useEffect(() => {
     if (!open) return;
     setFormat("iotsim");
     setIncludeSchema(true);
-    setExcludeCredentials(true);
     setPhase("idle");
   }, [open]);
 
@@ -203,15 +201,15 @@ export function RecordingExportDialog({
             </label>
             <label className="flex items-start gap-3 text-sm text-shell-muted">
               <input
-                checked={excludeCredentials}
+                checked
                 className="mt-1"
+                disabled
                 type="checkbox"
-                onChange={(e) => setExcludeCredentials(e.target.checked)}
               />
               <span>
                 Exclude credential values
                 <span className="ml-2 text-xs text-shell-muted">
-                  (security reminder)
+                  (always enforced)
                 </span>
               </span>
             </label>
