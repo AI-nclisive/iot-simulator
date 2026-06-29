@@ -1,5 +1,6 @@
 package com.ainclusive.iotsim.api.stream;
 
+import java.util.List;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -16,15 +17,19 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 public class RuntimeStreamController {
 
     private final LiveStreamSubscriptions subscriptions;
+    private final RuntimeStateSnapshot runtimeState;
 
-    public RuntimeStreamController(LiveStreamSubscriptions subscriptions) {
+    public RuntimeStreamController(LiveStreamSubscriptions subscriptions, RuntimeStateSnapshot runtimeState) {
         this.subscriptions = subscriptions;
+        this.runtimeState = runtimeState;
     }
 
     @GetMapping(value = "/api/v1/projects/{projectId}/stream/runtime",
             produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamRuntime(@PathVariable String projectId,
             @RequestHeader(value = "Last-Event-ID", required = false) String lastEventId) {
-        return subscriptions.subscribe(StreamKey.runtime(projectId), lastEventId);
+        List<LiveEvent> initial =
+                lastEventId == null ? runtimeState.initialFor(projectId) : List.of();
+        return subscriptions.subscribe(StreamKey.runtime(projectId), lastEventId, initial);
     }
 }

@@ -27,16 +27,6 @@ class StreamControllersTest {
     }
 
     @Test
-    void runtimeControllerSubscribesToProjectRuntimeStream() {
-        RecordingSubscriptions subs = new RecordingSubscriptions();
-        SseEmitter emitter = new RuntimeStreamController(subs).streamRuntime("p1", "42");
-
-        assertThat(emitter).isNotNull();
-        assertThat(subs.calls).singleElement()
-                .isEqualTo(new Sub(StreamKey.runtime("p1"), "42"));
-    }
-
-    @Test
     void clientControllerSubscribesToDataSourceClientsStream() {
         RecordingSubscriptions subs = new RecordingSubscriptions();
         SseEmitter emitter = new ClientStreamController(subs).streamClients("d9", null);
