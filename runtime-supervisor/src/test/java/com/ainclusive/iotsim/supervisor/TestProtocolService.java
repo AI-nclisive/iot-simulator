@@ -4,6 +4,7 @@ import com.ainclusive.iotsim.protocolmodel.ValueCodec;
 import com.ainclusive.iotsim.workercontract.WorkerContract;
 import com.ainclusive.iotsim.workercontract.v1.Ack;
 import com.ainclusive.iotsim.workercontract.v1.CaptureRequest;
+import com.ainclusive.iotsim.workercontract.v1.ClientEvent;
 import com.ainclusive.iotsim.workercontract.v1.ConfigureRequest;
 import com.ainclusive.iotsim.workercontract.v1.HealthRequest;
 import com.ainclusive.iotsim.workercontract.v1.HealthResponse;
@@ -16,6 +17,7 @@ import com.ainclusive.iotsim.workercontract.v1.ScanResponse;
 import com.ainclusive.iotsim.workercontract.v1.SchemaNodeMsg;
 import com.ainclusive.iotsim.workercontract.v1.StartRequest;
 import com.ainclusive.iotsim.workercontract.v1.StopRequest;
+import com.ainclusive.iotsim.workercontract.v1.StreamRequest;
 import com.ainclusive.iotsim.workercontract.v1.TestConnectionRequest;
 import com.ainclusive.iotsim.workercontract.v1.TestConnectionResponse;
 import com.ainclusive.iotsim.workercontract.v1.Value;
@@ -38,6 +40,7 @@ final class TestProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSourc
     private final AtomicReference<TestConnectionRequest> lastTestConnection = new AtomicReference<>();
     private final AtomicReference<CaptureRequest> lastCapture = new AtomicReference<>();
     private final CountDownLatch captureCancelled = new CountDownLatch(1);
+    private final CountDownLatch clientEventsCancelled = new CountDownLatch(1);
     private volatile boolean healthLive = true;
     private volatile boolean healthHang;
 
@@ -58,6 +61,11 @@ final class TestProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSourc
     /** Waits until the supervisor cancels the capture stream (stop()). */
     boolean awaitCaptureCancelled(long timeoutSeconds) throws InterruptedException {
         return captureCancelled.await(timeoutSeconds, TimeUnit.SECONDS);
+    }
+
+    /** Waits until the supervisor cancels the client-events stream (stop()/teardown). */
+    boolean awaitClientEventsCancelled(long timeoutSeconds) throws InterruptedException {
+        return clientEventsCancelled.await(timeoutSeconds, TimeUnit.SECONDS);
     }
 
     long appliedCount() {
@@ -137,6 +145,20 @@ final class TestProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSourc
                         .setSourceTimeMicros(1_000_000L)
                         .setValueEnc(ByteString.copyFrom(enc.bytes()))
                         .setQuality(Quality.GOOD))
+                .build());
+        // Stream stays open until the supervisor cancels (stop()).
+    }
+
+    @Override
+    public void clientEvents(StreamRequest request, StreamObserver<ClientEvent> obs) {
+        ServerCallStreamObserver<ClientEvent> server = (ServerCallStreamObserver<ClientEvent>) obs;
+        server.setOnCancelHandler(clientEventsCancelled::countDown);
+        // Emit one connect event the moment the supervisor subscribes, so a test can
+        // assert it is forwarded (tagged with the data-source id) to the listener.
+        server.onNext(ClientEvent.newBuilder()
+                .setKind(ClientEvent.Kind.CONNECTED)
+                .setClientId("client-1")
+                .setAtMicros(2_000_000L)
                 .build());
         // Stream stays open until the supervisor cancels (stop()).
     }

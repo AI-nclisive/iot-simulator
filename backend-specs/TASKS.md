@@ -21,8 +21,8 @@ dependency-ordered. (Optimized for "make the simulator real end to end, then
 broaden, then harden for teams" — can be re-weighted if the near-term goal
 differs.)
 
-Snapshot: **build green, 182 tests / 39 suites, 0 skipped.** 65 done · 1 partial ·
-49 todo (115 total). Live status is the board; this line is a periodic snapshot.
+Snapshot: **build green, 186 tests / 41 suites, 0 skipped.** 66 done · 1 partial ·
+48 todo (115 total). Live status is the board; this line is a periodic snapshot.
 
 <details>
 <summary>ID crosswalk — legacy <code>BE-*</code> / <code>SDLC-*</code> → <code>IS-XXX</code></summary>
@@ -162,7 +162,7 @@ Make `Scan → Record → Replay` work against real instruments, not provided va
 Make runs observable and produce the P0 evidence artifact.
 
 - [ ] IS-046 [BE] ⬜ [api] SSE infrastructure (live endpoints) — 05
-- [ ] IS-047 [BE] ⬜ [ipc] ClientEvents stream (worker → supervisor) — 02
+- [x] IS-047 [BE] ✅ [ipc] ClientEvents stream (worker → supervisor) — 02
 - [ ] IS-048 [BE] ⬜ [ipc] RuntimeEvents stream (worker → supervisor) — 02
 - [x] IS-049 [BE] ✅ [persist] runtime_events repository (activity_events in Wave E) — 04
 - [ ] IS-050 [BE] ⬜ [persist] Repos: Evidence, Run (Sample/Fault/Scenario as those land) — 04

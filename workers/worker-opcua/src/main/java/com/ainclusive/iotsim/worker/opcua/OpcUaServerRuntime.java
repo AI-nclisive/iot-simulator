@@ -1,5 +1,6 @@
 package com.ainclusive.iotsim.worker.opcua;
 
+import com.ainclusive.iotsim.workercontract.v1.ClientEvent;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -7,7 +8,10 @@ import java.nio.file.Files;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
+import java.util.function.Consumer;
 import org.eclipse.milo.opcua.sdk.server.OpcUaServer;
+import org.eclipse.milo.opcua.sdk.server.Session;
+import org.eclipse.milo.opcua.sdk.server.SessionListener;
 import org.eclipse.milo.opcua.sdk.server.api.config.OpcUaServerConfig;
 import org.eclipse.milo.opcua.stack.core.security.DefaultCertificateManager;
 import org.eclipse.milo.opcua.stack.core.security.DefaultTrustListManager;
@@ -31,6 +35,10 @@ final class OpcUaServerRuntime {
     private final String endpointUrl;
 
     OpcUaServerRuntime(int port, List<VarDef> variables) {
+        this(port, variables, event -> {});
+    }
+
+    OpcUaServerRuntime(int port, List<VarDef> variables, Consumer<ClientEvent> clientEventSink) {
         try {
             File pki = Files.createTempDirectory("iotsim-pki").toFile();
             DefaultTrustListManager trustList = new DefaultTrustListManager(pki);
@@ -57,6 +65,20 @@ final class OpcUaServerRuntime {
                     .build();
 
             this.server = new OpcUaServer(config);
+            // Surface protocol-client connect/disconnect as ClientEvents (IS-047). Milo
+            // fires session created/closed on the server's session manager; map each to a
+            // neutral event for the supervisor stream.
+            server.getSessionManager().addSessionListener(new SessionListener() {
+                @Override
+                public void onSessionCreated(Session session) {
+                    clientEventSink.accept(clientEvent(ClientEvent.Kind.CONNECTED, session));
+                }
+
+                @Override
+                public void onSessionClosed(Session session) {
+                    clientEventSink.accept(clientEvent(ClientEvent.Kind.DISCONNECTED, session));
+                }
+            });
             this.namespace = new SchemaNamespace(server, variables);
             this.endpointUrl = "opc.tcp://127.0.0.1:" + port + "/iotsim";
         } catch (IOException e) {
@@ -85,6 +107,19 @@ final class OpcUaServerRuntime {
     /** NodeId a client uses to address a variable (namespace index + node id). */
     NodeId variableNodeId(String nodeId) {
         return new NodeId(server.getNamespaceTable().getIndex(SchemaNamespace.URI), nodeId);
+    }
+
+    /** Builds a neutral client event from a Milo session, preferring the client-supplied session name. */
+    private static ClientEvent clientEvent(ClientEvent.Kind kind, Session session) {
+        String clientId = session.getSessionName();
+        if (clientId == null || clientId.isBlank()) {
+            clientId = session.getSessionId().toParseableString();
+        }
+        return ClientEvent.newBuilder()
+                .setKind(kind)
+                .setClientId(clientId)
+                .setAtMicros(System.currentTimeMillis() * 1_000L)
+                .build();
     }
 
     private static void await(java.util.concurrent.CompletableFuture<?> future) {

@@ -4,6 +4,8 @@ import com.ainclusive.iotsim.platform.capture.CaptureException;
 import com.ainclusive.iotsim.platform.capture.CaptureSession;
 import com.ainclusive.iotsim.platform.capture.CaptureSpec;
 import com.ainclusive.iotsim.platform.capture.SourceCapturer;
+import com.ainclusive.iotsim.platform.runtime.ClientActivityEvent;
+import com.ainclusive.iotsim.platform.runtime.ClientActivityListener;
 import com.ainclusive.iotsim.platform.runtime.RuntimeController;
 import com.ainclusive.iotsim.platform.runtime.RuntimeStartSpec;
 import com.ainclusive.iotsim.platform.scan.ConnectionTestResult;
@@ -18,6 +20,7 @@ import com.ainclusive.iotsim.protocolmodel.NodeKind;
 import com.ainclusive.iotsim.protocolmodel.SchemaNode;
 import com.ainclusive.iotsim.protocolmodel.ValueCodec;
 import com.ainclusive.iotsim.workercontract.v1.CaptureRequest;
+import com.ainclusive.iotsim.workercontract.v1.ClientEvent;
 import com.ainclusive.iotsim.workercontract.v1.ConnectionConfigMsg;
 import com.ainclusive.iotsim.workercontract.v1.Quality;
 import com.ainclusive.iotsim.workercontract.v1.ScanRequest;
@@ -84,22 +87,35 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
     private final WorkerLauncher launcher;
     private final RestartPolicy restartPolicy;
     private final HealthPolicy healthPolicy;
+    private final ClientActivityListener clientActivityListener;
     private final ScheduledExecutorService scheduler;
     private final Map<String, ManagedWorker> running = new ConcurrentHashMap<>();
     private volatile boolean closed;
 
     public Supervisor(WorkerLauncher launcher) {
-        this(launcher, RestartPolicy.DEFAULT, HealthPolicy.DEFAULT);
+        this(launcher, RestartPolicy.DEFAULT, HealthPolicy.DEFAULT, ClientActivityListener.NONE);
     }
 
     public Supervisor(WorkerLauncher launcher, RestartPolicy restartPolicy) {
-        this(launcher, restartPolicy, HealthPolicy.DEFAULT);
+        this(launcher, restartPolicy, HealthPolicy.DEFAULT, ClientActivityListener.NONE);
     }
 
     public Supervisor(WorkerLauncher launcher, RestartPolicy restartPolicy, HealthPolicy healthPolicy) {
+        this(launcher, restartPolicy, healthPolicy, ClientActivityListener.NONE);
+    }
+
+    /** Observes worker client-activity events (IS-047); pass {@link ClientActivityListener#NONE} to ignore them. */
+    public Supervisor(WorkerLauncher launcher, ClientActivityListener clientActivityListener) {
+        this(launcher, RestartPolicy.DEFAULT, HealthPolicy.DEFAULT, clientActivityListener);
+    }
+
+    public Supervisor(WorkerLauncher launcher, RestartPolicy restartPolicy, HealthPolicy healthPolicy,
+            ClientActivityListener clientActivityListener) {
         this.launcher = launcher;
         this.restartPolicy = restartPolicy;
         this.healthPolicy = healthPolicy;
+        this.clientActivityListener = clientActivityListener == null
+                ? ClientActivityListener.NONE : clientActivityListener;
         AtomicInteger seq = new AtomicInteger();
         // One pool serves restarts and the health-monitoring loop; sized so a probe
         // (bounded by HealthPolicy.probeTimeout) cannot starve a pending restart.
@@ -273,7 +289,7 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
         WorkerClient client = new WorkerClient("127.0.0.1", controlPort);
         try {
             awaitReady(client);
-            WorkerClient.CaptureHandle handle = client.capture(
+            WorkerClient.StreamHandle handle = client.capture(
                     request,
                     batch -> {
                         List<NeutralValue> values = toNeutralValues(batch, kinds);
@@ -342,6 +358,26 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
         return out;
     }
 
+    /**
+     * Maps a wire {@link ClientEvent} to the neutral {@link ClientActivityEvent} for a
+     * data source, or {@code null} for an unrecognised/unspecified kind (skipped).
+     */
+    private static ClientActivityEvent toClientActivity(String dataSourceId, ClientEvent event) {
+        ClientActivityEvent.Kind kind = switch (event.getKind()) {
+            case CONNECTED -> ClientActivityEvent.Kind.CONNECTED;
+            case DISCONNECTED -> ClientActivityEvent.Kind.DISCONNECTED;
+            case SUBSCRIPTION -> ClientActivityEvent.Kind.SUBSCRIPTION;
+            default -> null; // KIND_UNSPECIFIED / UNRECOGNIZED
+        };
+        if (kind == null) {
+            return null;
+        }
+        long micros = event.getAtMicros();
+        Instant at = Instant.ofEpochSecond(
+                Math.floorDiv(micros, 1_000_000L), Math.floorMod(micros, 1_000_000L) * 1_000L);
+        return new ClientActivityEvent(dataSourceId, kind, event.getClientId(), at);
+    }
+
     private static com.ainclusive.iotsim.protocolmodel.Quality neutralQuality(Quality wire) {
         return switch (wire) {
             case UNCERTAIN -> com.ainclusive.iotsim.protocolmodel.Quality.UNCERTAIN;
@@ -353,13 +389,13 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
     /** One live-capture session: cancels the worker stream and tears the worker down on stop. */
     private static final class SupervisorCaptureSession implements CaptureSession {
 
-        private final WorkerClient.CaptureHandle handle;
+        private final WorkerClient.StreamHandle handle;
         private final WorkerClient client;
         private final LaunchedWorker launched;
         private final AtomicBoolean stopped = new AtomicBoolean();
 
         SupervisorCaptureSession(
-                WorkerClient.CaptureHandle handle, WorkerClient client, LaunchedWorker launched) {
+                WorkerClient.StreamHandle handle, WorkerClient client, LaunchedWorker launched) {
             this.handle = handle;
             this.client = client;
             this.launched = launched;
@@ -518,6 +554,7 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
 
         private LaunchedWorker launched;
         private WorkerClient client;
+        private WorkerClient.StreamHandle clientEvents;
         private int restarts;
         private boolean stopping;
         private ScheduledFuture<?> pendingRestart;
@@ -571,6 +608,21 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
         private void install(Connection conn) {
             this.launched = conn.launched();
             this.client = conn.client();
+            // Subscribe to this worker's client-activity stream (IS-047). The call is
+            // async/non-blocking; events forward to the listener tagged with this source.
+            // A worker that does not implement the stream just fails with UNIMPLEMENTED,
+            // handled as "no client events" — never disrupts the worker.
+            this.clientEvents = conn.client().clientEvents(
+                    event -> {
+                        ClientActivityEvent activity = toClientActivity(dataSourceId, event);
+                        if (activity != null) {
+                            clientActivityListener.onClientActivity(activity);
+                        }
+                    },
+                    error -> {
+                        // Stream end (incl. CANCELLED on stop, UNIMPLEMENTED on a worker
+                        // without the stream) is non-fatal; the worker keeps running.
+                    });
             this.state = WorkerState.RUNNING;
             // A fresh worker starts healthy: drop any staleness carried over from the
             // launch it replaced so the health loop judges this one on its own probes.
@@ -580,12 +632,26 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
             conn.launched().onExit().whenComplete((v, t) -> onWorkerExit(conn.launched()));
         }
 
+        /** Caller holds the monitor. Cancels the client-event stream of the current worker, if any. */
+        private void cancelClientEvents() {
+            WorkerClient.StreamHandle handle = clientEvents;
+            clientEvents = null;
+            if (handle != null) {
+                try {
+                    handle.cancel();
+                } catch (RuntimeException ignored) {
+                    // best effort; closing the channel also ends the stream
+                }
+            }
+        }
+
         /** Fires when a worker process exits — schedules a restart unless it was intentional. */
         private synchronized void onWorkerExit(LaunchedWorker exited) {
             if (stopping || launched != exited) {
                 return;
             }
-            // The process is gone; release its client channel before relaunching.
+            // The process is gone; release its client-event stream and channel before relaunching.
+            cancelClientEvents();
             closeQuietly(client);
             client = null;
             launched = null;
@@ -651,6 +717,7 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
                 clientToClose = client;
                 launched = null;
                 client = null;
+                cancelClientEvents();
             }
             // Tear down outside the lock; onWorkerExit will see stopping=true and skip restart.
             // cancel(true) also interrupts a restart whose handshake is already in flight,
