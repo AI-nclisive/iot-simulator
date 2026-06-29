@@ -4,6 +4,7 @@ import { useShellStore } from "../shell/shell-store";
 import { SharedStatePanel } from "../ui/shared-state-panel";
 import { StatusBadge } from "../ui/status-badge";
 import { mockRecordings, type RecordingRow } from "./mock-recordings";
+import { RecordingExportDialog } from "./recording-export-dialog";
 
 type TypeFilter = "all" | "recording" | "sample";
 type OriginFilter = "all" | "captured" | "imported" | "synthetic";
@@ -18,6 +19,7 @@ export function RecordingsPage() {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [importDialogOpen, setImportDialogOpen] = useState<boolean>(false);
+  const [exportDialogOpen, setExportDialogOpen] = useState<boolean>(false);
 
   const uniqueSources = Array.from(
     new Map(mockRecordings.map((r) => [r.sourceId, r.sourceName])).entries(),
@@ -257,9 +259,15 @@ export function RecordingsPage() {
                   <button className="shell-action" disabled={!access.isAdmin} type="button">
                     Assign to replay
                   </button>
-                  <button className="shell-action" disabled={!access.isAdmin} type="button">
-                    Export
-                  </button>
+                  {access.isAdmin ? (
+                    <button
+                      className="shell-action"
+                      type="button"
+                      onClick={() => setExportDialogOpen(true)}
+                    >
+                      Export
+                    </button>
+                  ) : null}
                 </div>
                 {!access.isAdmin ? (
                   <p className="mt-3 text-xs text-shell-muted">
@@ -279,6 +287,15 @@ export function RecordingsPage() {
           )}
         </div>
       </section>
+
+      {/* Export dialog */}
+      {selected && access.isAdmin ? (
+        <RecordingExportDialog
+          open={exportDialogOpen}
+          recording={selected}
+          onClose={() => setExportDialogOpen(false)}
+        />
+      ) : null}
 
       {/* Import dialog stub (mock) */}
       {importDialogOpen ? (
