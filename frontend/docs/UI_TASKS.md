@@ -479,7 +479,7 @@ Parallel execution:
   Done when: validation, preview, unsupported artifact handling, and
   newer-than-supported protection are safe and understandable.
 
-- [ ] `UI-052` Recording and sample preview
+- [x] `UI-052` Recording and sample preview
   Surface: `Recordings & Samples`
   Depends: `UI-050`
   Done when: timeline preview, value count, and warnings help the user judge
