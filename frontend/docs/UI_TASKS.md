@@ -491,7 +491,7 @@ Parallel execution:
   Done when: reusable artifacts can be exported with clear scope and role-aware
   permissions.
 
-- [ ] `UI-055` Deterministic run settings
+- [x] `UI-055` Deterministic run settings
   Surface: `Deterministic Run Settings`
   Depends: `UI-035`, `UI-037`
   Done when: seed or preset, ordering or timing mode, repeatability scope, and
