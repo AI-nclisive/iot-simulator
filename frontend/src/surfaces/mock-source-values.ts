@@ -2,7 +2,7 @@ export type SourceValueRow = {
   id: string;
   sourceId: string;
   path: string;
-  dataType: "float" | "int" | "bool" | "enum";
+  dataType: "float" | "int" | "bool" | "string";
   currentValue: string;
   updatedAt: string;
   freshness: "Live" | "No updates";
@@ -13,19 +13,19 @@ const staticRows: SourceValueRow[] = [
   { id: "val-01", sourceId: "src-01", path: "oven.zone[1].temp", dataType: "float", currentValue: "182.4 C", updatedAt: "09:41:12", freshness: "Live", pinned: true },
   { id: "val-02", sourceId: "src-01", path: "oven.zone[2].temp", dataType: "float", currentValue: "183.1 C", updatedAt: "09:41:10", freshness: "Live", pinned: false },
   { id: "val-03", sourceId: "src-01", path: "line.speed", dataType: "float", currentValue: "1.82 m/s", updatedAt: "09:41:11", freshness: "Live", pinned: true },
-  { id: "val-04", sourceId: "src-01", path: "line.batch.id", dataType: "enum", currentValue: "BATCH-441", updatedAt: "09:40:58", freshness: "Live", pinned: false },
-  { id: "val-05", sourceId: "src-01", path: "alarm.state", dataType: "enum", currentValue: "Clear", updatedAt: "09:40:55", freshness: "Live", pinned: true },
+  { id: "val-04", sourceId: "src-01", path: "line.batch.id", dataType: "string", currentValue: "BATCH-441", updatedAt: "09:40:58", freshness: "Live", pinned: false },
+  { id: "val-05", sourceId: "src-01", path: "alarm.state", dataType: "string", currentValue: "Clear", updatedAt: "09:40:55", freshness: "Live", pinned: true },
   { id: "val-06", sourceId: "src-01", path: "power.feed.current", dataType: "float", currentValue: "12.8 A", updatedAt: "09:40:16", freshness: "No updates", pinned: false },
   { id: "val-07", sourceId: "src-01", path: "quality.reject.count", dataType: "int", currentValue: "4", updatedAt: "09:39:48", freshness: "No updates", pinned: false },
-  { id: "val-08", sourceId: "src-02", path: "register[120].state", dataType: "enum", currentValue: "Running", updatedAt: "09:41:02", freshness: "Live", pinned: true },
+  { id: "val-08", sourceId: "src-02", path: "register[120].state", dataType: "string", currentValue: "Running", updatedAt: "09:41:02", freshness: "Live", pinned: true },
   { id: "val-09", sourceId: "src-02", path: "line.counter", dataType: "int", currentValue: "14,882", updatedAt: "09:41:00", freshness: "Live", pinned: true },
   { id: "val-10", sourceId: "src-02", path: "jam.warning", dataType: "bool", currentValue: "false", updatedAt: "09:40:59", freshness: "Live", pinned: false },
   { id: "val-11", sourceId: "src-02", path: "register[131].pressure", dataType: "float", currentValue: "4.8 bar", updatedAt: "09:40:12", freshness: "No updates", pinned: false },
   { id: "val-12", sourceId: "src-02", path: "motor.load.avg", dataType: "float", currentValue: "62 %", updatedAt: "09:40:09", freshness: "No updates", pinned: false },
   { id: "val-13", sourceId: "src-03", path: "pump[2].rpm", dataType: "int", currentValue: "1,420", updatedAt: "09:41:06", freshness: "Live", pinned: true },
   { id: "val-14", sourceId: "src-03", path: "batch.temp.avg", dataType: "float", currentValue: "74.2 C", updatedAt: "09:41:05", freshness: "Live", pinned: true },
-  { id: "val-15", sourceId: "src-03", path: "quality.flag", dataType: "enum", currentValue: "Review", updatedAt: "09:41:04", freshness: "Live", pinned: true },
-  { id: "val-16", sourceId: "src-03", path: "pump[2].state", dataType: "enum", currentValue: "Recording", updatedAt: "09:40:58", freshness: "Live", pinned: false },
+  { id: "val-15", sourceId: "src-03", path: "quality.flag", dataType: "string", currentValue: "Review", updatedAt: "09:41:04", freshness: "Live", pinned: true },
+  { id: "val-16", sourceId: "src-03", path: "pump[2].state", dataType: "string", currentValue: "Running", updatedAt: "09:40:58", freshness: "Live", pinned: false },
   { id: "val-17", sourceId: "src-03", path: "flow.m3h", dataType: "float", currentValue: "11.4", updatedAt: "09:39:52", freshness: "No updates", pinned: false },
   { id: "val-18", sourceId: "src-04", path: "backup.feed.enabled", dataType: "bool", currentValue: "false", updatedAt: "09:12:20", freshness: "No updates", pinned: true },
   { id: "val-19", sourceId: "src-04", path: "backup.feed.current", dataType: "float", currentValue: "0.0 A", updatedAt: "09:12:20", freshness: "No updates", pinned: false },
@@ -97,9 +97,9 @@ const generatedPaths: Array<{ path: string; dataType: SourceValueRow["dataType"]
   { path: "vision.part.ok", dataType: "bool", unit: "" },
   { path: "vision.defect.count", dataType: "int", unit: "" },
   { path: "vision.fps", dataType: "float", unit: "" },
-  { path: "hmi.active.screen", dataType: "enum", unit: "" },
-  { path: "hmi.operator.id", dataType: "enum", unit: "" },
-  { path: "hmi.last.ack", dataType: "enum", unit: "" },
+  { path: "hmi.active.screen", dataType: "string", unit: "" },
+  { path: "hmi.operator.id", dataType: "string", unit: "" },
+  { path: "hmi.last.ack", dataType: "string", unit: "" },
   { path: "servo[1].pos", dataType: "float", unit: "mm" },
   { path: "servo[1].vel", dataType: "float", unit: "mm/s" },
   { path: "servo[1].torque", dataType: "float", unit: "%" },
@@ -109,7 +109,7 @@ const generatedPaths: Array<{ path: string; dataType: SourceValueRow["dataType"]
   { path: "servo[3].pos", dataType: "float", unit: "mm" },
   { path: "servo[3].vel", dataType: "float", unit: "mm/s" },
   { path: "servo[3].torque", dataType: "float", unit: "%" },
-  { path: "robot.arm.state", dataType: "enum", unit: "" },
+  { path: "robot.arm.state", dataType: "string", unit: "" },
   { path: "robot.arm.speed", dataType: "float", unit: "%" },
   { path: "robot.arm.pos.x", dataType: "float", unit: "mm" },
   { path: "robot.arm.pos.y", dataType: "float", unit: "mm" },
@@ -133,7 +133,7 @@ const sampleValues: Record<SourceValueRow["dataType"], string[]> = {
   float: ["0.0", "1.2", "3.7", "12.4", "48.9", "72.1", "100.0", "182.4", "210.5"],
   int: ["0", "1", "4", "12", "88", "441", "1420", "3000", "14882"],
   bool: ["true", "false"],
-  enum: ["Running", "Stopped", "Idle", "Error", "Clear", "Review", "Active"],
+  string: ["Running", "Idle", "Stopped", "Error", "Ready", "Active"],
 };
 
 const times = ["09:38:01", "09:39:12", "09:39:48", "09:40:05", "09:40:16", "09:40:44", "09:41:00", "09:41:08", "09:41:12"];
