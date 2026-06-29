@@ -7,9 +7,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.ainclusive.iotsim.api.stream.LiveStreamRegistry;
+import com.ainclusive.iotsim.api.stream.ProjectSources;
+import com.ainclusive.iotsim.api.stream.RuntimeStateSnapshot;
 import com.ainclusive.iotsim.api.stream.RuntimeStreamController;
 import com.ainclusive.iotsim.api.stream.StreamKey;
+import com.ainclusive.iotsim.platform.runtime.RuntimeController;
+import com.ainclusive.iotsim.platform.runtime.RuntimeStartSpec;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,6 +40,44 @@ class RuntimeStreamEndToEndTest {
         @Bean
         LiveStreamRegistry liveStreamRegistry(ObjectMapper json) {
             return new LiveStreamRegistry(json, 256, 256, Runnable::run);
+        }
+
+        @Bean
+        ProjectSources projectSources() {
+            // Stub: return empty for this test (RuntimeStateSnapshot calls it on-connect,
+            // but the test doesn't exercise that path — it only tests event publishing).
+            return projectId -> List.of();
+        }
+
+        @Bean
+        RuntimeController runtimeController() {
+            // Stub: only RuntimeStateSnapshot uses this (for state() calls on-connect).
+            return new RuntimeController() {
+                @Override
+                public String start(String dataSourceId, RuntimeStartSpec spec) {
+                    return "RUNNING";
+                }
+
+                @Override
+                public String stop(String dataSourceId) {
+                    return "STOPPED";
+                }
+
+                @Override
+                public String state(String dataSourceId) {
+                    return "IDLE";
+                }
+
+                @Override
+                public long applyValues(String dataSourceId, List values) {
+                    return 0;
+                }
+            };
+        }
+
+        @Bean
+        RuntimeStateSnapshot runtimeStateSnapshot(RuntimeController runtimeController, ProjectSources projectSources) {
+            return new RuntimeStateSnapshot(runtimeController, projectSources);
         }
     }
 

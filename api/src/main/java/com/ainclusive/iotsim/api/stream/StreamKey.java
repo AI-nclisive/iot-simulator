@@ -8,7 +8,8 @@ public record StreamKey(Type type, String scopeId) {
     /** Stream families exposed over SSE; each maps to one endpoint. */
     public enum Type {
         RUNTIME,
-        CLIENTS
+        CLIENTS,
+        VALUES
     }
 
     public StreamKey {
@@ -24,5 +25,10 @@ public record StreamKey(Type type, String scopeId) {
     /** Client-activity stream for a data source: {@code /data-sources/{id}/stream/clients}. */
     public static StreamKey clients(String dataSourceId) {
         return new StreamKey(Type.CLIENTS, dataSourceId);
+    }
+
+    /** Live-value stream for a data source: {@code /data-sources/{id}/stream/values}. */
+    public static StreamKey values(String dataSourceId) {
+        return new StreamKey(Type.VALUES, dataSourceId);
     }
 }

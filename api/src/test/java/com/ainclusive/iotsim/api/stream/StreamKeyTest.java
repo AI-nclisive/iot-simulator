@@ -27,4 +27,11 @@ class StreamKeyTest {
         assertThat(new LiveEvent(LiveEvent.NO_SEQ, "heartbeat", null, Instant.EPOCH).hasSeq())
                 .isFalse();
     }
+
+    @Test
+    void valuesFactoryBuildsTypedKey() {
+        assertThat(StreamKey.values("d1"))
+                .isEqualTo(new StreamKey(StreamKey.Type.VALUES, "d1"));
+        assertThat(StreamKey.values("d1")).isNotEqualTo(StreamKey.clients("d1"));
+    }
 }

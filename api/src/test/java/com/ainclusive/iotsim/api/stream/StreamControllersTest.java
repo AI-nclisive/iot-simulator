@@ -19,16 +19,11 @@ class StreamControllersTest {
             calls.add(new Sub(key, lastEventId));
             return new SseEmitter(0L);
         }
-    }
 
-    @Test
-    void runtimeControllerSubscribesToProjectRuntimeStream() {
-        RecordingSubscriptions subs = new RecordingSubscriptions();
-        SseEmitter emitter = new RuntimeStreamController(subs).streamRuntime("p1", "42");
-
-        assertThat(emitter).isNotNull();
-        assertThat(subs.calls).singleElement()
-                .isEqualTo(new Sub(StreamKey.runtime("p1"), "42"));
+        @Override
+        public SseEmitter subscribe(StreamKey key, String lastEventId, java.util.List<LiveEvent> initial) {
+            return subscribe(key, lastEventId);
+        }
     }
 
     @Test

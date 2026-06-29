@@ -78,6 +78,11 @@ public final class LiveStreamRegistry
 
     @Override
     public SseEmitter subscribe(StreamKey key, String lastEventId) {
+        return subscribe(key, lastEventId, java.util.List.of());
+    }
+
+    @Override
+    public SseEmitter subscribe(StreamKey key, String lastEventId, java.util.List<LiveEvent> initial) {
         SseEmitter emitter = new SseEmitter(0L);
         Subscriber sub = new Subscriber(new SseEmitterSink(emitter, json), queueCapacity, sender);
         // Register atomically with the prune path (same-key compute lambdas are
@@ -85,7 +90,7 @@ public final class LiveStreamRegistry
         // the stream between fetching it and registering this subscriber.
         streams.compute(key, (k, existing) -> {
             LiveStream stream = (existing != null) ? existing : new LiveStream(bufferCapacity);
-            stream.addSubscriber(sub, lastEventId);
+            stream.addSubscriber(sub, lastEventId, initial);
             return stream;
         });
         Runnable remove = () -> streams.computeIfPresent(key, (k, s) -> {

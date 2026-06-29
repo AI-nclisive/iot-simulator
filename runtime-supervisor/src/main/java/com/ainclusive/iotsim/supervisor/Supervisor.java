@@ -6,6 +6,7 @@ import com.ainclusive.iotsim.platform.capture.CaptureSpec;
 import com.ainclusive.iotsim.platform.capture.SourceCapturer;
 import com.ainclusive.iotsim.platform.runtime.ClientActivityEvent;
 import com.ainclusive.iotsim.platform.runtime.ClientActivityListener;
+import com.ainclusive.iotsim.platform.runtime.LiveValueListener;
 import com.ainclusive.iotsim.platform.runtime.RuntimeActivityEvent;
 import com.ainclusive.iotsim.platform.runtime.RuntimeActivityListener;
 import com.ainclusive.iotsim.platform.runtime.RuntimeController;
@@ -92,6 +93,7 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
     private final HealthPolicy healthPolicy;
     private final ClientActivityListener clientActivityListener;
     private final RuntimeActivityListener runtimeActivityListener;
+    private final LiveValueListener valueListener;
     private final ScheduledExecutorService scheduler;
     private final Map<String, ManagedWorker> running = new ConcurrentHashMap<>();
     private volatile boolean closed;
@@ -133,6 +135,14 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
     public Supervisor(WorkerLauncher launcher, RestartPolicy restartPolicy, HealthPolicy healthPolicy,
             ClientActivityListener clientActivityListener,
             RuntimeActivityListener runtimeActivityListener) {
+        this(launcher, restartPolicy, healthPolicy, clientActivityListener,
+                runtimeActivityListener, LiveValueListener.NONE);
+    }
+
+    public Supervisor(WorkerLauncher launcher, RestartPolicy restartPolicy, HealthPolicy healthPolicy,
+            ClientActivityListener clientActivityListener,
+            RuntimeActivityListener runtimeActivityListener,
+            LiveValueListener valueListener) {
         this.launcher = launcher;
         this.restartPolicy = restartPolicy;
         this.healthPolicy = healthPolicy;
@@ -140,6 +150,7 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
                 ? ClientActivityListener.NONE : clientActivityListener;
         this.runtimeActivityListener = runtimeActivityListener == null
                 ? RuntimeActivityListener.NONE : runtimeActivityListener;
+        this.valueListener = valueListener == null ? LiveValueListener.NONE : valueListener;
         AtomicInteger seq = new AtomicInteger();
         // One pool serves restarts and the health-monitoring loop; sized so a probe
         // (bounded by HealthPolicy.probeTimeout) cannot starve a pending restart.
@@ -227,7 +238,13 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
             throw new IllegalStateException("data source is not running: " + dataSourceId);
         }
         List<Value> protoValues = values.stream().map(Supervisor::toProto).toList();
-        return worker.applyValues(protoValues);
+        long applied = worker.applyValues(protoValues);
+        try {
+            valueListener.onValues(dataSourceId, values, Instant.now());
+        } catch (RuntimeException e) {
+            // Best-effort live observation must never break value application.
+        }
+        return applied;
     }
 
     /**
