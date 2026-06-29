@@ -174,7 +174,6 @@ export function RecordingImportDialog({
   function handleImport() {
     if (!validationResult || validationResult.status !== "ok") return;
     onImported(validationResult.artifact);
-    onClose();
   }
 
   function handleTryAnother() {
@@ -512,10 +511,17 @@ export function RecordingImportDialog({
 
   function renderReadOnly() {
     return (
-      <p className="mt-4 text-sm text-shell-muted">
-        Importing artifacts is available to Admins only. Contact your project
-        administrator to request access.
-      </p>
+      <>
+        <p className="mt-4 text-sm text-shell-muted">
+          Importing artifacts is available to Admins only. Contact your project
+          administrator to request access.
+        </p>
+        <div className="mt-5 flex justify-end">
+          <button className="shell-action" type="button" onClick={onClose}>
+            Close
+          </button>
+        </div>
+      </>
     );
   }
 
