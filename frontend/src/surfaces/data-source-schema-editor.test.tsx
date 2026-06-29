@@ -56,8 +56,6 @@ const mockSource: DataSourceRow = {
   parameterCount: 5,
   status: "Active",
   health: "Healthy",
-  clients: 0,
-  lastOperator: "tester",
 };
 
 // ---------------------------------------------------------------------------
