@@ -9,54 +9,26 @@ import type { DataSourceRow } from "./mock-data-sources";
 type EditBuffer = {
   description: string;
   unit: string;
-  min: string;
-  max: string;
 };
 
 function bufferFromParam(param: SchemaParameter): EditBuffer {
   return {
     description: param.description,
     unit: param.unit,
-    min: param.min !== null ? String(param.min) : "",
-    max: param.max !== null ? String(param.max) : "",
   };
 }
 
 export function detectDependencyWarnings(
-  param: SchemaParameter,
+  _param: SchemaParameter,
   buffer: EditBuffer,
   original: EditBuffer,
 ): string[] {
   const warnings: string[] = [];
 
-  // 1. Identifier rename — proxy: description changed
+  // Identifier rename — proxy: description changed
   if (buffer.description !== original.description) {
     warnings.push(
       "Renaming this parameter may break existing recordings, replay configurations, or scenarios that reference it by its current identifier.",
-    );
-  }
-
-  // 2. Type change impact — unit changed on a referenced parameter (hasDependent)
-  if (buffer.unit !== original.unit && param.hasDependent) {
-    warnings.push(
-      "Changing the unit of a parameter referenced by active recordings or scenarios may cause replay mismatches.",
-    );
-  }
-
-  // 3. Range narrowing — new min higher than old, or new max lower than old
-  const origMinNum = original.min !== "" ? Number(original.min) : null;
-  const origMaxNum = original.max !== "" ? Number(original.max) : null;
-  const newMinNum = buffer.min !== "" ? Number(buffer.min) : null;
-  const newMaxNum = buffer.max !== "" ? Number(buffer.max) : null;
-
-  const minNarrowed =
-    origMinNum !== null && newMinNum !== null && newMinNum > origMinNum;
-  const maxNarrowed =
-    origMaxNum !== null && newMaxNum !== null && newMaxNum < origMaxNum;
-
-  if (minNarrowed || maxNarrowed) {
-    warnings.push(
-      "Narrowing the value range may exclude values present in existing recordings.",
     );
   }
 
@@ -74,16 +46,12 @@ export function DataSourceSchemaEditor({
   const [originalBuffer, setOriginalBuffer] = useState<EditBuffer>({
     description: "",
     unit: "",
-    min: "",
-    max: "",
   });
   const [searchQuery, setSearchQuery] = useState("");
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [editBuffer, setEditBuffer] = useState<EditBuffer>({
     description: "",
     unit: "",
-    min: "",
-    max: "",
   });
   const [saving, setSaving] = useState(false);
   const [confirmSaveOpen, setConfirmSaveOpen] = useState(false);
@@ -110,23 +78,6 @@ export function DataSourceSchemaEditor({
       p.path.toLowerCase().includes(searchQuery.toLowerCase()) ||
       p.name.toLowerCase().includes(searchQuery.toLowerCase()),
   );
-
-  const validationIssues: string[] = [];
-  if (hasUnsavedChanges) {
-    const minNum = Number(editBuffer.min);
-    const maxNum = Number(editBuffer.max);
-    if (editBuffer.min && isNaN(minNum)) {
-      validationIssues.push("Min value must be a number.");
-    }
-    if (editBuffer.max && isNaN(maxNum)) {
-      validationIssues.push("Max value must be a number.");
-    }
-    if (editBuffer.min && editBuffer.max && !isNaN(minNum) && !isNaN(maxNum) && minNum > maxNum) {
-      validationIssues.push(
-        "Min value is greater than max value for " + selectedParam?.name,
-      );
-    }
-  }
 
   const dependencyWarnings: string[] =
     hasUnsavedChanges && selectedParam
@@ -196,7 +147,7 @@ export function DataSourceSchemaEditor({
         ) : null}
         <button
           className="shell-action"
-          disabled={!hasUnsavedChanges || isLockedByOther || validationIssues.length > 0 || saving}
+          disabled={!hasUnsavedChanges || isLockedByOther || saving}
           type="button"
           onClick={handleSave}
         >
@@ -212,22 +163,6 @@ export function DataSourceSchemaEditor({
         </button>
         {saving ? <StatusBadge label="Saving…" tone="accent" /> : null}
       </div>
-
-      {validationIssues.length > 0 ? (
-        <section className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3">
-          <p className="text-sm font-medium text-amber-700">
-            {validationIssues.length} validation issue
-            {validationIssues.length !== 1 ? "s" : ""}
-          </p>
-          <ul className="mt-2 space-y-1">
-            {validationIssues.map((issue, i) => (
-              <li key={i} className="text-sm text-shell-muted">
-                {issue}
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(18rem,1fr)]">
         <div className="space-y-3">
@@ -269,9 +204,6 @@ export function DataSourceSchemaEditor({
                           {param.type.charAt(0).toUpperCase() + param.type.slice(1)}
                         </span>
                       </div>
-                      {param.hasDependent ? (
-                        <span className="mt-1 text-xs text-amber-600">Has dependents</span>
-                      ) : null}
                     </button>
                   </li>
                 ))}
@@ -324,42 +256,6 @@ export function DataSourceSchemaEditor({
                     </div>
                   </div>
                 </div>
-                {selectedParam.type === "float" || selectedParam.type === "int" ? (
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="flex flex-col gap-2 text-sm text-shell-muted">
-                      Min value
-                      <input
-                        className="shell-field"
-                        disabled={isLockedByOther}
-                        type="number"
-                        value={editBuffer.min}
-                        onChange={(e) => {
-                          updateEditBuffer({ min: e.target.value });
-                          setHasUnsavedChanges(true);
-                        }}
-                      />
-                    </label>
-                    <label className="flex flex-col gap-2 text-sm text-shell-muted">
-                      Max value
-                      <input
-                        className="shell-field"
-                        disabled={isLockedByOther}
-                        type="number"
-                        value={editBuffer.max}
-                        onChange={(e) => {
-                          updateEditBuffer({ max: e.target.value });
-                          setHasUnsavedChanges(true);
-                        }}
-                      />
-                    </label>
-                  </div>
-                ) : null}
-                {selectedParam.hasDependent ? (
-                  <p className="text-xs text-amber-600">
-                    This parameter is referenced by other parameters. Renaming or
-                    retyping it may break downstream configurations.
-                  </p>
-                ) : null}
 
                 {dependencyWarnings.length > 0 ? (
                   <section className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3">

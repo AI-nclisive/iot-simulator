@@ -705,6 +705,12 @@ Parallel execution:
   Done when: live tabs and the runtime dashboard reflect real-time backend state
   with graceful reconnect, and no mock live data remains on those surfaces.
 
+- [x] `UI-099` Align SchemaParameter mock shape to NodeDto
+  Goal: remove fields not in NodeDto from SchemaParameter and fix all consumers.
+  Fields removed: `min`, `max`, `hasDependent`.
+  Surfaces: Schema editor.
+  Done when: SchemaParameter has only fields present in NodeDto; schema editor shows type/unit/description only; detectDependencyWarnings reduced to description-change only; no TypeScript errors.
+
 - [x] `UI-100` Align DataSourceRow mock shape to DataSourceResponse
   Goal: remove fields not in DataSourceResponse from DataSourceRow and fix all consumers.
   Fields removed: `process`, `clients`, `lastOperator`, `assignedReplayArtifactId`.
