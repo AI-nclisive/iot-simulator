@@ -22,7 +22,7 @@ broaden, then harden for teams" — can be re-weighted if the near-term goal
 differs.)
 
 Snapshot: **build green, 186 tests / 41 suites, 0 skipped.** 66 done · 1 partial ·
-48 todo (115 total). Live status is the board; this line is a periodic snapshot.
+49 todo (116 total). Live status is the board; this line is a periodic snapshot.
 
 <details>
 <summary>ID crosswalk — legacy <code>BE-*</code> / <code>SDLC-*</code> → <code>IS-XXX</code></summary>
@@ -206,6 +206,7 @@ Make runs observable and produce the P0 evidence artifact.
 - [ ] IS-082 [BE] ⬜ [auth] Secrets via env/external store; structural export exclusion — 08
 - [ ] IS-083 [BE] ⬜ [observ] User-activity audit (separate stream from runtime) — SPEC: User Activity History
 - [ ] IS-084 [BE] ⬜ [project] Project + environment settings — 05
+- [ ] IS-118 [BE] ⬜ [api] Admin/user-management endpoints (list users, role assignment, status; admin-only) — 05/08 · SPEC: Manage Access
 
 ## Wave F — Advanced workflows & hardening · P2
 

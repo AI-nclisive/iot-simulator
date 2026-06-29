@@ -50,6 +50,7 @@ Task input rule:
 | `P0` | Core shell and primary product flow | Shell, project surfaces, scan -> record -> replay, source detail, evidence, baseline review |
 | `P1` | Shared usage, reuse, and operational breadth | Login, project lifecycle, schema editing, recordings/samples, deterministic controls, admin/settings, retention, notifications |
 | `P2` | Advanced shared workflows | Activity history, identity expansion, scenarios, faults |
+| `INT` | Wire UI to the real backend API | API client + contract alignment, replace mocks on ready core, SSE live subscriptions |
 
 ## P0 - Core Shell And Primary Flow
 
@@ -643,6 +644,66 @@ Parallel execution:
   Depends: `UI-022`, `UI-061`
   Done when: current step, initiator, involved sources, faults, clients, events,
   and evidence state are visible during the run.
+
+## INT - Wire UI To Real Backend
+
+The P0/P1 surfaces above were built against mock fixtures (`frontend/src/**/mock-*.ts`)
+with no API client. This stage replaces those mocks with the real `/api/v1`
+backend. The field-by-field join, naming/enum gaps, and which surfaces are
+backable today live in `docs/FRONTEND_BACKEND_CONTRACT_MAP.md` — read it first.
+
+Read first:
+
+- `docs/FRONTEND_BACKEND_CONTRACT_MAP.md` (FE↔BE contract map + gap index)
+- `UI_SCREEN_SPECS.md`: `Cross-Surface Contract`
+
+Parallel execution:
+
+1. Start `UI-096` first (everything depends on the client + contract alignment).
+2. After `UI-096`, run `UI-097` (ready-core REST) and — once backend SSE lands —
+   `UI-098` (live streams) in parallel.
+
+- [ ] `UI-096` Backend API client and contract alignment
+  Goal: replace mock fixtures with a typed client generated from the backend
+  OpenAPI, and resolve the naming/enum gaps documented in the contract map.
+  Surface: cross-surface foundation
+  Work includes: `VITE_API_BASE_URL` + dev proxy in `vite.config.ts`; generated
+  TS client/types from `/openapi.json`; a shared request layer that captures
+  `ETag` on reads and sends `If-Match` on writes; `application/problem+json` →
+  shared error/toast mapping; `Authorization: Bearer` injection in shared mode;
+  enum mappers (protocol, `runtimeState` → status/health, `dataType` → type).
+  Depends: `UI-001`, `UI-002`, `UI-090`
+  Done when: a typed client talks to `/api/v1`, ETag/If-Match round-trips,
+  errors surface through shared patterns, and no ready-core surface imports
+  `mock-*.ts` for live data.
+
+- [ ] `UI-097` Wire ready-core surfaces to live API
+  Goal: switch projects, data sources, schema, scan, recording capture, and
+  replay from Zustand mocks to the real endpoints.
+  Surface: `Project Entry`, `Data Sources List`, `Data Source Detail`,
+  `Full Schema Editor`, `Create Data Source Wizard` (scan branch),
+  `Recording Flow`, `Replay Flow`
+  Work includes: projects CRUD; data-source CRUD + start/stop + credential
+  clear; schema get/save (round-trip `kind`/`parentId`/`valueRank`/`access`);
+  async scan with `jobId` polling + type-resolution create; recording capture
+  start/stop + list; fire-and-return replay; derive `parameterCount`/source
+  counts where the backend exposes no field (per the contract map).
+  Depends: `UI-096`
+  Done when: the `Scan → Record → Replay` path and core CRUD run against
+  `/api/v1` with mocks removed; gaps with no backend field are clearly stubbed
+  and flagged, never faked silently.
+
+- [ ] `UI-098` Live SSE subscriptions
+  Goal: drive live surfaces from server-sent events instead of static mocks.
+  Surface: `Data Source Detail` (Values/Clients/Events), `Runtime Dashboard`,
+  `Project Overview`
+  Work includes: an `EventSource` subscription layer with reconnect/backoff and
+  stale handling (`UI-002`/`UI-095`); bind live values, connected clients,
+  runtime events, and runtime/overview state; remove the corresponding mock
+  fixtures.
+  Depends: `UI-096`; backend `IS-046` (SSE infra) + `IS-051`/`IS-052`/`IS-053`/`IS-054`/`IS-055`
+  Done when: live tabs and the runtime dashboard reflect real-time backend state
+  with graceful reconnect, and no mock live data remains on those surfaces.
 
 ## Recommended Sequence
 
