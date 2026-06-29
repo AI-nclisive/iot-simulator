@@ -1,4 +1,5 @@
 import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { RecordingExportDialog } from "./recording-export-dialog";
 import type { RecordingRow } from "./mock-recordings";
@@ -83,5 +84,26 @@ describe("RecordingExportDialog — secret exclusion notice", () => {
       screen.queryByText("IoT Simulator package (.iotsim)"),
     ).toBeNull();
     expect(screen.queryByTestId("secret-exclusion-notice")).toBeNull();
+  });
+});
+
+describe("RecordingExportDialog — CSV format disables include-schema", () => {
+  it("disables Include schema definition checkbox when CSV format is selected", async () => {
+    const user = userEvent.setup();
+    render(
+      <RecordingExportDialog
+        open
+        recording={mockRecording}
+        onClose={vi.fn()}
+      />,
+    );
+
+    const csvRadio = screen.getByDisplayValue("csv");
+    await user.click(csvRadio);
+
+    const checkbox = screen.getByRole("checkbox", {
+      name: /Include schema definition/i,
+    }) as HTMLInputElement;
+    expect(checkbox.disabled).toBeTruthy();
   });
 });
