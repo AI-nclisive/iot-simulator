@@ -12,6 +12,7 @@ import com.ainclusive.iotsim.workercontract.v1.HealthResponse;
 import com.ainclusive.iotsim.workercontract.v1.HelloRequest;
 import com.ainclusive.iotsim.workercontract.v1.HelloResponse;
 import com.ainclusive.iotsim.workercontract.v1.ProtocolDataSourceGrpc;
+import com.ainclusive.iotsim.workercontract.v1.RuntimeEvent;
 import com.ainclusive.iotsim.workercontract.v1.ScanRequest;
 import com.ainclusive.iotsim.workercontract.v1.ScanResponse;
 import com.ainclusive.iotsim.workercontract.v1.SchemaNodeMsg;
@@ -47,6 +48,7 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
     private final AtomicReference<OpcUaServerRuntime> serverRuntime = new AtomicReference<>();
     private final Map<String, String> nodeDataTypes = new ConcurrentHashMap<>();
     private final ClientEventHub clientEventHub = new ClientEventHub();
+    private final RuntimeEventHub runtimeEventHub = new RuntimeEventHub();
 
     /** Total values received via ApplyValues (introspection/tests). */
     public long appliedCount() {
@@ -61,6 +63,11 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
     /** Number of open supervisor {@code ClientEvents} streams (introspection/tests). */
     public int openClientEventStreams() {
         return clientEventHub.openStreamCount();
+    }
+
+    /** Number of open supervisor {@code RuntimeEvents} streams (introspection/tests). */
+    public int openRuntimeEventStreams() {
+        return runtimeEventHub.openStreamCount();
     }
 
     @Override
@@ -83,7 +90,8 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
                 nodeDataTypes.put(node.getNodeId(), node.getDataType());
             }
         }
-        serverRuntime.set(new OpcUaServerRuntime(request.getListenPort(), variables, clientEventHub::emit));
+        serverRuntime.set(new OpcUaServerRuntime(
+                request.getListenPort(), variables, clientEventHub::emit, runtimeEventHub::emit));
         configuredNodes.set(request.getSchema().getNodesCount());
         state.set("CONFIGURED");
         ackOk(obs, "configured " + variables.size() + " variables");
@@ -178,6 +186,18 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
         clientEventHub.register((ServerCallStreamObserver<ClientEvent>) responseObserver);
     }
 
+    /**
+     * Worker → supervisor runtime-event stream (IS-048): registers the supervisor's
+     * observer with the {@link RuntimeEventHub} and leaves it open. The running server
+     * publishes SOURCE_START/SOURCE_STOP and value-apply failures publish ERROR; the
+     * stream ends when the supervisor cancels it.
+     * See backend-specs/02_WORKER_CONTRACT_AND_IPC.md.
+     */
+    @Override
+    public void runtimeEvents(StreamRequest request, StreamObserver<RuntimeEvent> responseObserver) {
+        runtimeEventHub.register((ServerCallStreamObserver<RuntimeEvent>) responseObserver);
+    }
+
     /** Maps the wire credential message to the discovery's session-only form. */
     private static OpcUaDiscovery.Credentials credentials(ConnectionConfigMsg cfg) {
         if (cfg == null || cfg.getMode().isEmpty()) {
@@ -243,9 +263,18 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
         for (Value value : batch.getValuesList()) {
             String dataType = nodeDataTypes.get(value.getNodeId());
             if (dataType != null) {
-                Object decoded = ValueCodec.decode(
-                        OpcUaTypes.codecKind(dataType), value.getValueEnc().toByteArray());
-                runtime.updateValue(value.getNodeId(), OpcUaTypes.toOpcUaValue(dataType, decoded));
+                try {
+                    Object decoded = ValueCodec.decode(
+                            OpcUaTypes.codecKind(dataType), value.getValueEnc().toByteArray());
+                    runtime.updateValue(value.getNodeId(), OpcUaTypes.toOpcUaValue(dataType, decoded));
+                } catch (RuntimeException e) {
+                    runtimeEventHub.emit(RuntimeEvent.newBuilder()
+                            .setType("ERROR")
+                            .setAtMicros(System.currentTimeMillis() * 1_000L)
+                            .setDetail("failed to apply value for node " + value.getNodeId()
+                                    + ": " + e.getMessage())
+                            .build());
+                }
             }
         }
     }

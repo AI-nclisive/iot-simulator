@@ -1,6 +1,7 @@
 package com.ainclusive.iotsim.worker.opcua;
 
 import com.ainclusive.iotsim.workercontract.v1.ClientEvent;
+import com.ainclusive.iotsim.workercontract.v1.RuntimeEvent;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -33,12 +34,19 @@ final class OpcUaServerRuntime {
     private final OpcUaServer server;
     private final SchemaNamespace namespace;
     private final String endpointUrl;
+    private final Consumer<RuntimeEvent> runtimeEventSink;
 
     OpcUaServerRuntime(int port, List<VarDef> variables) {
-        this(port, variables, event -> {});
+        this(port, variables, event -> {}, event -> {});
     }
 
     OpcUaServerRuntime(int port, List<VarDef> variables, Consumer<ClientEvent> clientEventSink) {
+        this(port, variables, clientEventSink, event -> {});
+    }
+
+    OpcUaServerRuntime(int port, List<VarDef> variables, Consumer<ClientEvent> clientEventSink,
+            Consumer<RuntimeEvent> runtimeEventSink) {
+        this.runtimeEventSink = runtimeEventSink;
         try {
             File pki = Files.createTempDirectory("iotsim-pki").toFile();
             DefaultTrustListManager trustList = new DefaultTrustListManager(pki);
@@ -89,9 +97,14 @@ final class OpcUaServerRuntime {
     void start() {
         namespace.startup();
         await(server.startup());
+        // Server is now listening: surface SOURCE_START on the runtime stream (IS-048).
+        runtimeEventSink.accept(runtimeEvent("SOURCE_START", ""));
     }
 
     void stop() {
+        // Emit before tearing down so the supervisor sees SOURCE_STOP while the stream
+        // is still open (best-effort on teardown).
+        runtimeEventSink.accept(runtimeEvent("SOURCE_STOP", ""));
         await(server.shutdown());
         namespace.shutdown();
     }
@@ -107,6 +120,15 @@ final class OpcUaServerRuntime {
     /** NodeId a client uses to address a variable (namespace index + node id). */
     NodeId variableNodeId(String nodeId) {
         return new NodeId(server.getNamespaceTable().getIndex(SchemaNamespace.URI), nodeId);
+    }
+
+    /** Builds a neutral runtime event with the current wall-clock time in micros. */
+    private static RuntimeEvent runtimeEvent(String type, String detail) {
+        return RuntimeEvent.newBuilder()
+                .setType(type)
+                .setAtMicros(System.currentTimeMillis() * 1_000L)
+                .setDetail(detail == null ? "" : detail)
+                .build();
     }
 
     /** Builds a neutral client event from a Milo session, preferring the client-supplied session name. */
