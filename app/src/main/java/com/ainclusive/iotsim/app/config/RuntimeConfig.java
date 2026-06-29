@@ -1,6 +1,7 @@
 package com.ainclusive.iotsim.app.config;
 
 import com.ainclusive.iotsim.api.stream.LiveEventHub;
+import com.ainclusive.iotsim.api.stream.LiveValuesHub;
 import com.ainclusive.iotsim.app.runtime.PersistingRuntimeActivityListener;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRepository;
 import com.ainclusive.iotsim.persistence.runtimeevent.RuntimeEventRepository;
@@ -36,7 +37,8 @@ public class RuntimeConfig {
     @Bean
     public RuntimeController runtimeController(RuntimeProperties props,
             DataSourceRepository dataSources, RuntimeEventRepository runtimeEvents, ObjectMapper json,
-            ExecutorService runtimeEventExecutor, LiveEventHub liveEventHub) {
+            ExecutorService runtimeEventExecutor, LiveEventHub liveEventHub,
+            LiveValuesHub liveValuesHub) {
         if (props.isSupervisorMode()) {
             // Persist runtime events off the IPC delivery thread (IS-048), and fan the
             // same events to the live SSE hub (IS-046). Client-activity events feed the
@@ -47,7 +49,7 @@ public class RuntimeConfig {
                     new CompositeRuntimeActivityListener(persister, liveEventHub);
             return new Supervisor(
                     new ProcessWorkerLauncher(props.workers()), props.restartPolicy(),
-                    HealthPolicy.DEFAULT, liveEventHub, runtimeListener);
+                    HealthPolicy.DEFAULT, liveEventHub, runtimeListener, liveValuesHub);
         }
         return new InMemoryRuntimeController();
     }
