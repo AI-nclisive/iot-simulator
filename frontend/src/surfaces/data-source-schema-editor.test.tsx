@@ -55,7 +55,7 @@ const mockSource: DataSourceRow = {
   protocol: "OPC UA",
   endpoint: "opc.tcp://localhost:4840",
   parameterCount: 5,
-  status: "Idle",
+  status: "Active",
   health: "Healthy",
   clients: 0,
   lastOperator: "tester",
