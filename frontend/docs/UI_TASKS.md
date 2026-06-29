@@ -485,7 +485,7 @@ Parallel execution:
   Done when: timeline preview, value count, and warnings help the user judge
   fitness for replay.
 
-- [ ] `UI-053` Recording and sample export
+- [x] `UI-053` Recording and sample export
   Surface: `Recordings & Samples`
   Depends: `UI-006`, `UI-050`
   Done when: reusable artifacts can be exported with clear scope and role-aware
