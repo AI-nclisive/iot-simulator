@@ -1,33 +1,24 @@
 export type DataSourceRow = {
-  assignedReplayArtifactId?: string;
   id: string;
   name: string;
   protocol: "OPC UA" | "Modbus TCP";
   endpoint: string;
   parameterCount: number;
   status: "Active" | "Stopped";
-  process?: "Recording" | "Replay";
   health: "Healthy" | "Warning" | "Error";
-  clients: number;
-  lastOperator: string;
 };
 
 export const sourceRows: DataSourceRow[] = [
   {
-    assignedReplayArtifactId: "artifact-01",
     id: "src-01",
     name: "Line A telemetry",
     protocol: "OPC UA",
     endpoint: "opc.tcp://line-a.local:4840",
     parameterCount: 2480,
     status: "Active",
-    process: "Replay",
     health: "Healthy",
-    clients: 2,
-    lastOperator: "Alex M.",
   },
   {
-    assignedReplayArtifactId: "artifact-02",
     id: "src-02",
     name: "Packaging cell stream",
     protocol: "Modbus TCP",
@@ -35,8 +26,6 @@ export const sourceRows: DataSourceRow[] = [
     parameterCount: 640,
     status: "Active",
     health: "Warning",
-    clients: 1,
-    lastOperator: "Automation",
   },
   {
     id: "src-03",
@@ -45,10 +34,7 @@ export const sourceRows: DataSourceRow[] = [
     endpoint: "opc.tcp://field-lab.local:4801",
     parameterCount: 3120,
     status: "Active",
-    process: "Recording",
     health: "Healthy",
-    clients: 0,
-    lastOperator: "Jordan K.",
   },
   {
     id: "src-04",
@@ -58,7 +44,5 @@ export const sourceRows: DataSourceRow[] = [
     parameterCount: 128,
     status: "Stopped",
     health: "Error",
-    clients: 0,
-    lastOperator: "Alex M.",
   },
 ];

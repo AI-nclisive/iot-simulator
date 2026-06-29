@@ -711,6 +711,12 @@ Parallel execution:
   Surfaces: Schema editor.
   Done when: SchemaParameter has only fields present in NodeDto; schema editor shows type/unit/description only; detectDependencyWarnings reduced to description-change only; no TypeScript errors.
 
+- [x] `UI-100` Align DataSourceRow mock shape to DataSourceResponse
+  Goal: remove fields not in DataSourceResponse from DataSourceRow and fix all consumers.
+  Fields removed: `process`, `clients`, `lastOperator`, `assignedReplayArtifactId`.
+  Surfaces: Data Sources List, Data Source Detail (Overview, header), Recording Flow, Replay Flow.
+  Done when: DataSourceRow has only fields present in DataSourceResponse; all list/detail/flow surfaces work without those fields; store methods that only mutated removed fields are deleted; no TypeScript errors.
+
 ## Recommended Sequence
 
 1. Complete the P0 shell and shared-pattern tasks first.
@@ -723,3 +729,4 @@ Parallel execution:
 
 The task order above already follows this sequence. The section is kept only as
 the short executive summary.
+
