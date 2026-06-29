@@ -4,6 +4,7 @@ import com.ainclusive.iotsim.protocolmodel.ValueCodec;
 import com.ainclusive.iotsim.workercontract.WorkerContract;
 import com.ainclusive.iotsim.workercontract.v1.Ack;
 import com.ainclusive.iotsim.workercontract.v1.CaptureRequest;
+import com.ainclusive.iotsim.workercontract.v1.ClientEvent;
 import com.ainclusive.iotsim.workercontract.v1.ConfigureRequest;
 import com.ainclusive.iotsim.workercontract.v1.ConnectionConfigMsg;
 import com.ainclusive.iotsim.workercontract.v1.HealthRequest;
@@ -16,6 +17,7 @@ import com.ainclusive.iotsim.workercontract.v1.ScanResponse;
 import com.ainclusive.iotsim.workercontract.v1.SchemaNodeMsg;
 import com.ainclusive.iotsim.workercontract.v1.StartRequest;
 import com.ainclusive.iotsim.workercontract.v1.StopRequest;
+import com.ainclusive.iotsim.workercontract.v1.StreamRequest;
 import com.ainclusive.iotsim.workercontract.v1.TestConnectionRequest;
 import com.ainclusive.iotsim.workercontract.v1.TestConnectionResponse;
 import com.ainclusive.iotsim.workercontract.v1.Value;
@@ -44,6 +46,7 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
     private final AtomicInteger configuredNodes = new AtomicInteger();
     private final AtomicReference<OpcUaServerRuntime> serverRuntime = new AtomicReference<>();
     private final Map<String, String> nodeDataTypes = new ConcurrentHashMap<>();
+    private final ClientEventHub clientEventHub = new ClientEventHub();
 
     /** Total values received via ApplyValues (introspection/tests). */
     public long appliedCount() {
@@ -53,6 +56,11 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
     /** Number of schema nodes received via Configure (introspection/tests). */
     public int configuredNodeCount() {
         return configuredNodes.get();
+    }
+
+    /** Number of open supervisor {@code ClientEvents} streams (introspection/tests). */
+    public int openClientEventStreams() {
+        return clientEventHub.openStreamCount();
     }
 
     @Override
@@ -75,7 +83,7 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
                 nodeDataTypes.put(node.getNodeId(), node.getDataType());
             }
         }
-        serverRuntime.set(new OpcUaServerRuntime(request.getListenPort(), variables));
+        serverRuntime.set(new OpcUaServerRuntime(request.getListenPort(), variables, clientEventHub::emit));
         configuredNodes.set(request.getSchema().getNodesCount());
         state.set("CONFIGURED");
         ackOk(obs, "configured " + variables.size() + " variables");
@@ -156,6 +164,18 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
                     .withDescription(OpcUaClientSupport.rootMessage(e))
                     .asRuntimeException());
         }
+    }
+
+    /**
+     * Worker → supervisor client-activity stream (IS-047): registers the supervisor's
+     * observer with the {@link ClientEventHub} and leaves it open. The running OPC UA
+     * server publishes a {@link ClientEvent} to the hub for each protocol client that
+     * connects or disconnects; the stream ends when the supervisor cancels it.
+     * See backend-specs/02_WORKER_CONTRACT_AND_IPC.md.
+     */
+    @Override
+    public void clientEvents(StreamRequest request, StreamObserver<ClientEvent> responseObserver) {
+        clientEventHub.register((ServerCallStreamObserver<ClientEvent>) responseObserver);
     }
 
     /** Maps the wire credential message to the discovery's session-only form. */

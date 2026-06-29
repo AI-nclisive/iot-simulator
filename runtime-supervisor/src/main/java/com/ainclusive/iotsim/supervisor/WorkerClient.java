@@ -3,6 +3,7 @@ package com.ainclusive.iotsim.supervisor;
 import com.ainclusive.iotsim.workercontract.WorkerContract;
 import com.ainclusive.iotsim.workercontract.v1.Ack;
 import com.ainclusive.iotsim.workercontract.v1.CaptureRequest;
+import com.ainclusive.iotsim.workercontract.v1.ClientEvent;
 import com.ainclusive.iotsim.workercontract.v1.ConfigureRequest;
 import com.ainclusive.iotsim.workercontract.v1.HealthRequest;
 import com.ainclusive.iotsim.workercontract.v1.HealthResponse;
@@ -14,6 +15,7 @@ import com.ainclusive.iotsim.workercontract.v1.ScanResponse;
 import com.ainclusive.iotsim.workercontract.v1.Schema;
 import com.ainclusive.iotsim.workercontract.v1.StartRequest;
 import com.ainclusive.iotsim.workercontract.v1.StopRequest;
+import com.ainclusive.iotsim.workercontract.v1.StreamRequest;
 import com.ainclusive.iotsim.workercontract.v1.TestConnectionRequest;
 import com.ainclusive.iotsim.workercontract.v1.TestConnectionResponse;
 import com.ainclusive.iotsim.workercontract.v1.Value;
@@ -115,10 +117,10 @@ public final class WorkerClient implements AutoCloseable {
      * streams observed value batches back until the returned handle is cancelled
      * (server-streaming, IS-045). {@code onBatch} is called per published batch;
      * {@code onError} on a non-cancel stream failure. The handle's
-     * {@link CaptureHandle#cancel() cancel} ends the stream, which fires the
+     * {@link StreamHandle#cancel() cancel} ends the stream, which fires the
      * worker's cancel handler so it stops the subscription.
      */
-    public CaptureHandle capture(CaptureRequest request, Consumer<ValueBatch> onBatch,
+    public StreamHandle capture(CaptureRequest request, Consumer<ValueBatch> onBatch,
             Consumer<Throwable> onError) {
         ProtocolDataSourceGrpc.ProtocolDataSourceStub async = ProtocolDataSourceGrpc.newStub(channel);
         AtomicReference<ClientCallStreamObserver<CaptureRequest>> requestStream = new AtomicReference<>();
@@ -154,9 +156,53 @@ public final class WorkerClient implements AutoCloseable {
         };
     }
 
-    /** Cancels an in-progress {@link #capture} stream. */
+    /**
+     * Opens the worker → supervisor {@code ClientEvents} stream: the worker pushes a
+     * {@link ClientEvent} for every client connect/disconnect/subscription change at
+     * its protocol endpoint until the returned handle is cancelled (server-streaming,
+     * IS-047). {@code onEvent} is called per event; {@code onError} on a non-cancel
+     * stream failure (a worker that does not implement the stream fails here with
+     * {@code UNIMPLEMENTED} — the caller treats that as "no client events", never
+     * fatal). See backend-specs/02_WORKER_CONTRACT_AND_IPC.md.
+     */
+    public StreamHandle clientEvents(Consumer<ClientEvent> onEvent, Consumer<Throwable> onError) {
+        ProtocolDataSourceGrpc.ProtocolDataSourceStub async = ProtocolDataSourceGrpc.newStub(channel);
+        AtomicReference<ClientCallStreamObserver<StreamRequest>> requestStream = new AtomicReference<>();
+        ClientResponseObserver<StreamRequest, ClientEvent> observer = new ClientResponseObserver<>() {
+            @Override
+            public void beforeStart(ClientCallStreamObserver<StreamRequest> stream) {
+                requestStream.set(stream);
+            }
+
+            @Override
+            public void onNext(ClientEvent event) {
+                onEvent.accept(event);
+            }
+
+            @Override
+            public void onError(Throwable t) {
+                if (onError != null) {
+                    onError.accept(t);
+                }
+            }
+
+            @Override
+            public void onCompleted() {
+                // server-streaming ends only via cancel; nothing to do
+            }
+        };
+        async.clientEvents(StreamRequest.getDefaultInstance(), observer);
+        return () -> {
+            ClientCallStreamObserver<StreamRequest> stream = requestStream.get();
+            if (stream != null) {
+                stream.cancel("client events stopped", null);
+            }
+        };
+    }
+
+    /** Cancels an in-progress worker stream opened by {@link #capture} or {@link #clientEvents}. */
     @FunctionalInterface
-    public interface CaptureHandle {
+    public interface StreamHandle {
         void cancel();
     }
 
