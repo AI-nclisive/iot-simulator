@@ -200,6 +200,64 @@ class DataSourceServiceTest {
         assertThat(credentials.has(ds.id())).isTrue();
     }
 
+    @Test
+    void duplicateCreatesNewSourceWithCopyNameDisabledAndStopped() {
+        DataSource original = service.create(
+                PROJECT, "Pump", "OPC_UA", "MANUAL", "{\"host\":\"plc1\"}", "{\"rate\":500}", null, "a");
+
+        DataSource copy = service.duplicate(PROJECT, original.id(), "a");
+
+        assertThat(copy.id()).isNotEqualTo(original.id());
+        assertThat(copy.name()).isEqualTo("Pump (copy)");
+        assertThat(copy.protocol()).isEqualTo(Protocol.OPC_UA);
+        assertThat(copy.basis()).isEqualTo(SourceBasis.MANUAL);
+        assertThat(copy.endpoint()).isEqualTo(original.endpoint());
+        assertThat(copy.runtimeConfig()).isEqualTo(original.runtimeConfig());
+        assertThat(copy.enabled()).isFalse();
+        assertThat(copy.runtimeState()).isEqualTo(RuntimeState.STOPPED);
+        assertThat(copy.projectId()).isEqualTo(PROJECT);
+    }
+
+    @Test
+    void duplicateOnMissingSourceThrowsNotFound() {
+        assertThatThrownBy(() -> service.duplicate(PROJECT, "no-such-ds", "a"))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void duplicateOnWrongProjectThrowsNotFound() {
+        DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null, "a");
+        assertThatThrownBy(() -> service.duplicate("other-project", ds.id(), "a"))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void duplicateWithSchemaCopiesSchemaNodes() {
+        FakeSchemaRepository schemaRepo = new FakeSchemaRepository(repository);
+        DataSourceService svc = new DataSourceService(
+                repository,
+                new FakeProjectRepository(Set.of(PROJECT)),
+                schemaRepo,
+                new InMemoryRuntimeController(),
+                credentials);
+
+        DataSource original = svc.create(PROJECT, "Sensor", "OPC_UA", "SCAN", null, null, null, "a");
+        SchemaNode node = new SchemaNode("n1", null, "/root/temp", "Temperature",
+                com.ainclusive.iotsim.protocolmodel.NodeKind.VARIABLE,
+                com.ainclusive.iotsim.protocolmodel.DataType.FLOAT32,
+                com.ainclusive.iotsim.protocolmodel.ValueRank.SCALAR,
+                com.ainclusive.iotsim.protocolmodel.Access.READ,
+                "°C", null);
+        schemaRepo.saveNewVersion(original.id(), List.of(node));
+
+        DataSource copy = svc.duplicate(PROJECT, original.id(), "a");
+
+        assertThat(copy.name()).isEqualTo("Sensor (copy)");
+        assertThat(copy.schemaId()).isNotNull();
+        assertThat(copy.schemaVersion()).isEqualTo(1);
+        assertThat(copy.schemaId()).isNotEqualTo(original.schemaId());
+    }
+
     private static final class InMemoryDataSourceRepository implements DataSourceRepository {
         private final List<DataSourceRow> rows = new ArrayList<>();
         private int seq;
@@ -245,8 +303,38 @@ class DataSourceServiceTest {
         }
 
         @Override
+        public Optional<DataSourceRow> duplicate(String sourceId, String newName, String createdBy) {
+            return rows.stream()
+                    .filter(r -> r.id().equals(sourceId))
+                    .findFirst()
+                    .map(source -> {
+                        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+                        DataSourceRow copy = new DataSourceRow(
+                                "ds-" + (++seq), source.projectId(), newName,
+                                source.protocol(), source.basis(), null, null,
+                                source.endpoint(), source.runtimeConfig(),
+                                false, now, now, createdBy, 0);
+                        rows.add(copy);
+                        return copy;
+                    });
+        }
+
+        @Override
         public boolean deleteById(String id) {
             return rows.removeIf(r -> r.id().equals(id));
+        }
+
+        void setSchema(String id, String schemaId, int schemaVersion) {
+            for (int i = 0; i < rows.size(); i++) {
+                DataSourceRow r = rows.get(i);
+                if (r.id().equals(id)) {
+                    rows.set(i, new DataSourceRow(
+                            r.id(), r.projectId(), r.name(), r.protocol(), r.basis(),
+                            schemaId, schemaVersion, r.endpoint(), r.runtimeConfig(),
+                            r.enabled(), r.createdAt(), r.updatedAt(), r.createdBy(), r.version()));
+                    return;
+                }
+            }
         }
     }
 
@@ -296,6 +384,36 @@ class DataSourceServiceTest {
         @Override
         public SchemaWithNodes saveNewVersion(String dataSourceId, List<SchemaNode> nodes) {
             throw new UnsupportedOperationException();
+        }
+    }
+
+    /**
+     * A schema repository backed by a map; mirrors what the jOOQ implementation does:
+     * {@code saveNewVersion} also updates the data-source row's schemaId/schemaVersion.
+     */
+    private static final class FakeSchemaRepository implements SchemaRepository {
+        private final java.util.Map<String, SchemaWithNodes> byDataSource = new java.util.HashMap<>();
+        private final InMemoryDataSourceRepository dsRepo;
+        private int seq;
+
+        FakeSchemaRepository(InMemoryDataSourceRepository dsRepo) {
+            this.dsRepo = dsRepo;
+        }
+
+        @Override
+        public Optional<SchemaWithNodes> findCurrent(String dataSourceId) {
+            return Optional.ofNullable(byDataSource.get(dataSourceId));
+        }
+
+        @Override
+        public SchemaWithNodes saveNewVersion(String dataSourceId, List<SchemaNode> nodes) {
+            String schemaId = "schema-" + (++seq);
+            int version = 1;
+            OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+            SchemaWithNodes swn = new SchemaWithNodes(schemaId, dataSourceId, version, now, List.copyOf(nodes));
+            byDataSource.put(dataSourceId, swn);
+            dsRepo.setSchema(dataSourceId, schemaId, version);
+            return swn;
         }
     }
 }

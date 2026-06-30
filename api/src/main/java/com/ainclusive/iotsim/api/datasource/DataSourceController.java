@@ -88,6 +88,20 @@ public class DataSourceController {
         return ResponseEntity.ok().eTag(etag(ds.version())).body(DataSourceResponse.from(ds));
     }
 
+    /**
+     * Deep-copies an existing data source within the same project.
+     * The copy gets a new ID, name {@code "<original name> (copy)"}, enabled=false, and STOPPED state.
+     * Schema nodes are copied when present. Returns 201 with the new resource. See IS-066.
+     */
+    @PostMapping("/{id}/duplicate")
+    public ResponseEntity<DataSourceResponse> duplicate(@PathVariable String projectId, @PathVariable String id) {
+        DataSource ds = dataSources.duplicate(projectId, id, "local");
+        return ResponseEntity.created(
+                        URI.create("/api/v1/projects/" + projectId + "/data-sources/" + ds.id()))
+                .eTag(etag(ds.version()))
+                .body(DataSourceResponse.from(ds));
+    }
+
     @PostMapping("/{id}/start")
     public ResponseEntity<DataSourceResponse> start(@PathVariable String projectId, @PathVariable String id) {
         DataSource ds = dataSources.start(projectId, id);

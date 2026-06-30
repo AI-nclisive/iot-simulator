@@ -66,4 +66,30 @@ class DataSourceRepositoryIT {
         DataSourceRow created = dataSources.insert(projectId, "Stale", "MODBUS_TCP", "SCAN", null, null, "it");
         assertThat(dataSources.update(created.id(), "x", null, null, true, 999)).isEmpty();
     }
+
+    @Test
+    void duplicateCreatesNewRowWithSameProtocolAndEndpoint() {
+        DataSourceRow source = dataSources.insert(
+                projectId, "Boiler", "OPC_UA", "SCAN",
+                "{\"host\":\"boiler1\"}", "{\"rate\":2000}", "it");
+
+        Optional<DataSourceRow> copy = dataSources.duplicate(source.id(), "Boiler (copy)", "it");
+
+        assertThat(copy).isPresent();
+        assertThat(copy.get().id()).isNotEqualTo(source.id());
+        assertThat(copy.get().name()).isEqualTo("Boiler (copy)");
+        assertThat(copy.get().projectId()).isEqualTo(projectId);
+        assertThat(copy.get().protocol()).isEqualTo("OPC_UA");
+        assertThat(copy.get().basis()).isEqualTo("SCAN");
+        assertThat(copy.get().endpoint()).isEqualTo(source.endpoint());
+        assertThat(copy.get().runtimeConfig()).isEqualTo(source.runtimeConfig());
+        assertThat(copy.get().enabled()).isFalse();
+        assertThat(copy.get().version()).isZero();
+        assertThat(copy.get().schemaId()).isNull();
+    }
+
+    @Test
+    void duplicateOnMissingSourceReturnsEmpty() {
+        assertThat(dataSources.duplicate("no-such-id", "Copy", "it")).isEmpty();
+    }
 }

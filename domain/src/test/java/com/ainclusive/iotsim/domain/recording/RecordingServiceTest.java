@@ -300,6 +300,11 @@ class RecordingServiceTest {
         }
 
         @Override
+        public Optional<DataSourceRow> duplicate(String sourceId, String newName, String createdBy) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public boolean deleteById(String id) {
             throw new UnsupportedOperationException();
         }

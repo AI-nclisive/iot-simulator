@@ -72,6 +72,29 @@ public class JooqDataSourceRepository implements DataSourceRepository {
     }
 
     @Override
+    public Optional<DataSourceRow> duplicate(String sourceId, String newName, String createdBy) {
+        DataSourcesRecord source = dsl.selectFrom(DATA_SOURCES)
+                .where(DATA_SOURCES.ID.eq(sourceId))
+                .fetchOne();
+        if (source == null) {
+            return Optional.empty();
+        }
+        DataSourcesRecord copy = dsl.insertInto(DATA_SOURCES)
+                .set(DATA_SOURCES.ID, Ids.newId())
+                .set(DATA_SOURCES.PROJECT_ID, source.getProjectId())
+                .set(DATA_SOURCES.NAME, newName)
+                .set(DATA_SOURCES.PROTOCOL, source.getProtocol())
+                .set(DATA_SOURCES.BASIS, source.getBasis())
+                .set(DATA_SOURCES.ENDPOINT, source.getEndpoint())
+                .set(DATA_SOURCES.RUNTIME_CONFIG, source.getRuntimeConfig())
+                .set(DATA_SOURCES.ENABLED, false)
+                .set(DATA_SOURCES.CREATED_BY, createdBy)
+                .returning()
+                .fetchOne();
+        return Optional.ofNullable(copy).map(this::map);
+    }
+
+    @Override
     public boolean deleteById(String id) {
         return dsl.deleteFrom(DATA_SOURCES).where(DATA_SOURCES.ID.eq(id)).execute() > 0;
     }

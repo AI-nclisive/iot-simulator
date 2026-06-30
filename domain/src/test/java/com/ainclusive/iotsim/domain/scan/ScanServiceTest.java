@@ -313,6 +313,11 @@ class ScanServiceTest {
         }
 
         @Override
+        public Optional<DataSourceRow> duplicate(String sourceId, String newName, String createdBy) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public boolean deleteById(String id) {
             return rows.removeIf(r -> r.id().equals(id));
         }

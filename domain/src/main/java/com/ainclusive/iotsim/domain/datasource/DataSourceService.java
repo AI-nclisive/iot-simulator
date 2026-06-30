@@ -6,11 +6,14 @@ import com.ainclusive.iotsim.persistence.datasource.DataSourceRepository;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRow;
 import com.ainclusive.iotsim.persistence.project.ProjectRepository;
 import com.ainclusive.iotsim.persistence.schema.SchemaRepository;
+import com.ainclusive.iotsim.persistence.schema.SchemaWithNodes;
 import com.ainclusive.iotsim.platform.runtime.RuntimeController;
 import com.ainclusive.iotsim.platform.secret.ConnectionCredentials;
 import com.ainclusive.iotsim.platform.secret.CredentialStore;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /** Data-source lifecycle and runtime control (backend-specs/03 & 05). */
 @Service
@@ -90,6 +93,32 @@ public class DataSourceService {
         DataSourceRow row = requireRow(projectId, id);
         runtime.stop(id);
         return map(row);
+    }
+
+    /**
+     * Creates a deep copy of a data-source within the same project.
+     * The copy has a new ID, name {@code "<original name> (copy)"}, {@code enabled=false},
+     * and {@code runtimeState=STOPPED}. If the source has a schema, its nodes are
+     * copied to a new schema version on the copy (starting at version 1).
+     * Returns 404 if the source or project is not found.
+     */
+    @Transactional
+    public DataSource duplicate(String projectId, String id, String actor) {
+        requireProject(projectId);
+        DataSourceRow source = requireRow(projectId, id);
+        String copyName = source.name() + " (copy)";
+        DataSourceRow initialCopy = dataSources.duplicate(source.id(), copyName, actor)
+                .orElseThrow(() -> new ResourceNotFoundException("DataSource", id));
+        // Copy schema nodes if the source has a schema.
+        Optional<SchemaWithNodes> sourceSchema = schemas.findCurrent(source.id());
+        if (sourceSchema.isPresent() && !sourceSchema.get().nodes().isEmpty()) {
+            schemas.saveNewVersion(initialCopy.id(), sourceSchema.get().nodes());
+            // Re-fetch so schemaId/schemaVersion are populated after saveNewVersion updates the row.
+            String copyId = initialCopy.id();
+            return map(dataSources.findById(copyId)
+                    .orElseThrow(() -> new ResourceNotFoundException("DataSource", copyId)));
+        }
+        return map(initialCopy);
     }
 
     /**
