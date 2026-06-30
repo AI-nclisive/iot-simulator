@@ -279,6 +279,11 @@ class ScanServiceTest {
         public boolean deleteById(String id) {
             throw new UnsupportedOperationException();
         }
+
+        @Override
+        public Optional<ProjectRow> archive(String id) {
+            throw new UnsupportedOperationException();
+        }
     }
 
     private static final class InMemoryDataSourceRepository implements DataSourceRepository {

@@ -19,5 +19,8 @@ public interface ProjectRepository {
      */
     Optional<ProjectRow> update(String id, String name, String description, long expectedVersion);
 
+    /** Sets status to {@code ARCHIVED}. Returns the updated row, or empty when not found. */
+    Optional<ProjectRow> archive(String id);
+
     boolean deleteById(String id);
 }
