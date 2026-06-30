@@ -298,10 +298,10 @@ describe("DataSourceSchemaEditor — ConfirmationDialog flow when saving with wa
 });
 
 // ---------------------------------------------------------------------------
-// Round-trip tests (UI-109): PUT payload must preserve all NodeDto fields
+// Round-trip tests: PUT payload must preserve all NodeDto fields
 // ---------------------------------------------------------------------------
 
-describe("DataSourceSchemaEditor — NodeDto round-trip on save (UI-109)", () => {
+describe("DataSourceSchemaEditor — NodeDto round-trip on save", () => {
   it("PUT payload preserves parentId, kind, dataType, valueRank, and access from GET", async () => {
     const schemaWithRichNodes = {
       id: "schema-rt",

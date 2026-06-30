@@ -157,12 +157,7 @@ export function DataSourceSchemaEditor({
     if (!projectId || !source.id || !selectedParam) return;
     setSaving(true);
     try {
-      // Build PUT payload by merging rawNodes with EditBuffer.
-      // All NodeDto fields are preserved from the original GET response;
-      // only unit and description are overwritten from the EditBuffer for
-      // the selected parameter. FOLDER nodes and all other fields
-      // (parentId, kind, dataType, valueRank, access) are passed through
-      // unchanged so the backend never sees a corrupted schema.
+      // Merge rawNodes with EditBuffer so PUT preserves all NodeDto fields.
       const updatedNodes: NodeDto[] = rawNodesRef.current.map((raw) => {
         if (raw.nodeId === selectedParam.id) {
           return {
