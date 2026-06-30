@@ -129,8 +129,12 @@ mismatch → 409.
   update (replace-all) / duplicate / delete; step ordering; cascade delete.
 - **Service unit**: validation rules, not-found, optimistic version, duplicate
   copying (steps + DRAFT status + name suffix).
-- **Controller web-layer**: every endpoint, status codes, ETag/If-Match
-  semantics, pagination — in the style of existing `*ControllerTest`.
+- **Controller unit (POJO)**: instantiate `ScenarioController` with a capturing
+  `ScenarioService` fake; assert `ResponseEntity` status/headers (201/200/204,
+  `ETag`, `Location`), `If-Match`→428, blank-name→400, version parsing, and
+  `ordinal` normalization. Matches the repo convention (`RuntimeStreamControllerTest`),
+  no new test dependencies. True HTTP-layer (`MockMvc`) coverage is **deferred to
+  IS-121 [SDLC]** (introduce the web-layer test harness repo-wide).
 
 ## Definition of done
 
