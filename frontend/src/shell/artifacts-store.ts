@@ -21,9 +21,30 @@ function mapRecording(r: RecordingResponse): ReusableArtifact {
     createdAt: r.createdAt,
     createdBy: r.createdBy,
     sourceId: r.dataSourceId,
+    origin: r.origin === "SCAN_RECORD" ? "captured" : "imported",
     valueCount: r.valueCount,
   };
 }
+
+// Backend response shape from GET/POST /api/v1/projects/{pid}/samples
+export type SampleResponse = {
+  id: string;
+  projectId: string;
+  derivedFromRecordingId: string;
+  name: string;
+  selection: string;
+  tags: string[];
+  createdAt: string;
+  createdBy: string;
+  version: number;
+};
+
+export type CreateSampleRequest = {
+  name: string;
+  derivedFromRecordingId: string;
+  selection: string;
+  tags: string[];
+};
 
 type CreateRecordingInput = {
   createdBy: string;
@@ -33,9 +54,15 @@ type CreateRecordingInput = {
 
 type ArtifactsState = {
   artifacts: ReusableArtifact[];
+  samples: SampleResponse[];
   isLoading: boolean;
+  isSamplesLoading: boolean;
   error: string | null;
+  samplesError: string | null;
   loadRecordings: (projectId: string) => Promise<void>;
+  loadSamples: (projectId: string) => Promise<void>;
+  createSample: (projectId: string, req: CreateSampleRequest) => Promise<SampleResponse>;
+  deleteSample: (projectId: string, sampleId: string) => Promise<void>;
   // createRecording is kept for backward-compat with RecordingFlowPage
   // which uses start/stop capture endpoints separately; recording IDs are
   // appended to the store after a successful stop.
@@ -45,8 +72,11 @@ type ArtifactsState = {
 
 export const useArtifactsStore = create<ArtifactsState>((set) => ({
   artifacts: [],
+  samples: [],
   isLoading: false,
+  isSamplesLoading: false,
   error: null,
+  samplesError: null,
 
   loadRecordings: async (projectId: string) => {
     set({ isLoading: true, error: null });
@@ -59,6 +89,36 @@ export const useArtifactsStore = create<ArtifactsState>((set) => ({
       const message = err instanceof ApiError ? err.title : "Failed to load recordings";
       set({ error: message, isLoading: false });
     }
+  },
+
+  loadSamples: async (projectId: string) => {
+    set({ isSamplesLoading: true, samplesError: null });
+    try {
+      const data = await apiFetch<{ items: SampleResponse[]; nextCursor?: string }>(
+        `/api/v1/projects/${projectId}/samples`,
+      );
+      set({ samples: data.items, isSamplesLoading: false });
+    } catch (err) {
+      const message = err instanceof ApiError ? err.title : "Failed to load samples";
+      set({ samplesError: message, isSamplesLoading: false });
+    }
+  },
+
+  createSample: async (projectId: string, req: CreateSampleRequest) => {
+    const data = await apiFetch<SampleResponse>(
+      `/api/v1/projects/${projectId}/samples`,
+      { method: "POST", body: JSON.stringify(req) },
+    );
+    set((state) => ({ samples: [data, ...state.samples] }));
+    return data;
+  },
+
+  deleteSample: async (projectId: string, sampleId: string) => {
+    await apiFetch<void>(
+      `/api/v1/projects/${projectId}/samples/${sampleId}`,
+      { method: "DELETE" },
+    );
+    set((state) => ({ samples: state.samples.filter((s) => s.id !== sampleId) }));
   },
 
   appendRecording: (artifact) => {

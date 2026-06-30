@@ -755,21 +755,21 @@ Parallel execution:
   Depends: `UI-096`; backend IS-055 (✅).
   Done when: Events tab shows real runtime events; live events append without duplicates; mock-source-events.ts removed; no TypeScript errors.
 
-- [ ] `UI-107` Wire project overview counts to /projects/overview
+- [x] `UI-107` Wire project overview counts to /projects/overview
   Goal: replace hardcoded-0 count badges in projects-store.ts with data from GET /api/v1/projects/overview.
   Surface: `Project Entry` — source/artifact count badges
   Work includes: call GET /api/v1/projects/overview after loadProjects; merge by projectId into ProjectSummary; expose sourcesNeedingAttention as optional badge; lastActivity stays updatedAt (no backend field — comment clearly).
   Depends: `UI-096`; backend IS-054 (✅).
   Done when: configuredSources, runningSources, reusableArtifacts reflect real backend data; no TypeScript errors.
 
-- [ ] `UI-108` Wire Recordings page to live store + add Samples surface
+- [x] `UI-108` Wire Recordings page to live store + add Samples surface
   Goal: switch recordings-page.tsx from mockRecordings to artifacts-store (already calls live API); add Samples surface.
   Surface: `Recordings & Samples`
   Work includes: recordings-page.tsx reads from useArtifactsStore instead of mockRecordings; remove mock-recordings.ts import; add samples methods to artifacts-store.ts (GET/POST/DELETE /api/v1/projects/{pid}/samples); add Samples section to recordings page; SampleResponse = {id, projectId, derivedFromRecordingId, name, selection, tags[], createdAt, createdBy, version}.
   Depends: `UI-096`; backend IS-068 (✅).
   Done when: recordings load from store (live API); samples list/create/delete work; mock-recordings.ts no longer imported; no TypeScript errors.
 
-- [ ] `UI-109` Fix schema editor round-trip — preserve all NodeDto fields on save
+- [x] `UI-109` Fix schema editor round-trip — preserve all NodeDto fields on save
   Goal: schema PUT currently drops parentId/kind/dataType/valueRank/access; only saves unit+description for selected param. This corrupts folder structure and type metadata on every save.
   Surface: `Data Source Detail` — Schema tab
   Work includes: store raw NodeDto[] from GET in editor state alongside EditBuffer; executeSave builds PUT payload from original NodeDto + applied edits — nothing dropped; DataType mapping on save: float→FLOAT64, int→INT32, bool→BOOL, string→STRING; BYTES/DATETIME preserved as-is (no FE type, read-only); ETag/If-Match correctly threaded.

@@ -21,8 +21,7 @@ dependency-ordered. (Optimized for "make the simulator real end to end, then
 broaden, then harden for teams" — can be re-weighted if the near-term goal
 differs.)
 
-Snapshot: **build green, 186 tests / 41 suites, 0 skipped.** 66 done · 1 partial ·
-49 todo (116 total). Live status is the board; this line is a periodic snapshot.
+Snapshot: **build green.** 94 done · 25 todo (119 total). Live status is the board; this line is a periodic snapshot.
 
 <details>
 <summary>ID crosswalk — legacy <code>BE-*</code> / <code>SDLC-*</code> → <code>IS-XXX</code></summary>
@@ -184,7 +183,7 @@ import/export. Modbus moved to Wave G (deferred) — see the note there.
 - [x] IS-062 [BE] ✅ [gen] Synthetic generation (patterns + range + seed) — SPEC: Generate Synthetic
 - [x] IS-063 [BE] ✅ [gen] Deterministic run settings — SPEC: Run Deterministic
 - [x] IS-064 [BE] ✅ [model] Injectable clock + seeded RNG — 01
-- [ ] IS-065 [BE] ⬜ [source] Create from synthetic setup — SPEC: Manually Create / Synthetic
+- [x] IS-065 [BE] ✅ [source] Create from synthetic setup — SPEC: Manually Create / Synthetic
 - [x] IS-066 [BE] ✅ [source] Duplicate data source — SPEC: Manage Data Sources
 - [x] IS-067 [BE] ✅ [source] Create from import / prepared data — SPEC: Manually Create
 - [x] IS-068 [BE] ✅ [recording] Samples (named subset/snapshot) — SPEC: Store Multiple/Samples
@@ -194,6 +193,7 @@ import/export. Modbus moved to Wave G (deferred) — see the note there.
 - [x] IS-072 [BE] ✅ [project] Archive project — SPEC: Manage Projects
 - [ ] IS-073 [BE] ⬜ [io] Project export/import (versioned ZIP+manifest, secret-free) — 06
 - [x] IS-074 [BE] ✅ [api] Cursor pagination + filtering on collections — 05
+- [ ] IS-119 [BE] ⬜ [runtime] Run synthetic source — continuous live feed (Model B / real-time pacing); low priority, pairs with IS-069 — 02
 
 ## Wave E — Shared-team & security · P1→P2
 

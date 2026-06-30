@@ -172,7 +172,7 @@ describe("RecordingImportDialog — ready to import", () => {
 
     expect(onImported).toHaveBeenCalledOnce();
     expect(onImported).toHaveBeenCalledWith(
-      expect.objectContaining({ name: "result-ok", type: "recording", origin: "imported" }),
+      expect.objectContaining({ origin: "imported", sourceId: "src-01" }),
     );
   });
 });

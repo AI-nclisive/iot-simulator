@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { type RecordingRow } from "./mock-recordings";
+import { type RecordingRow } from "./recordings-page";
 
 // ---------------------------------------------------------------------------
 // Validation types

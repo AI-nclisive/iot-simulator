@@ -2,7 +2,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { RecordingExportDialog } from "./recording-export-dialog";
-import type { RecordingRow } from "./mock-recordings";
+import type { RecordingRow } from "./recordings-page";
 
 const mockRecording: RecordingRow = {
   id: "rec-001",
