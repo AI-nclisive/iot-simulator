@@ -10,6 +10,12 @@ export type UserRow = {
   lastActive: string;
 };
 
+/** Set to true in tests to simulate a failed save response. */
+export let mockUserSaveShouldFail = false;
+export function setMockUserSaveShouldFail(v: boolean) {
+  mockUserSaveShouldFail = v;
+}
+
 export const mockUsers: UserRow[] = [
   {
     id: "u-001",
