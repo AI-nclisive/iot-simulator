@@ -79,25 +79,11 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
   },
 
   duplicateProject: async (id) => {
-    const source = get().projects.find((p) => p.id === id);
-    if (!source) return;
-    // POST /api/v1/projects/{id}/copy is the canonical duplicate endpoint;
-    // fall back to creating a new project with the same name + " (copy)" if not available.
-    try {
-      const data = await apiFetch<ProjectResponse>(`/api/v1/projects/${id}/copy`, {
-        method: "POST",
-      });
-      const copy = mapProject(data);
-      set((state) => ({ projects: [...state.projects, copy] }));
-    } catch {
-      // Fallback: create a new project with "(copy)" suffix
-      const data = await apiFetch<ProjectResponse>("/api/v1/projects", {
-        method: "POST",
-        body: JSON.stringify({ name: `${source.name} (copy)`, description: null }),
-      });
-      const copy = mapProject(data);
-      set((state) => ({ projects: [...state.projects, copy] }));
-    }
+    const data = await apiFetch<ProjectResponse>(`/api/v1/projects/${id}/duplicate`, {
+      method: "POST",
+    });
+    const copy = mapProject(data);
+    set((state) => ({ projects: [...state.projects, copy] }));
   },
 
   archiveProject: async (id) => {
