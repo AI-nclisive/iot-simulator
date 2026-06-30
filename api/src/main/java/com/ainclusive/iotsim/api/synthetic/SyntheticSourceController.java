@@ -1,0 +1,48 @@
+package com.ainclusive.iotsim.api.synthetic;
+
+import com.ainclusive.iotsim.api.datasource.DataSourceController.DataSourceResponse;
+import com.ainclusive.iotsim.domain.datasource.DataSource;
+import com.ainclusive.iotsim.domain.synthetic.SyntheticConfig;
+import com.ainclusive.iotsim.domain.synthetic.SyntheticSourceService;
+import java.net.URI;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+/** Create-from-synthetic data sources (backend-specs/05; IS-065). */
+@RestController
+@RequestMapping("/api/v1/projects/{projectId}/data-sources/synthetic")
+public class SyntheticSourceController {
+
+    private final SyntheticSourceService syntheticSources;
+
+    public SyntheticSourceController(SyntheticSourceService syntheticSources) {
+        this.syntheticSources = syntheticSources;
+    }
+
+    @PostMapping
+    public ResponseEntity<DataSourceResponse> create(
+            @PathVariable String projectId, @RequestBody CreateSyntheticSourceRequest req) {
+        if (req == null || req.name() == null || req.name().isBlank()) {
+            throw new IllegalArgumentException("name is required");
+        }
+        if (req.protocol() == null || req.protocol().isBlank()) {
+            throw new IllegalArgumentException("protocol is required");
+        }
+        if (req.config() == null) {
+            throw new IllegalArgumentException("config is required");
+        }
+        DataSource ds = syntheticSources.create(
+                projectId, req.name(), req.protocol(), req.endpoint(), req.config(), "local");
+        return ResponseEntity.created(
+                        URI.create("/api/v1/projects/" + projectId + "/data-sources/" + ds.id()))
+                .eTag("\"" + ds.version() + "\"")
+                .body(DataSourceResponse.from(ds));
+    }
+
+    public record CreateSyntheticSourceRequest(
+            String name, String protocol, String endpoint, SyntheticConfig config) {}
+}
