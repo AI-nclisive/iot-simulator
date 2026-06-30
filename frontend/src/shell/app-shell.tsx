@@ -59,13 +59,6 @@ export function AppShell() {
         </header>
 
         <div className="flex min-h-0 flex-1 flex-col gap-3 lg:flex-row">
-          {/*
-            Project rail / sidebar.
-            Responsive behavior:
-            — Desktop (lg+, >=1024 px): always visible, fixed 280 px wide, side-by-side with content.
-            — Tablet (md, 768-1023 px): hidden by default; toggled by the hamburger button.
-            — Phone (<768 px): same toggle behavior; rail stacks above the content area when open.
-          */}
           <aside
             id="project-rail"
             aria-label="Project navigation"
