@@ -1,9 +1,13 @@
 /**
  * Tests for DataSourceSchemaEditor dependency warnings (UI-043, UI-097)
+ * and NodeDto round-trip correctness (UI-109)
  *
  * Covers:
  * - No changes → no warnings returned
  * - Description change → identifier rename warning appears
+ * - PUT payload preserves parentId, kind, dataType, valueRank, access from GET
+ * - FOLDER nodes are included in PUT payload unchanged
+ * - BYTES/DATETIME dataType values are preserved on save
  */
 
 import { cleanup, render, screen } from "@testing-library/react";
@@ -290,5 +294,252 @@ describe("DataSourceSchemaEditor — ConfirmationDialog flow when saving with wa
     expect(screen.queryByText("Save with dependency impact")).toBeNull();
     expect(screen.getByText("Unsaved changes")).toBeTruthy();
     expect(screen.getByText("Dependency impact")).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Round-trip tests: PUT payload must preserve all NodeDto fields
+// ---------------------------------------------------------------------------
+
+describe("DataSourceSchemaEditor — NodeDto round-trip on save", () => {
+  it("PUT payload preserves parentId, kind, dataType, valueRank, and access from GET", async () => {
+    const schemaWithRichNodes = {
+      id: "schema-rt",
+      dataSourceId: "src-test",
+      version: 1,
+      nodes: [
+        {
+          nodeId: "v-001",
+          parentId: "f-root",
+          path: "root/temp",
+          name: "temp",
+          kind: "VARIABLE" as const,
+          dataType: "FLOAT32",
+          valueRank: "SCALAR",
+          access: "READ_WRITE",
+          unit: "°C",
+          description: "Temperature",
+        },
+      ],
+    };
+    mockApiFetch
+      .mockResolvedValueOnce(schemaWithRichNodes) // GET on mount
+      .mockResolvedValueOnce(schemaWithRichNodes); // PUT on save
+
+    render(<DataSourceSchemaEditor source={mockSource} projectId={PROJECT_ID} />);
+    await screen.findByText("root/temp");
+    await userEvent.click(screen.getByText("root/temp"));
+
+    const unitInput = screen.getAllByRole("textbox").find(
+      (el) => (el as HTMLInputElement).value === "°C",
+    ) as HTMLInputElement;
+    await userEvent.clear(unitInput);
+    await userEvent.type(unitInput, "K");
+
+    const saveButton = screen.getByRole("button", { name: "Save schema" });
+    await userEvent.click(saveButton);
+
+    // Find the PUT call (second apiFetch call)
+    const putCall = mockApiFetch.mock.calls.find(
+      (call) => (call[1] as RequestInit | undefined)?.method === "PUT",
+    );
+    expect(putCall).toBeTruthy();
+    const body = JSON.parse((putCall![1] as RequestInit).body as string) as {
+      nodes: Array<{
+        nodeId: string;
+        parentId: string | null;
+        kind: string;
+        dataType: string | null;
+        valueRank: string | null;
+        access: string | null;
+        unit: string | null;
+      }>;
+    };
+    const node = body.nodes.find((n) => n.nodeId === "v-001")!;
+    expect(node.parentId).toBe("f-root");
+    expect(node.kind).toBe("VARIABLE");
+    expect(node.dataType).toBe("FLOAT32");
+    expect(node.valueRank).toBe("SCALAR");
+    expect(node.access).toBe("READ_WRITE");
+    expect(node.unit).toBe("K");
+  });
+
+  it("PUT payload includes FOLDER nodes unchanged", async () => {
+    const schemaWithFolder = {
+      id: "schema-folder",
+      dataSourceId: "src-test",
+      version: 1,
+      nodes: [
+        {
+          nodeId: "f-root",
+          parentId: null,
+          path: "root",
+          name: "root",
+          kind: "FOLDER" as const,
+          dataType: null,
+          valueRank: null,
+          access: null,
+          unit: null,
+          description: null,
+        },
+        {
+          nodeId: "v-child",
+          parentId: "f-root",
+          path: "root/pressure",
+          name: "pressure",
+          kind: "VARIABLE" as const,
+          dataType: "FLOAT64",
+          valueRank: null,
+          access: "READ",
+          unit: "bar",
+          description: "Pressure sensor",
+        },
+      ],
+    };
+    mockApiFetch
+      .mockResolvedValueOnce(schemaWithFolder) // GET on mount
+      .mockResolvedValueOnce(schemaWithFolder); // PUT on save
+
+    render(<DataSourceSchemaEditor source={mockSource} projectId={PROJECT_ID} />);
+    await screen.findByText("root/pressure");
+    await userEvent.click(screen.getByText("root/pressure"));
+
+    const unitInput = screen.getAllByRole("textbox").find(
+      (el) => (el as HTMLInputElement).value === "bar",
+    ) as HTMLInputElement;
+    await userEvent.clear(unitInput);
+    await userEvent.type(unitInput, "Pa");
+
+    const saveButton = screen.getByRole("button", { name: "Save schema" });
+    await userEvent.click(saveButton);
+
+    const putCall = mockApiFetch.mock.calls.find(
+      (call) => (call[1] as RequestInit | undefined)?.method === "PUT",
+    );
+    expect(putCall).toBeTruthy();
+    const body = JSON.parse((putCall![1] as RequestInit).body as string) as {
+      nodes: Array<{ nodeId: string; kind: string; parentId: string | null }>;
+    };
+    // FOLDER node must be present in payload
+    const folderNode = body.nodes.find((n) => n.nodeId === "f-root");
+    expect(folderNode).toBeTruthy();
+    expect(folderNode!.kind).toBe("FOLDER");
+    expect(folderNode!.parentId).toBeNull();
+    // Variable node must have updated unit
+    const varNode = body.nodes.find((n) => n.nodeId === "v-child")!;
+    expect(varNode.kind).toBe("VARIABLE");
+  });
+
+  it("PUT payload preserves BYTES dataType unchanged", async () => {
+    const schemaWithBytes = {
+      id: "schema-bytes",
+      dataSourceId: "src-test",
+      version: 1,
+      nodes: [
+        {
+          nodeId: "v-bytes",
+          parentId: null,
+          path: "sensor/raw",
+          name: "raw",
+          kind: "VARIABLE" as const,
+          dataType: "BYTES",
+          valueRank: null,
+          access: "READ",
+          unit: "hex",
+          description: "Raw bytes field",
+        },
+      ],
+    };
+    // Reset to avoid mock queue leaking from previous tests
+    mockApiFetch.mockReset();
+    mockApiFetch
+      .mockResolvedValueOnce(schemaWithBytes) // GET on mount
+      .mockResolvedValueOnce(schemaWithBytes); // PUT on save
+
+    render(<DataSourceSchemaEditor source={mockSource} projectId={PROJECT_ID} />);
+    await screen.findByText("sensor/raw");
+    await userEvent.click(screen.getByText("sensor/raw"));
+
+    // Edit unit (not description) to avoid triggering the dependency-warning dialog
+    const unitInputs = screen.getAllByRole("textbox");
+    const unitInput = unitInputs.find(
+      (el) => (el as HTMLInputElement).value === "hex",
+    ) as HTMLInputElement;
+    expect(unitInput).toBeTruthy();
+    await userEvent.clear(unitInput);
+    await userEvent.type(unitInput, "bin");
+
+    const saveButton = screen.getByRole("button", { name: "Save schema" });
+    await userEvent.click(saveButton);
+
+    // Wait for save to complete
+    await screen.findByRole("button", { name: "Save schema" });
+
+    const putCall = mockApiFetch.mock.calls.find(
+      (call) => (call[1] as RequestInit | undefined)?.method === "PUT",
+    );
+    expect(putCall).toBeTruthy();
+    const body = JSON.parse((putCall![1] as RequestInit).body as string) as {
+      nodes: Array<{ nodeId: string; dataType: string | null; unit: string | null }>;
+    };
+    const node = body.nodes.find((n) => n.nodeId === "v-bytes")!;
+    // BYTES dataType must be preserved unchanged — no FE type mapping for it
+    expect(node.dataType).toBe("BYTES");
+    expect(node.unit).toBe("bin");
+  });
+
+  it("PUT payload preserves DATETIME dataType unchanged", async () => {
+    const schemaWithDatetime = {
+      id: "schema-dt",
+      dataSourceId: "src-test",
+      version: 1,
+      nodes: [
+        {
+          nodeId: "v-dt",
+          parentId: null,
+          path: "sensor/timestamp",
+          name: "timestamp",
+          kind: "VARIABLE" as const,
+          dataType: "DATETIME",
+          valueRank: null,
+          access: "READ",
+          unit: "epoch",
+          description: "Timestamp field",
+        },
+      ],
+    };
+    // Reset to avoid mock queue leaking from previous tests
+    mockApiFetch.mockReset();
+    mockApiFetch
+      .mockResolvedValueOnce(schemaWithDatetime)
+      .mockResolvedValueOnce(schemaWithDatetime);
+
+    render(<DataSourceSchemaEditor source={mockSource} projectId={PROJECT_ID} />);
+    await screen.findByText("sensor/timestamp");
+    await userEvent.click(screen.getByText("sensor/timestamp"));
+
+    // Edit unit (not description) to avoid triggering the dependency-warning dialog
+    const unitInputs = screen.getAllByRole("textbox");
+    const unitInput = unitInputs.find(
+      (el) => (el as HTMLInputElement).value === "epoch",
+    ) as HTMLInputElement;
+    expect(unitInput).toBeTruthy();
+    await userEvent.clear(unitInput);
+    await userEvent.type(unitInput, "ms");
+
+    const saveButton = screen.getByRole("button", { name: "Save schema" });
+    await userEvent.click(saveButton);
+
+    await screen.findByRole("button", { name: "Save schema" });
+
+    const putCall = mockApiFetch.mock.calls.find(
+      (call) => (call[1] as RequestInit | undefined)?.method === "PUT",
+    );
+    expect(putCall).toBeTruthy();
+    const body = JSON.parse((putCall![1] as RequestInit).body as string) as {
+      nodes: Array<{ nodeId: string; dataType: string | null }>;
+    };
+    const node = body.nodes.find((n) => n.nodeId === "v-dt")!;
+    expect(node.dataType).toBe("DATETIME");
   });
 });
