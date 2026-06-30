@@ -10,7 +10,9 @@ import org.springframework.stereotype.Component;
 /**
  * Builds the current per-source {@code runtime-state} snapshot sent on connect to the
  * runtime stream (IS-051): for each data source in the project, its
- * {@link RuntimeController#state} (RUNNING/STOPPED/STARTING/ERROR/STALE).
+ * {@link RuntimeController#health} — the runtime state
+ * (RUNNING/STOPPED/STARTING/ERROR/STALE) plus the most recent error (IS-053),
+ * {@code null} when none.
  */
 @Component
 public class RuntimeStateSnapshot {
