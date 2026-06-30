@@ -153,8 +153,6 @@ export const sourceListStale = false;
 
 export const sourceListError = false;
 
-export const dashboardStale = false;
-
 export const mockSourceLock: "unlocked" | "locked-by-self" | "locked-by-other" | "stale" =
   "unlocked";
 

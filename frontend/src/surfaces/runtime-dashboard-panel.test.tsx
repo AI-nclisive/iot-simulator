@@ -30,6 +30,22 @@ vi.mock("../shell/mock-workspace", async () => {
   };
 });
 
+// Panel reads the current project id from the shell store (UI-098).
+vi.mock("../shell/shell-store", () => ({
+  useShellStore: (selector: (s: { currentProjectId: string }) => unknown) =>
+    selector({ currentProjectId: "p1" }),
+}));
+
+// jsdom has no EventSource; the live runtime hook needs one. A minimal stub that
+// never opens is enough — these tests assert the run-process list, not live state.
+class StubEventSource {
+  onopen: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  addEventListener() {}
+  close() {}
+}
+vi.stubGlobal("EventSource", StubEventSource as unknown as typeof EventSource);
+
 import { RuntimeDashboardPanel } from "./runtime-dashboard-panel";
 
 afterEach(() => {

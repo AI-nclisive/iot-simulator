@@ -1,5 +1,7 @@
 import { Link } from "react-router-dom";
-import { activeRuns, dashboardStale, type RunState } from "../shell/mock-workspace";
+import { activeRuns, type RunState } from "../shell/mock-workspace";
+import { useShellStore } from "../shell/shell-store";
+import { useLiveRuntime } from "../shell/use-live-runtime";
 import { SharedStatePanel } from "../ui/shared-state-panel";
 import { StaleBanner } from "../ui/stale-banner";
 import { StatusBadge, type StatusTone } from "../ui/status-badge";
@@ -50,11 +52,41 @@ function runProcessLabel(
 }
 
 export function RuntimeDashboardPanel() {
+  const projectId = useShellStore((state) => state.currentProjectId);
+  // Live runtime stream drives the connection/stale indicator and per-source
+  // health summary. The active-run process list (recordings/replays/scenarios)
+  // is wired separately under UI-097; here we reflect real-time connection state.
+  const { sources, status: liveStatus } = useLiveRuntime(projectId);
+
+  const isStale = liveStatus === "stale" || liveStatus === "reconnecting";
+  const unhealthy = sources.filter((s) => s.health === "Error" || s.health === "Warning");
+
   return (
     <section aria-label="Runtime dashboard" className="shell-panel px-5 py-5">
-      {dashboardStale ? (
-        <StaleBanner message="Dashboard data may be outdated. Refresh the page to see the latest runtime state." />
+      {isStale ? (
+        <StaleBanner
+          message={
+            liveStatus === "reconnecting"
+              ? "Reconnecting to live runtime updates…"
+              : "Live runtime updates have paused. Showing the last known state."
+          }
+        />
       ) : null}
+
+      {sources.length > 0 ? (
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <StatusBadge label={`${sources.length} sources`} tone="neutral" />
+          {unhealthy.length > 0 ? (
+            <StatusBadge
+              label={`${unhealthy.length} need attention`}
+              tone="warning"
+            />
+          ) : (
+            <StatusBadge label="All healthy" tone="accent" />
+          )}
+        </div>
+      ) : null}
+
       {activeRuns.length === 0 ? (
         <SharedStatePanel
           message="Start a source, recording, replay, or scenario to bring active runtime back into view here."
