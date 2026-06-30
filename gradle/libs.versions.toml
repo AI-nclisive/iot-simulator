@@ -28,6 +28,7 @@ spring-boot-starter-oauth2-resource-server = { module = "org.springframework.boo
 spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }
 spring-boot-starter-webmvc-test = { module = "org.springframework.boot:spring-boot-starter-webmvc-test" }
 spring-security-test = { module = "org.springframework.security:spring-security-test" }
+mockito-core = { module = "org.mockito:mockito-core" }
 
 # Spring (extra)
 spring-context = { module = "org.springframework:spring-context" }

@@ -14,4 +14,6 @@ dependencies {
     // Jackson 3 (BOM-managed) — evidence manifests are JSON; assembly/export lives here
     // (api -> domain -> persistence), so the JSON handling does too.
     implementation("tools.jackson.core:jackson-databind")
+
+    testImplementation(libs.mockito.core)
 }
