@@ -348,7 +348,11 @@ export function ProjectEntryPage() {
     return (
       <div className="min-h-screen px-3 py-3 text-shell-ink sm:px-4 lg:px-5">
         <div className="mx-auto max-w-[1280px] pt-12">
-          <p className="text-sm text-shell-muted">Loading…</p>
+          <SharedStatePanel
+            message="Loading your saved simulator projects."
+            state="loading"
+            title="Loading projects…"
+          />
         </div>
       </div>
     );

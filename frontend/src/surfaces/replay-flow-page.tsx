@@ -321,7 +321,7 @@ export function ReplayFlowPage() {
         <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <MetricCard
             label="Target source"
-            value="Ready"
+            value={source.status === "Active" ? "Run" : "Off"}
           />
           <MetricCard
             label="Parameters"

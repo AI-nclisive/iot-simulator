@@ -544,7 +544,7 @@ Parallel execution:
   Depends: `UI-081`
   Done when: role changes are confirmed and traceable in shared activity.
 
-- [ ] `UI-093` End-to-end prototype review
+- [x] `UI-093` End-to-end prototype review
   Surface: cross-surface review
   Depends: `UI-020`, `UI-030`, `UI-040`
   Done when: the team can walk through the primary path end to end and identify

@@ -305,7 +305,11 @@ export function DataSourcesListPage() {
     return (
       <div className="flex h-full flex-col gap-3">
         <section className="shell-panel px-5 py-5">
-          <p className="text-sm text-shell-muted">Loading…</p>
+          <SharedStatePanel
+            message="Loading data sources for this project."
+            state="loading"
+            title="Loading sources…"
+          />
         </section>
       </div>
     );
@@ -316,7 +320,11 @@ export function DataSourcesListPage() {
       <div className="flex h-full flex-col gap-3">
         <section className="shell-panel px-5 py-5">
           <SharedStatePanel
-            message="Check your connection and try refreshing. If the problem continues, contact your project admin."
+            actionLabel="Retry"
+            message="Check your connection and try again. If the problem continues, contact your project admin."
+            onAction={() => {
+              if (currentProjectId) loadDataSources(currentProjectId);
+            }}
             state="error"
             title="Data sources could not be loaded."
           />

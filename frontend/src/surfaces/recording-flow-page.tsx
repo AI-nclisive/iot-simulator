@@ -333,22 +333,22 @@ export function RecordingFlowPage() {
         <section className="shell-panel px-5 py-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0 max-w-3xl">
-              <h3 className="text-lg font-semibold text-shell-ink">Save recording</h3>
+              <h3 className="text-lg font-semibold text-shell-ink">Recording saved</h3>
               <p className="mt-2 text-sm leading-6 text-shell-muted">
-                Capture completed. Review the summary, then continue into replay.
+                Capture saved as a reusable recording. Continue into replay or return to the source.
               </p>
               <p className="mt-2 text-sm leading-6 text-shell-muted">
-                This recording represents activity across{" "}
+                This recording covers activity across{" "}
                 {source.parameterCount.toLocaleString()} parameters in the source.
               </p>
             </div>
-            <StatusBadge label="Save ready" tone="accent" />
+            <StatusBadge label="Saved" tone="accent" />
           </div>
 
           <div className="mt-5">
             <div className="rounded-md border border-shell-line bg-white px-4 py-4">
               <p className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
-                Save result
+                Recording summary
               </p>
               <dl className="mt-3 space-y-3 text-sm text-shell-muted">
                 <div className="flex items-center justify-between gap-3">
@@ -369,10 +369,10 @@ export function RecordingFlowPage() {
 
           <div className="mt-5 flex flex-wrap items-center gap-2">
             <button className="shell-action" type="button" onClick={saveReadyRecording}>
-              Save recording
+              Open replay
             </button>
             <button className="shell-action" type="button" onClick={resetCapture}>
-              Discard capture
+              Record again
             </button>
           </div>
         </section>
