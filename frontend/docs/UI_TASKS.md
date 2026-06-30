@@ -616,7 +616,7 @@ Parallel execution:
   Done when: saved scenarios show state, last run, owner or editor context, and
   role-aware actions from one landing page.
 
-- [ ] `UI-061` Scenario builder shell
+- [x] `UI-061` Scenario builder shell
   Surface: `Scenario Builder`
   Depends: `UI-005`, `UI-006`, `UI-060`
   Done when: the builder provides step list, details panel, validation, and
