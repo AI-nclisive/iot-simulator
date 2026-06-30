@@ -181,7 +181,7 @@ Protocol-agnostic breadth: synthetic generation, determinism, creation/reuse, an
 import/export. Modbus moved to Wave G (deferred) — see the note there.
 
 - [ ] IS-061 [BE] ⬜ [runtime] Resource governance (concurrent-source caps, backpressure) — 02
-- [ ] IS-062 [BE] ⬜ [gen] Synthetic generation (patterns + range + seed) — SPEC: Generate Synthetic
+- [x] IS-062 [BE] ✅ [gen] Synthetic generation (patterns + range + seed) — SPEC: Generate Synthetic
 - [x] IS-063 [BE] ✅ [gen] Deterministic run settings — SPEC: Run Deterministic
 - [x] IS-064 [BE] ✅ [model] Injectable clock + seeded RNG — 01
 - [ ] IS-065 [BE] ⬜ [source] Create from synthetic setup — SPEC: Manually Create / Synthetic
