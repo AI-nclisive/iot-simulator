@@ -550,7 +550,7 @@ Parallel execution:
   Done when: the team can walk through the primary path end to end and identify
   friction before implementation expands.
 
-- [ ] `UI-094` Responsive and platform baseline
+- [x] `UI-094` Responsive and platform baseline
   Surface: cross-surface review
   Depends: `UI-001`, `UI-090`
   Done when: desktop-first behavior, tablet tolerance, phone limits, and

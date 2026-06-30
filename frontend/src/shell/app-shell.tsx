@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, NavLink, Outlet } from "react-router-dom";
 import { ToastRegion } from "../ui/notification-pattern";
 import { useNotificationStore } from "./notification-store";
@@ -26,6 +27,9 @@ export function AppShell() {
   const dismissNotification = useNotificationStore((state) => state.dismiss);
   const projects = useProjectsStore((state) => state.projects);
 
+  // Mobile nav: collapsed by default on narrow screens, always visible on lg+
+  const [navOpen, setNavOpen] = useState(false);
+
   const currentProject = projects.find((p) => p.id === currentProjectId) ?? null;
   const access = resolveAccess(accessMode, sharedRole);
 
@@ -33,14 +37,39 @@ export function AppShell() {
     <>
     <div className="min-h-screen px-3 py-3 text-shell-ink sm:px-4 lg:px-5">
       <div className="mx-auto flex min-h-[calc(100vh-1.5rem)] max-w-[1680px] flex-col gap-3">
-        <header className="shell-panel px-4 py-3 lg:px-5">
+        {/* Top bar — product identity + mobile nav toggle */}
+        <header className="shell-panel flex items-center justify-between px-4 py-3 lg:px-5">
           <h1 className="text-lg font-semibold text-shell-ink">IoT Simulator</h1>
+          {/* Hamburger button — only visible below lg breakpoint (1024 px) */}
+          <button
+            aria-controls="project-rail"
+            aria-expanded={navOpen}
+            aria-label={navOpen ? "Close navigation" : "Open navigation"}
+            className="inline-flex items-center justify-center rounded-md border border-shell-line bg-white p-2 text-shell-ink transition hover:border-shell-accent hover:text-shell-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-shell-accent/40 lg:hidden"
+            type="button"
+            onClick={() => setNavOpen((open) => !open)}
+          >
+            {/* Three-line hamburger icon rendered with spans */}
+            <span aria-hidden="true" className="flex h-5 w-5 flex-col items-center justify-center gap-[4px]">
+              <span className="block h-[2px] w-full rounded-sm bg-current" />
+              <span className="block h-[2px] w-full rounded-sm bg-current" />
+              <span className="block h-[2px] w-full rounded-sm bg-current" />
+            </span>
+          </button>
         </header>
 
         <div className="flex min-h-0 flex-1 flex-col gap-3 lg:flex-row">
+          {/*
+            Project rail / sidebar.
+            Responsive behavior:
+            — Desktop (lg+, >=1024 px): always visible, fixed 280 px wide, side-by-side with content.
+            — Tablet (md, 768-1023 px): hidden by default; toggled by the hamburger button.
+            — Phone (<768 px): same toggle behavior; rail stacks above the content area when open.
+          */}
           <aside
+            id="project-rail"
             aria-label="Project navigation"
-            className="shell-panel w-full shrink-0 lg:w-[280px]"
+            className={`shell-panel w-full shrink-0 lg:block lg:w-[280px] ${navOpen ? "block" : "hidden"}`}
           >
             <div className="flex h-full flex-col">
               <div className="border-b border-shell-line px-4 py-4">
@@ -82,6 +111,7 @@ export function AppShell() {
                         `shell-nav-item ${isActive ? "shell-nav-item-active" : ""}`
                       }
                       to={item.to}
+                      onClick={() => setNavOpen(false)}
                     >
                       <span>{item.label}</span>
                     </NavLink>
