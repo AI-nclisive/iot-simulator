@@ -14,6 +14,7 @@ import { ProjectEntryPage } from "./surfaces/project-entry-page";
 import { RecordingFlowPage } from "./surfaces/recording-flow-page";
 import { RecordingsPage } from "./surfaces/recordings-page";
 import { ReplayFlowPage } from "./surfaces/replay-flow-page";
+import { ScenariosPage } from "./surfaces/scenarios-page";
 import { SettingsPage } from "./surfaces/settings-page";
 import { SurfaceStubPage } from "./surfaces/surface-stub-page";
 
@@ -27,11 +28,6 @@ const surfaceContent = {
     title: "Recordings & Samples",
     summary: "Work with captured and reusable data prepared for replay.",
     note: "This screen will hold recordings, samples, imports, and actions that connect them back into runtime work.",
-  },
-  scenarios: {
-    title: "Scenarios",
-    summary: "Build and run repeatable simulator flows.",
-    note: "This screen will hold saved scenarios, run entry points, and the path into scenario execution.",
   },
   evidence: {
     title: "Evidence",
@@ -126,7 +122,7 @@ export const router = createBrowserRouter([
       },
       {
         path: "scenarios",
-        element: <SurfaceStubPage {...surfaceContent.scenarios} />,
+        element: <ScenariosPage />,
       },
       {
         path: "evidence",
