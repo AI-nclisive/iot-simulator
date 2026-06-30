@@ -19,7 +19,7 @@ export function resolveAccess(accessMode: AccessMode, sharedRole: SharedRole) {
     canDeleteSource: isAdmin,
     canDuplicateSource: isAdmin,
     canImportProject: isAdmin,
-    canManageAdmin: isAdmin,
+    canManageAdmin: isShared && sharedRole === "admin",
     canRecordSource: isAdmin,
     canStopSource: true,
     canStartStoppedSource: true,
