@@ -736,6 +736,12 @@ Parallel execution:
   Depends: backend IS-071.
   Done when: `duplicateProject` calls `POST /api/v1/projects/{id}/duplicate` directly; fallback create path removed; no TypeScript errors.
 
+- [x] `UI-104` Wire duplicate data source to POST /data-sources/{id}/duplicate
+  Goal: replace the manual `POST /data-sources` create in `data-sources-store.ts` with the canonical `/duplicate` endpoint delivered by IS-066.
+  Surfaces: Data Sources list — duplicate action.
+  Depends: backend IS-066.
+  Done when: `duplicateDataSource` calls `POST /api/v1/projects/{pid}/data-sources/{rowId}/duplicate` directly; manual create path removed; no TypeScript errors.
+
 ## Recommended Sequence
 
 1. Complete the P0 shell and shared-pattern tasks first.

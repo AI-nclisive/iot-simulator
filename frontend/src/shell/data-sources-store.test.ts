@@ -7,6 +7,7 @@
  * - loadDataSources error path: sets error state
  * - deleteDataSource: removes from store after DELETE
  * - startDataSource: updates row from API response
+ * - duplicateDataSource: calls POST /data-sources/{id}/duplicate (UI-104)
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi, type MockedFunction } from "vitest";
@@ -131,5 +132,24 @@ describe("startDataSource", () => {
     await useDataSourcesStore.getState().startDataSource("src-01", "proj-1");
     const row = useDataSourcesStore.getState().dataSources[0];
     expect(row.status).toBe("Active");
+  });
+});
+
+describe("duplicateDataSource", () => {
+  it("calls POST /data-sources/{rowId}/duplicate and appends the copy", async () => {
+    useDataSourcesStore.setState({
+      dataSources: [
+        { id: "src-01", name: "Source A", protocol: "OPC UA", endpoint: "opc.tcp://test:4840", parameterCount: 0, status: "Stopped", health: "Healthy" },
+      ],
+      currentProjectId: "proj-1",
+    });
+    mockApiFetch.mockResolvedValueOnce(makeDataSourceResponse({ id: "src-02", name: "Source A (copy)" }));
+    await useDataSourcesStore.getState().duplicateDataSource("src-01", "proj-1");
+    expect(mockApiFetch).toHaveBeenCalledWith(
+      "/api/v1/projects/proj-1/data-sources/src-01/duplicate",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(useDataSourcesStore.getState().dataSources).toHaveLength(2);
+    expect(useDataSourcesStore.getState().dataSources[1].id).toBe("src-02");
   });
 });
