@@ -21,12 +21,15 @@ import tools.jackson.databind.node.ObjectNode;
 @Component
 public class ZipEvidenceArtifactWriter implements EvidenceArtifactWriter {
 
-    private static final String FORMAT_VERSION = "1.0.0";
-
     private final ObjectMapper json;
 
     public ZipEvidenceArtifactWriter(ObjectMapper json) {
         this.json = json;
+    }
+
+    @Override
+    public EvidenceFormat format() {
+        return EvidenceFormat.BUNDLE;
     }
 
     @Override
@@ -47,13 +50,13 @@ public class ZipEvidenceArtifactWriter implements EvidenceArtifactWriter {
     }
 
     @Override
-    public String formatVersion() {
-        return FORMAT_VERSION;
+    public String contentType() {
+        return "application/zip";
     }
 
     @Override
-    public String contentType() {
-        return "application/zip";
+    public String artifactFilename() {
+        return "bundle.zip";
     }
 
     /** Renders runtime events with the payload as a nested object rather than a string. */
