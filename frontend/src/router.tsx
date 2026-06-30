@@ -1,5 +1,6 @@
 import { Navigate, createBrowserRouter } from "react-router-dom";
 import { AppShell } from "./shell/app-shell";
+import { AdminUsersPage } from "./surfaces/admin-users-page";
 import { CreateDataSourceWizardPage } from "./surfaces/create-data-source-wizard-page";
 import { DataSourceDetailPreviewPage } from "./surfaces/data-source-detail-preview-page";
 import { DataSourcesListPage } from "./surfaces/data-sources-list-page";
@@ -145,7 +146,7 @@ export const router = createBrowserRouter([
       },
       {
         path: "admin",
-        element: <SurfaceStubPage {...surfaceContent.admin} adminOnly />,
+        element: <AdminUsersPage />,
       },
       {
         path: "notifications-demo",

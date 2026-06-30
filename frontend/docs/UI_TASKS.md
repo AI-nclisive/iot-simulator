@@ -527,7 +527,7 @@ Parallel execution:
   Done when: project settings and environment settings are separated and
   mutation remains role-aware.
 
-- [ ] `UI-081` Admin users list
+- [x] `UI-081` Admin users list
   Surface: `Admin UI`
   Depends: `UI-001`, `UI-003`, `UI-006`
   Done when: the Admin surface clearly shows users, roles, status, and recent
