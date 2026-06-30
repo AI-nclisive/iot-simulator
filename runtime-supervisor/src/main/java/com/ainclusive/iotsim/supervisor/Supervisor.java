@@ -433,9 +433,12 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
     /**
      * Maps a wire {@link RuntimeEvent} to the neutral {@link RuntimeActivityEvent} for a
      * data source, or {@code null} for a blank type (skipped). {@code type} is passed
-     * through verbatim so new worker event kinds need no supervisor change.
+     * through verbatim so new worker event kinds need no supervisor change; a worker
+     * {@code ERROR} is attributed to {@link HealthOrigin#PROTOCOL} (the worker reported
+     * it), other kinds carry no origin. Package-private for direct unit testing of the
+     * origin attribution.
      */
-    private static RuntimeActivityEvent toRuntimeActivity(String dataSourceId, RuntimeEvent event) {
+    static RuntimeActivityEvent toRuntimeActivity(String dataSourceId, RuntimeEvent event) {
         String type = event.getType();
         if (type == null || type.isBlank()) {
             return null;
