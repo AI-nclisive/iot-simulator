@@ -730,6 +730,12 @@ Parallel execution:
   Surfaces: Data Source Detail — Values tab.
   Done when: `SourceValueRow.dataType` contains only values present in backend `DataType` contract (`FLOAT32/64→float`, `INT*→int`, `BOOL→bool`, `STRING→string`); no `"enum"` in mock data; no TypeScript errors.
 
+- [x] `UI-103` Wire duplicate project to POST /projects/{id}/duplicate
+  Goal: replace the `/copy` stub + fallback in `projects-store.ts` with the canonical `/duplicate` endpoint delivered by IS-071.
+  Surfaces: Projects list — duplicate action.
+  Depends: backend IS-071.
+  Done when: `duplicateProject` calls `POST /api/v1/projects/{id}/duplicate` directly; fallback create path removed; no TypeScript errors.
+
 ## Recommended Sequence
 
 1. Complete the P0 shell and shared-pattern tasks first.
