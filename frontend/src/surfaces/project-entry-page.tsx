@@ -248,6 +248,103 @@ function RenameProjectDialog({
   );
 }
 
+function CreateProjectDialog({
+  onClose,
+  onCreated,
+}: {
+  onClose: () => void;
+  onCreated: (project: ProjectSummary) => void;
+}) {
+  const createProject = useProjectsStore((state) => state.createProject);
+  const push = useNotificationStore((state) => state.push);
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const trimmedName = name.trim();
+  const isValid = trimmedName.length > 0;
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape" && !submitting) onClose();
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onClose, submitting]);
+
+  async function handleCreate() {
+    if (!isValid || submitting) return;
+    setSubmitting(true);
+    try {
+      const project = await createProject(trimmedName, description.trim() || undefined);
+      onCreated(project);
+    } catch (err) {
+      const title = err instanceof Error ? err.message : "Could not create the project";
+      push({ tone: "error", title });
+      setSubmitting(false);
+    }
+  }
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div
+        className="w-full max-w-md rounded-lg border border-shell-line bg-white shadow-xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="create-dialog-title"
+      >
+        <div className="border-b border-shell-line px-5 py-4">
+          <h2 id="create-dialog-title" className="text-base font-semibold text-shell-ink">
+            Create project
+          </h2>
+        </div>
+
+        <div className="space-y-4 px-5 py-5">
+          <label className="flex flex-col gap-2 text-sm text-shell-muted">
+            Project name
+            <input
+              autoFocus
+              className="shell-field"
+              disabled={submitting}
+              placeholder="Assembly line A"
+              type="text"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+            />
+          </label>
+
+          <label className="flex flex-col gap-2 text-sm text-shell-muted">
+            Description (optional)
+            <textarea
+              className="shell-field"
+              disabled={submitting}
+              placeholder="What this simulator setup is for"
+              rows={3}
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+            />
+          </label>
+        </div>
+
+        <div className="flex items-center justify-end gap-2 border-t border-shell-line px-5 py-4">
+          <button className="shell-action" disabled={submitting} type="button" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            className="shell-action"
+            disabled={!isValid || submitting}
+            type="button"
+            onClick={handleCreate}
+          >
+            {submitting ? "Creating…" : "Create"}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 export function ProjectEntryPage() {
   const navigate = useNavigate();
   const accessMode = useShellStore((state) => state.accessMode);
@@ -264,6 +361,7 @@ export function ProjectEntryPage() {
   const push = useNotificationStore((state) => state.push);
   const access = resolveAccess(accessMode, sharedRole);
   const [importOpen, setImportOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
   const [lifecycleRequest, setLifecycleRequest] = useState<LifecycleRequest>(null);
 
   useEffect(() => {
@@ -404,7 +502,7 @@ export function ProjectEntryPage() {
                 <button
                   className="shell-action"
                   type="button"
-                  onClick={() => navigate("/projects/create")}
+                  onClick={() => setCreateOpen(true)}
                 >
                   Create project
                 </button>
@@ -418,9 +516,7 @@ export function ProjectEntryPage() {
             <SharedStatePanel
               actionLabel={access.canCreateProject ? "Create project" : undefined}
               message="Create or import a simulator project to start working with data-sources, recordings, and replay."
-              onAction={
-                access.canCreateProject ? () => navigate("/projects/create") : undefined
-              }
+              onAction={access.canCreateProject ? () => setCreateOpen(true) : undefined}
               state="empty"
               title="No projects are available yet."
             />
@@ -543,6 +639,16 @@ export function ProjectEntryPage() {
 
       {importOpen ? (
         <ImportProjectDialog projects={projects} onClose={() => setImportOpen(false)} />
+      ) : null}
+
+      {createOpen ? (
+        <CreateProjectDialog
+          onClose={() => setCreateOpen(false)}
+          onCreated={(project) => {
+            setCreateOpen(false);
+            openProject(project.id);
+          }}
+        />
       ) : null}
 
       {lifecycleRequest?.action === "rename" ? (

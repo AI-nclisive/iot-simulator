@@ -58,11 +58,6 @@ const surfaceContent = {
 } as const;
 
 const entrySurfaceContent = {
-  projectCreate: {
-    title: "Create Project",
-    summary: "Start a new saved simulator setup.",
-    note: "This surface will hold the guided project creation flow and its naming, validation, and save behavior.",
-  },
   projectImport: {
     title: "Import Project",
     summary: "Bring an existing simulator setup into this environment.",
@@ -82,10 +77,6 @@ export const router = createBrowserRouter([
   {
     path: "/projects",
     element: <ProjectEntryPage />,
-  },
-  {
-    path: "/projects/create",
-    element: <SurfaceStubPage {...entrySurfaceContent.projectCreate} />,
   },
   {
     path: "/projects/import",

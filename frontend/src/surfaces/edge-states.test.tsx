@@ -70,7 +70,7 @@ describe("DataSourcesListPage — sourceListStale", () => {
     }));
     const { DataSourcesListPage } = await import("./data-sources-list-page");
     render(<MemoryRouter><DataSourcesListPage /></MemoryRouter>);
-    expect(screen.getByText("Loading…")).toBeTruthy();
+    expect(screen.getByText("Loading sources…")).toBeTruthy();
   });
 
   it("hides loading when isLoading is false", async () => {
@@ -79,7 +79,7 @@ describe("DataSourcesListPage — sourceListStale", () => {
     }));
     const { DataSourcesListPage } = await import("./data-sources-list-page");
     render(<MemoryRouter><DataSourcesListPage /></MemoryRouter>);
-    expect(screen.queryByText("Loading…")).toBeNull();
+    expect(screen.queryByText("Loading sources…")).toBeNull();
   });
 });
 
