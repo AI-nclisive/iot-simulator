@@ -56,7 +56,7 @@ export function RuntimeDashboardPanel() {
   // Live runtime stream drives the connection/stale indicator and per-source
   // health summary. The active-run process list (recordings/replays/scenarios)
   // is wired separately under UI-097; here we reflect real-time connection state.
-  const { sources, status: liveStatus } = useLiveRuntime(projectId);
+  const { sources, status: liveStatus } = useLiveRuntime(projectId, !!projectId);
 
   const isStale = liveStatus === "stale" || liveStatus === "reconnecting";
   const unhealthy = sources.filter((s) => s.health === "Error" || s.health === "Warning");

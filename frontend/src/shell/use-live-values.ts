@@ -42,7 +42,7 @@ function formatTime(sourceTime: string): string {
     : d.toLocaleTimeString("en-GB", { hour12: false });
 }
 
-function toRow(sourceId: string, v: StreamValue, pinned: boolean): SourceValueRow {
+function toRow(sourceId: string, v: StreamValue): SourceValueRow {
   return {
     id: `${sourceId}:${v.nodeId}`,
     sourceId,
@@ -53,7 +53,7 @@ function toRow(sourceId: string, v: StreamValue, pinned: boolean): SourceValueRo
     currentValue: formatValue(v.value),
     updatedAt: formatTime(v.sourceTime),
     freshness: v.quality === "GOOD" ? "Live" : "No updates",
-    pinned,
+    pinned: false,
   };
 }
 
@@ -74,9 +74,6 @@ export function useLiveValues(sourceId: string, enabled = true): LiveValuesResul
   useEffect(() => {
     if (!enabled) return;
 
-    // Preserve pin state across snapshot replacements within this subscription.
-    const pinned = new Set<string>();
-
     const handle = openLiveStream(`/api/v1/data-sources/${sourceId}/stream/values`, {
       eventTypes: ["values-snapshot", "values"],
       onStatus: (s) => {
@@ -88,20 +85,18 @@ export function useLiveValues(sourceId: string, enabled = true): LiveValuesResul
       },
       onEvent: (type, data) => {
         if (type === "values-snapshot" && Array.isArray(data)) {
-          const next = data
-            .filter(isStreamValue)
-            .map((v) => toRow(sourceId, v, pinned.has(`${sourceId}:${v.nodeId}`)));
+          const next = data.filter(isStreamValue).map((v) => toRow(sourceId, v));
           setRows(next);
           return;
         }
         if (type === "values" && isStreamValue(data)) {
           const id = `${sourceId}:${data.nodeId}`;
-          const row = toRow(sourceId, data, pinned.has(id));
+          const row = toRow(sourceId, data);
           setRows((prev) => {
             const idx = prev.findIndex((r) => r.id === id);
             if (idx === -1) return [...prev, row];
             const copy = prev.slice();
-            copy[idx] = { ...row, pinned: prev[idx].pinned };
+            copy[idx] = row;
             return copy;
           });
         }
