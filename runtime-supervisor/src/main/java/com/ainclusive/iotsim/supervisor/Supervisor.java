@@ -6,11 +6,14 @@ import com.ainclusive.iotsim.platform.capture.CaptureSpec;
 import com.ainclusive.iotsim.platform.capture.SourceCapturer;
 import com.ainclusive.iotsim.platform.runtime.ClientActivityEvent;
 import com.ainclusive.iotsim.platform.runtime.ClientActivityListener;
+import com.ainclusive.iotsim.platform.runtime.HealthOrigin;
 import com.ainclusive.iotsim.platform.runtime.LiveValueListener;
 import com.ainclusive.iotsim.platform.runtime.RuntimeActivityEvent;
 import com.ainclusive.iotsim.platform.runtime.RuntimeActivityListener;
 import com.ainclusive.iotsim.platform.runtime.RuntimeController;
 import com.ainclusive.iotsim.platform.runtime.RuntimeStartSpec;
+import com.ainclusive.iotsim.platform.runtime.SourceError;
+import com.ainclusive.iotsim.platform.runtime.SourceHealth;
 import com.ainclusive.iotsim.platform.scan.ConnectionTestResult;
 import com.ainclusive.iotsim.platform.scan.DiscoveredNode;
 import com.ainclusive.iotsim.platform.scan.ScanResult;
@@ -232,6 +235,14 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
     }
 
     @Override
+    public SourceHealth health(String dataSourceId) {
+        ManagedWorker worker = running.get(dataSourceId);
+        return worker == null
+                ? new SourceHealth(STOPPED, null)
+                : new SourceHealth(worker.stateName(), worker.lastError);
+    }
+
+    @Override
     public long applyValues(String dataSourceId, List<NeutralValue> values) {
         ManagedWorker worker = running.get(dataSourceId);
         if (worker == null) {
@@ -433,7 +444,8 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
         Instant at = Instant.ofEpochSecond(
                 Math.floorDiv(micros, 1_000_000L), Math.floorMod(micros, 1_000_000L) * 1_000L);
         String detail = event.getDetail().isEmpty() ? null : event.getDetail();
-        return new RuntimeActivityEvent(dataSourceId, type, at, detail);
+        HealthOrigin origin = "ERROR".equals(type) ? HealthOrigin.PROTOCOL : null;
+        return new RuntimeActivityEvent(dataSourceId, type, at, detail, origin);
     }
 
     private static com.ainclusive.iotsim.protocolmodel.Quality neutralQuality(Quality wire) {
@@ -628,10 +640,17 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
         private int healthFailures;
         private volatile WorkerState state = WorkerState.SPAWNED;
         private volatile boolean stale;
+        private volatile SourceError lastError;
 
         ManagedWorker(String dataSourceId, RuntimeStartSpec spec) {
             this.dataSourceId = dataSourceId;
             this.spec = spec;
+        }
+
+        /** Emits a supervisor-detected health transition; call OUTSIDE the monitor. */
+        private void emitHealthEvent(String type, String reason) {
+            runtimeActivityListener.onRuntimeActivity(new RuntimeActivityEvent(
+                    dataSourceId, type, Instant.now(), reason, HealthOrigin.SIMULATOR));
         }
 
         /** Initial bring-up, synchronous so the caller of {@code start()} sees failures. */
@@ -745,23 +764,36 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
         }
 
         /** Fires when a worker process exits — schedules a restart unless it was intentional. */
-        private synchronized void onWorkerExit(LaunchedWorker exited) {
-            if (stopping || launched != exited) {
-                return;
+        private void onWorkerExit(LaunchedWorker exited) {
+            boolean terminal;
+            synchronized (this) {
+                if (stopping || launched != exited) {
+                    return;
+                }
+                // The process is gone; release its streams and channel before relaunching.
+                cancelStreams();
+                closeQuietly(client);
+                client = null;
+                launched = null;
+                terminal = scheduleRestart();
             }
-            // The process is gone; release its client-event stream and channel before relaunching.
-            cancelStreams();
-            closeQuietly(client);
-            client = null;
-            launched = null;
-            scheduleRestart();
+            if (terminal) {
+                emitHealthEvent("SOURCE_ERROR",
+                        lastError != null ? lastError.reason() : "worker exited");
+            }
         }
 
-        /** Caller holds the monitor. Backs off and schedules a restart, or gives up at the cap. */
-        private void scheduleRestart() {
+        /**
+         * Caller holds the monitor. Backs off and schedules a restart, or gives up
+         * at the cap. Returns {@code true} if the worker reached a terminal
+         * {@code EXITED} (ERROR) state with no further restart.
+         */
+        private boolean scheduleRestart() {
             if (restarts >= restartPolicy.maxRestarts()) {
                 state = WorkerState.EXITED; // exhausted -> reported as ERROR
-                return;
+                lastError = new SourceError(HealthOrigin.SIMULATOR,
+                        "restart budget exhausted after " + restarts + " attempts", Instant.now());
+                return true;
             }
             restarts++;
             state = WorkerState.SPAWNED; // recovering -> reported as STARTING
@@ -771,7 +803,11 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
                         this::restart, delay.toMillis(), TimeUnit.MILLISECONDS);
             } catch (RejectedExecutionException e) {
                 state = WorkerState.EXITED; // scheduler shutting down; nothing more to try
+                lastError = new SourceError(HealthOrigin.SIMULATOR,
+                        "supervisor shutting down", Instant.now());
+                return true;
             }
+            return false;
         }
 
         private void restart() {
@@ -786,10 +822,15 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
             } catch (RuntimeException e) {
                 // Relaunch itself failed (or was interrupted by stop()); back off again
                 // unless we are tearing down.
+                boolean terminal = false;
                 synchronized (this) {
                     if (!stopping) {
-                        scheduleRestart();
+                        terminal = scheduleRestart();
                     }
+                }
+                if (terminal) {
+                    emitHealthEvent("SOURCE_ERROR",
+                            lastError != null ? lastError.reason() : "worker exited");
                 }
                 return;
             }
@@ -866,18 +907,30 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
                 current = client;
             }
             boolean healthy = current.isHealthy(healthPolicy.probeTimeout());
+            boolean becameStale = false;
+            boolean recovered = false;
+            String reason = null;
             synchronized (this) {
-                // The worker may have stopped or been restarted while we probed; if the
-                // live client changed, our verdict is about a now-defunct worker — drop it.
                 if (stopping || state != WorkerState.RUNNING || client != current) {
                     return;
                 }
                 if (healthy) {
                     healthFailures = 0;
-                    stale = false;
-                } else if (++healthFailures >= healthPolicy.staleThreshold()) {
+                    if (stale) {
+                        stale = false;
+                        recovered = true;
+                    }
+                } else if (++healthFailures >= healthPolicy.staleThreshold() && !stale) {
                     stale = true;
+                    becameStale = true;
+                    reason = "no health response in " + healthFailures + " consecutive probes";
+                    lastError = new SourceError(HealthOrigin.SIMULATOR, reason, Instant.now());
                 }
+            }
+            if (becameStale) {
+                emitHealthEvent("SOURCE_STALE", reason);
+            } else if (recovered) {
+                emitHealthEvent("SOURCE_RECOVERED", "health restored");
             }
         }
 
