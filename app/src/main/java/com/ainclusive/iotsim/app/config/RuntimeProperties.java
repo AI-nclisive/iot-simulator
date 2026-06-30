@@ -1,5 +1,6 @@
 package com.ainclusive.iotsim.app.config;
 
+import com.ainclusive.iotsim.supervisor.ResourceGovernancePolicy;
 import com.ainclusive.iotsim.supervisor.RestartPolicy;
 import java.time.Duration;
 import java.util.List;
@@ -19,12 +20,15 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  *       argument.
  *   <li>{@code restart} tunes restart-with-backoff on unexpected worker failure;
  *       unset fields fall back to {@link RestartPolicy#DEFAULT}.
+ *   <li>{@code governance.max-concurrent-workers} caps concurrent source workers
+ *       (default 50; {@code <= 0} = unlimited). See {@link Governance}.
  * </ul>
  *
  * <p>See backend-specs/02_WORKER_CONTRACT_AND_IPC.md.
  */
 @ConfigurationProperties(prefix = "iotsim.runtime")
-public record RuntimeProperties(String mode, Map<String, List<String>> workers, Restart restart) {
+public record RuntimeProperties(
+        String mode, Map<String, List<String>> workers, Restart restart, Governance governance) {
 
     public RuntimeProperties {
         mode = (mode == null || mode.isBlank()) ? "memory" : mode;
@@ -35,6 +39,7 @@ public record RuntimeProperties(String mode, Map<String, List<String>> workers, 
                 .filter(e -> e.getKey() != null && e.getValue() != null)
                 .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, e -> List.copyOf(e.getValue())));
         restart = restart == null ? new Restart(null, null, null, null) : restart;
+        governance = governance == null ? new Governance(null) : governance;
     }
 
     public boolean isSupervisorMode() {
@@ -44,6 +49,26 @@ public record RuntimeProperties(String mode, Map<String, List<String>> workers, 
     /** Builds the {@link RestartPolicy}, applying {@link RestartPolicy#DEFAULT} for unset fields. */
     public RestartPolicy restartPolicy() {
         return restart.toPolicy();
+    }
+
+    /** Builds the {@link ResourceGovernancePolicy}, applying its default for an unset cap. */
+    public ResourceGovernancePolicy governancePolicy() {
+        return governance.toPolicy();
+    }
+
+    /**
+     * Resource-governance tuning (IS-061). {@code maxConcurrentWorkers} caps the
+     * number of concurrent long-running source workers; unset inherits
+     * {@link ResourceGovernancePolicy#DEFAULT} (50), and a value {@code <= 0} means
+     * unlimited. Property: {@code iotsim.runtime.governance.max-concurrent-workers}.
+     */
+    public record Governance(Integer maxConcurrentWorkers) {
+
+        ResourceGovernancePolicy toPolicy() {
+            return maxConcurrentWorkers == null
+                    ? ResourceGovernancePolicy.DEFAULT
+                    : new ResourceGovernancePolicy(maxConcurrentWorkers);
+        }
     }
 
     /**

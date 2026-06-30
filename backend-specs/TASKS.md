@@ -180,7 +180,7 @@ Make runs observable and produce the P0 evidence artifact.
 Protocol-agnostic breadth: synthetic generation, determinism, creation/reuse, and
 import/export. Modbus moved to Wave G (deferred) — see the note there.
 
-- [ ] IS-061 [BE] ⬜ [runtime] Resource governance (concurrent-source caps, backpressure) — 02
+- [x] IS-061 [BE] ✅ [runtime] Resource governance (concurrent-source caps, backpressure) — 02
 - [x] IS-062 [BE] ✅ [gen] Synthetic generation (patterns + range + seed) — SPEC: Generate Synthetic
 - [x] IS-063 [BE] ✅ [gen] Deterministic run settings — SPEC: Run Deterministic
 - [x] IS-064 [BE] ✅ [model] Injectable clock + seeded RNG — 01

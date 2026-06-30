@@ -23,6 +23,7 @@ final class TestWorkerLauncher implements WorkerLauncher {
 
     private final List<Launch> launches = new CopyOnWriteArrayList<>();
     private volatile boolean handshakeBroken;
+    private volatile boolean launchFailing;
 
     /**
      * From now on, launched workers bind their port but expose no service, so the
@@ -33,8 +34,19 @@ final class TestWorkerLauncher implements WorkerLauncher {
         this.handshakeBroken = broken;
     }
 
+    /**
+     * From now on, {@code launch(...)} throws immediately, simulating a worker that
+     * cannot be spawned — used to exercise admission-permit rollback on a failed launch.
+     */
+    void setLaunchFailing(boolean failing) {
+        this.launchFailing = failing;
+    }
+
     @Override
     public LaunchedWorker launch(String protocol, int controlPort) throws Exception {
+        if (launchFailing) {
+            throw new IllegalStateException("simulated launch failure");
+        }
         TestProtocolService service = new TestProtocolService();
         NettyServerBuilder builder = NettyServerBuilder
                 .forAddress(new InetSocketAddress(InetAddress.getLoopbackAddress(), controlPort));
