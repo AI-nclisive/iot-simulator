@@ -108,4 +108,22 @@ class SupervisorGovernanceTest {
         }
         assertThat(launcher.launchCount()).isEqualTo(5);
     }
+
+    @Test
+    void permitHeldAcrossRestartBackoffRefusesAnotherSource() {
+        // A recovering worker keeps its permit for the whole restart-with-backoff
+        // window. With a long backoff (30s, never fires during the test) and one
+        // retry budget, an unexpected crash leaves ds1 in STARTING — still holding
+        // the only slot — so a *different* source must still be refused. This is the
+        // subtlest governance invariant: the restart path must not release or
+        // re-acquire the permit. (If the permit were freed on exit, ds2 would start.)
+        RestartPolicy slowRetry = new RestartPolicy(
+                Duration.ofSeconds(30), 1.0, Duration.ofSeconds(30), 1);
+        supervisor = new Supervisor(launcher, slowRetry, new ResourceGovernancePolicy(1));
+        supervisor.start("ds1", spec());
+        launcher.crashLast();
+        assertThat(supervisor.state("ds1")).isEqualTo("STARTING");
+        assertThatThrownBy(() -> supervisor.start("ds2", spec()))
+                .isInstanceOf(RuntimeCapacityException.class);
+    }
 }
