@@ -15,5 +15,5 @@ dependencies {
     // (api -> domain -> persistence), so the JSON handling does too.
     implementation("tools.jackson.core:jackson-databind")
 
-    testImplementation("org.mockito:mockito-core")
+    testImplementation(libs.mockito.core)
 }

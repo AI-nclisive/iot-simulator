@@ -26,8 +26,7 @@ public class SyntheticRunController {
     public SyntheticRunResponse run(
             @PathVariable String projectId, @PathVariable String dataSourceId,
             @RequestBody SyntheticRunRequest req) {
-        long durationMs = req == null ? 0 : req.durationMs();
-        SyntheticRunSummary summary = syntheticRuns.run(projectId, dataSourceId, durationMs);
+        SyntheticRunSummary summary = syntheticRuns.run(projectId, dataSourceId, req.durationMs());
         return new SyntheticRunResponse(summary.dataSourceId(), summary.valueCount(),
                 summary.seed(), summary.runId(), summary.evidenceId());
     }
