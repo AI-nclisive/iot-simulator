@@ -534,6 +534,57 @@ The interface should support:
 Complex tables, editors, and live panels need the same accessibility care as
 forms and dialogs.
 
+## Responsive Baseline
+
+The product is desktop-first. The primary runtime context is a workstation or
+laptop screen. Responsive behavior is a baseline requirement, not a full mobile
+redesign.
+
+### Breakpoints
+
+Standard Tailwind CSS breakpoints apply:
+
+| Name | Width    | Behavior                                              |
+| ---- | -------- | ----------------------------------------------------- |
+| `sm` | >= 640 px | Minor padding and spacing adjustments.                |
+| `md` | >= 768 px | Tablet portrait. Layout still stacks vertically.      |
+| `lg` | >= 1024 px| Desktop baseline. Two-column shell: sidebar + content.|
+| `xl` | >= 1280 px| Wide desktop. Toolbar controls may go side-by-side.   |
+
+### Desktop (lg+)
+
+Full two-column layout. Sidebar is always visible. All operational surfaces are
+fully supported. This is the primary supported context.
+
+### Tablet tolerance (md, 768-1023 px)
+
+The shell collapses to a single column. The project rail hides behind a hamburger
+toggle in the top bar. Tables stay readable via horizontal scroll. Forms stack
+vertically without truncation. Operational use is possible but not optimized.
+
+### Phone limits (<768 px)
+
+The shell is accessible but not optimized for phone-first use. The hamburger
+toggle remains available. Dense operational tables scroll horizontally. Forms
+remain usable. No phone-specific layouts are planned.
+
+### Browser consistency
+
+The interface must behave consistently on the latest stable versions of Chrome,
+Firefox, and Safari across Linux, Windows, and macOS. Internet Explorer is not
+supported. Edge (Chromium) behaves equivalent to Chrome.
+
+### Implementation rules
+
+- Tables always wrap in `overflow-x-auto` so dense columns scroll rather than
+  truncate or break layout.
+- Forms use `flex-col` stacking on narrow screens and may expand to row layouts
+  at `xl` or wider.
+- The project rail collapses to hidden below `lg`; the hamburger toggle
+  (`aria-expanded`, `aria-controls`) makes it accessible via keyboard and touch.
+- No minimum viewport width is enforced. The layout degrades gracefully below
+  320 px but is not tested at that size.
+
 ## Stable UX Decisions
 
 These design decisions are fixed unless the product direction changes:
