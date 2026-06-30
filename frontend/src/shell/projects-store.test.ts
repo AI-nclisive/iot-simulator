@@ -163,7 +163,9 @@ describe("loadProjects", () => {
   });
 
   it("sets error on API failure when projects fetch fails", async () => {
-    mockApiFetch.mockRejectedValueOnce(new Error("Network error"));
+    mockApiFetch
+      .mockRejectedValueOnce(new Error("Network error"))
+      .mockResolvedValueOnce([]);
     await useProjectsStore.getState().loadProjects();
     const { error, isLoading, projects } = useProjectsStore.getState();
     expect(error).toBeTruthy();
