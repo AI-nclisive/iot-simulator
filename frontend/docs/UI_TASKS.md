@@ -533,7 +533,7 @@ Parallel execution:
   Done when: the Admin surface clearly shows users, roles, status, and recent
   activity hints.
 
-- [ ] `UI-082` Access management flows
+- [x] `UI-082` Access management flows
   Surface: `Admin UI`
   Depends: `UI-081`
   Done when: role assignment, status validation, and save states are clear

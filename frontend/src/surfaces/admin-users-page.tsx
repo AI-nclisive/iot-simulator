@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { resolveAccess } from "../shell/access-policy";
+import { useNotificationStore } from "../shell/notification-store";
 import { useShellStore } from "../shell/shell-store";
 import { ConfirmationDialog } from "../ui/confirmation-dialog";
 import { SharedStatePanel } from "../ui/shared-state-panel";
@@ -13,7 +14,7 @@ import {
   type TableRowAction,
   type TableSortState,
 } from "../ui/table-pattern";
-import { mockUsers, type UserRow } from "./mock-users";
+import { mockUserSaveShouldFail, mockUsers, type UserRow } from "./mock-users";
 
 type RoleFilter = "all" | "admin" | "user";
 type StatusFilter = "all" | "active" | "inactive";
@@ -39,10 +40,20 @@ function statusLabel(status: "active" | "inactive") {
   return status === "active" ? "Active" : "Inactive";
 }
 
+function mockSaveUser(): Promise<void> {
+  return new Promise((resolve, reject) =>
+    setTimeout(() => {
+      if (mockUserSaveShouldFail) reject(new Error("Service unavailable"));
+      else resolve();
+    }, 700),
+  );
+}
+
 export function AdminUsersPage() {
   const accessMode = useShellStore((state) => state.accessMode);
   const sharedRole = useShellStore((state) => state.sharedRole);
   const access = resolveAccess(accessMode, sharedRole);
+  const notify = useNotificationStore((s) => s.push);
 
   const [users, setUsers] = useState<UserRow[]>(mockUsers);
   const [searchValue, setSearchValue] = useState("");
@@ -53,6 +64,8 @@ export function AdminUsersPage() {
     direction: "asc",
   });
   const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [savingUserId, setSavingUserId] = useState<string | null>(null);
 
   const hasQueryState =
     searchValue.trim() !== "" || roleFilter !== "all" || statusFilter !== "all";
@@ -68,24 +81,60 @@ export function AdminUsersPage() {
     });
   }, [users, searchValue, roleFilter, statusFilter]);
 
-  function applyRoleChange(userId: string, newRole: "admin" | "user") {
-    setUsers((prev) =>
-      prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u)),
+  function isLastActiveAdmin(userId: string): boolean {
+    return (
+      users.filter((u) => u.role === "admin" && u.status === "active" && u.id !== userId)
+        .length === 0
     );
-    setConfirmRequest(null);
   }
 
-  function applyDeactivate(userId: string) {
-    setUsers((prev) =>
-      prev.map((u) => (u.id === userId ? { ...u, status: "inactive" } : u)),
-    );
-    setConfirmRequest(null);
+  async function handleRoleChange(userId: string, newRole: "admin" | "user") {
+    setIsSaving(true);
+    try {
+      await mockSaveUser();
+      setUsers((prev) =>
+        prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u)),
+      );
+      setConfirmRequest(null);
+      notify({ tone: "success", title: `Role changed to ${roleLabel(newRole)}.` });
+    } catch {
+      setConfirmRequest(null);
+      notify({ tone: "error", title: "Failed to change role. Try again." });
+    } finally {
+      setIsSaving(false);
+    }
   }
 
-  function applyActivate(userId: string) {
-    setUsers((prev) =>
-      prev.map((u) => (u.id === userId ? { ...u, status: "active" } : u)),
-    );
+  async function handleDeactivate(userId: string) {
+    setIsSaving(true);
+    try {
+      await mockSaveUser();
+      setUsers((prev) =>
+        prev.map((u) => (u.id === userId ? { ...u, status: "inactive" } : u)),
+      );
+      setConfirmRequest(null);
+      notify({ tone: "success", title: "User deactivated." });
+    } catch {
+      setConfirmRequest(null);
+      notify({ tone: "error", title: "Failed to deactivate user. Try again." });
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleActivate(userId: string) {
+    setSavingUserId(userId);
+    try {
+      await mockSaveUser();
+      setUsers((prev) =>
+        prev.map((u) => (u.id === userId ? { ...u, status: "active" } : u)),
+      );
+      notify({ tone: "success", title: "User activated." });
+    } catch {
+      notify({ tone: "error", title: "Failed to activate user. Try again." });
+    } finally {
+      setSavingUserId(null);
+    }
   }
 
   const columns: TableColumn<UserRow>[] = [
@@ -128,23 +177,41 @@ export function AdminUsersPage() {
     ? (u: UserRow): TableRowAction<UserRow>[] => [
         {
           label: u.role === "admin" ? "Make User" : "Make Admin",
-          onClick: () =>
+          onClick: () => {
+            if (u.role === "admin" && isLastActiveAdmin(u.id)) {
+              notify({
+                tone: "warning",
+                title: "Cannot change role.",
+                message: "At least one Admin must remain active.",
+              });
+              return;
+            }
             setConfirmRequest({
               kind: "role-change",
               userId: u.id,
               newRole: u.role === "admin" ? "user" : "admin",
-            }),
+            });
+          },
         },
         u.status === "active"
           ? {
               label: "Deactivate",
               tone: "danger" as const,
-              onClick: () =>
-                setConfirmRequest({ kind: "deactivate", userId: u.id }),
+              onClick: () => {
+                if (u.role === "admin" && isLastActiveAdmin(u.id)) {
+                  notify({
+                    tone: "warning",
+                    title: "Cannot deactivate.",
+                    message: "At least one Admin must remain active.",
+                  });
+                  return;
+                }
+                setConfirmRequest({ kind: "deactivate", userId: u.id });
+              },
             }
           : {
-              label: "Activate",
-              onClick: () => applyActivate(u.id),
+              label: savingUserId === u.id ? "Saving…" : "Activate",
+              onClick: () => handleActivate(u.id),
             },
       ]
     : undefined;
@@ -267,8 +334,9 @@ export function AdminUsersPage() {
           objectLabel={confirmingUser.email}
           reversibilityLabel="Role can be changed again at any time."
           confirmLabel="Change role"
-          onConfirm={() => applyRoleChange(confirmRequest.userId, confirmRequest.newRole)}
-          onClose={() => setConfirmRequest(null)}
+          isProcessing={isSaving}
+          onConfirm={() => handleRoleChange(confirmRequest.userId, confirmRequest.newRole)}
+          onClose={() => { if (!isSaving) setConfirmRequest(null); }}
         />
       ) : null}
 
@@ -281,8 +349,9 @@ export function AdminUsersPage() {
           objectLabel={confirmingUser.email}
           reversibilityLabel="Can be reactivated from the users list."
           confirmLabel="Deactivate"
-          onConfirm={() => applyDeactivate(confirmRequest.userId)}
-          onClose={() => setConfirmRequest(null)}
+          isProcessing={isSaving}
+          onConfirm={() => handleDeactivate(confirmRequest.userId)}
+          onClose={() => { if (!isSaving) setConfirmRequest(null); }}
         />
       ) : null}
     </div>
