@@ -121,13 +121,16 @@ export function DataSourceDetailEventsTab({ source }: { source: DataSourceRow })
 
   // Fetch initial events from REST API
   useEffect(() => {
-    if (!projectId) return;
+    if (!projectId) {
+      setIsLoading(false);
+      return;
+    }
     let cancelled = false;
     setIsLoading(true);
     setFetchError(null);
 
     apiFetch<RuntimeEventsResponse>(
-      `/api/v1/projects/${projectId}/runtime-events?source=${source.id}&limit=100`,
+      `/api/v1/projects/${projectId}/runtime-events?source=${encodeURIComponent(source.id)}&limit=100`,
     )
       .then((res) => {
         if (cancelled) return;
