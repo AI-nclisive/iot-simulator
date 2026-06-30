@@ -749,7 +749,7 @@ Parallel execution:
   Depends: `UI-096`; spike on manifest JSON shape from EvidenceService.
   Done when: Evidence list and detail load from /api/v1; export/download work; mock-evidence.ts removed; no TypeScript errors.
 
-- [ ] `UI-106` Wire Events tab to runtime-events API + SSE
+- [x] `UI-106` Wire Events tab to runtime-events API + SSE
   Goal: replace mock-source-events.ts with real backend history + live SSE events on the Events tab.
   Surface: `Data Source Detail` — Events tab
   Work includes: GET /api/v1/projects/{projectId}/runtime-events?source={sourceId} for history; live append from existing use-live-runtime SSE hook (filter by dataSourceId); type→level mapping (SOURCE_ERROR/ERROR→error, SOURCE_STALE→warning, rest→info); type→category mapping; remove mock-source-events.ts.

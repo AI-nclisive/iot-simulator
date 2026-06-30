@@ -146,6 +146,7 @@ function SamplesSection({
   const deleteSample = useArtifactsStore((s) => s.deleteSample);
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     if (projectId) {
@@ -155,8 +156,12 @@ function SamplesSection({
 
   async function handleDelete(sampleId: string) {
     setDeletingId(sampleId);
+    setDeleteError(null);
     try {
       await deleteSample(projectId, sampleId);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Delete failed";
+      setDeleteError(msg);
     } finally {
       setDeletingId(null);
     }
@@ -169,6 +174,9 @@ function SamplesSection({
         Named subsets derived from recordings.
       </p>
 
+      {deleteError ? (
+        <p className="mt-4 text-sm text-red-600" role="alert">{deleteError}</p>
+      ) : null}
       {isSamplesLoading ? (
         <p className="mt-4 text-sm text-shell-muted">Loading samples…</p>
       ) : samplesError ? (
