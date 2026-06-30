@@ -48,18 +48,23 @@ export interface ScenarioValidationIssue {
 }
 
 export interface ScenarioValidation {
-  /** No blocking issues — the scenario can run. */
+  /** No blocking issues — the scenario can run. Warnings do not affect this. */
   ready: boolean;
+  /** Blocking problems that prevent running. */
   issues: ScenarioValidationIssue[];
+  /** Non-blocking advisories (the scenario can still run). */
+  warnings: ScenarioValidationIssue[];
 }
 
 /**
  * Validate a scenario's steps into a runnable / not-runnable summary. The shell
  * uses this to drive the draft/invalid/ready states and to tell the user
- * exactly why a scenario is not runnable (UI-061 done-when).
+ * exactly why a scenario is not runnable (UI-061 done-when). Warnings are
+ * advisory and never block running.
  */
 export function validateScenario(steps: ScenarioStep[]): ScenarioValidation {
   const issues: ScenarioValidationIssue[] = [];
+  const warnings: ScenarioValidationIssue[] = [];
 
   if (steps.length === 0) {
     issues.push({ stepId: null, message: "Add at least one step before running." });
@@ -75,15 +80,13 @@ export function validateScenario(steps: ScenarioStep[]): ScenarioValidation {
   }
 
   // A scenario that only waits/marks does nothing observable — warn, don't block.
-  const hasActionable = steps.some(
-    (s) => s.type !== "wait" && s.type !== "marker",
-  );
+  const hasActionable = steps.some((s) => s.type !== "wait" && s.type !== "marker");
   if (steps.length > 0 && !hasActionable) {
-    issues.push({
+    warnings.push({
       stepId: null,
       message: "Scenario has no start, replay, synthetic, or fault step — it will not produce data.",
     });
   }
 
-  return { ready: issues.length === 0, issues };
+  return { ready: issues.length === 0, issues, warnings };
 }

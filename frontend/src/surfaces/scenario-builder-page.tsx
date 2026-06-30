@@ -198,6 +198,20 @@ export function ScenarioBuilderPage() {
         </section>
       )}
 
+      {/* Non-blocking warnings — shown whether or not the scenario is runnable. */}
+      {validation.warnings.length > 0 ? (
+        <section
+          aria-label="Validation warnings"
+          className="rounded-md border border-shell-warning/20 bg-shell-warning/5 px-4 py-3"
+        >
+          <ul className="list-disc space-y-1 pl-5 text-sm text-shell-muted">
+            {validation.warnings.map((w, i) => (
+              <li key={`warn-${w.stepId ?? "scenario"}-${i}`}>{w.message}</li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
       {/* Two-pane: step list + details */}
       <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
         {/* Step list */}
@@ -333,8 +347,8 @@ export function ScenarioBuilderPage() {
                     type="button"
                     onClick={() =>
                       pushNotification({
-                        tone: "success",
-                        title: "Step editor",
+                        tone: "warning",
+                        title: "Step editor not available yet",
                         message: "The typed field editor for this step opens here once available.",
                       })
                     }

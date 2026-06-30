@@ -150,6 +150,38 @@ describe("ScenarioBuilderPage", () => {
     expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
   });
 
+  it("treats a wait/marker-only scenario as runnable but warns it produces no data", () => {
+    // Build a scenario whose only step is a configured wait — no actionable step.
+    useScenariosStore.setState((s) => ({
+      scenarios: [
+        ...s.scenarios,
+        {
+          id: "scn-wait",
+          name: "Wait only",
+          description: "Only waits.",
+          stepCount: 1,
+          runState: "Idle" as const,
+          lastRun: { at: null, outcome: null },
+          owner: "You",
+          lockedBy: null,
+          updatedAt: "2026-06-30T00:00:00Z",
+        },
+      ],
+      steps: {
+        ...s.steps,
+        "scn-wait": [
+          { id: "w1", type: "wait" as const, label: "Hold", config: { seconds: 5 }, configured: true },
+        ],
+      },
+    }));
+    renderBuilder("scn-wait");
+    // Runnable (warning does not block), but the no-data warning is shown.
+    expect(screen.getByText("Ready to run")).toBeTruthy();
+    const run = screen.getByRole("button", { name: "Run" }) as HTMLButtonElement;
+    expect(run.disabled).toBe(false);
+    expect(screen.getByText(/will not produce data/)).toBeTruthy();
+  });
+
   it("shows a not-found panel for an unknown scenario", () => {
     renderBuilder("scn-does-not-exist");
     expect(screen.getByText("Scenario not found.")).toBeTruthy();
