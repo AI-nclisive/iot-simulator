@@ -45,7 +45,9 @@ class EvidenceControllerTest {
 
     @Test
     void listReturnsEvidenceWithNestedManifest() throws Exception {
-        given(service.list("p1")).willReturn(List.of(view("ev-1", "READY", "evidence/ev-1/bundle.zip")));
+        given(service.listPaged(eq("p1"), any(), any()))
+                .willReturn(new com.ainclusive.iotsim.domain.support.Page<>(
+                        List.of(view("ev-1", "READY", "evidence/ev-1/bundle.zip")), null, 50));
 
         MvcResult result = mvc.perform(get("/api/v1/projects/p1/evidence"))
                 .andExpect(status().isOk())

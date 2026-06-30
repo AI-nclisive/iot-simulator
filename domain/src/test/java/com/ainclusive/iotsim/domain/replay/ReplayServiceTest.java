@@ -303,6 +303,12 @@ class ReplayServiceTest {
             throw new UnsupportedOperationException();
         }
 
+        @Override
+        public List<EvidenceRow> findByProjectPaged(String projectId,
+                java.time.OffsetDateTime afterAt, String afterId, int limit) {
+            return List.of();
+        }
+
         public EvidenceRow updateStatus(String id, String status, String objectRef) {
             throw new UnsupportedOperationException();
         }
@@ -326,6 +332,12 @@ class ReplayServiceTest {
 
         @Override
         public List<DataSourceRow> findByProject(String projectId) {
+            return List.of();
+        }
+
+        @Override
+        public List<DataSourceRow> findByProjectPaged(String projectId, String protocol,
+                OffsetDateTime afterAt, String afterId, int limit) {
             return List.of();
         }
 
@@ -363,6 +375,12 @@ class ReplayServiceTest {
 
         @Override
         public List<RecordingRow> findByProject(String projectId) {
+            return List.of();
+        }
+
+        @Override
+        public List<RecordingRow> findByProjectPaged(String projectId,
+                OffsetDateTime afterAt, String afterId, int limit) {
             return List.of();
         }
 
@@ -426,6 +444,12 @@ class ReplayServiceTest {
 
         @Override
         public List<RecordingRow> findByProject(String projectId) {
+            return List.of();
+        }
+
+        @Override
+        public List<RecordingRow> findByProjectPaged(String projectId,
+                OffsetDateTime afterAt, String afterId, int limit) {
             return List.of();
         }
 

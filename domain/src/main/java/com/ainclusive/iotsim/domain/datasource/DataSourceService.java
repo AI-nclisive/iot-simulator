@@ -2,6 +2,8 @@ package com.ainclusive.iotsim.domain.datasource;
 
 import com.ainclusive.iotsim.domain.common.ConcurrencyConflictException;
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
+import com.ainclusive.iotsim.domain.support.Page;
+import com.ainclusive.iotsim.domain.support.PageCursor;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRepository;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRow;
 import com.ainclusive.iotsim.persistence.project.ProjectRepository;
@@ -11,6 +13,7 @@ import com.ainclusive.iotsim.platform.runtime.RuntimeController;
 import com.ainclusive.iotsim.platform.secret.ConnectionCredentials;
 import com.ainclusive.iotsim.platform.secret.CredentialStore;
 import com.ainclusive.iotsim.protocolmodel.SchemaNode;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
@@ -61,6 +64,22 @@ public class DataSourceService {
     public List<DataSource> list(String projectId) {
         requireProject(projectId);
         return dataSources.findByProject(projectId).stream().map(this::map).toList();
+    }
+
+    public Page<DataSource> listPaged(String projectId, String protocol, String cursor, Integer limit) {
+        requireProject(projectId);
+        int size = PageCursor.clamp(limit);
+        PageCursor.Parts after = PageCursor.decode(cursor);
+        OffsetDateTime afterAt = after != null ? after.at() : null;
+        String afterId = after != null ? after.id() : null;
+        List<DataSourceRow> rows = dataSources.findByProjectPaged(projectId, protocol, afterAt, afterId, size + 1);
+        String nextCursor = null;
+        if (rows.size() > size) {
+            rows = rows.subList(0, size);
+            DataSourceRow last = rows.get(rows.size() - 1);
+            nextCursor = PageCursor.encode(last.createdAt(), last.id());
+        }
+        return new Page<>(rows.stream().map(this::map).toList(), nextCursor, size);
     }
 
     public DataSource get(String projectId, String id) {

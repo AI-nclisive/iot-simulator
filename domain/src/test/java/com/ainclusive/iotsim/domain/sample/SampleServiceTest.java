@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
+import com.ainclusive.iotsim.domain.support.Page;
 import com.ainclusive.iotsim.persistence.project.ProjectRepository;
 import com.ainclusive.iotsim.persistence.project.ProjectRow;
 import com.ainclusive.iotsim.persistence.recording.RecordingRepository;
@@ -92,6 +93,28 @@ class SampleServiceTest {
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
+    @Test
+    void listPagedThrowsNotFoundForMissingProject() {
+        assertThatThrownBy(() -> service.listPaged("no-such-project", null, null))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void listPagedEmitsCursorWhenResultsExceedLimit() {
+        service.create(PROJECT, null, "S1", null, null, "it");
+        service.create(PROJECT, null, "S2", null, null, "it");
+        service.create(PROJECT, null, "S3", null, null, "it");
+
+        Page<Sample> page = service.listPaged(PROJECT, null, 2);
+        assertThat(page.items()).hasSize(2);
+        assertThat(page.nextCursor()).isNotNull();
+        assertThat(page.limit()).isEqualTo(2);
+
+        Page<Sample> page2 = service.listPaged(PROJECT, page.nextCursor(), 2);
+        assertThat(page2.items()).hasSize(1);
+        assertThat(page2.nextCursor()).isNull();
+    }
+
     private static final class InMemorySampleRepository implements SampleRepository {
         private final Map<String, SampleRow> rows = new HashMap<>();
         private int seq;
@@ -114,6 +137,19 @@ class SampleServiceTest {
         @Override
         public List<SampleRow> findByProject(String projectId) {
             return rows.values().stream().filter(r -> r.projectId().equals(projectId)).toList();
+        }
+
+        @Override
+        public List<SampleRow> findByProjectPaged(String projectId,
+                java.time.OffsetDateTime afterAt, String afterId, int limit) {
+            return rows.values().stream()
+                    .filter(r -> r.projectId().equals(projectId))
+                    .filter(r -> afterAt == null || r.createdAt().isBefore(afterAt)
+                            || (r.createdAt().isEqual(afterAt) && r.id().compareTo(afterId) < 0))
+                    .sorted(java.util.Comparator.comparing(SampleRow::createdAt).reversed()
+                            .thenComparing(java.util.Comparator.comparing(SampleRow::id).reversed()))
+                    .limit(limit)
+                    .toList();
         }
 
         @Override
@@ -145,6 +181,12 @@ class SampleServiceTest {
 
         @Override
         public List<ProjectRow> findAll() {
+            return List.of();
+        }
+
+        @Override
+        public List<ProjectRow> findAllPaged(String status, java.time.OffsetDateTime afterAt,
+                String afterId, int limit) {
             return List.of();
         }
 
@@ -191,6 +233,12 @@ class SampleServiceTest {
 
         @Override
         public List<RecordingRow> findByProject(String projectId) {
+            return List.of();
+        }
+
+        @Override
+        public List<RecordingRow> findByProjectPaged(String projectId,
+                java.time.OffsetDateTime afterAt, String afterId, int limit) {
             return List.of();
         }
 

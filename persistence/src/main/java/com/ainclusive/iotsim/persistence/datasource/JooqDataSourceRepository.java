@@ -48,6 +48,23 @@ public class JooqDataSourceRepository implements DataSourceRepository {
     }
 
     @Override
+    public List<DataSourceRow> findByProjectPaged(String projectId, String protocol,
+            OffsetDateTime afterAt, String afterId, int limit) {
+        var q = dsl.selectFrom(DATA_SOURCES).where(DATA_SOURCES.PROJECT_ID.eq(projectId));
+        if (protocol != null) {
+            q = q.and(DATA_SOURCES.PROTOCOL.eq(protocol));
+        }
+        if (afterAt != null) {
+            q = q.and(DATA_SOURCES.CREATED_AT.lt(afterAt)
+                    .or(DATA_SOURCES.CREATED_AT.eq(afterAt).and(DATA_SOURCES.ID.lt(afterId))));
+        }
+        return q.orderBy(DATA_SOURCES.CREATED_AT.desc(), DATA_SOURCES.ID.desc())
+                .limit(limit)
+                .fetch()
+                .map(this::map);
+    }
+
+    @Override
     public Optional<DataSourceRow> findById(String id) {
         return dsl.selectFrom(DATA_SOURCES)
                 .where(DATA_SOURCES.ID.eq(id))

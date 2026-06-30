@@ -1,10 +1,13 @@
 package com.ainclusive.iotsim.domain.evidence;
 
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
+import com.ainclusive.iotsim.domain.support.Page;
+import com.ainclusive.iotsim.domain.support.PageCursor;
 import com.ainclusive.iotsim.persistence.clientconnection.ClientConnectionRepository;
 import com.ainclusive.iotsim.persistence.clientconnection.ClientConnectionRow;
 import com.ainclusive.iotsim.persistence.evidence.EvidenceRepository;
 import com.ainclusive.iotsim.persistence.evidence.EvidenceRow;
+import com.ainclusive.iotsim.persistence.project.ProjectRepository;
 import com.ainclusive.iotsim.persistence.run.RunRepository;
 import com.ainclusive.iotsim.persistence.run.RunRow;
 import com.ainclusive.iotsim.persistence.runtimeevent.RuntimeEventRepository;
@@ -15,6 +18,7 @@ import com.ainclusive.iotsim.protocolmodel.NeutralValue;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
@@ -45,11 +49,12 @@ public class EvidenceService {
     private final Map<EvidenceFormat, EvidenceArtifactWriter> writers;
     private final ObjectStore objectStore;
     private final ObjectMapper json;
+    private final ProjectRepository projects;
 
     public EvidenceService(EvidenceRepository evidence, RunRepository runs,
             ValueTimelineRepository timeline, RuntimeEventRepository runtimeEvents,
             ClientConnectionRepository clients, List<EvidenceArtifactWriter> writers,
-            ObjectStore objectStore, ObjectMapper json) {
+            ObjectStore objectStore, ObjectMapper json, ProjectRepository projects) {
         this.evidence = evidence;
         this.runs = runs;
         this.timeline = timeline;
@@ -59,11 +64,28 @@ public class EvidenceService {
         writers.forEach(w -> this.writers.put(w.format(), w));
         this.objectStore = objectStore;
         this.json = json;
+        this.projects = projects;
     }
 
     /** All evidence for a project, newest first. */
     public List<EvidenceView> list(String projectId) {
         return evidence.findByProject(projectId).stream().map(EvidenceView::from).toList();
+    }
+
+    public Page<EvidenceView> listPaged(String projectId, String cursor, Integer limit) {
+        requireProject(projectId);
+        int size = PageCursor.clamp(limit);
+        PageCursor.Parts after = PageCursor.decode(cursor);
+        OffsetDateTime afterAt = after != null ? after.at() : null;
+        String afterId = after != null ? after.id() : null;
+        List<EvidenceRow> rows = evidence.findByProjectPaged(projectId, afterAt, afterId, size + 1);
+        String nextCursor = null;
+        if (rows.size() > size) {
+            rows = rows.subList(0, size);
+            EvidenceRow last = rows.get(rows.size() - 1);
+            nextCursor = PageCursor.encode(last.createdAt(), last.id());
+        }
+        return new Page<>(rows.stream().map(EvidenceView::from).toList(), nextCursor, size);
     }
 
     /** One evidence record, scoped to its project. */
@@ -77,6 +99,12 @@ public class EvidenceService {
                 .filter(e -> e.objectRef() != null)
                 .flatMap(e -> objectStore.get(e.objectRef()).map(in -> new EvidenceBundle(
                         in, contentTypeFor(e.objectRef()), "evidence-" + evidenceId + extensionFor(e.objectRef()))));
+    }
+
+    private void requireProject(String projectId) {
+        if (projects.findById(projectId).isEmpty()) {
+            throw new ResourceNotFoundException("Project", projectId);
+        }
     }
 
     private static String contentTypeFor(String objectRef) {

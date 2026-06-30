@@ -75,6 +75,23 @@ class RecordingAndTimelineIT {
         assertThat(finalized.valueCount()).isEqualTo(3);
     }
 
+    @Test
+    void findByProjectPagedReturnsBatchNewestFirst() {
+        RecordingRow a = recordings.create(projectId, dataSourceId, 1, "SCAN_RECORD", "it");
+        RecordingRow b = recordings.create(projectId, dataSourceId, 1, "SCAN_RECORD", "it");
+        RecordingRow c = recordings.create(projectId, dataSourceId, 1, "SCAN_RECORD", "it");
+
+        List<RecordingRow> page1 = recordings.findByProjectPaged(projectId, null, null, 2);
+        assertThat(page1).hasSize(2);
+        assertThat(page1.get(0).id()).isEqualTo(c.id());
+        assertThat(page1.get(1).id()).isEqualTo(b.id());
+
+        RecordingRow last = page1.get(page1.size() - 1);
+        List<RecordingRow> page2 = recordings.findByProjectPaged(projectId, last.createdAt(), last.id(), 2);
+        assertThat(page2).extracting(RecordingRow::id).contains(a.id());
+        assertThat(page2).extracting(RecordingRow::id).doesNotContain(b.id(), c.id());
+    }
+
     /** IS-093: value_timeline is range-partitioned by source_time with a DEFAULT partition. */
     @Test
     void valueTimelineIsRangePartitioned() {

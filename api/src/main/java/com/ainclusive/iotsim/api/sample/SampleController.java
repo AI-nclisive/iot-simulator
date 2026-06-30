@@ -2,6 +2,7 @@ package com.ainclusive.iotsim.api.sample;
 
 import com.ainclusive.iotsim.domain.sample.Sample;
 import com.ainclusive.iotsim.domain.sample.SampleService;
+import com.ainclusive.iotsim.domain.support.Page;
 import java.net.URI;
 import java.time.Instant;
 import java.util.List;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /** Named sample subsets/snapshots within a project (backend-specs/05_API_CONTRACT.md). */
@@ -26,8 +28,11 @@ public class SampleController {
     }
 
     @GetMapping
-    public List<SampleResponse> list(@PathVariable String projectId) {
-        return sampleService.list(projectId).stream().map(SampleResponse::from).toList();
+    public Page<SampleResponse> list(
+            @PathVariable String projectId,
+            @RequestParam(required = false) String cursor,
+            @RequestParam(required = false) Integer limit) {
+        return sampleService.listPaged(projectId, cursor, limit).map(SampleResponse::from);
     }
 
     @PostMapping

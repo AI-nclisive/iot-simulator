@@ -4,6 +4,7 @@ import static com.ainclusive.iotsim.persistence.jooq.tables.Samples.SAMPLES;
 
 import com.ainclusive.iotsim.persistence.jooq.tables.records.SamplesRecord;
 import com.ainclusive.iotsim.platform.Ids;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.jooq.DSLContext;
@@ -45,6 +46,20 @@ public class JooqSampleRepository implements SampleRepository {
         return dsl.selectFrom(SAMPLES)
                 .where(SAMPLES.PROJECT_ID.eq(projectId))
                 .orderBy(SAMPLES.CREATED_AT.desc())
+                .fetch()
+                .map(this::map);
+    }
+
+    @Override
+    public List<SampleRow> findByProjectPaged(String projectId,
+            OffsetDateTime afterAt, String afterId, int limit) {
+        var q = dsl.selectFrom(SAMPLES).where(SAMPLES.PROJECT_ID.eq(projectId));
+        if (afterAt != null) {
+            q = q.and(SAMPLES.CREATED_AT.lt(afterAt)
+                    .or(SAMPLES.CREATED_AT.eq(afterAt).and(SAMPLES.ID.lt(afterId))));
+        }
+        return q.orderBy(SAMPLES.CREATED_AT.desc(), SAMPLES.ID.desc())
+                .limit(limit)
                 .fetch()
                 .map(this::map);
     }

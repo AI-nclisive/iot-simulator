@@ -1,5 +1,6 @@
 package com.ainclusive.iotsim.persistence.evidence;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -26,6 +27,9 @@ public interface EvidenceRepository {
 
     /** All evidence for a project, newest first. */
     List<EvidenceRow> findByProject(String projectId);
+
+    /** Cursor-paged list (IS-074). Sort: {@code created_at DESC, id DESC}. */
+    List<EvidenceRow> findByProjectPaged(String projectId, OffsetDateTime afterAt, String afterId, int limit);
 
     /** Replaces the content manifest (JSON object). */
     EvidenceRow updateManifest(String id, String manifestJson);

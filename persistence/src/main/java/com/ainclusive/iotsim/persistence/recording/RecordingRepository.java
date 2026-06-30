@@ -14,6 +14,9 @@ public interface RecordingRepository {
 
     List<RecordingRow> findByProject(String projectId);
 
+    /** Cursor-paged list (IS-074). Sort: {@code created_at DESC, id DESC}. */
+    List<RecordingRow> findByProjectPaged(String projectId, OffsetDateTime afterAt, String afterId, int limit);
+
     RecordingRow finalizeStats(String id, OffsetDateTime timeStart, OffsetDateTime timeEnd,
             long valueCount, long sizeBytes);
 }

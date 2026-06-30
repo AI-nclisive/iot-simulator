@@ -85,7 +85,7 @@ class ProjectOverviewServiceTest {
                 return sourcesByProject.getOrDefault(projectId, List.of());
             }
         };
-        RecordingService recordingService = new RecordingService(null, null, null, null, null, null) {
+        RecordingService recordingService = new RecordingService(null, null, null, null, null, null, null) {
             @Override
             public List<Recording> list(String projectId) {
                 return recordingsByProject.getOrDefault(projectId, List.of());

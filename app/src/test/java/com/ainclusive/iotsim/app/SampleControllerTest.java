@@ -12,6 +12,7 @@ import com.ainclusive.iotsim.api.sample.SampleController.SampleResponse;
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.domain.sample.Sample;
 import com.ainclusive.iotsim.domain.sample.SampleService;
+import com.ainclusive.iotsim.domain.support.Page;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -56,10 +57,11 @@ class SampleControllerTest {
 
     @Test
     void listReturnsSamples() {
-        given(service.list(PROJECT)).willReturn(List.of(sample()));
-        List<SampleResponse> result = controller.list(PROJECT);
-        assertThat(result).hasSize(1);
-        assertThat(result.get(0).id()).isEqualTo("smp-1");
+        given(service.listPaged(PROJECT, null, null))
+                .willReturn(new Page<>(List.of(sample()), null, 50));
+        Page<SampleResponse> result = controller.list(PROJECT, null, null);
+        assertThat(result.items()).hasSize(1);
+        assertThat(result.items().get(0).id()).isEqualTo("smp-1");
     }
 
     @Test
