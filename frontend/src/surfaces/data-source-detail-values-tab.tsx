@@ -1,5 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSourceValuesStore } from "../shell/source-values-store";
+import { useLiveValues } from "../shell/use-live-values";
+import { useNotificationStore } from "../shell/notification-store";
 import {
   OperationalTable,
   TableToolbar,
@@ -26,8 +28,33 @@ export function DataSourceDetailValuesTab({
 }: {
   source: DataSourceRow;
 }) {
-  const allValues = useSourceValuesStore((state) => state.values);
+  // Live values stream while the source is running; the static store is the
+  // fallback for stopped sources (no live stream to subscribe to).
+  const isLive = source.status === "Active";
+  const { rows: liveRows, status: liveStatus } = useLiveValues(source.id, isLive);
+
+  const storeValues = useSourceValuesStore((state) => state.values);
   const togglePinnedValue = useSourceValuesStore((state) => state.togglePinnedValue);
+  const pushNotification = useNotificationStore((state) => state.push);
+
+  // Surface stream connection issues through the shared notification pattern.
+  useEffect(() => {
+    if (!isLive) return;
+    if (liveStatus === "reconnecting") {
+      pushNotification({
+        tone: "reconnecting",
+        title: "Reconnecting to live values…",
+        message: `Lost the live stream for ${source.name}. Retrying automatically.`,
+      });
+    } else if (liveStatus === "stale") {
+      pushNotification({
+        tone: "stale",
+        title: "Live values may be out of date.",
+        message: `No updates received from ${source.name} recently.`,
+      });
+    }
+  }, [isLive, liveStatus, pushNotification, source.name]);
+
   const [searchValue, setSearchValue] = useState("");
   const [freshnessFilter, setFreshnessFilter] = useState("all");
   const [pinFilter, setPinFilter] = useState("all");
@@ -37,8 +64,11 @@ export function DataSourceDetailValuesTab({
   });
 
   const values = useMemo(
-    () => allValues.filter((valueRow) => valueRow.sourceId === source.id),
-    [allValues, source.id],
+    () =>
+      isLive
+        ? liveRows
+        : storeValues.filter((valueRow) => valueRow.sourceId === source.id),
+    [isLive, liveRows, storeValues, source.id],
   );
 
   const filteredRows = useMemo(() => {
@@ -219,6 +249,9 @@ export function DataSourceDetailValuesTab({
         noResultsTitle="No runtime values match the current filters."
         onSortChange={setSortState}
         rowActions={(row) => {
+          // Pin persistence lives in the static store keyed by mock ids; it does
+          // not apply to live-stream rows, so only offer it in the static view.
+          if (isLive) return [];
           const actions: TableRowAction<SourceValueRow>[] = [
             {
               label: row.pinned ? "Unpin" : "Pin",

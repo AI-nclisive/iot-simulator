@@ -1,16 +1,20 @@
+import { useLiveClients } from "../shell/use-live-clients";
 import { SharedStatePanel } from "../ui/shared-state-panel";
 import { StatusBadge, type StatusTone } from "../ui/status-badge";
-import { getClientsForSource } from "./mock-source-clients";
 import type { DataSourceRow } from "./mock-data-sources";
 
-function connectionTone(state: "Connected" | "Connecting" | "Disconnected"): StatusTone {
-  if (state === "Connected") return "accent";
-  if (state === "Connecting") return "warning";
-  return "neutral";
+function connectionTone(connected: boolean): StatusTone {
+  return connected ? "accent" : "neutral";
+}
+
+function formatTime(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleTimeString("en-GB", { hour12: false });
 }
 
 export function DataSourceDetailClientsTab({ source }: { source: DataSourceRow }) {
-  const clients = getClientsForSource(source.id);
+  const isLive = source.status === "Active";
+  const { rows: clients } = useLiveClients(source.id, isLive);
 
   if (clients.length === 0) {
     return (
@@ -33,7 +37,7 @@ export function DataSourceDetailClientsTab({ source }: { source: DataSourceRow }
           <table className="min-w-full border-collapse">
             <thead className="bg-shell-base/65">
               <tr>
-                {(["Remote address", "State", "Connected since", "Reads", "Last read"] as const).map(
+                {(["Client", "State", "Connected since", "Disconnected"] as const).map(
                   (col) => (
                     <th
                       key={col}
@@ -48,21 +52,21 @@ export function DataSourceDetailClientsTab({ source }: { source: DataSourceRow }
             </thead>
             <tbody>
               {clients.map((client) => (
-                <tr key={client.id} className="border-t border-shell-line">
+                <tr key={client.clientId} className="border-t border-shell-line">
                   <td className="px-4 py-3 align-top font-mono text-sm text-shell-ink">
-                    {client.remoteAddress}
+                    {client.clientId}
                   </td>
                   <td className="px-4 py-3 align-top">
-                    <StatusBadge label={client.state} tone={connectionTone(client.state)} />
+                    <StatusBadge
+                      label={client.connected ? "Connected" : "Disconnected"}
+                      tone={connectionTone(client.connected)}
+                    />
                   </td>
                   <td className="px-4 py-3 align-top text-sm text-shell-ink">
-                    {client.connectedSince}
+                    {formatTime(client.connectedAt)}
                   </td>
                   <td className="px-4 py-3 align-top text-sm text-shell-ink">
-                    {client.readCount.toLocaleString()}
-                  </td>
-                  <td className="px-4 py-3 align-top text-sm text-shell-ink">
-                    {client.lastReadAt}
+                    {client.disconnectedAt ? formatTime(client.disconnectedAt) : "—"}
                   </td>
                 </tr>
               ))}
@@ -73,7 +77,7 @@ export function DataSourceDetailClientsTab({ source }: { source: DataSourceRow }
 
       {source.status === "Stopped" ? (
         <p className="text-sm text-shell-muted">
-          This source is stopped. Clients shown above may have lost their connection.
+          This source is stopped. Live client tracking resumes when it runs again.
         </p>
       ) : null}
     </div>
