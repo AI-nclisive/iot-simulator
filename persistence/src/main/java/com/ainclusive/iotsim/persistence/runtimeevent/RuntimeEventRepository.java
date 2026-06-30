@@ -31,4 +31,11 @@ public interface RuntimeEventRepository {
 
     /** Events for a single data source, newest first (index-backed: data_source_id, at). */
     List<RuntimeEventRow> findByDataSource(String dataSourceId);
+
+    /**
+     * Filtered, keyset-paginated history query (IS-055). Scoped to a project, with
+     * optional source/run/type and {@code [from, to)} time filters; returns up to
+     * {@code limit} rows newest first. Backs {@code GET .../runtime-events}.
+     */
+    List<RuntimeEventRow> query(RuntimeEventQuery filter);
 }

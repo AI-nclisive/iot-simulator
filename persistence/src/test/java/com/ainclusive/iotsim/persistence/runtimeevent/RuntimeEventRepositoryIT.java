@@ -92,4 +92,66 @@ class RuntimeEventRepositoryIT {
         assertThat(events.findByDataSource("valve")).singleElement()
                 .extracting(RuntimeEventRow::runId).isEqualTo("runB");
     }
+
+    @Test
+    void queryFiltersBySourceRunAndType() {
+        String project = new JooqProjectRepository(dsl).insert("Query-filter", null, "it").id();
+        OffsetDateTime base = OffsetDateTime.parse("2026-04-01T00:00:00Z");
+        // Identifiers are globally unique so the project-agnostic findBy* tests stay isolated.
+        events.append(project, "qf-pump", "qf-runA", "SOURCE_START", base, null);
+        events.append(project, "qf-pump", "qf-runA", "ERROR", base.plusSeconds(5), null);
+        events.append(project, "qf-valve", "qf-runB", "ERROR", base.plusSeconds(10), null);
+
+        List<RuntimeEventRow> bySource =
+                events.query(RuntimeEventQuery.forProject(project).dataSourceId("qf-pump").build());
+        assertThat(bySource).extracting(RuntimeEventRow::type)
+                .containsExactly("ERROR", "SOURCE_START");
+
+        List<RuntimeEventRow> byType =
+                events.query(RuntimeEventQuery.forProject(project).type("ERROR").build());
+        assertThat(byType).extracting(RuntimeEventRow::dataSourceId)
+                .containsExactly("qf-valve", "qf-pump");
+
+        List<RuntimeEventRow> byRun =
+                events.query(RuntimeEventQuery.forProject(project).runId("qf-runB").build());
+        assertThat(byRun).singleElement()
+                .extracting(RuntimeEventRow::dataSourceId).isEqualTo("qf-valve");
+    }
+
+    @Test
+    void queryFiltersByTimeRange() {
+        String project = new JooqProjectRepository(dsl).insert("Query-time", null, "it").id();
+        OffsetDateTime base = OffsetDateTime.parse("2026-05-01T00:00:00Z");
+        events.append(project, null, null, "SOURCE_START", base, null);
+        events.append(project, null, null, "ERROR", base.plusSeconds(10), null);
+        events.append(project, null, null, "SOURCE_STOP", base.plusSeconds(20), null);
+
+        // from is inclusive, to is exclusive: only the +10s ERROR falls in [base+5s, base+15s).
+        List<RuntimeEventRow> rows = events.query(RuntimeEventQuery.forProject(project)
+                .from(base.plusSeconds(5))
+                .to(base.plusSeconds(15))
+                .build());
+
+        assertThat(rows).extracting(RuntimeEventRow::type).containsExactly("ERROR");
+    }
+
+    @Test
+    void queryPaginatesNewestFirstWithKeysetCursor() {
+        String project = new JooqProjectRepository(dsl).insert("Query-page", null, "it").id();
+        OffsetDateTime base = OffsetDateTime.parse("2026-06-01T00:00:00Z");
+        events.append(project, null, null, "E1", base, null);
+        events.append(project, null, null, "E2", base.plusSeconds(10), null);
+        events.append(project, null, null, "E3", base.plusSeconds(20), null);
+
+        List<RuntimeEventRow> page1 =
+                events.query(RuntimeEventQuery.forProject(project).limit(2).build());
+        assertThat(page1).extracting(RuntimeEventRow::type).containsExactly("E3", "E2");
+
+        RuntimeEventRow last = page1.get(1);
+        List<RuntimeEventRow> page2 = events.query(RuntimeEventQuery.forProject(project)
+                .limit(2)
+                .before(last.at(), last.id())
+                .build());
+        assertThat(page2).extracting(RuntimeEventRow::type).containsExactly("E1");
+    }
 }
