@@ -1,194 +1,27 @@
-import { useEffect, useId, useState } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
+import { apiFetch, authHeaders } from "../api/client";
 import { resolveAccess } from "../shell/access-policy";
 import { useShellStore } from "../shell/shell-store";
 import { SharedStatePanel } from "../ui/shared-state-panel";
 import { StatusBadge } from "../ui/status-badge";
 import {
-  buildExportScopeLabel,
-  evidenceDeliveryTone,
   evidenceExportStateTone,
-  evidenceIssueTone,
   evidenceStatusTone,
-  evidenceTimelineTone,
   isEvidenceExportAvailable,
-  willRetryFail,
 } from "./evidence-detail-helpers";
-import { evidenceArtifacts, type EvidenceArtifact, type EvidenceFormat } from "./mock-evidence";
-
-type ExportDialogProps = {
-  evidence: EvidenceArtifact;
-  open: boolean;
-  recoveryMode: boolean;
-  onClose: () => void;
-  onExportComplete: (result: "success" | "failed", format: EvidenceFormat) => void;
-};
-
-function ExportEvidenceDialog({
-  evidence,
-  open,
-  recoveryMode,
-  onClose,
-  onExportComplete,
-}: ExportDialogProps) {
-  const titleId = useId();
-  const descriptionId = useId();
-  const [format, setFormat] = useState<EvidenceFormat>(evidence.formats[0] ?? "PDF");
-  const [includeSummary, setIncludeSummary] = useState(true);
-  const [includeTimeline, setIncludeTimeline] = useState(true);
-  const [includeClients, setIncludeClients] = useState(!recoveryMode);
-  const [includeIssues, setIncludeIssues] = useState(evidence.issues.length > 0);
-
-  useEffect(() => {
-    if (!open) return;
-    setFormat(evidence.formats[0] ?? "PDF");
-    setIncludeSummary(true);
-    setIncludeTimeline(true);
-    setIncludeClients(!recoveryMode);
-    setIncludeIssues(evidence.issues.length > 0);
-  }, [evidence.formats, evidence.issues.length, open, recoveryMode]);
-
-  if (!open || typeof document === "undefined") return null;
-
-  const selectedScope = buildExportScopeLabel({ includeSummary, includeTimeline, includeClients, includeIssues });
-
-  const retryWillFail = willRetryFail(recoveryMode, format, includeClients, evidence.clientCount);
-
-  return createPortal(
-    // eslint-disable-next-line jsx-a11y/no-static-element-interactions
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-shell-ink/45 px-4 py-8"
-      tabIndex={-1}
-      onKeyDown={(e) => { if (e.key === "Escape") onClose(); }}
-    >
-      <button
-        aria-label="Close export dialog"
-        className="absolute inset-0"
-        type="button"
-        onClick={onClose}
-      />
-
-      <div
-        aria-describedby={descriptionId}
-        aria-labelledby={titleId}
-        aria-modal="true"
-        className="relative z-10 w-full max-w-3xl rounded-lg border border-shell-line bg-white shadow-panel"
-        role="dialog"
-      >
-        <div className="border-b border-shell-line px-5 py-4">
-          <StatusBadge
-            label={recoveryMode ? "Recovery export" : "Export evidence"}
-            tone={recoveryMode ? "warning" : "accent"}
-          />
-          <h2 id={titleId} className="mt-3 text-lg font-semibold text-shell-ink">
-            {recoveryMode ? "Retry evidence export" : "Export evidence"}
-          </h2>
-          <p id={descriptionId} className="mt-2 text-sm leading-6 text-shell-muted">
-            Choose the artifact format and scope. Credential material, passwords, and secret
-            values are excluded from every export.
-          </p>
-        </div>
-
-        <div className="space-y-5 px-5 py-4">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="rounded-md border border-shell-line bg-shell-base/60 px-4 py-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
-                Artifact
-              </p>
-              <p className="mt-2 text-sm font-medium text-shell-ink">{evidence.title}</p>
-              <p className="mt-1 text-sm text-shell-muted">
-                {evidence.runType} · {evidence.runId}
-              </p>
-            </div>
-
-            <div className="rounded-md border border-shell-line bg-shell-base/60 px-4 py-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
-                Secret handling
-              </p>
-              <p className="mt-2 text-sm font-medium text-shell-ink">Excluded from export</p>
-              <p className="mt-1 text-sm text-shell-muted">
-                Credentials and secret references stay out of files.
-              </p>
-            </div>
-          </div>
-
-          <label className="flex flex-col gap-2 text-sm text-shell-muted">
-            Format
-            <select
-              className="shell-field"
-              value={format}
-              onChange={(event) => setFormat(event.target.value as EvidenceFormat)}
-            >
-              {evidence.formats.map((availableFormat) => (
-                <option key={availableFormat} value={availableFormat}>
-                  {availableFormat}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <fieldset className="space-y-3 rounded-md border border-shell-line px-4 py-4">
-            <legend className="px-1 text-sm font-medium text-shell-ink">Artifact scope</legend>
-            {(
-              [
-                ["Summary", includeSummary, setIncludeSummary],
-                ["Timeline", includeTimeline, setIncludeTimeline],
-                ["Clients", includeClients, setIncludeClients],
-                ["Faults and errors", includeIssues, setIncludeIssues],
-              ] as [string, boolean, (v: boolean) => void][]
-            ).map(([label, checked, setChecked]) => (
-              <label key={label} className="flex items-start gap-3 text-sm text-shell-muted">
-                <input
-                  className="mt-1"
-                  checked={checked}
-                  type="checkbox"
-                  onChange={(event) => setChecked(event.target.checked)}
-                />
-                <span>{label}</span>
-              </label>
-            ))}
-          </fieldset>
-
-          {retryWillFail ? (
-            <div className="rounded-md border border-shell-danger/25 bg-shell-danger/10 px-4 py-3">
-              <p className="text-sm font-medium text-shell-danger">Retry will fail with this scope.</p>
-              <p className="mt-2 text-sm leading-6 text-shell-muted">
-                Client delivery details are unavailable for this artifact. Remove Clients from the
-                scope or choose a non-bundle format.
-              </p>
-            </div>
-          ) : null}
-
-          <div className="rounded-md border border-shell-line bg-shell-base/60 px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
-              Export summary
-            </p>
-            <p className="mt-2 text-sm text-shell-ink">
-              {format} ·{" "}
-              {selectedScope.length > 0 ? selectedScope.join(", ") : "No sections selected"}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex flex-col-reverse gap-2 border-t border-shell-line px-5 py-4 sm:flex-row sm:items-center sm:justify-end">
-          <button autoFocus className="shell-action" type="button" onClick={onClose}>
-            Cancel
-          </button>
-          <button
-            className={retryWillFail ? "shell-action-warning" : "shell-action"}
-            disabled={selectedScope.length === 0}
-            type="button"
-            onClick={() => onExportComplete(retryWillFail ? "failed" : "success", format)}
-          >
-            {recoveryMode ? "Retry export" : "Start export"}
-          </button>
-        </div>
-      </div>
-    </div>,
-    document.body,
-  );
-}
+import {
+  evidenceCompletenessLabel,
+  evidenceExportStateLabel,
+  evidenceKindLabel,
+  evidenceStatusLabel,
+  evidenceTitle,
+  mapEvidenceDto,
+  type EvidenceExportStateLabel,
+  type EvidenceItem,
+  type EvidenceResponseDto,
+  type EvidenceStatusLabel,
+} from "./evidence-types";
 
 function SummaryCard({ label, value }: { label: string; value: string | number }) {
   return (
@@ -201,35 +34,108 @@ function SummaryCard({ label, value }: { label: string; value: string | number }
   );
 }
 
+function DetailRow({ label, value }: { label: string; value: string | null }) {
+  return (
+    <div className="rounded-md border border-shell-line bg-white px-4 py-3">
+      <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
+        {label}
+      </dt>
+      <dd className="mt-2 text-sm text-shell-ink">{value ?? "—"}</dd>
+    </div>
+  );
+}
+
+function deriveDuration(startedAt: string, endedAt: string | null): string {
+  if (!endedAt) return "Still running";
+  const start = new Date(startedAt).getTime();
+  const end = new Date(endedAt).getTime();
+  if (Number.isNaN(start) || Number.isNaN(end)) return "—";
+  const diffSeconds = Math.round((end - start) / 1000);
+  const minutes = Math.floor(diffSeconds / 60);
+  const seconds = diffSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
 export function EvidenceDetailPage() {
   const { evidenceId } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const accessMode = useShellStore((state) => state.accessMode);
   const sharedRole = useShellStore((state) => state.sharedRole);
+  const currentProjectId = useShellStore((state) => state.currentProjectId);
   const access = resolveAccess(accessMode, sharedRole);
-  const evidence = evidenceArtifacts.find((a) => a.id === evidenceId);
-  const [exportDialogOpen, setExportDialogOpen] = useState(false);
-  const [exportedFormat, setExportedFormat] = useState<EvidenceFormat | null>(null);
+
+  const [item, setItem] = useState<EvidenceItem | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
+  // Export state
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   const [exportOutcome, setExportOutcome] = useState<"success" | "failed" | null>(null);
 
-  const exportAvailable = evidence ? isEvidenceExportAvailable(evidence) : false;
-  const currentExportState = exportOutcome === "success"
-    ? "Exported"
-    : exportOutcome === "failed"
-      ? "Export failed"
-      : evidence?.exportState;
+  // Download state
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (searchParams.get("export") !== "1" || !access.isAdmin || !exportAvailable) return;
-    setExportDialogOpen(true);
-  }, [access.isAdmin, exportAvailable, searchParams]);
+    if (!currentProjectId || !evidenceId) {
+      setIsLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setIsLoading(true);
+    setFetchError(null);
 
-  if (!evidence || !currentExportState) {
+    apiFetch<EvidenceResponseDto>(
+      `/api/v1/projects/${currentProjectId}/evidence/${evidenceId}`,
+    )
+      .then((dto) => {
+        if (cancelled) return;
+        setItem(mapEvidenceDto(dto));
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setFetchError(err instanceof Error ? err.message : "Failed to load evidence artifact");
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentProjectId, evidenceId]);
+
+  // Trigger export dialog from URL param
+  useEffect(() => {
+    if (searchParams.get("export") !== "1" || !access.isAdmin || !item) return;
+    if (item.status === "CAPTURING") return;
+    // Clear the param — the export UI is always visible on this page
+    const next = new URLSearchParams(searchParams);
+    next.delete("export");
+    setSearchParams(next, { replace: true });
+  }, [access.isAdmin, item, searchParams, setSearchParams]);
+
+  if (isLoading) {
     return (
       <div className="flex h-full flex-col gap-3">
         <section className="shell-panel px-5 py-5">
           <SharedStatePanel
-            message="Return to the Evidence list and choose a valid artifact."
+            message="Loading evidence artifact from the API."
+            state="loading"
+            title="Loading evidence…"
+          />
+        </section>
+      </div>
+    );
+  }
+
+  if (fetchError || !item) {
+    return (
+      <div className="flex h-full flex-col gap-3">
+        <section className="shell-panel px-5 py-5">
+          <SharedStatePanel
+            message={fetchError ?? "Return to the Evidence list and choose a valid artifact."}
             state="error"
             title="This evidence artifact could not be found."
           />
@@ -243,29 +149,86 @@ export function EvidenceDetailPage() {
     );
   }
 
-  function closeExportDialog() {
-    setExportDialogOpen(false);
-    const next = new URLSearchParams(searchParams);
-    next.delete("export");
-    setSearchParams(next, { replace: true });
+  const statusLbl: EvidenceStatusLabel =
+    exportOutcome === "success"
+      ? "Ready"
+      : exportOutcome === "failed"
+        ? "Export failed"
+        : evidenceStatusLabel(item.status);
+
+  const exportStateLbl: EvidenceExportStateLabel =
+    exportOutcome === "success"
+      ? "Exported"
+      : exportOutcome === "failed"
+        ? "Export failed"
+        : evidenceExportStateLabel(item.exported, item.status);
+
+  const exportAvailable = isEvidenceExportAvailable(statusLbl);
+  const recoveryMode = exportStateLbl === "Export failed";
+  const title = evidenceTitle(item.kind, item.runId);
+  const duration = deriveDuration(item.startedAt, item.endedAt);
+
+  function handleExport() {
+    if (!currentProjectId || !evidenceId) return;
+    setIsExporting(true);
+    setExportError(null);
+
+    apiFetch<unknown>(
+      `/api/v1/projects/${currentProjectId}/evidence/${evidenceId}/export?format=BUNDLE`,
+      { method: "POST" },
+    )
+      .then(() => {
+        setExportOutcome("success");
+      })
+      .catch((err: unknown) => {
+        setExportOutcome("failed");
+        setExportError(err instanceof Error ? err.message : "Export failed");
+      })
+      .finally(() => {
+        setIsExporting(false);
+      });
   }
 
-  function handleExportComplete(result: "success" | "failed", format: EvidenceFormat) {
-    setExportedFormat(format);
-    setExportOutcome(result);
-    setExportDialogOpen(false);
-    const next = new URLSearchParams(searchParams);
-    next.delete("export");
-    setSearchParams(next, { replace: true });
+  function handleDownload() {
+    if (!currentProjectId || !evidenceId) return;
+    setIsDownloading(true);
+    setDownloadError(null);
+
+    fetch(
+      `${import.meta.env.VITE_API_BASE_URL ?? ""}/api/v1/projects/${currentProjectId}/evidence/${evidenceId}/download`,
+      {
+        headers: authHeaders(),
+      },
+    )
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(`Download failed: ${response.statusText}`);
+        }
+        const blob = await response.blob();
+        const contentDisposition = response.headers.get("Content-Disposition");
+        let filename = `evidence-${evidenceId}.zip`;
+        if (contentDisposition) {
+          const match = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(contentDisposition);
+          if (match?.[1]) {
+            filename = match[1].replace(/['"]/g, "");
+          }
+        }
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = filename;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        URL.revokeObjectURL(url);
+      })
+      .catch((err: unknown) => {
+        setDownloadError(err instanceof Error ? err.message : "Download failed");
+      })
+      .finally(() => {
+        setIsDownloading(false);
+      });
   }
-
-  const effectiveStatus = exportOutcome === "success"
-    ? ("Exported" as const)
-    : exportOutcome === "failed"
-      ? ("Export failed" as const)
-      : evidence.status;
-
-  const recoveryMode = currentExportState === "Export failed";
 
   return (
     <div className="flex h-full flex-col gap-3">
@@ -275,63 +238,85 @@ export function EvidenceDetailPage() {
             <Link className="shell-text-action -ml-2" to="/evidence">
               Back to evidence
             </Link>
-            <h2 className="mt-2 text-2xl font-semibold text-shell-ink">{evidence.title}</h2>
-            <p className="mt-2 text-sm leading-6 text-shell-muted">{evidence.completeness}</p>
+            <h2 className="mt-2 text-2xl font-semibold text-shell-ink">{title}</h2>
+            <p className="mt-2 text-sm leading-6 text-shell-muted">
+              {evidenceCompletenessLabel(item.completeness)}
+            </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <StatusBadge label={effectiveStatus} tone={evidenceStatusTone(effectiveStatus)} />
+            <StatusBadge label={statusLbl} tone={evidenceStatusTone(statusLbl)} />
             <StatusBadge
-              label={currentExportState}
-              tone={evidenceExportStateTone(currentExportState)}
+              label={exportStateLbl}
+              tone={evidenceExportStateTone(exportStateLbl)}
             />
           </div>
         </div>
 
-        <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-          <SummaryCard label="Run origin" value={`${evidence.runType} · ${evidence.runId}`} />
-          <SummaryCard label="Initiator" value={evidence.initiator} />
-          <SummaryCard label="Duration" value={evidence.duration} />
-          <SummaryCard label="Values" value={evidence.valueCount.toLocaleString()} />
-          <SummaryCard label="Size" value={evidence.sizeLabel} />
+        <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <SummaryCard label="Kind" value={evidenceKindLabel(item.kind)} />
+          <SummaryCard label="Initiator" value={item.initiator} />
+          <SummaryCard label="Duration" value={duration} />
+          <SummaryCard label="Created by" value={item.createdBy} />
         </div>
 
         <div className="mt-6 flex flex-wrap items-center gap-2">
-          <button
-            className={recoveryMode ? "shell-action-warning" : "shell-action"}
-            disabled={!access.isAdmin || !exportAvailable}
-            type="button"
-            onClick={() => setExportDialogOpen(true)}
-          >
-            {recoveryMode ? "Retry export" : exportAvailable ? "Export evidence" : "Export not ready"}
-          </button>
-          {evidence.sourcePath ? (
-            <Link className="shell-text-action" to={evidence.sourcePath}>
-              Open source
-            </Link>
-          ) : null}
-          {evidence.scenarioName ? (
-            <Link className="shell-text-action" to="/scenarios">
-              Open scenario
-            </Link>
+          {access.isAdmin && exportAvailable ? (
+            <button
+              className={recoveryMode ? "shell-action-warning" : "shell-action"}
+              disabled={isExporting}
+              type="button"
+              onClick={handleExport}
+            >
+              {isExporting
+                ? "Exporting…"
+                : recoveryMode
+                  ? "Retry export"
+                  : "Export evidence"}
+            </button>
+          ) : !access.isAdmin ? null : (
+            <button className="shell-action" disabled type="button">
+              Export not ready
+            </button>
+          )}
+
+          {exportStateLbl === "Exported" || exportOutcome === "success" ? (
+            <button
+              className="shell-action"
+              disabled={isDownloading}
+              type="button"
+              onClick={handleDownload}
+            >
+              {isDownloading ? "Downloading…" : "Download bundle"}
+            </button>
           ) : null}
         </div>
 
-        {exportedFormat ? (
+        {exportError ? (
+          <div className="mt-4 rounded-md border border-shell-danger/25 bg-shell-danger/10 px-4 py-3">
+            <p className="text-sm font-medium text-shell-danger">Export failed.</p>
+            <p className="mt-1 text-sm text-shell-muted">{exportError}</p>
+          </div>
+        ) : null}
+
+        {exportOutcome === "success" && !exportError ? (
           <div className="mt-4 rounded-md border border-shell-line bg-shell-base/60 px-4 py-3">
-            <p className="text-sm font-medium text-shell-ink">
-              {exportOutcome === "success" ? "Last export:" : "Last export attempt:"} {exportedFormat}
-            </p>
+            <p className="text-sm font-medium text-shell-ink">Export queued successfully.</p>
             <p className="mt-1 text-sm text-shell-muted">
-              {exportOutcome === "success"
-                ? "Export completed. Secret values were excluded from the artifact."
-                : "Export failed. Adjust the scope and retry."}
+              The bundle is being assembled. Use the Download button to retrieve it.
             </p>
+          </div>
+        ) : null}
+
+        {downloadError ? (
+          <div className="mt-4 rounded-md border border-shell-danger/25 bg-shell-danger/10 px-4 py-3">
+            <p className="text-sm font-medium text-shell-danger">Download failed.</p>
+            <p className="mt-1 text-sm text-shell-muted">{downloadError}</p>
           </div>
         ) : null}
       </section>
 
-      {recoveryMode ? (
+      {recoveryMode && !exportOutcome ? (
         <section className="rounded-lg border border-shell-danger/25 bg-white px-5 py-5 shadow-panel">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0 max-w-3xl">
@@ -340,21 +325,20 @@ export function EvidenceDetailPage() {
                 Export needs another pass
               </h3>
               <p className="mt-2 text-sm leading-6 text-shell-muted">
-                {evidence.exportFailureReason ??
-                  "The previous export failed before the artifact was written."}
+                The previous export failed before the artifact was written.
               </p>
               <p className="mt-2 text-sm leading-6 text-shell-muted">
-                {evidence.exportNextAction ??
-                  "Retry export after adjusting the artifact scope or format."}
+                Retry the export to re-queue bundle generation.
               </p>
             </div>
             {access.isAdmin ? (
               <button
                 className="shell-action-warning"
+                disabled={isExporting}
                 type="button"
-                onClick={() => setExportDialogOpen(true)}
+                onClick={handleExport}
               >
-                Retry export
+                {isExporting ? "Exporting…" : "Retry export"}
               </button>
             ) : null}
           </div>
@@ -363,140 +347,55 @@ export function EvidenceDetailPage() {
 
       <div className="grid gap-3 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         <section className="shell-panel px-5 py-5">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className="text-base font-semibold text-shell-ink">Timeline</h3>
-            <StatusBadge label={evidence.completedAt ?? "Still capturing"} />
-          </div>
-
-          <ol className="mt-5 space-y-3">
-            {evidence.timeline.map((event) => (
-              <li
-                key={event.id}
-                className="rounded-md border border-shell-line bg-white px-4 py-4"
-              >
-                <div className="flex flex-wrap items-center gap-2">
-                  <StatusBadge
-                    label={event.time}
-                    tone={evidenceTimelineTone(event.tone)}
-                  />
-                  <p className="text-sm font-medium text-shell-ink">{event.title}</p>
-                </div>
-                <p className="mt-2 text-sm leading-6 text-shell-muted">{event.description}</p>
-              </li>
-            ))}
-          </ol>
-        </section>
-
-        <section className="shell-panel px-5 py-5">
-          <h3 className="text-base font-semibold text-shell-ink">Origin</h3>
+          <h3 className="text-base font-semibold text-shell-ink">Manifest</h3>
           <dl className="mt-5 grid gap-3">
-            <div className="rounded-md border border-shell-line bg-white px-4 py-3">
-              <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
-                Project
-              </dt>
-              <dd className="mt-2 text-sm text-shell-ink">{evidence.projectName}</dd>
-            </div>
-            <div className="rounded-md border border-shell-line bg-white px-4 py-3">
-              <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
-                Source or scenario
-              </dt>
-              <dd className="mt-2 text-sm text-shell-ink">
-                {evidence.scenarioName ?? evidence.sourceName}
-              </dd>
-            </div>
-            <div className="rounded-md border border-shell-line bg-white px-4 py-3">
-              <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
-                Export formats
-              </dt>
-              <dd className="mt-2 text-sm text-shell-ink">{evidence.formats.join(", ")}</dd>
-            </div>
+            <DetailRow label="Kind" value={evidenceKindLabel(item.kind)} />
+            <DetailRow label="Initiator" value={item.initiator} />
+            <DetailRow label="Started at" value={item.startedAt} />
+            <DetailRow label="Ended at" value={item.endedAt} />
+            <DetailRow label="Completeness" value={evidenceCompletenessLabel(item.completeness)} />
+            <DetailRow label="Run ID" value={item.runId} />
+            {item.scenarioId ? (
+              <DetailRow label="Scenario ID" value={item.scenarioId} />
+            ) : null}
+            {item.recordingId ? (
+              <DetailRow label="Recording ID" value={item.recordingId} />
+            ) : null}
           </dl>
         </section>
-      </div>
-
-      <div className="grid gap-3 xl:grid-cols-2">
-        <section className="shell-panel px-5 py-5">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className="text-base font-semibold text-shell-ink">Clients</h3>
-            <StatusBadge
-              label={`${evidence.clientCount} client${evidence.clientCount === 1 ? "" : "s"}`}
-            />
-          </div>
-
-          {evidence.clients.length > 0 ? (
-            <div className="mt-5 space-y-3">
-              {evidence.clients.map((client) => (
-                <div
-                  key={client.id}
-                  className="rounded-md border border-shell-line bg-white px-4 py-4"
-                >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-medium text-shell-ink">{client.name}</p>
-                    <StatusBadge
-                      label={client.delivery}
-                      tone={evidenceDeliveryTone(client.delivery)}
-                    />
-                  </div>
-                  <p className="mt-2 text-sm text-shell-muted">{client.protocol}</p>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <SharedStatePanel
-              message="No client delivery was captured for this evidence artifact."
-              state={
-                evidence.status === "Incomplete" || evidence.status === "Export failed"
-                  ? "warning"
-                  : "empty"
-              }
-              title="No clients captured."
-            />
-          )}
-        </section>
 
         <section className="shell-panel px-5 py-5">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className="text-base font-semibold text-shell-ink">Faults and errors</h3>
-            <StatusBadge
-              label={`${evidence.issues.length} issue${evidence.issues.length === 1 ? "" : "s"}`}
-            />
-          </div>
-
-          {evidence.issues.length > 0 ? (
-            <div className="mt-5 space-y-3">
-              {evidence.issues.map((issue) => (
-                <div
-                  key={issue.id}
-                  className="rounded-md border border-shell-line bg-white px-4 py-4"
+          <h3 className="text-base font-semibold text-shell-ink">Sources</h3>
+          {item.sourceIds.length > 0 ? (
+            <ul className="mt-5 space-y-3">
+              {item.sourceIds.map((sourceId) => (
+                <li
+                  key={sourceId}
+                  className="rounded-md border border-shell-line bg-white px-4 py-3 text-sm text-shell-ink"
                 >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <StatusBadge
-                      label={issue.severity}
-                      tone={evidenceIssueTone(issue.severity)}
-                    />
-                    <p className="text-sm font-medium text-shell-ink">{issue.label}</p>
-                  </div>
-                  <p className="mt-2 text-sm leading-6 text-shell-muted">{issue.description}</p>
-                </div>
+                  {sourceId}
+                </li>
               ))}
-            </div>
+            </ul>
           ) : (
             <SharedStatePanel
-              message="No faults or errors are attached to this evidence artifact."
+              message="No source IDs are associated with this evidence artifact."
               state="empty"
-              title="No issues captured."
+              title="No sources."
             />
           )}
+
+          <div className="mt-5 rounded-md border border-shell-line bg-shell-base/60 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
+              Bundle contents
+            </p>
+            <p className="mt-2 text-sm text-shell-muted">
+              Full timeline, client delivery details, and value counts are available in the
+              downloaded bundle.
+            </p>
+          </div>
         </section>
       </div>
-
-      <ExportEvidenceDialog
-        evidence={evidence}
-        open={exportDialogOpen}
-        recoveryMode={recoveryMode}
-        onClose={closeExportDialog}
-        onExportComplete={handleExportComplete}
-      />
     </div>
   );
 }

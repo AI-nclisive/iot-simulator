@@ -741,8 +741,7 @@ Parallel execution:
   Surfaces: Data Sources list — duplicate action.
   Depends: backend IS-066.
   Done when: `duplicateDataSource` calls `POST /api/v1/projects/{pid}/data-sources/{rowId}/duplicate` directly; manual create path removed; no TypeScript errors.
-
-- [ ] `UI-105` Wire Evidence surfaces to live API
+- [x] `UI-105` Wire Evidence surfaces to live API
   Goal: replace mock-evidence.ts with real backend calls on Evidence List and Evidence Detail.
   Surface: `Evidence List`, `Evidence Detail`
   Work includes: GET /api/v1/projects/{projectId}/evidence (list); GET /{id} (detail, parse manifest JsonNode); POST /{id}/export?format=BUNDLE + GET /{id}/download (export/download); status mapping CAPTURING→"In progress", READY→"Ready", PARTIAL→"Incomplete", EXPORT_FAILED→"Export failed"; remove mock-evidence.ts.

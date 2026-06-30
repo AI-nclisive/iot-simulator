@@ -1,65 +1,54 @@
-import type { EvidenceArtifact } from "./mock-evidence";
+import type { EvidenceItem } from "./evidence-types";
+import { evidenceExportStateLabel, evidenceKindLabel, evidenceStatusLabel } from "./evidence-types";
 
 export type EvidenceListFilters = {
   initiatorFilter: string;
-  projectFilter: string;
   scenarioFilter: string;
   searchValue: string;
-  sourceFilter: string;
   stateFilter: string;
 };
 
-export function filterEvidenceArtifacts(
-  artifacts: EvidenceArtifact[],
+export function filterEvidenceItems(
+  items: EvidenceItem[],
   {
     initiatorFilter,
-    projectFilter,
     scenarioFilter,
     searchValue,
-    sourceFilter,
     stateFilter,
   }: EvidenceListFilters,
 ) {
   const normalizedSearch = searchValue.trim().toLowerCase();
 
-  return artifacts.filter((artifact) => {
+  return items.filter((item) => {
+    const statusLabel = evidenceStatusLabel(item.status);
+    const exportState = evidenceExportStateLabel(item.exported, item.status);
+    const kindLabel = evidenceKindLabel(item.kind);
+
     const searchMatches =
       normalizedSearch.length === 0 ||
       [
-        artifact.title,
-        artifact.projectName,
-        artifact.sourceName,
-        artifact.scenarioName ?? "",
-        artifact.runId,
-        artifact.runType,
-        artifact.initiator,
-        artifact.status,
-        artifact.exportState,
+        item.runId,
+        kindLabel,
+        item.initiator,
+        statusLabel,
+        exportState,
+        item.createdBy,
+        ...(item.sourceIds ?? []),
       ]
         .join(" ")
         .toLowerCase()
         .includes(normalizedSearch);
 
-    const projectMatches = projectFilter === "all" || artifact.projectName === projectFilter;
-    const sourceMatches = sourceFilter === "all" || artifact.sourceName === sourceFilter;
-    const initiatorMatches =
-      initiatorFilter === "all" || artifact.initiator === initiatorFilter;
-    const stateMatches = stateFilter === "all" || artifact.status === stateFilter;
+    const initiatorMatches = initiatorFilter === "all" || item.initiator === initiatorFilter;
+    const stateMatches = stateFilter === "all" || statusLabel === stateFilter;
     const scenarioMatches =
       scenarioFilter === "all" ||
-      (scenarioFilter === "scenario" ? artifact.scenarioName : !artifact.scenarioName);
+      (scenarioFilter === "scenario" ? item.scenarioId !== null : item.scenarioId === null);
 
-    return (
-      searchMatches &&
-      projectMatches &&
-      sourceMatches &&
-      initiatorMatches &&
-      stateMatches &&
-      scenarioMatches
-    );
+    return searchMatches && initiatorMatches && stateMatches && scenarioMatches;
   });
 }
 
-export function canExportEvidenceArtifact(artifact: EvidenceArtifact) {
-  return artifact.status !== "In progress" && artifact.exportState !== "Not ready";
+export function canExportEvidenceItem(item: EvidenceItem): boolean {
+  return item.status !== "CAPTURING";
 }
