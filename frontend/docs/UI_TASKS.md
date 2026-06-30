@@ -776,6 +776,13 @@ Parallel execution:
   Depends: `UI-096`.
   Done when: GET→PUT round-trip preserves FOLDER nodes, parentId, valueRank, access; editing unit/description works; BYTES/DATETIME shown read-only; no TypeScript errors.
 
+- [ ] `UI-110` Create Project flow (modal)
+  Goal: the `Create project` button on `Project Entry` navigates to `/projects/create`, which renders only a `SurfaceStubPage` placeholder — no form, so nothing happens. The `createProject(name, description)` store action (`POST /api/v1/projects`) and the backend endpoint already exist (UI-097); only the creation surface is missing. Add a real surface as a modal, mirroring the existing `ImportProjectDialog`.
+  Surface: `Project Entry` — Create project action.
+  Work includes: add a `CreateProjectDialog` modal in `project-entry-page.tsx` (React portal, parallel to `ImportProjectDialog`); name (required, trimmed, non-empty) + optional description fields with inline validation; wire confirm to the existing `createProject` store action; disabled/loading state while the POST is in flight; surface failures via the notification store (`push`) like the other lifecycle actions; on success close the dialog and open the new project (`setCurrentProjectId` + navigate to `/overview`); replace both `navigate("/projects/create")` call sites (header button + empty-state action) with opening the modal; remove the now-dead `/projects/create` stub route, `entrySurfaceContent.projectCreate`, and the `SurfaceStubPage` import if it becomes unused; keep Admin-only gating via `access.canCreateProject`; add a test covering validation + successful submit.
+  Depends: `UI-011`, `UI-097`.
+  Done when: clicking `Create project` opens a modal; submitting a valid name calls `POST /api/v1/projects`, the new project opens (and appears in the list), and errors are shown without closing the dialog; the `/projects/create` stub route is removed; tests pass and there are no TypeScript errors.
+
 ## Recommended Sequence
 
 1. Complete the P0 shell and shared-pattern tasks first.
