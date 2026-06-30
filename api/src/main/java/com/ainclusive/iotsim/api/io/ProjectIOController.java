@@ -10,6 +10,7 @@ import java.io.InputStream;
 import java.net.URI;
 import java.time.Instant;
 import org.springframework.core.io.InputStreamResource;
+import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -55,10 +56,12 @@ public class ProjectIOController {
     @PostMapping("/{id}/export")
     public ResponseEntity<InputStreamResource> export(@PathVariable String id) {
         ProjectBundle bundle = exportService.export(id);
+        ContentDisposition disposition = ContentDisposition.attachment()
+                .filename(bundle.filename())
+                .build();
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(bundle.contentType()))
-                .header(HttpHeaders.CONTENT_DISPOSITION,
-                        "attachment; filename=\"" + bundle.filename() + "\"")
+                .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
                 .body(new InputStreamResource(bundle.content()));
     }
 

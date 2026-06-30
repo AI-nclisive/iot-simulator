@@ -38,6 +38,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
@@ -129,6 +130,45 @@ class ProjectImportServiceTest {
                 .isInstanceOf(ProjectImportException.class);
     }
 
+    @Test
+    void rejectsChecksumMismatch() {
+        // Build a valid export ZIP then tamper with project.json content
+        // by creating a new ZIP with the same manifest but different project bytes.
+        byte[] goodZip = new ProjectZipExporter(json).toBytes(simpleContent("Original"));
+
+        // Extract entries and corrupt project.json
+        Map<String, String> entries = new java.util.LinkedHashMap<>();
+        try (ZipInputStream zis = new ZipInputStream(new ByteArrayInputStream(goodZip))) {
+            ZipEntry e;
+            while ((e = zis.getNextEntry()) != null) {
+                String content = new String(zis.readAllBytes(), StandardCharsets.UTF_8);
+                if ("project.json".equals(e.getName())) {
+                    // tamper: change the name so checksum no longer matches
+                    content = content.replace("Original", "Tampered");
+                }
+                entries.put(e.getName(), content);
+            }
+        } catch (IOException ex) {
+            throw new UncheckedIOException(ex);
+        }
+        byte[] tamperedZip = makeZip(entries);
+
+        Fixture fixture = new Fixture();
+        assertThatThrownBy(() -> fixture.service().importProject(new ByteArrayInputStream(tamperedZip), "local"))
+                .isInstanceOf(ProjectImportException.class)
+                .hasMessageContaining("Integrity check failed");
+    }
+
+    @Test
+    void preservesEnabledStateOfDataSources() {
+        Fixture fixture = new Fixture();
+        fixture.service().importProject(exportStream(fullContent()), "local");
+
+        // fullContent() has enabled=true for the one data source.
+        // After insert (enabled=false by default) + update should have been called.
+        assertThat(fixture.updateCalledCount).isGreaterThan(0);
+    }
+
     // -------------------------------------------------------------------------
 
     private InputStream exportStream(ProjectExportContent content) {
@@ -198,6 +238,7 @@ class ProjectImportServiceTest {
         final List<List<SchemaNode>> savedSchemas = new ArrayList<>();
         final List<RecordingRow> createdRecordings = new ArrayList<>();
         final List<Sample> createdSamples = new ArrayList<>();
+        int updateCalledCount = 0;
 
         private final AtomicInteger counter = new AtomicInteger();
 
@@ -233,7 +274,16 @@ class ProjectImportServiceTest {
                 @Override
                 public Optional<DataSourceRow> update(String id, String name, String endpointJson,
                         String runtimeConfigJson, boolean enabled, long expectedVersion) {
-                    return Optional.empty();
+                    updateCalledCount++;
+                    // Return the last inserted row with the updated enabled state.
+                    if (insertedDataSources.isEmpty()) {
+                        return Optional.empty();
+                    }
+                    DataSourceRow last = insertedDataSources.get(insertedDataSources.size() - 1);
+                    OffsetDateTime odt = OffsetDateTime.now(ZoneOffset.UTC);
+                    return Optional.of(new DataSourceRow(last.id(), last.projectId(), name,
+                            last.protocol(), last.basis(), null, null, endpointJson,
+                            runtimeConfigJson, enabled, last.createdAt(), odt, last.createdBy(), expectedVersion + 1));
                 }
 
                 @Override

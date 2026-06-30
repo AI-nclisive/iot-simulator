@@ -12,8 +12,11 @@ import com.ainclusive.iotsim.protocolmodel.SchemaNode;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.zip.ZipEntry;
@@ -34,11 +37,24 @@ import tools.jackson.databind.ObjectMapper;
  * <p>Secrets are never present in the export format; the import creates data
  * sources with {@code ANONYMOUS} credential state (user can supply credentials
  * after import).
+ *
+ * <p>Safety guards:
+ * <ul>
+ *   <li>Per-entry size cap ({@link #MAX_ENTRY_BYTES}) prevents ZIP-bomb / heap exhaustion.</li>
+ *   <li>Entry-count cap ({@link #MAX_ENTRIES}) limits the number of ZIP entries processed.</li>
+ *   <li>Per-entry SHA-256 checksums declared in {@code manifest.entries} are verified
+ *       against the actual bytes after reading (integrity check).</li>
+ * </ul>
  */
 @Service
 public class ProjectImportService {
 
     private static final int SUPPORTED_MAJOR = 1;
+    /** Maximum size of any single ZIP entry (10 MB). */
+    private static final long MAX_ENTRY_BYTES = 10 * 1024 * 1024L;
+    /** Maximum number of ZIP entries to process. */
+    private static final int MAX_ENTRIES = 64;
+
     private static final TypeReference<List<SchemaNode>> SCHEMA_NODE_LIST = new TypeReference<>() {};
 
     private final ProjectService projects;
@@ -68,11 +84,18 @@ public class ProjectImportService {
      * re-pointed to the new IDs.
      *
      * @return the newly created {@link Project}
-     * @throws ProjectImportException if the ZIP is malformed or uses an unsupported version
+     * @throws ProjectImportException if the ZIP is malformed, checksum mismatch,
+     *                                or uses an unsupported format version
      */
     @Transactional
     public Project importProject(InputStream inputStream, String actor) {
-        Map<String, String> zipEntries = readZipEntries(inputStream);
+        Map<String, byte[]> rawEntries = readZipEntries(inputStream);
+
+        // Convert raw bytes to strings for JSON parsing.
+        Map<String, String> zipEntries = new HashMap<>();
+        for (Map.Entry<String, byte[]> e : rawEntries.entrySet()) {
+            zipEntries.put(e.getKey(), new String(e.getValue(), StandardCharsets.UTF_8));
+        }
 
         // --- manifest validation ---
         String manifestJson = zipEntries.get("manifest.json");
@@ -81,6 +104,7 @@ public class ProjectImportService {
         }
         JsonNode manifest = parseJson(manifestJson);
         validateFormatVersion(manifest.path("formatVersion").asString(null));
+        verifyChecksums(manifest, rawEntries);
 
         // --- project ---
         String projectJson = zipEntries.get("project.json");
@@ -110,6 +134,13 @@ public class ProjectImportService {
 
                     DataSourceRow row = dataSources.insert(
                             newProject.id(), dsName, protocol, basis, endpoint, runtimeConfig, actor);
+
+                    // Preserve the exported enabled state: insert() defaults to false;
+                    // apply an update only when the exported value is true.
+                    if (enabled) {
+                        dataSources.update(row.id(), row.name(), row.endpoint(),
+                                row.runtimeConfig(), true, row.version());
+                    }
 
                     if (oldId != null) {
                         dsIdMap.put(oldId, row.id());
@@ -210,20 +241,86 @@ public class ProjectImportService {
         }
     }
 
-    private Map<String, String> readZipEntries(InputStream in) {
-        Map<String, String> entries = new HashMap<>();
+    /**
+     * Verifies per-entry SHA-256 checksums declared in {@code manifest.entries}
+     * against the bytes actually read from the ZIP. Throws
+     * {@link ProjectImportException} if any entry is missing or has a mismatched
+     * checksum.
+     */
+    private void verifyChecksums(JsonNode manifest, Map<String, byte[]> rawEntries) {
+        JsonNode entries = manifest.path("entries");
+        if (entries.isMissingNode() || !entries.isArray()) {
+            return; // no entries declared; skip verification (older compatible minor)
+        }
+        for (JsonNode entry : entries) {
+            String path = entry.path("path").asString(null);
+            String expectedSha = entry.path("sha256").asString(null);
+            if (path == null || expectedSha == null) {
+                continue;
+            }
+            byte[] bytes = rawEntries.get(path);
+            if (bytes == null) {
+                throw new ProjectImportException(
+                        "Integrity check failed: manifest references missing entry: " + path);
+            }
+            String actualSha = sha256(bytes);
+            if (!actualSha.equals(expectedSha)) {
+                throw new ProjectImportException(
+                        "Integrity check failed: SHA-256 mismatch for entry: " + path);
+            }
+        }
+    }
+
+    /**
+     * Reads all ZIP entries into memory with size and count guards to prevent
+     * ZIP-bomb / heap-exhaustion attacks.
+     */
+    private Map<String, byte[]> readZipEntries(InputStream in) {
+        Map<String, byte[]> entries = new HashMap<>();
         try (ZipInputStream zis = new ZipInputStream(in)) {
             ZipEntry entry;
             while ((entry = zis.getNextEntry()) != null) {
+                if (entries.size() >= MAX_ENTRIES) {
+                    throw new ProjectImportException(
+                            "Invalid project export: too many ZIP entries (max " + MAX_ENTRIES + ")");
+                }
                 String name = entry.getName();
-                byte[] bytes = zis.readAllBytes();
-                entries.put(name, new String(bytes, StandardCharsets.UTF_8));
+                byte[] bytes = readEntryBytes(zis, name);
+                entries.put(name, bytes);
                 zis.closeEntry();
             }
         } catch (IOException e) {
             throw new ProjectImportException("Failed to read project export ZIP", e);
         }
         return entries;
+    }
+
+    /**
+     * Reads bytes from the current ZIP entry with a hard size cap to prevent
+     * heap exhaustion from oversized or crafted entries.
+     */
+    private static byte[] readEntryBytes(ZipInputStream zis, String entryName) throws IOException {
+        byte[] buffer = new byte[8192];
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        int read;
+        while ((read = zis.read(buffer)) != -1) {
+            if (out.size() + read > MAX_ENTRY_BYTES) {
+                throw new ProjectImportException(
+                        "Invalid project export: entry too large (max " + MAX_ENTRY_BYTES + " bytes): "
+                        + entryName);
+            }
+            out.write(buffer, 0, read);
+        }
+        return out.toByteArray();
+    }
+
+    private static String sha256(byte[] bytes) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return HexFormat.of().formatHex(digest.digest(bytes));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 not available", e);
+        }
     }
 
     private JsonNode parseJson(String text) {
