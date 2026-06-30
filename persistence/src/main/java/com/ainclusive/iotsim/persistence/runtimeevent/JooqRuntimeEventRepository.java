@@ -4,11 +4,14 @@ import static com.ainclusive.iotsim.persistence.jooq.tables.RuntimeEvents.RUNTIM
 
 import com.ainclusive.iotsim.persistence.jooq.tables.records.RuntimeEventsRecord;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import org.jooq.Condition;
 import org.jooq.DSLContext;
 import org.jooq.InsertSetMoreStep;
 import org.jooq.JSONB;
+import org.jooq.impl.DSL;
 import org.springframework.stereotype.Repository;
 
 /** jOOQ-backed, append-only {@link RuntimeEventRepository} (backend-specs/04). */
@@ -68,6 +71,38 @@ public class JooqRuntimeEventRepository implements RuntimeEventRepository {
         return dsl.selectFrom(RUNTIME_EVENTS)
                 .where(RUNTIME_EVENTS.DATA_SOURCE_ID.eq(dataSourceId))
                 .orderBy(RUNTIME_EVENTS.AT.desc(), RUNTIME_EVENTS.ID.desc())
+                .fetch()
+                .map(this::map);
+    }
+
+    @Override
+    public List<RuntimeEventRow> query(RuntimeEventQuery filter) {
+        List<Condition> conditions = new ArrayList<>();
+        conditions.add(RUNTIME_EVENTS.PROJECT_ID.eq(filter.projectId()));
+        if (filter.dataSourceId() != null) {
+            conditions.add(RUNTIME_EVENTS.DATA_SOURCE_ID.eq(filter.dataSourceId()));
+        }
+        if (filter.runId() != null) {
+            conditions.add(RUNTIME_EVENTS.RUN_ID.eq(filter.runId()));
+        }
+        if (filter.type() != null) {
+            conditions.add(RUNTIME_EVENTS.TYPE.eq(filter.type()));
+        }
+        if (filter.from() != null) {
+            conditions.add(RUNTIME_EVENTS.AT.ge(filter.from()));
+        }
+        if (filter.to() != null) {
+            conditions.add(RUNTIME_EVENTS.AT.lt(filter.to()));
+        }
+        // Keyset cursor: rows strictly older than (beforeAt, beforeId) in (at desc, id desc) order.
+        if (filter.beforeAt() != null && filter.beforeId() != null) {
+            conditions.add(DSL.row(RUNTIME_EVENTS.AT, RUNTIME_EVENTS.ID)
+                    .lessThan(DSL.row(filter.beforeAt(), filter.beforeId())));
+        }
+        return dsl.selectFrom(RUNTIME_EVENTS)
+                .where(conditions)
+                .orderBy(RUNTIME_EVENTS.AT.desc(), RUNTIME_EVENTS.ID.desc())
+                .limit(filter.limit())
                 .fetch()
                 .map(this::map);
     }
