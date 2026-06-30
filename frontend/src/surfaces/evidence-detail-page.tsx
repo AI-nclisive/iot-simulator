@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { apiFetch } from "../api/client";
+import { apiFetch, authHeaders } from "../api/client";
 import { resolveAccess } from "../shell/access-policy";
 import { useShellStore } from "../shell/shell-store";
 import { SharedStatePanel } from "../ui/shared-state-panel";
@@ -11,6 +11,7 @@ import {
   isEvidenceExportAvailable,
 } from "./evidence-detail-helpers";
 import {
+  evidenceCompletenessLabel,
   evidenceExportStateLabel,
   evidenceKindLabel,
   evidenceStatusLabel,
@@ -196,10 +197,7 @@ export function EvidenceDetailPage() {
     fetch(
       `${import.meta.env.VITE_API_BASE_URL ?? ""}/api/v1/projects/${currentProjectId}/evidence/${evidenceId}/download`,
       {
-        headers: (() => {
-          const token = sessionStorage.getItem("jwt");
-          const h: Record<string, string> = {}; if (token) h["Authorization"] = `Bearer ${token}`; return h;
-        })(),
+        headers: authHeaders(),
       },
     )
       .then(async (response) => {
@@ -242,7 +240,7 @@ export function EvidenceDetailPage() {
             </Link>
             <h2 className="mt-2 text-2xl font-semibold text-shell-ink">{title}</h2>
             <p className="mt-2 text-sm leading-6 text-shell-muted">
-              {item.completeness}
+              {evidenceCompletenessLabel(item.completeness)}
             </p>
           </div>
 
@@ -355,7 +353,7 @@ export function EvidenceDetailPage() {
             <DetailRow label="Initiator" value={item.initiator} />
             <DetailRow label="Started at" value={item.startedAt} />
             <DetailRow label="Ended at" value={item.endedAt} />
-            <DetailRow label="Completeness" value={item.completeness} />
+            <DetailRow label="Completeness" value={evidenceCompletenessLabel(item.completeness)} />
             <DetailRow label="Run ID" value={item.runId} />
             {item.scenarioId ? (
               <DetailRow label="Scenario ID" value={item.scenarioId} />

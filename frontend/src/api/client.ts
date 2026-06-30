@@ -16,7 +16,7 @@ function baseUrl(): string {
   return import.meta.env.VITE_API_BASE_URL ?? "";
 }
 
-function authHeaders(): Record<string, string> {
+export function authHeaders(): Record<string, string> {
   const token = sessionStorage.getItem("jwt");
   return token ? { Authorization: `Bearer ${token}` } : {};
 }

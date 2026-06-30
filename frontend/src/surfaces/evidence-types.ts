@@ -124,12 +124,21 @@ export function evidenceKindLabel(kind: EvidenceKind): string {
   }
 }
 
+
+/** Human-readable completeness label */
+export function evidenceCompletenessLabel(completeness: EvidenceCompleteness): string {
+  switch (completeness) {
+    case "COMPLETE":
+      return "Complete";
+    case "PARTIAL":
+      return "Partial";
+    case "FAILED":
+      return "Failed";
+  }
+}
+
 /** Derive a display title from kind + runId */
 export function evidenceTitle(kind: EvidenceKind, runId: string): string {
   return `${evidenceKindLabel(kind)} run · ${runId}`;
 }
 
-/** Whether export can be triggered (status is not CAPTURING) */
-export function canExportEvidence(item: EvidenceItem): boolean {
-  return item.status !== "CAPTURING";
-}
