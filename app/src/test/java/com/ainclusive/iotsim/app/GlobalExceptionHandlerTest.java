@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.ainclusive.iotsim.api.error.GlobalExceptionHandler;
 import com.ainclusive.iotsim.platform.capture.CaptureException;
+import com.ainclusive.iotsim.platform.runtime.RuntimeCapacityException;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.ProblemDetail;
 
@@ -32,5 +33,13 @@ class GlobalExceptionHandlerTest {
         ProblemDetail pd = handler.captureFailed(
                 new CaptureException(CaptureException.Kind.UNAVAILABLE, "endpoint unreachable"));
         assertThat(pd.getStatus()).isEqualTo(503);
+    }
+
+    @Test
+    void runtimeCapacityMapsTo503() {
+        ProblemDetail pd = handler.capacityExceeded(
+                new RuntimeCapacityException("concurrent-source cap reached (50)"));
+        assertThat(pd.getStatus()).isEqualTo(503);
+        assertThat(pd.getDetail()).isEqualTo("concurrent-source cap reached (50)");
     }
 }
