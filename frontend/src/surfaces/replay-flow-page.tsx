@@ -4,9 +4,20 @@ import { resolveAccess } from "../shell/access-policy";
 import { useArtifactsStore } from "../shell/artifacts-store";
 import { useDataSourcesStore } from "../shell/data-sources-store";
 import { useShellStore } from "../shell/shell-store";
+import { useNotificationStore } from "../shell/notification-store";
+import { apiFetch } from "../api";
 import { SharedStatePanel } from "../ui/shared-state-panel";
 import { StatusBadge, type StatusTone } from "../ui/status-badge";
 import { DeterministicRunSettings, type DeterministicSettings } from "./deterministic-run-settings";
+
+// Backend response for POST /api/v1/projects/{pid}/data-sources/{dsId}/replay
+type ReplayResponse = {
+  recordingId: string;
+  dataSourceId: string;
+  valueCount: number;
+  runId: string;
+  evidenceId: string;
+};
 
 type ReplayUiState = "idle" | "running" | "completed" | "failed";
 
@@ -56,10 +67,12 @@ export function ReplayFlowPage() {
   const [searchParams] = useSearchParams();
   const accessMode = useShellStore((state) => state.accessMode);
   const sharedRole = useShellStore((state) => state.sharedRole);
+  const currentProjectId = useShellStore((state) => state.currentProjectId);
   const artifacts = useArtifactsStore((state) => state.artifacts);
   const source = useDataSourcesStore((state) =>
     state.dataSources.find((row) => row.id === sourceId),
   );
+  const push = useNotificationStore((state) => state.push);
   const access = resolveAccess(accessMode, sharedRole);
   const [selectedArtifactId, setSelectedArtifactId] = useState(
     searchParams.get("artifactId") ?? artifacts[0]?.id ?? "",
@@ -84,27 +97,13 @@ export function ReplayFlowPage() {
   const canConfigureReplay = access.canConfigureReplay;
   const replayReady = Boolean(selectedArtifact) && compatibleArtifact;
 
+  // TODO(UI-097): no backend progress streaming — progress stays at "running" until
+  // a future SSE or polling endpoint is wired. For now set to 100% on completed.
   useEffect(() => {
-    if (!source || replayState !== "running") {
-      return;
+    if (replayState === "completed") {
+      setProgress(100);
     }
-
-    const intervalId = window.setInterval(() => {
-      setProgress((currentProgress) => {
-        const nextProgress = Math.min(currentProgress + 20, 100);
-
-        if (nextProgress >= 100) {
-          window.clearInterval(intervalId);
-          setReplayState("completed");
-          setEvidenceState("Ready");
-        }
-
-        return nextProgress;
-      });
-    }, 900);
-
-    return () => window.clearInterval(intervalId);
-  }, [replayState, source]);
+  }, [replayState]);
 
   const runtimeEvents = useMemo(() => {
     if (!selectedArtifact) {
@@ -181,12 +180,8 @@ export function ReplayFlowPage() {
 
   const activeSource = source;
 
-  function handleStartReplay() {
-    if (
-      !selectedArtifact ||
-      !replayReady ||
-      !canConfigureReplay
-    ) {
+  async function handleStartReplay() {
+    if (!selectedArtifact || !replayReady || !canConfigureReplay || !currentProjectId || !sourceId) {
       return;
     }
 
@@ -199,9 +194,27 @@ export function ReplayFlowPage() {
         minute: "2-digit",
       }).format(new Date()),
     );
+
+    try {
+      await apiFetch<ReplayResponse>(
+        `/api/v1/projects/${currentProjectId}/data-sources/${sourceId}/replay`,
+        {
+          method: "POST",
+          body: JSON.stringify({ recordingId: selectedArtifact.id }),
+        },
+      );
+      setReplayState("completed");
+      setEvidenceState("Ready");
+    } catch (err) {
+      const title = err instanceof Error ? err.message : "Replay failed";
+      push({ tone: "error", title });
+      setReplayState("failed");
+      setEvidenceState("Retry needed");
+    }
   }
 
   function handleStopReplay() {
+    // TODO(UI-097): no backend stop endpoint — only local state update
     setReplayState("failed");
     setEvidenceState("Retry needed");
   }

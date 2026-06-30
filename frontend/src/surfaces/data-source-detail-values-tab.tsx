@@ -12,7 +12,7 @@ import {
   type TableSortState,
 } from "../ui/table-pattern";
 import { StatusBadge } from "../ui/status-badge";
-import type { DataSourceRow } from "./mock-data-sources";
+import type { DataSourceRow } from "../shell/data-sources-store";
 import type { SourceValueRow } from "./mock-source-values";
 
 function freshnessTone(freshness: SourceValueRow["freshness"]) {

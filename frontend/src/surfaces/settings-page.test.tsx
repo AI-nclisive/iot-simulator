@@ -22,6 +22,23 @@ const { mockShellStore } = vi.hoisted(() => ({ mockShellStore: vi.fn() }));
 
 vi.mock("../shell/shell-store", () => ({ useShellStore: mockShellStore }));
 
+vi.mock("../shell/projects-store", () => ({
+  useProjectsStore: (selector: (s: object) => unknown) =>
+    selector({
+      projects: [
+        {
+          id: "assembly-line-a",
+          name: "Assembly Line A",
+          configuredSources: 0,
+          runningSources: 0,
+          reusableArtifacts: 0,
+          lastActivity: "",
+        },
+      ],
+      renameProject: async () => {},
+    }),
+}));
+
 function setupStore(opts: { accessMode?: "local" | "shared"; sharedRole?: "admin" | "user" } = {}) {
   const { accessMode = "local", sharedRole = "admin" } = opts;
   mockShellStore.mockImplementation((selector: (s: object) => unknown) =>

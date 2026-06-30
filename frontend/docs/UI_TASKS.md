@@ -677,7 +677,7 @@ Parallel execution:
   errors surface through shared patterns, and no ready-core surface imports
   `mock-*.ts` for live data.
 
-- [ ] `UI-097` Wire ready-core surfaces to live API
+- [x] `UI-097` Wire ready-core surfaces to live API
   Goal: switch projects, data sources, schema, scan, recording capture, and
   replay from Zustand mocks to the real endpoints.
   Surface: `Project Entry`, `Data Sources List`, `Data Source Detail`,

@@ -1,13 +1,12 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { resolveAccess } from "../shell/access-policy";
 import { useDataSourcesStore } from "../shell/data-sources-store";
 import { useShellStore } from "../shell/shell-store";
-import { sourceListError, sourceListStale } from "../shell/mock-workspace";
+import { useNotificationStore } from "../shell/notification-store";
 import { type DataSourceRow } from "./mock-data-sources";
 import { ConfirmationDialog } from "../ui/confirmation-dialog";
 import { SharedStatePanel } from "../ui/shared-state-panel";
-import { StaleBanner } from "../ui/stale-banner";
 import { StatusBadge } from "../ui/status-badge";
 import { stopActionCopy } from "./source-action-copy";
 import {
@@ -67,11 +66,22 @@ export function DataSourcesListPage() {
   const navigate = useNavigate();
   const accessMode = useShellStore((state) => state.accessMode);
   const sharedRole = useShellStore((state) => state.sharedRole);
+  const currentProjectId = useShellStore((state) => state.currentProjectId);
   const rows = useDataSourcesStore((state) => state.dataSources);
+  const isLoading = useDataSourcesStore((state) => state.isLoading);
+  const error = useDataSourcesStore((state) => state.error);
+  const loadDataSources = useDataSourcesStore((state) => state.loadDataSources);
   const startDataSource = useDataSourcesStore((state) => state.startDataSource);
   const stopDataSource = useDataSourcesStore((state) => state.stopDataSource);
   const duplicateDataSource = useDataSourcesStore((state) => state.duplicateDataSource);
   const deleteDataSource = useDataSourcesStore((state) => state.deleteDataSource);
+  const push = useNotificationStore((state) => state.push);
+
+  useEffect(() => {
+    if (currentProjectId) {
+      loadDataSources(currentProjectId);
+    }
+  }, [currentProjectId, loadDataSources]);
   const [searchValue, setSearchValue] = useState("");
   const [protocolFilter, setProtocolFilter] = useState("all");
   const [stateFilter, setStateFilter] = useState("all");
@@ -148,25 +158,40 @@ export function DataSourcesListPage() {
     };
   }, [confirmationRequest, rows]);
 
-  function startSource(rowId: string) {
-    startDataSource(rowId);
+  async function startSource(rowId: string) {
+    try {
+      await startDataSource(rowId, currentProjectId);
+    } catch (err) {
+      const title = err instanceof Error ? err.message : "Failed to start source";
+      push({ tone: "error", title });
+    }
   }
 
-  function duplicateSource(rowId: string) {
-    duplicateDataSource(rowId);
+  async function duplicateSource(rowId: string) {
+    try {
+      await duplicateDataSource(rowId, currentProjectId);
+    } catch (err) {
+      const title = err instanceof Error ? err.message : "Failed to duplicate source";
+      push({ tone: "error", title });
+    }
   }
 
-  function confirmRequestedAction() {
+  async function confirmRequestedAction() {
     if (!confirmationRequest) {
       return;
     }
 
-    if (confirmationRequest.action === "stop") {
-      stopDataSource(confirmationRequest.rowId);
-    }
+    try {
+      if (confirmationRequest.action === "stop") {
+        await stopDataSource(confirmationRequest.rowId, currentProjectId);
+      }
 
-    if (confirmationRequest.action === "delete") {
-      deleteDataSource(confirmationRequest.rowId);
+      if (confirmationRequest.action === "delete") {
+        await deleteDataSource(confirmationRequest.rowId, currentProjectId);
+      }
+    } catch (err) {
+      const title = err instanceof Error ? err.message : "Action failed";
+      push({ tone: "error", title });
     }
 
     setConfirmationRequest(null);
@@ -276,7 +301,17 @@ export function DataSourcesListPage() {
   const hasQueryState =
     searchValue.trim().length > 0 || protocolFilter !== "all" || stateFilter !== "all";
 
-  if (sourceListError) {
+  if (isLoading) {
+    return (
+      <div className="flex h-full flex-col gap-3">
+        <section className="shell-panel px-5 py-5">
+          <p className="text-sm text-shell-muted">Loading…</p>
+        </section>
+      </div>
+    );
+  }
+
+  if (error) {
     return (
       <div className="flex h-full flex-col gap-3">
         <section className="shell-panel px-5 py-5">
@@ -293,9 +328,6 @@ export function DataSourcesListPage() {
   return (
     <div className="flex h-full flex-col gap-3">
       <section className="shell-panel px-5 py-5">
-        {sourceListStale ? (
-          <StaleBanner message="Source status may be outdated. Refresh the page to see the latest state." />
-        ) : null}
         <TableToolbar
           activeFilters={activeFilters}
           filters={filters}

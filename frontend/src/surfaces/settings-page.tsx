@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { resolveAccess } from "../shell/access-policy";
-import { mockExportShouldFail, projects } from "../shell/mock-workspace";
+import { useProjectsStore } from "../shell/projects-store";
 import { useShellStore } from "../shell/shell-store";
 import { SharedStatePanel } from "../ui/shared-state-panel";
 import { StatusBadge } from "../ui/status-badge";
@@ -18,9 +18,11 @@ type SaveState = "idle" | "saving" | "saved" | "error";
 function ProjectNameField({
   initialName,
   canEdit,
+  onSave,
 }: {
   initialName: string;
   canEdit: boolean;
+  onSave: (name: string) => Promise<void>;
 }) {
   const [name, setName] = useState(initialName);
   const [saveState, setSaveState] = useState<SaveState>("idle");
@@ -33,7 +35,7 @@ function ProjectNameField({
     };
   }, []);
 
-  function handleSave() {
+  async function handleSave() {
     if (!canEdit) return;
     const trimmed = name.trim();
     if (!trimmed) {
@@ -42,10 +44,13 @@ function ProjectNameField({
     }
     setValidationError("");
     setSaveState("saving");
-    savedTimerRef.current = setTimeout(() => {
+    try {
+      await onSave(trimmed);
       setSaveState("saved");
       savedTimerRef.current = setTimeout(() => setSaveState("idle"), 2500);
-    }, 600);
+    } catch {
+      setSaveState("error");
+    }
   }
 
   if (!canEdit) {
@@ -120,13 +125,9 @@ function ExportProjectSection({
     setExportState({ phase: "exporting" });
 
     setTimeout(() => {
-      if (mockExportShouldFail) {
-        setExportState({ phase: "failed", reason: "Export service is temporarily unavailable." });
-      } else {
-        const scopeSuffix = scope === "config-only" ? "-config" : "-full";
-        const safeName = projectName.toLowerCase().replace(/\s+/g, "-");
-        setExportState({ phase: "done", fileName: `${safeName}${scopeSuffix}.iotsim` });
-      }
+      const scopeSuffix = scope === "config-only" ? "-config" : "-full";
+      const safeName = projectName.toLowerCase().replace(/\s+/g, "-");
+      setExportState({ phase: "done", fileName: `${safeName}${scopeSuffix}.iotsim` });
     }, 1000);
   }
 
@@ -229,9 +230,11 @@ export function SettingsPage() {
   const accessMode = useShellStore((state) => state.accessMode);
   const sharedRole = useShellStore((state) => state.sharedRole);
   const currentProjectId = useShellStore((state) => state.currentProjectId);
+  const projects = useProjectsStore((state) => state.projects);
+  const renameProject = useProjectsStore((state) => state.renameProject);
   const access = resolveAccess(accessMode, sharedRole);
 
-  const currentProject = projects.find((p) => p.id === currentProjectId) ?? projects[0];
+  const currentProject = projects.find((p) => p.id === currentProjectId) ?? projects[0] ?? null;
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080 (dev proxy)";
 
   return (
@@ -243,7 +246,7 @@ export function SettingsPage() {
             <h2 className="text-lg font-semibold text-shell-ink">Project settings</h2>
             <p className="mt-1 text-sm text-shell-muted">
               Configuration scoped to{" "}
-              <span className="font-medium">{currentProject.name}</span>.
+              <span className="font-medium">{currentProject?.name ?? "—"}</span>.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -256,11 +259,12 @@ export function SettingsPage() {
           <ProjectNameField
             key={currentProjectId}
             canEdit={access.isAdmin}
-            initialName={currentProject.name}
+            initialName={currentProject?.name ?? ""}
+            onSave={(name) => renameProject(currentProjectId, name)}
           />
           <div className="flex flex-col gap-1">
             <dt className="text-sm text-shell-muted">Project ID</dt>
-            <dd className="font-mono text-sm text-shell-ink">{currentProject.id}</dd>
+            <dd className="font-mono text-sm text-shell-ink">{currentProject?.id ?? "—"}</dd>
           </div>
         </dl>
 
@@ -293,7 +297,7 @@ export function SettingsPage() {
       <section className="shell-panel px-5 py-5">
         <ExportProjectSection
           canExport={access.isAdmin}
-          projectName={currentProject.name}
+          projectName={currentProject?.name ?? ""}
         />
       </section>
 

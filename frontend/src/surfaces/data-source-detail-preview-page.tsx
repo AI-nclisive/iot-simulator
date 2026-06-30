@@ -41,16 +41,11 @@ function stateMeta(source: {
   return { label: "Off", tone: "neutral" as const };
 }
 
-function healthTone(health: "Healthy" | "Warning" | "Error") {
-  if (health === "Error") {
-    return "danger";
-  }
-
-  if (health === "Warning") {
-    return "warning";
-  }
-
-  return "accent";
+function healthTone(health: string) {
+  if (health === "Error") return "danger";
+  if (health === "Warning" || health === "Starting") return "warning";
+  if (health === "Healthy") return "accent";
+  return "neutral";
 }
 
 function currentTabId(searchValue: string | null): DetailTabId {
@@ -97,6 +92,7 @@ export function DataSourceDetailPreviewPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const accessMode = useShellStore((state) => state.accessMode);
   const sharedRole = useShellStore((state) => state.sharedRole);
+  const currentProjectId = useShellStore((state) => state.currentProjectId);
   const source = useDataSourcesStore((state) =>
     state.dataSources.find((row) => row.id === sourceId),
   );
@@ -193,7 +189,7 @@ export function DataSourceDetailPreviewPage() {
     }
 
     if (activeTab === "schema") {
-      return <DataSourceSchemaEditor source={activeSource} onUnsavedChanges={setSchemaUnsaved} />;
+      return <DataSourceSchemaEditor projectId={currentProjectId} source={activeSource} onUnsavedChanges={setSchemaUnsaved} />;
     }
 
     if (activeTab === "values") {

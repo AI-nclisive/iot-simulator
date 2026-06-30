@@ -1,103 +1,194 @@
 /**
- * Tests for useProjectsStore (UI-013)
+ * Tests for useProjectsStore (UI-097 live-API rewrite)
  *
- * Covers all four mutations:
- * - renameProject: updates project name
- * - duplicateProject: appends a copy with "(copy)" suffix
- * - archiveProject: moves project to archivedProjects (not permanently deleted)
+ * All apiFetch calls are mocked via vi.mock('../api').
+ * Covers:
+ * - loadProjects: sets projects from API, handles error
+ * - renameProject: updates project name via PUT
+ * - duplicateProject: adds a copy via POST copy endpoint (or fallback)
+ * - archiveProject: moves project to archivedProjects
  * - deleteProject: permanently removes from projects list
  */
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type MockedFunction } from "vitest";
 import { useProjectsStore } from "./projects-store";
+import { apiFetch } from "../api";
 
-afterEach(() => {
-  useProjectsStore.setState({ projects: [], archivedProjects: [] });
-});
+vi.mock("../api", () => ({
+  apiFetch: vi.fn(),
+  ApiError: class ApiError extends Error {
+    constructor(
+      public readonly status: number,
+      public readonly title: string,
+      public readonly detail: string | undefined,
+      public readonly type: string | undefined,
+    ) {
+      super(title);
+      this.name = "ApiError";
+    }
+  },
+  mapProtocol: vi.fn(),
+  mapRuntimeStateToStatus: vi.fn(),
+  mapRuntimeStateToHealth: vi.fn(),
+  mapDataType: vi.fn(),
+}));
 
-function seedProject(id = "p1", name = "Test Project") {
-  useProjectsStore.setState({
-    projects: [
-      { id, name, configuredSources: 2, runningSources: 0, reusableArtifacts: 1, lastActivity: "Yesterday" },
-    ],
-    archivedProjects: [],
-  });
+const mockApiFetch = apiFetch as MockedFunction<typeof apiFetch>;
+
+function makeProjectResponse(overrides: Partial<{
+  id: string;
+  name: string;
+  status: "ACTIVE" | "ARCHIVED";
+}> = {}) {
+  return {
+    id: overrides.id ?? "p1",
+    name: overrides.name ?? "Test Project",
+    description: null,
+    status: overrides.status ?? "ACTIVE",
+    createdAt: "2026-06-01T00:00:00Z",
+    updatedAt: "2026-06-01T00:00:00Z",
+    createdBy: "testuser",
+    version: 1,
+  };
 }
 
-describe("renameProject", () => {
-  it("updates the project name", () => {
-    seedProject();
-    useProjectsStore.getState().renameProject("p1", "Renamed Project");
-    const project = useProjectsStore.getState().projects.find((p) => p.id === "p1");
-    expect(project?.name).toBe("Renamed Project");
+beforeEach(() => {
+  useProjectsStore.setState({ projects: [], archivedProjects: [], isLoading: false, error: null });
+  mockApiFetch.mockReset();
+});
+
+afterEach(() => {
+  vi.clearAllMocks();
+});
+
+describe("loadProjects", () => {
+  it("sets active projects from API response", async () => {
+    mockApiFetch.mockResolvedValueOnce([
+      makeProjectResponse({ id: "p1", name: "Alpha" }),
+      makeProjectResponse({ id: "p2", name: "Beta" }),
+    ]);
+    await useProjectsStore.getState().loadProjects();
+    const { projects, archivedProjects, isLoading, error } = useProjectsStore.getState();
+    expect(projects).toHaveLength(2);
+    expect(projects[0].id).toBe("p1");
+    expect(projects[0].name).toBe("Alpha");
+    expect(archivedProjects).toHaveLength(0);
+    expect(isLoading).toBe(false);
+    expect(error).toBeNull();
   });
 
-  it("does not affect other projects", () => {
+  it("separates archived projects", async () => {
+    mockApiFetch.mockResolvedValueOnce([
+      makeProjectResponse({ id: "p1", status: "ACTIVE" }),
+      makeProjectResponse({ id: "p2", status: "ARCHIVED" }),
+    ]);
+    await useProjectsStore.getState().loadProjects();
+    expect(useProjectsStore.getState().projects).toHaveLength(1);
+    expect(useProjectsStore.getState().archivedProjects).toHaveLength(1);
+  });
+
+  it("sets error on API failure", async () => {
+    mockApiFetch.mockRejectedValueOnce(new Error("Network error"));
+    await useProjectsStore.getState().loadProjects();
+    const { error, isLoading, projects } = useProjectsStore.getState();
+    expect(error).toBeTruthy();
+    expect(isLoading).toBe(false);
+    expect(projects).toHaveLength(0);
+  });
+
+  it("sets isLoading true during fetch and false after", async () => {
+    let resolvePromise!: (v: unknown) => void;
+    mockApiFetch.mockReturnValueOnce(
+      new Promise((res) => {
+        resolvePromise = res;
+      }),
+    );
+    const loadPromise = useProjectsStore.getState().loadProjects();
+    expect(useProjectsStore.getState().isLoading).toBe(true);
+    resolvePromise([]);
+    await loadPromise;
+    expect(useProjectsStore.getState().isLoading).toBe(false);
+  });
+});
+
+describe("renameProject", () => {
+  it("updates the project name via PUT", async () => {
     useProjectsStore.setState({
       projects: [
         { id: "p1", name: "Alpha", configuredSources: 0, runningSources: 0, reusableArtifacts: 0, lastActivity: "" },
-        { id: "p2", name: "Beta", configuredSources: 0, runningSources: 0, reusableArtifacts: 0, lastActivity: "" },
       ],
       archivedProjects: [],
     });
-    useProjectsStore.getState().renameProject("p1", "Alpha Renamed");
-    expect(useProjectsStore.getState().projects.find((p) => p.id === "p2")?.name).toBe("Beta");
+    mockApiFetch.mockResolvedValueOnce(makeProjectResponse({ id: "p1", name: "Alpha Renamed" }));
+    await useProjectsStore.getState().renameProject("p1", "Alpha Renamed");
+    expect(useProjectsStore.getState().projects[0].name).toBe("Alpha Renamed");
   });
 });
 
 describe("duplicateProject", () => {
-  it("adds a copy with '(copy)' suffix", () => {
-    seedProject();
-    useProjectsStore.getState().duplicateProject("p1");
-    const projects = useProjectsStore.getState().projects;
-    expect(projects).toHaveLength(2);
-    expect(projects[1].name).toBe("Test Project (copy)");
-  });
-
-  it("sets runningSources to 0 on the copy", () => {
+  it("adds a copy via the copy endpoint", async () => {
     useProjectsStore.setState({
       projects: [
-        { id: "p1", name: "Running", configuredSources: 3, runningSources: 2, reusableArtifacts: 0, lastActivity: "" },
+        { id: "p1", name: "Alpha", configuredSources: 0, runningSources: 0, reusableArtifacts: 0, lastActivity: "" },
       ],
       archivedProjects: [],
     });
-    useProjectsStore.getState().duplicateProject("p1");
-    const copy = useProjectsStore.getState().projects[1];
-    expect(copy.runningSources).toBe(0);
+    mockApiFetch.mockResolvedValueOnce(makeProjectResponse({ id: "p1-copy", name: "Alpha (copy)" }));
+    await useProjectsStore.getState().duplicateProject("p1");
+    expect(useProjectsStore.getState().projects).toHaveLength(2);
+    expect(useProjectsStore.getState().projects[1].name).toBe("Alpha (copy)");
   });
 
-  it("does nothing when project id is not found", () => {
-    seedProject();
-    useProjectsStore.getState().duplicateProject("does-not-exist");
-    expect(useProjectsStore.getState().projects).toHaveLength(1);
+  it("falls back to POST /api/v1/projects when copy endpoint fails", async () => {
+    useProjectsStore.setState({
+      projects: [
+        { id: "p1", name: "Alpha", configuredSources: 0, runningSources: 0, reusableArtifacts: 0, lastActivity: "" },
+      ],
+      archivedProjects: [],
+    });
+    // First call (copy endpoint) fails, second (fallback POST) succeeds
+    mockApiFetch
+      .mockRejectedValueOnce(new Error("Not found"))
+      .mockResolvedValueOnce(makeProjectResponse({ id: "p1-copy2", name: "Alpha (copy)" }));
+    await useProjectsStore.getState().duplicateProject("p1");
+    expect(useProjectsStore.getState().projects).toHaveLength(2);
+  });
+
+  it("does nothing when project id is not found", async () => {
+    useProjectsStore.setState({ projects: [], archivedProjects: [] });
+    await useProjectsStore.getState().duplicateProject("does-not-exist");
+    expect(useProjectsStore.getState().projects).toHaveLength(0);
+    expect(mockApiFetch).not.toHaveBeenCalled();
   });
 });
 
 describe("archiveProject", () => {
-  it("removes the project from active projects", () => {
-    seedProject();
-    useProjectsStore.getState().archiveProject("p1");
+  it("removes the project from active projects and moves to archived", async () => {
+    useProjectsStore.setState({
+      projects: [
+        { id: "p1", name: "Archive Me", configuredSources: 0, runningSources: 0, reusableArtifacts: 0, lastActivity: "" },
+      ],
+      archivedProjects: [],
+    });
+    mockApiFetch.mockResolvedValueOnce(makeProjectResponse({ id: "p1", status: "ARCHIVED" }));
+    await useProjectsStore.getState().archiveProject("p1");
     expect(useProjectsStore.getState().projects).toHaveLength(0);
-  });
-
-  it("moves the project to archivedProjects", () => {
-    seedProject("p1", "Archive Me");
-    useProjectsStore.getState().archiveProject("p1");
     expect(useProjectsStore.getState().archivedProjects).toHaveLength(1);
     expect(useProjectsStore.getState().archivedProjects[0].name).toBe("Archive Me");
   });
 });
 
 describe("deleteProject", () => {
-  it("permanently removes the project from projects", () => {
-    seedProject();
-    useProjectsStore.getState().deleteProject("p1");
+  it("permanently removes the project from projects", async () => {
+    useProjectsStore.setState({
+      projects: [
+        { id: "p1", name: "Delete Me", configuredSources: 0, runningSources: 0, reusableArtifacts: 0, lastActivity: "" },
+      ],
+      archivedProjects: [],
+    });
+    mockApiFetch.mockResolvedValueOnce(undefined);
+    await useProjectsStore.getState().deleteProject("p1");
     expect(useProjectsStore.getState().projects).toHaveLength(0);
-  });
-
-  it("does not add the project to archivedProjects", () => {
-    seedProject();
-    useProjectsStore.getState().deleteProject("p1");
     expect(useProjectsStore.getState().archivedProjects).toHaveLength(0);
   });
 });

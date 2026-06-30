@@ -1,5 +1,39 @@
 import { create } from "zustand";
-import { sourceRows, type DataSourceRow } from "../surfaces/mock-data-sources";
+import { apiFetch, ApiError, mapProtocol, mapRuntimeStateToStatus, mapRuntimeStateToHealth } from "../api";
+import type { DataSourceRow } from "../surfaces/mock-data-sources";
+import type { BackendProtocol, BackendRuntimeState } from "../api";
+
+// Backend response shape from GET/POST/PUT /api/v1/projects/{pid}/data-sources
+type DataSourceResponse = {
+  id: string;
+  projectId: string;
+  name: string;
+  protocol: BackendProtocol;
+  basis: "SCAN" | "MANUAL" | "IMPORT" | "SYNTHETIC";
+  schemaId: string | null;
+  schemaVersion: number | null;
+  endpoint: string | null;
+  runtimeConfig: string | null;
+  enabled: boolean;
+  runtimeState: BackendRuntimeState;
+  credentialState: string;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+  version: number;
+};
+
+function mapDataSource(d: DataSourceResponse): DataSourceRow {
+  return {
+    id: d.id,
+    name: d.name,
+    protocol: mapProtocol(d.protocol),
+    endpoint: d.endpoint ?? "",
+    parameterCount: 0, // TODO(UI-097): no backend field — will come from schema node count
+    status: mapRuntimeStateToStatus(d.runtimeState),
+    health: mapRuntimeStateToHealth(d.runtimeState) ?? "Healthy",
+  };
+}
 
 type CreateDataSourceInput = {
   endpoint: string;
@@ -8,104 +42,134 @@ type CreateDataSourceInput = {
 };
 
 type DataSourcesState = {
-  createDataSource: (input: CreateDataSourceInput) => string;
   dataSources: DataSourceRow[];
-  deleteDataSource: (rowId: string) => void;
-  duplicateDataSource: (rowId: string) => void;
-  startDataSource: (rowId: string) => void;
-  stopDataSource: (rowId: string) => void;
+  isLoading: boolean;
+  error: string | null;
+  loadDataSources: (projectId: string) => Promise<void>;
+  createDataSource: (input: CreateDataSourceInput & { projectId: string }) => Promise<string>;
+  deleteDataSource: (rowId: string, projectId?: string) => Promise<void>;
+  duplicateDataSource: (rowId: string, projectId?: string) => Promise<void>;
+  startDataSource: (rowId: string, projectId?: string) => Promise<void>;
+  stopDataSource: (rowId: string, projectId?: string) => Promise<void>;
   updateSourceConfiguration: (
     rowId: string,
     input: Pick<CreateDataSourceInput, "endpoint" | "name">,
-  ) => void;
+    projectId?: string,
+  ) => Promise<void>;
+  currentProjectId: string;
 };
 
-function nextId(currentRows: DataSourceRow[]) {
-  const highestId = currentRows.reduce((highest, row) => {
-    const numericId = Number(row.id.replace("src-", ""));
-    if (Number.isNaN(numericId)) {
-      return highest;
-    }
-
-    return Math.max(highest, numericId);
-  }, 0);
-
-  return `src-${String(highestId + 1).padStart(2, "0")}`;
+function backendProtocol(protocol: DataSourceRow["protocol"]): BackendProtocol {
+  return protocol === "OPC UA" ? "OPC_UA" : "MODBUS_TCP";
 }
 
-export const useDataSourcesStore = create<DataSourcesState>((set) => ({
-  createDataSource: ({ endpoint, name, protocol }) => {
-    let createdId = "";
+export const useDataSourcesStore = create<DataSourcesState>((set, get) => ({
+  dataSources: [],
+  isLoading: false,
+  error: null,
+  currentProjectId: "",
 
-    set((state) => {
-      createdId = nextId(state.dataSources);
-
-      return {
-        dataSources: [
-          ...state.dataSources,
-          {
-            endpoint,
-            health: "Healthy",
-            id: createdId,
-            name,
-            parameterCount: protocol === "OPC UA" ? 480 : 96,
-            protocol,
-            status: "Stopped",
-          },
-        ],
-      };
-    });
-
-    return createdId;
+  loadDataSources: async (projectId: string) => {
+    set({ isLoading: true, error: null, currentProjectId: projectId });
+    try {
+      const data = await apiFetch<DataSourceResponse[]>(
+        `/api/v1/projects/${projectId}/data-sources`,
+      );
+      set({ dataSources: data.map(mapDataSource), isLoading: false });
+    } catch (err) {
+      const message = err instanceof ApiError ? err.title : "Failed to load data sources";
+      set({ error: message, isLoading: false });
+    }
   },
-  dataSources: sourceRows,
-  deleteDataSource: (rowId) =>
+
+  createDataSource: async ({ endpoint, name, protocol, projectId }) => {
+    const data = await apiFetch<DataSourceResponse>(
+      `/api/v1/projects/${projectId}/data-sources`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          name,
+          endpoint,
+          protocol: backendProtocol(protocol),
+          basis: "MANUAL",
+        }),
+      },
+    );
+    const row = mapDataSource(data);
+    set((state) => ({ dataSources: [...state.dataSources, row] }));
+    return row.id;
+  },
+
+  deleteDataSource: async (rowId, projectId) => {
+    const pid = projectId ?? get().currentProjectId;
+    await apiFetch<undefined>(
+      `/api/v1/projects/${pid}/data-sources/${rowId}`,
+      { method: "DELETE" },
+    );
     set((state) => ({
       dataSources: state.dataSources.filter((row) => row.id !== rowId),
-    })),
-  duplicateDataSource: (rowId) =>
-    set((state) => {
-      const row = state.dataSources.find((item) => item.id === rowId);
-      if (!row) {
-        return state;
-      }
+    }));
+  },
 
-      return {
-        dataSources: [
-          ...state.dataSources,
-          {
-            ...row,
-            id: nextId(state.dataSources),
-            name: `${row.name} copy`,
-            status: "Stopped",
-          },
-        ],
-      };
-    }),
-  startDataSource: (rowId) =>
+  duplicateDataSource: async (rowId, projectId) => {
+    const pid = projectId ?? get().currentProjectId;
+    const source = get().dataSources.find((r) => r.id === rowId);
+    if (!source) return;
+    const data = await apiFetch<DataSourceResponse>(
+      `/api/v1/projects/${pid}/data-sources`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          name: `${source.name} copy`,
+          endpoint: source.endpoint,
+          protocol: backendProtocol(source.protocol),
+          basis: "MANUAL",
+        }),
+      },
+    );
+    const row = mapDataSource(data);
+    set((state) => ({ dataSources: [...state.dataSources, row] }));
+  },
+
+  startDataSource: async (rowId, projectId) => {
+    const pid = projectId ?? get().currentProjectId;
+    const data = await apiFetch<DataSourceResponse>(
+      `/api/v1/projects/${pid}/data-sources/${rowId}/start`,
+      { method: "POST" },
+    );
+    const updated = mapDataSource(data);
     set((state) => ({
-      dataSources: state.dataSources.map((row) =>
-        row.id === rowId ? { ...row, status: "Active" } : row,
-      ),
-    })),
-  stopDataSource: (rowId) =>
+      dataSources: state.dataSources.map((row) => (row.id === rowId ? updated : row)),
+    }));
+  },
+
+  stopDataSource: async (rowId, projectId) => {
+    const pid = projectId ?? get().currentProjectId;
+    const data = await apiFetch<DataSourceResponse>(
+      `/api/v1/projects/${pid}/data-sources/${rowId}/stop`,
+      { method: "POST" },
+    );
+    const updated = mapDataSource(data);
     set((state) => ({
-      dataSources: state.dataSources.map((row) =>
-        row.id === rowId ? { ...row, status: "Stopped" } : row,
-      ),
-    })),
-  updateSourceConfiguration: (rowId, input) =>
+      dataSources: state.dataSources.map((row) => (row.id === rowId ? updated : row)),
+    }));
+  },
+
+  updateSourceConfiguration: async (rowId, input, projectId) => {
+    const pid = projectId ?? get().currentProjectId;
+    const data = await apiFetch<DataSourceResponse>(
+      `/api/v1/projects/${pid}/data-sources/${rowId}`,
+      {
+        method: "PUT",
+        body: JSON.stringify({ name: input.name, endpoint: input.endpoint }),
+      },
+    );
+    const updated = mapDataSource(data);
     set((state) => ({
-      dataSources: state.dataSources.map((row) =>
-        row.id === rowId
-          ? {
-              ...row,
-              endpoint: input.endpoint,
-              name: input.name,
-            }
-          : row,
-      ),
-    })),
+      dataSources: state.dataSources.map((row) => (row.id === rowId ? updated : row)),
+    }));
+  },
 }));
 
 export type { CreateDataSourceInput };
+export type { DataSourceRow } from "../surfaces/mock-data-sources";
