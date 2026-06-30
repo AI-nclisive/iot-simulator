@@ -188,7 +188,7 @@ import/export. Modbus moved to Wave G (deferred) — see the note there.
 - [x] IS-067 [BE] ✅ [source] Create from import / prepared data — SPEC: Manually Create
 - [x] IS-068 [BE] ✅ [recording] Samples (named subset/snapshot) — SPEC: Store Multiple/Samples
 - [x] IS-069 [BE] ✅ [replay] Replay configuration (timing/ordering/compat checks) — SPEC: Replay
-- [ ] IS-070 [BE] ⬜ [recording] Recording/sample import & export (legacy alias BE-IO2) — SPEC: Import/Export · 06
+- [x] IS-070 [BE] ✅ [recording] Recording/sample import & export (legacy alias BE-IO2) — SPEC: Import/Export · 06
 - [x] IS-071 [BE] ⬜ [project] Duplicate project — SPEC: Manage Projects
 - [x] IS-072 [BE] ✅ [project] Archive project — SPEC: Manage Projects
 - [x] IS-073 [BE] ✅ [io] Project export/import (versioned ZIP+manifest, secret-free) — 06
