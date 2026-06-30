@@ -46,7 +46,7 @@ class DataSourceServiceTest {
 
     @Test
     void createUnderExistingProjectStartsStoppedAtVersionZero() {
-        DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null, "alice");
+        DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null, null, "alice");
         assertThat(ds.id()).isNotBlank();
         assertThat(ds.protocol()).isEqualTo(Protocol.OPC_UA);
         assertThat(ds.basis()).isEqualTo(SourceBasis.MANUAL);
@@ -57,40 +57,40 @@ class DataSourceServiceTest {
 
     @Test
     void createUnderMissingProjectThrowsNotFound() {
-        assertThatThrownBy(() -> service.create("nope", "Pump", "OPC_UA", "MANUAL", null, null, null, "a"))
+        assertThatThrownBy(() -> service.create("nope", "Pump", "OPC_UA", "MANUAL", null, null, null, null, "a"))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test
     void createWithInvalidProtocolThrowsBadInput() {
-        assertThatThrownBy(() -> service.create(PROJECT, "Pump", "NOPE", "MANUAL", null, null, null, "a"))
+        assertThatThrownBy(() -> service.create(PROJECT, "Pump", "NOPE", "MANUAL", null, null, null, null, "a"))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void getFromWrongProjectThrowsNotFound() {
-        DataSource ds = service.create(PROJECT, "Pump", "MODBUS_TCP", "SCAN", null, null, null, "a");
+        DataSource ds = service.create(PROJECT, "Pump", "MODBUS_TCP", "SCAN", null, null, null, null, "a");
         assertThatThrownBy(() -> service.get("other-project", ds.id()))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test
     void startThenStopTogglesRuntimeState() {
-        DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null, "a");
+        DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null, null, "a");
         assertThat(service.start(PROJECT, ds.id()).runtimeState()).isEqualTo(RuntimeState.RUNNING);
         assertThat(service.stop(PROJECT, ds.id()).runtimeState()).isEqualTo(RuntimeState.STOPPED);
     }
 
     @Test
     void updateWithStaleVersionThrowsConflict() {
-        DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null, "a");
+        DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null, null, "a");
         assertThatThrownBy(() -> service.update(PROJECT, ds.id(), "x", null, null, true, null, ds.version() + 5))
                 .isInstanceOf(ConcurrencyConflictException.class);
     }
 
     @Test
     void deleteRemovesSource() {
-        DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null, "a");
+        DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null, null, "a");
         service.delete(PROJECT, ds.id());
         assertThatThrownBy(() -> service.get(PROJECT, ds.id()))
                 .isInstanceOf(ResourceNotFoundException.class);
@@ -98,7 +98,7 @@ class DataSourceServiceTest {
 
     @Test
     void createWithoutCredentialsIsMissing() {
-        DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null, "a");
+        DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null, null, "a");
         assertThat(ds.credentialState()).isEqualTo(CredentialState.MISSING);
         assertThat(credentials.has(ds.id())).isFalse();
     }
@@ -106,7 +106,7 @@ class DataSourceServiceTest {
     @Test
     void createWithPasswordCredentialsIsSessionOnlyAndNeverWrittenToTheRow() {
         ConnectionCredentials creds = ConnectionCredentials.password("operator", "s3cr3t");
-        DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", "{}", "{}", creds, "a");
+        DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", "{}", "{}", creds, null, "a");
 
         assertThat(ds.credentialState()).isEqualTo(CredentialState.SESSION_ONLY);
         assertThat(credentials.find(ds.id())).contains(creds);
@@ -119,14 +119,14 @@ class DataSourceServiceTest {
     @Test
     void createWithAnonymousCredentialsStaysMissing() {
         DataSource ds = service.create(
-                PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, ConnectionCredentials.anonymous(), "a");
+                PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, ConnectionCredentials.anonymous(), null, "a");
         assertThat(ds.credentialState()).isEqualTo(CredentialState.MISSING);
         assertThat(credentials.has(ds.id())).isFalse();
     }
 
     @Test
     void updateStoresCredentialsWithoutChangingThemWhenAbsent() {
-        DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null, "a");
+        DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null, null, "a");
 
         // Absent credentials leave state unchanged.
         DataSource unchanged = service.update(PROJECT, ds.id(), "Renamed", null, null, true, null, ds.version());
@@ -142,7 +142,7 @@ class DataSourceServiceTest {
     @Test
     void clearCredentialsRemovesThem() {
         DataSource ds = service.create(
-                PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, ConnectionCredentials.password("u", "pw"), "a");
+                PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, ConnectionCredentials.password("u", "pw"), null, "a");
         assertThat(ds.credentialState()).isEqualTo(CredentialState.SESSION_ONLY);
 
         DataSource cleared = service.clearCredentials(PROJECT, ds.id());
@@ -153,14 +153,14 @@ class DataSourceServiceTest {
     @Test
     void deleteClearsHeldCredentials() {
         DataSource ds = service.create(
-                PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, ConnectionCredentials.password("u", "pw"), "a");
+                PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, ConnectionCredentials.password("u", "pw"), null, "a");
         service.delete(PROJECT, ds.id());
         assertThat(credentials.has(ds.id())).isFalse();
     }
 
     @Test
     void staleUpdateNeverStoresTheSecret() {
-        DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null, "a");
+        DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null, null, "a");
         // A conflicting (stale) update carrying a password must fail the version check
         // AND leave the store untouched: credentials are applied only after the check passes.
         assertThatThrownBy(() -> service.update(PROJECT, ds.id(), "x", null, null, true,
@@ -172,7 +172,7 @@ class DataSourceServiceTest {
     @Test
     void createWithExternalRefIsSessionOnly() {
         DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", null, null,
-                ConnectionCredentials.externalRef("vault://pump"), "a");
+                ConnectionCredentials.externalRef("vault://pump"), null, "a");
         assertThat(ds.credentialState()).isEqualTo(CredentialState.SESSION_ONLY);
         assertThat(credentials.find(ds.id())).map(ConnectionCredentials::mode)
                 .contains(ConnectionCredentials.Mode.EXTERNAL_REF);
@@ -181,7 +181,7 @@ class DataSourceServiceTest {
     @Test
     void updateWithAnonymousClearsExistingCredentials() {
         DataSource ds = service.create(
-                PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, ConnectionCredentials.password("u", "pw"), "a");
+                PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, ConnectionCredentials.password("u", "pw"), null, "a");
         assertThat(credentials.has(ds.id())).isTrue();
 
         DataSource cleared = service.update(PROJECT, ds.id(), null, null, null, null,
@@ -193,7 +193,7 @@ class DataSourceServiceTest {
     @Test
     void clearCredentialsFromWrongProjectThrowsNotFoundAndKeepsTheSecret() {
         DataSource ds = service.create(
-                PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, ConnectionCredentials.password("u", "pw"), "a");
+                PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, ConnectionCredentials.password("u", "pw"), null, "a");
         assertThatThrownBy(() -> service.clearCredentials("other-project", ds.id()))
                 .isInstanceOf(ResourceNotFoundException.class);
         // A wrong-project request must not clear the real source's held secret.
@@ -203,7 +203,7 @@ class DataSourceServiceTest {
     @Test
     void duplicateCreatesNewSourceWithCopyNameDisabledAndStopped() {
         DataSource original = service.create(
-                PROJECT, "Pump", "OPC_UA", "MANUAL", "{\"host\":\"plc1\"}", "{\"rate\":500}", null, "a");
+                PROJECT, "Pump", "OPC_UA", "MANUAL", "{\"host\":\"plc1\"}", "{\"rate\":500}", null, null, "a");
 
         DataSource copy = service.duplicate(PROJECT, original.id(), "a");
 
@@ -226,7 +226,7 @@ class DataSourceServiceTest {
 
     @Test
     void duplicateOnWrongProjectThrowsNotFound() {
-        DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null, "a");
+        DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null, null, "a");
         assertThatThrownBy(() -> service.duplicate("other-project", ds.id(), "a"))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
@@ -241,7 +241,7 @@ class DataSourceServiceTest {
                 new InMemoryRuntimeController(),
                 credentials);
 
-        DataSource original = svc.create(PROJECT, "Sensor", "OPC_UA", "SCAN", null, null, null, "a");
+        DataSource original = svc.create(PROJECT, "Sensor", "OPC_UA", "SCAN", null, null, null, null, "a");
         SchemaNode node = new SchemaNode("n1", null, "/root/temp", "Temperature",
                 com.ainclusive.iotsim.protocolmodel.NodeKind.VARIABLE,
                 com.ainclusive.iotsim.protocolmodel.DataType.FLOAT32,
@@ -256,6 +256,30 @@ class DataSourceServiceTest {
         assertThat(copy.schemaId()).isNotNull();
         assertThat(copy.schemaVersion()).isEqualTo(1);
         assertThat(copy.schemaId()).isNotEqualTo(original.schemaId());
+    }
+
+    @Test
+    void createImportWithInitialSchemaPopulatesSchemaVersion() {
+        FakeSchemaRepository schemaRepo = new FakeSchemaRepository(repository);
+        DataSourceService svc = new DataSourceService(
+                repository,
+                new FakeProjectRepository(Set.of(PROJECT)),
+                schemaRepo,
+                new InMemoryRuntimeController(),
+                credentials);
+
+        SchemaNode node = new SchemaNode("n1", null, "/root/temp", "Temperature",
+                com.ainclusive.iotsim.protocolmodel.NodeKind.VARIABLE,
+                com.ainclusive.iotsim.protocolmodel.DataType.FLOAT32,
+                com.ainclusive.iotsim.protocolmodel.ValueRank.SCALAR,
+                com.ainclusive.iotsim.protocolmodel.Access.READ,
+                "°C", null);
+
+        DataSource ds = svc.create(PROJECT, "Sensor", "OPC_UA", "IMPORT", null, null, null, List.of(node), "a");
+
+        assertThat(ds.basis()).isEqualTo(SourceBasis.IMPORT);
+        assertThat(ds.schemaId()).isNotNull();
+        assertThat(ds.schemaVersion()).isEqualTo(1);
     }
 
     private static final class InMemoryDataSourceRepository implements DataSourceRepository {
