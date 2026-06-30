@@ -19,7 +19,7 @@ Explanation:
 Users can create and run simulated Modbus TCP data sources so Edge Devices can be tested against common industrial protocol integrations.
 
 Priority:
-P0
+P2
 
 Implementation Status:
 ToDo

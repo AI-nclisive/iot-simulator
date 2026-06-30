@@ -175,10 +175,11 @@ Make runs observable and produce the P0 evidence artifact.
 - [x] IS-057 [BE] ✅ [observ] Evidence assembly + export — SPEC: Export Run Evidence (P0)
 - [x] IS-058 [BE] ✅ [io] Evidence export format (bundle + JSON summary) — 06
 
-## Wave D — Modbus + creation/reuse breadth · P1
+## Wave D — Creation/reuse breadth & synthetic generation · P1
 
-- [ ] IS-059 [BE] ⬜ [runtime] worker-modbus (j2mod) gRPC server + Modbus slave — 02
-- [ ] IS-060 [BE] ⬜ [model] Modbus register-map binding — 01
+Protocol-agnostic breadth: synthetic generation, determinism, creation/reuse, and
+import/export. Modbus moved to Wave G (deferred) — see the note there.
+
 - [ ] IS-061 [BE] ⬜ [runtime] Resource governance (concurrent-source caps, backpressure) — 02
 - [ ] IS-062 [BE] ⬜ [gen] Synthetic generation (patterns + range + seed) — SPEC: Generate Synthetic
 - [ ] IS-063 [BE] ⬜ [gen] Deterministic run settings — SPEC: Run Deterministic
@@ -223,11 +224,25 @@ Make runs observable and produce the P0 evidence artifact.
 - [x] IS-095 [BE] ✅ [build] CI pipeline (build + test on push) — 07 (delivered as IS-098)
 - [ ] IS-096 [BE] ⬜ [build] Self-contained local distribution (jlink/jpackage) — 07/STACK
 
+## Wave G — Second protocol: Modbus · P2 (deferred)
+
+Lowered from P1: Modbus is not near-term critical. The extension seam is already in
+place and ArchUnit-guarded (IS-004) — the protocol-neutral model (`protocol-model`,
+IS-011/012/013), the `ProtocolDataSource` worker contract (`worker-contract`,
+IS-014–017), the reserved `workers/worker-modbus/` module (`07`), the specified Modbus
+projection (`01 §5`), and the `/new-worker` scaffold. So this is pure worker
+implementation: per `02 §1` it must not change the supervisor.
+
+- [ ] IS-059 [BE] ⬜ [runtime] worker-modbus (j2mod) gRPC server + Modbus slave — 02
+- [ ] IS-060 [BE] ⬜ [model] Modbus register-map binding — 01
+
 ## Recommended immediate next
 
-**Wave C — observability & evidence.** Wave B is complete: the primary
-`Scan → Record → Replay` flow now works against a *real* source
-(`IS-043 → IS-044 → IS-045`). Next, make runs observable and produce the P0
-evidence artifact, starting with the SSE/event plumbing
-(`IS-046 → IS-047 → IS-048 → IS-049`) that live values, client/health observation,
-and runtime-event history build on.
+**Wave D — synthetic generation & determinism (P1).** Waves A–C are complete: real
+OPC UA runtime fidelity, the primary `Scan → Record → Replay` flow against a *real*
+source, and observability + the P0 evidence export. The next P1 value is
+protocol-agnostic breadth, starting with the determinism foundation that synthetic
+generation builds on: injectable clock + seeded RNG (`IS-064`) → deterministic run
+settings (`IS-063`) → synthetic generation (`IS-062`) → create-from-synthetic
+(`IS-065`). Resource governance (`IS-061`) is independent supervisor work that can
+land in parallel. Modbus (`IS-059`/`IS-060`) is deferred to Wave G.
