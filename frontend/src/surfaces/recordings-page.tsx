@@ -1,11 +1,21 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { resolveAccess } from "../shell/access-policy";
+import { useArtifactsStore } from "../shell/artifacts-store";
 import { useShellStore } from "../shell/shell-store";
 import { SharedStatePanel } from "../ui/shared-state-panel";
 import { StatusBadge } from "../ui/status-badge";
-import { mockRecordings, type RecordingRow } from "./mock-recordings";
 import { RecordingExportDialog } from "./recording-export-dialog";
 import { RecordingImportDialog } from "./recording-import-dialog";
+
+// Display-layer shape for the recordings list — derived from live RecordingResponse via artifacts-store
+export type RecordingRow = {
+  id: string;
+  sourceId: string;
+  origin: "captured" | "imported";
+  valueCount: number;
+  capturedAt: string;
+  capturedBy: string;
+};
 
 type OriginFilter = "all" | "captured" | "imported";
 
@@ -118,11 +128,148 @@ function RecordingPreviewPanel({
   );
 }
 
+// ─── Samples section ──────────────────────────────────────────────────────────
+
+function SamplesSection({
+  projectId,
+  recordingsById,
+  isAdmin,
+}: {
+  projectId: string;
+  recordingsById: Map<string, RecordingRow>;
+  isAdmin: boolean;
+}) {
+  const samples = useArtifactsStore((s) => s.samples);
+  const isSamplesLoading = useArtifactsStore((s) => s.isSamplesLoading);
+  const samplesError = useArtifactsStore((s) => s.samplesError);
+  const loadSamples = useArtifactsStore((s) => s.loadSamples);
+  const deleteSample = useArtifactsStore((s) => s.deleteSample);
+
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (projectId) {
+      void loadSamples(projectId);
+    }
+  }, [projectId, loadSamples]);
+
+  async function handleDelete(sampleId: string) {
+    setDeletingId(sampleId);
+    setDeleteError(null);
+    try {
+      await deleteSample(projectId, sampleId);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Delete failed";
+      setDeleteError(msg);
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  return (
+    <section className="shell-panel px-5 py-5" data-testid="samples-section">
+      <h3 className="text-lg font-semibold text-shell-ink">Samples</h3>
+      <p className="mt-1 text-sm text-shell-muted">
+        Named subsets derived from recordings.
+      </p>
+
+      {deleteError ? (
+        <p className="mt-4 text-sm text-red-600" role="alert">{deleteError}</p>
+      ) : null}
+      {isSamplesLoading ? (
+        <p className="mt-4 text-sm text-shell-muted">Loading samples…</p>
+      ) : samplesError ? (
+        <p className="mt-4 text-sm text-red-600" role="alert">{samplesError}</p>
+      ) : samples.length === 0 ? (
+        <SharedStatePanel
+          message="No samples have been created for this project yet."
+          state="empty"
+          title="No samples."
+        />
+      ) : (
+        <div className="mt-4 overflow-hidden rounded-md border border-shell-line bg-white">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-shell-line bg-shell-base/60 text-left text-xs font-semibold uppercase tracking-wide text-shell-muted">
+                <th className="px-4 py-3">Name</th>
+                <th className="px-4 py-3">Source recording</th>
+                <th className="px-4 py-3">Tags</th>
+                <th className="px-4 py-3">Created at</th>
+                <th className="px-4 py-3">Created by</th>
+                {isAdmin ? <th className="px-4 py-3 sr-only">Actions</th> : null}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-shell-line">
+              {samples.map((sample) => {
+                const sourceRecording = recordingsById.get(sample.derivedFromRecordingId);
+                return (
+                  <tr key={sample.id} className="hover:bg-shell-base/40">
+                    <td className="px-4 py-3 font-medium text-shell-ink">
+                      {sample.name}
+                    </td>
+                    <td className="px-4 py-3 text-shell-muted">
+                      {sourceRecording
+                        ? sourceRecording.sourceId
+                        : sample.derivedFromRecordingId}
+                    </td>
+                    <td className="px-4 py-3">
+                      {sample.tags.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {sample.tags.map((tag) => (
+                            <span
+                              key={tag}
+                              className="rounded bg-shell-base px-1.5 py-0.5 text-xs text-shell-muted"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-shell-muted">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-shell-muted">
+                      {sample.createdAt}
+                    </td>
+                    <td className="px-4 py-3 text-shell-muted">
+                      {sample.createdBy}
+                    </td>
+                    {isAdmin ? (
+                      <td className="px-4 py-3">
+                        <button
+                          className="text-xs text-red-600 hover:underline disabled:opacity-50"
+                          disabled={deletingId === sample.id}
+                          type="button"
+                          onClick={() => void handleDelete(sample.id)}
+                        >
+                          {deletingId === sample.id ? "Deleting…" : "Delete"}
+                        </button>
+                      </td>
+                    ) : null}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export function RecordingsPage() {
-  const { accessMode, sharedRole } = useShellStore();
+  const accessMode = useShellStore((s) => s.accessMode);
+  const sharedRole = useShellStore((s) => s.sharedRole);
+  const currentProjectId = useShellStore((s) => s.currentProjectId);
   const access = resolveAccess(accessMode, sharedRole);
+
+  const storeArtifacts = useArtifactsStore((s) => s.artifacts);
+  const isLoading = useArtifactsStore((s) => s.isLoading);
+  const storeError = useArtifactsStore((s) => s.error);
+  const loadRecordings = useArtifactsStore((s) => s.loadRecordings);
 
   const [originFilter, setOriginFilter] = useState<OriginFilter>("all");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
@@ -130,7 +277,37 @@ export function RecordingsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [importDialogOpen, setImportDialogOpen] = useState<boolean>(false);
   const [exportDialogOpen, setExportDialogOpen] = useState<boolean>(false);
-  const [localRecordings, setLocalRecordings] = useState<RecordingRow[]>(mockRecordings);
+  // localRecordings holds artifacts appended from import (before next reload)
+  const [importedRows, setImportedRows] = useState<RecordingRow[]>([]);
+
+  // Load live recordings from API on mount / project change
+  useEffect(() => {
+    if (currentProjectId) {
+      void loadRecordings(currentProjectId);
+    }
+  }, [currentProjectId, loadRecordings]);
+
+  // Map store artifacts to RecordingRow for display
+  const storeRows: RecordingRow[] = storeArtifacts.map((a) => ({
+    id: a.id,
+    sourceId: a.sourceId ?? "",
+    origin: a.origin ?? "captured",
+    valueCount: a.valueCount,
+    capturedAt: a.createdAt,
+    capturedBy: a.createdBy,
+  }));
+
+  // Merge store rows with any locally imported rows (deduplicate by id)
+  const storeIds = new Set(storeRows.map((r) => r.id));
+  const localRecordings: RecordingRow[] = [
+    ...storeRows,
+    ...importedRows.filter((r) => !storeIds.has(r.id)),
+  ];
+
+  // Build a lookup map for samples section
+  const recordingsById = new Map<string, RecordingRow>(
+    localRecordings.map((r) => [r.id, r]),
+  );
 
   const uniqueSourceIds = Array.from(new Set(localRecordings.map((r) => r.sourceId)));
 
@@ -176,6 +353,13 @@ export function RecordingsPage() {
       </section>
 
       <section className="shell-panel px-5 py-5">
+        {/* Loading / error states */}
+        {isLoading ? (
+          <p className="text-sm text-shell-muted">Loading recordings…</p>
+        ) : storeError ? (
+          <p className="text-sm text-red-600" role="alert">{storeError}</p>
+        ) : null}
+
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-3">
           <input
@@ -223,7 +407,7 @@ export function RecordingsPage() {
         <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(18rem,1fr)]">
           {/* List */}
           <div>
-            {filtered.length === 0 ? (
+            {filtered.length === 0 && !isLoading ? (
               <SharedStatePanel
                 message="No recordings match the active filters."
                 state="empty"
@@ -304,6 +488,13 @@ export function RecordingsPage() {
         </div>
       </section>
 
+      {/* Samples section */}
+      <SamplesSection
+        projectId={currentProjectId}
+        recordingsById={recordingsById}
+        isAdmin={access.isAdmin}
+      />
+
       {/* Export dialog */}
       {selected && access.isAdmin ? (
         <RecordingExportDialog
@@ -318,7 +509,7 @@ export function RecordingsPage() {
         open={importDialogOpen}
         onClose={() => setImportDialogOpen(false)}
         onImported={(artifact) => {
-          setLocalRecordings((prev) => [artifact, ...prev]);
+          setImportedRows((prev) => [artifact, ...prev]);
           setImportDialogOpen(false);
         }}
       />

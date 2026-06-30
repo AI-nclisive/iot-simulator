@@ -763,7 +763,7 @@ Parallel execution:
   Depends: `UI-096`; backend IS-054 (✅).
   Done when: configuredSources, runningSources, reusableArtifacts reflect real backend data; no TypeScript errors.
 
-- [ ] `UI-108` Wire Recordings page to live store + add Samples surface
+- [x] `UI-108` Wire Recordings page to live store + add Samples surface
   Goal: switch recordings-page.tsx from mockRecordings to artifacts-store (already calls live API); add Samples surface.
   Surface: `Recordings & Samples`
   Work includes: recordings-page.tsx reads from useArtifactsStore instead of mockRecordings; remove mock-recordings.ts import; add samples methods to artifacts-store.ts (GET/POST/DELETE /api/v1/projects/{pid}/samples); add Samples section to recordings page; SampleResponse = {id, projectId, derivedFromRecordingId, name, selection, tags[], createdAt, createdBy, version}.

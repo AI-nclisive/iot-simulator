@@ -1,6 +1,6 @@
 import { useEffect, useId, useState } from "react";
 import { createPortal } from "react-dom";
-import type { RecordingRow } from "./mock-recordings";
+import type { RecordingRow } from "./recordings-page";
 
 export type ExportFormat = "iotsim" | "json" | "csv";
 type ExportPhase = "idle" | "exporting" | "done";
