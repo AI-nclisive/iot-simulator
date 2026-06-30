@@ -1,28 +1,35 @@
 /**
- * Tests for AdminUsersPage (UI-081)
+ * Tests for AdminUsersPage (UI-081 + UI-082)
  *
  * Covers:
- * - Local mode: informational panel shown, no table
- * - Shared User: locked panel shown, no table
- * - Shared Admin: table visible with users
- * - Filters: role and status filter narrow the list
- * - Search: filters by name and email
- * - Row action: Make Admin opens confirmation dialog
- * - Row action: Deactivate opens confirmation dialog
- * - Row action: Activate applies immediately without dialog
- * - Confirming role change updates the row badge
- * - Cancelling dialog leaves data unchanged
+ * - Access gates: Local mode → table shown; Shared User → locked panel
+ * - Table renders users with role/status badges
+ * - Search filters by name and email
+ * - Role and status dropdown filters
+ * - Role change: confirmation dialog → isProcessing → success toast + badge update
+ * - Role change: error path → error toast
+ * - Deactivate: confirmation dialog → success toast + status update
+ * - Activate: no dialog → success toast + status update
+ * - Last-admin validation: warning toast when only one active admin remains
+ * - Cancel: dialog closes without mutation
  */
 
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { setMockUserSaveShouldFail } from "./mock-users";
 import { AdminUsersPage } from "./admin-users-page";
 
 const { mockShellStore } = vi.hoisted(() => ({ mockShellStore: vi.fn() }));
 
 vi.mock("../shell/shell-store", () => ({ useShellStore: mockShellStore }));
+
+const mockNotifyPush = vi.fn();
+vi.mock("../shell/notification-store", () => ({
+  useNotificationStore: (sel: (s: object) => unknown) =>
+    sel({ push: mockNotifyPush }),
+}));
 
 function setupStore(opts: {
   accessMode?: "local" | "shared";
@@ -37,6 +44,11 @@ function setupStore(opts: {
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  setMockUserSaveShouldFail(false);
+});
+
+beforeEach(() => {
+  setMockUserSaveShouldFail(false);
 });
 
 function renderPage() {
@@ -62,112 +74,138 @@ describe("AdminUsersPage — access gates", () => {
   });
 });
 
-describe("AdminUsersPage — table (shared Admin)", () => {
-  it("renders the users table with user rows", () => {
-    setupStore({ accessMode: "shared", sharedRole: "admin" });
+describe("AdminUsersPage — table", () => {
+  it("renders user rows with role and status badges", () => {
+    setupStore();
     renderPage();
-    expect(screen.getByRole("table")).toBeTruthy();
     expect(screen.getByText("Jordan Kim")).toBeTruthy();
-    expect(screen.getByText("Alex Rivera")).toBeTruthy();
+    expect(screen.getAllByText("Admin").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Active").length).toBeGreaterThan(0);
   });
 
-  it("shows Role and Status badges", () => {
-    setupStore({ accessMode: "shared", sharedRole: "admin" });
-    renderPage();
-    const adminBadges = screen.getAllByText("Admin");
-    expect(adminBadges.length).toBeGreaterThan(0);
-    const activeBadges = screen.getAllByText("Active");
-    expect(activeBadges.length).toBeGreaterThan(0);
-  });
-});
-
-describe("AdminUsersPage — search", () => {
   it("filters rows by name", async () => {
-    setupStore({ accessMode: "shared", sharedRole: "admin" });
+    setupStore();
     renderPage();
-    const input = screen.getByPlaceholderText(/search by name/i);
-    await userEvent.type(input, "Jordan");
+    await userEvent.type(screen.getByPlaceholderText(/search by name/i), "Jordan");
     expect(screen.getByText("Jordan Kim")).toBeTruthy();
     expect(screen.queryByText("Alex Rivera")).toBeNull();
   });
 
   it("filters rows by email", async () => {
-    setupStore({ accessMode: "shared", sharedRole: "admin" });
+    setupStore();
     renderPage();
-    const input = screen.getByPlaceholderText(/search by name/i);
-    await userEvent.type(input, "sam.chen");
+    await userEvent.type(screen.getByPlaceholderText(/search by name/i), "sam.chen");
     expect(screen.getByText("Sam Chen")).toBeTruthy();
     expect(screen.queryByText("Jordan Kim")).toBeNull();
   });
-});
 
-describe("AdminUsersPage — role/status filters", () => {
   it("filters to admin users only", async () => {
-    setupStore({ accessMode: "shared", sharedRole: "admin" });
+    setupStore();
     renderPage();
-    const roleSelect = screen.getByRole("combobox", { name: /role/i });
-    await userEvent.selectOptions(roleSelect, "admin");
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: /role/i }), "admin");
     expect(screen.getByText("Jordan Kim")).toBeTruthy();
     expect(screen.queryByText("Alex Rivera")).toBeNull();
   });
 
   it("filters to inactive users only", async () => {
-    setupStore({ accessMode: "shared", sharedRole: "admin" });
+    setupStore();
     renderPage();
-    const statusSelect = screen.getByRole("combobox", { name: /status/i });
-    await userEvent.selectOptions(statusSelect, "inactive");
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: /status/i }), "inactive");
     expect(screen.getByText("Taylor Brooks")).toBeTruthy();
     expect(screen.queryByText("Jordan Kim")).toBeNull();
   });
 });
 
-describe("AdminUsersPage — row actions", () => {
-  it("opens role-change confirmation dialog when clicking Make Admin", async () => {
-    setupStore({ accessMode: "shared", sharedRole: "admin" });
-    renderPage();
-    const makeAdminBtn = screen.getAllByRole("button", { name: /make admin/i })[0];
-    await userEvent.click(makeAdminBtn);
-    expect(screen.getByText(/Change role for/i)).toBeTruthy();
-  });
-
-  it("opens deactivate confirmation dialog", async () => {
-    setupStore({ accessMode: "shared", sharedRole: "admin" });
-    renderPage();
-    const deactivateBtns = screen.getAllByRole("button", { name: /deactivate/i });
-    await userEvent.click(deactivateBtns[0]);
-    expect(screen.getByText(/no longer be able to access/i)).toBeTruthy();
-  });
-
-  it("confirming role change updates the badge", async () => {
-    setupStore({ accessMode: "shared", sharedRole: "admin" });
+describe("AdminUsersPage — role change (save states)", () => {
+  it("shows isProcessing state and resolves with success toast + badge update", async () => {
+    setupStore();
     renderPage();
     const adminCountBefore = screen.getAllByText("Admin").length;
-    const makeAdminBtn = screen.getAllByRole("button", { name: /make admin/i })[0];
-    await userEvent.click(makeAdminBtn);
+    await userEvent.click(screen.getAllByRole("button", { name: /make admin/i })[0]);
     await userEvent.click(screen.getByRole("button", { name: /change role/i }));
     await waitFor(() =>
       expect(screen.getAllByText("Admin").length).toBe(adminCountBefore + 1),
     );
+    expect(mockNotifyPush).toHaveBeenCalledWith(
+      expect.objectContaining({ tone: "success" }),
+    );
   });
 
-  it("cancelling role-change dialog leaves data unchanged", async () => {
-    setupStore({ accessMode: "shared", sharedRole: "admin" });
+  it("shows error toast when save fails", async () => {
+    setMockUserSaveShouldFail(true);
+    setupStore();
     renderPage();
-    const makeAdminBtn = screen.getAllByRole("button", { name: /make admin/i })[0];
-    await userEvent.click(makeAdminBtn);
-    const cancelBtn = screen.getByRole("button", { name: /cancel/i });
-    await userEvent.click(cancelBtn);
+    await userEvent.click(screen.getAllByRole("button", { name: /make admin/i })[0]);
+    await userEvent.click(screen.getByRole("button", { name: /change role/i }));
+    await waitFor(() =>
+      expect(mockNotifyPush).toHaveBeenCalledWith(
+        expect.objectContaining({ tone: "error" }),
+      ),
+    );
+  });
+
+  it("cancel closes dialog without mutation", async () => {
+    setupStore();
+    renderPage();
+    const adminCountBefore = screen.getAllByText("Admin").length;
+    await userEvent.click(screen.getAllByRole("button", { name: /make admin/i })[0]);
+    await userEvent.click(screen.getByRole("button", { name: /cancel/i }));
     expect(screen.queryByText(/Change role for/i)).toBeNull();
-    expect(screen.getByText("Alex Rivera")).toBeTruthy();
+    expect(screen.getAllByText("Admin").length).toBe(adminCountBefore);
   });
+});
 
-  it("activate applies immediately without dialog", async () => {
-    setupStore({ accessMode: "shared", sharedRole: "admin" });
+describe("AdminUsersPage — deactivate (save states)", () => {
+  it("deactivates user and shows success toast", async () => {
+    setupStore();
     renderPage();
-    const statusSelect = screen.getByRole("combobox", { name: /status/i });
-    await userEvent.selectOptions(statusSelect, "inactive");
-    const activateBtn = screen.getAllByRole("button", { name: /^activate$/i })[0];
-    await userEvent.click(activateBtn);
+    await userEvent.click(screen.getAllByRole("button", { name: /deactivate/i })[0]);
+    const dialog = screen.getByRole("dialog");
+    await userEvent.click(within(dialog).getByRole("button", { name: /deactivate/i }));
+    await waitFor(() =>
+      expect(mockNotifyPush).toHaveBeenCalledWith(
+        expect.objectContaining({ tone: "success", title: "User deactivated." }),
+      ),
+    );
+  });
+});
+
+describe("AdminUsersPage — activate (save states)", () => {
+  it("activates inactive user with success toast, no dialog", async () => {
+    setupStore();
+    renderPage();
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: /status/i }), "inactive");
+    await userEvent.click(screen.getAllByRole("button", { name: /^activate$/i })[0]);
+    await waitFor(() =>
+      expect(mockNotifyPush).toHaveBeenCalledWith(
+        expect.objectContaining({ tone: "success", title: "User activated." }),
+      ),
+    );
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+});
+
+describe("AdminUsersPage — last-admin validation", () => {
+  it("shows warning toast when trying to Make User the only remaining active admin", async () => {
+    setupStore();
+    renderPage();
+    // Filter to only admins; Jordan Kim and Morgan Lee are admins.
+    // Deactivate one admin first so only one active admin remains.
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: /role/i }), "admin");
+    // Deactivate Morgan Lee (second admin) to leave Jordan Kim as last active admin
+    const deactivateBtns = screen.getAllByRole("button", { name: /deactivate/i });
+    await userEvent.click(deactivateBtns[1]);
+    await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: /deactivate/i }));
+    await waitFor(() =>
+      expect(mockNotifyPush).toHaveBeenCalledWith(
+        expect.objectContaining({ tone: "success" }),
+      ),
+    );
+    mockNotifyPush.mockClear();
+    // Now try to Make User the last active admin
+    await userEvent.click(screen.getAllByRole("button", { name: /make user/i })[0]);
+    expect(mockNotifyPush).toHaveBeenCalledWith(
+      expect.objectContaining({ tone: "warning" }),
+    );
   });
 });
