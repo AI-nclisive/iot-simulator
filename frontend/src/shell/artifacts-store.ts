@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { apiFetch, ApiError } from "../api";
+import { apiFetch, ApiError, type Page } from "../api";
 import type { ReusableArtifact } from "../surfaces/mock-artifacts";
 
 // Backend response shape from GET/POST /api/v1/projects/{pid}/recordings
@@ -81,10 +81,10 @@ export const useArtifactsStore = create<ArtifactsState>((set) => ({
   loadRecordings: async (projectId: string) => {
     set({ isLoading: true, error: null });
     try {
-      const data = await apiFetch<RecordingResponse[]>(
+      const { items } = await apiFetch<Page<RecordingResponse>>(
         `/api/v1/projects/${projectId}/recordings`,
       );
-      set({ artifacts: data.map(mapRecording), isLoading: false });
+      set({ artifacts: items.map(mapRecording), isLoading: false });
     } catch (err) {
       const message = err instanceof ApiError ? err.title : "Failed to load recordings";
       set({ error: message, isLoading: false });

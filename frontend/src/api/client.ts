@@ -10,6 +10,16 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Cursor-paginated collection envelope returned by every list endpoint
+ * (IS-074). List responses are `{ items, nextCursor, limit }`, not a bare array.
+ */
+export type Page<T> = {
+  items: T[];
+  nextCursor: string | null;
+  limit: number;
+};
+
 const etagStore = new Map<string, string>();
 
 function baseUrl(): string {
