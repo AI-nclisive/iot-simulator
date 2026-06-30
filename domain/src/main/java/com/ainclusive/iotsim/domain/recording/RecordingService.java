@@ -1,8 +1,11 @@
 package com.ainclusive.iotsim.domain.recording;
 
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
+import com.ainclusive.iotsim.domain.support.Page;
+import com.ainclusive.iotsim.domain.support.PageCursor;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRepository;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRow;
+import com.ainclusive.iotsim.persistence.project.ProjectRepository;
 import com.ainclusive.iotsim.persistence.recording.RecordingRepository;
 import com.ainclusive.iotsim.persistence.recording.RecordingRow;
 import com.ainclusive.iotsim.persistence.schema.SchemaRepository;
@@ -15,6 +18,7 @@ import com.ainclusive.iotsim.platform.capture.SourceCapturer;
 import com.ainclusive.iotsim.platform.secret.CredentialStore;
 import com.ainclusive.iotsim.protocolmodel.NeutralValue;
 import com.ainclusive.iotsim.protocolmodel.NodeKind;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -30,19 +34,21 @@ public class RecordingService {
     private final SchemaRepository schemas;
     private final CredentialStore credentials;
     private final SourceCapturer capturer;
+    private final ProjectRepository projects;
 
     // Live captures in progress, keyed by data-source id (one capture per source).
     private final Map<String, ActiveCapture> active = new ConcurrentHashMap<>();
 
     public RecordingService(RecordingRepository recordings, ValueTimelineRepository timeline,
             DataSourceRepository dataSources, SchemaRepository schemas, CredentialStore credentials,
-            SourceCapturer capturer) {
+            SourceCapturer capturer, ProjectRepository projects) {
         this.recordings = recordings;
         this.timeline = timeline;
         this.dataSources = dataSources;
         this.schemas = schemas;
         this.credentials = credentials;
         this.capturer = capturer;
+        this.projects = projects;
     }
 
     public Recording create(String projectId, String dataSourceId, String actor) {
@@ -128,8 +134,30 @@ public class RecordingService {
         return recordings.findByProject(projectId).stream().map(this::map).toList();
     }
 
+    public Page<Recording> listPaged(String projectId, String cursor, Integer limit) {
+        requireProject(projectId);
+        int size = PageCursor.clamp(limit);
+        PageCursor.Parts after = PageCursor.decode(cursor);
+        OffsetDateTime afterAt = after != null ? after.at() : null;
+        String afterId = after != null ? after.id() : null;
+        List<RecordingRow> rows = recordings.findByProjectPaged(projectId, afterAt, afterId, size + 1);
+        String nextCursor = null;
+        if (rows.size() > size) {
+            rows = rows.subList(0, size);
+            RecordingRow last = rows.get(rows.size() - 1);
+            nextCursor = PageCursor.encode(last.createdAt(), last.id());
+        }
+        return new Page<>(rows.stream().map(this::map).toList(), nextCursor, size);
+    }
+
     public Recording get(String projectId, String recordingId) {
         return map(requireRecording(projectId, recordingId));
+    }
+
+    private void requireProject(String projectId) {
+        if (projects.findById(projectId).isEmpty()) {
+            throw new ResourceNotFoundException("Project", projectId);
+        }
     }
 
     private DataSourceRow requireSource(String projectId, String dataSourceId) {

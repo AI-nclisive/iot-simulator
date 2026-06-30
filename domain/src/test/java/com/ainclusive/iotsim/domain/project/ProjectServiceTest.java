@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.ainclusive.iotsim.domain.common.ConcurrencyConflictException;
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
+import com.ainclusive.iotsim.domain.support.Page;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRepository;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRow;
 import com.ainclusive.iotsim.persistence.project.ProjectRepository;
@@ -173,6 +174,22 @@ class ProjectServiceTest {
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
+    @Test
+    void listPagedEmitsCursorWhenResultsExceedLimit() {
+        service.create("A", null, "it");
+        service.create("B", null, "it");
+        service.create("C", null, "it");
+
+        Page<Project> page = service.listPaged(null, null, 2);
+        assertThat(page.items()).hasSize(2);
+        assertThat(page.nextCursor()).isNotNull();
+        assertThat(page.limit()).isEqualTo(2);
+
+        Page<Project> page2 = service.listPaged(null, page.nextCursor(), 2);
+        assertThat(page2.items()).hasSize(1);
+        assertThat(page2.nextCursor()).isNull();
+    }
+
     // =========================================================================
     // In-memory fakes
     // =========================================================================
@@ -199,6 +216,19 @@ class ProjectServiceTest {
         @Override
         public List<ProjectRow> findAll() {
             return List.copyOf(rows);
+        }
+
+        @Override
+        public List<ProjectRow> findAllPaged(String status, java.time.OffsetDateTime afterAt,
+                String afterId, int limit) {
+            return rows.stream()
+                    .filter(r -> status == null || r.status().equals(status))
+                    .filter(r -> afterAt == null || r.createdAt().isBefore(afterAt)
+                            || (r.createdAt().isEqual(afterAt) && r.id().compareTo(afterId) < 0))
+                    .sorted(java.util.Comparator.comparing(ProjectRow::createdAt).reversed()
+                            .thenComparing(java.util.Comparator.comparing(ProjectRow::id).reversed()))
+                    .limit(limit)
+                    .toList();
         }
 
         @Override
@@ -256,6 +286,12 @@ class ProjectServiceTest {
         @Override
         public List<DataSourceRow> findByProject(String projectId) {
             return rows.stream().filter(r -> r.projectId().equals(projectId)).toList();
+        }
+
+        @Override
+        public List<DataSourceRow> findByProjectPaged(String projectId, String protocol,
+                java.time.OffsetDateTime afterAt, String afterId, int limit) {
+            return List.of();
         }
 
         @Override
@@ -333,6 +369,12 @@ class ProjectServiceTest {
         @Override
         public List<RecordingRow> findByProject(String projectId) {
             return rows.stream().filter(r -> r.projectId().equals(projectId)).toList();
+        }
+
+        @Override
+        public List<RecordingRow> findByProjectPaged(String projectId,
+                java.time.OffsetDateTime afterAt, String afterId, int limit) {
+            return List.of();
         }
 
         @Override

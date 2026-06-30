@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.ainclusive.iotsim.domain.common.ConcurrencyConflictException;
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
+import com.ainclusive.iotsim.domain.support.Page;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRepository;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRow;
 import com.ainclusive.iotsim.persistence.project.ProjectRepository;
@@ -282,6 +283,33 @@ class DataSourceServiceTest {
         assertThat(ds.schemaVersion()).isEqualTo(1);
     }
 
+    @Test
+    void listPagedThrowsNotFoundForMissingProject() {
+        assertThatThrownBy(() -> service.listPaged("no-such-project", null, null, null))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void listPagedEmitsCursorWhenResultsExceedLimit() {
+        service.create(PROJECT, "DS-A", "OPC_UA", "MANUAL", null, null, null, null, "it");
+        service.create(PROJECT, "DS-B", "OPC_UA", "MANUAL", null, null, null, null, "it");
+        service.create(PROJECT, "DS-C", "MODBUS_TCP", "SCAN", null, null, null, null, "it");
+
+        Page<DataSource> page = service.listPaged(PROJECT, null, null, 2);
+        assertThat(page.items()).hasSize(2);
+        assertThat(page.nextCursor()).isNotNull();
+        assertThat(page.limit()).isEqualTo(2);
+
+        Page<DataSource> page2 = service.listPaged(PROJECT, null, page.nextCursor(), 2);
+        assertThat(page2.items()).hasSize(1);
+        assertThat(page2.nextCursor()).isNull();
+
+        // protocol filter narrows the set
+        Page<DataSource> modbusOnly = service.listPaged(PROJECT, "MODBUS_TCP", null, 10);
+        assertThat(modbusOnly.items()).hasSize(1);
+        assertThat(modbusOnly.items().get(0).name()).isEqualTo("DS-C");
+    }
+
     private static final class InMemoryDataSourceRepository implements DataSourceRepository {
         private final List<DataSourceRow> rows = new ArrayList<>();
         private int seq;
@@ -302,6 +330,20 @@ class DataSourceServiceTest {
         @Override
         public List<DataSourceRow> findByProject(String projectId) {
             return rows.stream().filter(r -> r.projectId().equals(projectId)).toList();
+        }
+
+        @Override
+        public List<DataSourceRow> findByProjectPaged(String projectId, String protocol,
+                java.time.OffsetDateTime afterAt, String afterId, int limit) {
+            return rows.stream()
+                    .filter(r -> r.projectId().equals(projectId))
+                    .filter(r -> protocol == null || r.protocol().equals(protocol))
+                    .filter(r -> afterAt == null || r.createdAt().isBefore(afterAt)
+                            || (r.createdAt().isEqual(afterAt) && r.id().compareTo(afterId) < 0))
+                    .sorted(java.util.Comparator.comparing(DataSourceRow::createdAt).reversed()
+                            .thenComparing(java.util.Comparator.comparing(DataSourceRow::id).reversed()))
+                    .limit(limit)
+                    .toList();
         }
 
         @Override
@@ -385,6 +427,12 @@ class DataSourceServiceTest {
 
         @Override
         public List<ProjectRow> findAll() {
+            return List.of();
+        }
+
+        @Override
+        public List<ProjectRow> findAllPaged(String status, java.time.OffsetDateTime afterAt,
+                String afterId, int limit) {
             return List.of();
         }
 

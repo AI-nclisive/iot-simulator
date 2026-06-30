@@ -129,6 +129,12 @@ class SchemaServiceTest {
         }
 
         @Override
+        public List<DataSourceRow> findByProjectPaged(String projectId, String protocol,
+                java.time.OffsetDateTime afterAt, String afterId, int limit) {
+            return List.of();
+        }
+
+        @Override
         public Optional<DataSourceRow> update(String id, String name, String endpointJson,
                 String runtimeConfigJson, boolean enabled, long expectedVersion) {
             throw new UnsupportedOperationException();

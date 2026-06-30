@@ -85,4 +85,25 @@ class SampleRepositoryIT {
     void deleteOnMissingIdReturnsFalse() {
         assertThat(samples.deleteById("no-such-id")).isFalse();
     }
+
+    @Test
+    void findByProjectPagedReturnsBatchNewestFirst() {
+        SampleRow a = samples.create(projectId, null, "Paged-A", null, null, "it");
+        SampleRow b = samples.create(projectId, null, "Paged-B", null, null, "it");
+        SampleRow c = samples.create(projectId, null, "Paged-C", null, null, "it");
+
+        List<SampleRow> page1 = samples.findByProjectPaged(projectId, null, null, 2);
+        assertThat(page1).hasSize(2);
+        assertThat(page1.get(0).id()).isEqualTo(c.id());
+        assertThat(page1.get(1).id()).isEqualTo(b.id());
+
+        SampleRow last = page1.get(page1.size() - 1);
+        List<SampleRow> page2 = samples.findByProjectPaged(projectId, last.createdAt(), last.id(), 2);
+        assertThat(page2).extracting(SampleRow::id).contains(a.id());
+        assertThat(page2).extracting(SampleRow::id).doesNotContain(b.id(), c.id());
+
+        samples.deleteById(a.id());
+        samples.deleteById(b.id());
+        samples.deleteById(c.id());
+    }
 }

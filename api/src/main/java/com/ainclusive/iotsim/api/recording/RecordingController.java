@@ -2,15 +2,16 @@ package com.ainclusive.iotsim.api.recording;
 
 import com.ainclusive.iotsim.domain.recording.Recording;
 import com.ainclusive.iotsim.domain.recording.RecordingService;
+import com.ainclusive.iotsim.domain.support.Page;
 import java.net.URI;
 import java.time.Instant;
-import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /** Recordings within a project (backend-specs/05_API_CONTRACT.md). */
@@ -25,8 +26,11 @@ public class RecordingController {
     }
 
     @GetMapping
-    public List<RecordingResponse> list(@PathVariable String projectId) {
-        return recordings.list(projectId).stream().map(RecordingResponse::from).toList();
+    public Page<RecordingResponse> list(
+            @PathVariable String projectId,
+            @RequestParam(required = false) String cursor,
+            @RequestParam(required = false) Integer limit) {
+        return recordings.listPaged(projectId, cursor, limit).map(RecordingResponse::from);
     }
 
     @PostMapping

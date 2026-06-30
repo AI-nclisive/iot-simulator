@@ -49,6 +49,22 @@ public class JooqProjectRepository implements ProjectRepository {
     }
 
     @Override
+    public List<ProjectRow> findAllPaged(String status, OffsetDateTime afterAt, String afterId, int limit) {
+        var q = dsl.selectFrom(PROJECTS).where(org.jooq.impl.DSL.noCondition());
+        if (status != null) {
+            q = q.and(PROJECTS.STATUS.eq(status));
+        }
+        if (afterAt != null) {
+            q = q.and(PROJECTS.CREATED_AT.lt(afterAt)
+                    .or(PROJECTS.CREATED_AT.eq(afterAt).and(PROJECTS.ID.lt(afterId))));
+        }
+        return q.orderBy(PROJECTS.CREATED_AT.desc(), PROJECTS.ID.desc())
+                .limit(limit)
+                .fetch()
+                .map(this::map);
+    }
+
+    @Override
     public Optional<ProjectRow> update(String id, String name, String description, long expectedVersion) {
         ProjectsRecord record = dsl.update(PROJECTS)
                 .set(PROJECTS.NAME, name)

@@ -5,6 +5,7 @@ import com.ainclusive.iotsim.api.support.ConnectionConfigRequest;
 import com.ainclusive.iotsim.api.support.CredentialRequests;
 import com.ainclusive.iotsim.domain.datasource.DataSource;
 import com.ainclusive.iotsim.domain.datasource.DataSourceService;
+import com.ainclusive.iotsim.domain.support.Page;
 import com.ainclusive.iotsim.protocolmodel.Access;
 import com.ainclusive.iotsim.protocolmodel.DataType;
 import com.ainclusive.iotsim.protocolmodel.NodeKind;
@@ -23,6 +24,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -41,8 +43,13 @@ public class DataSourceController {
     }
 
     @GetMapping
-    public List<DataSourceResponse> list(@PathVariable String projectId) {
-        return dataSources.list(projectId).stream().map(DataSourceResponse::from).toList();
+    public Page<DataSourceResponse> list(
+            @PathVariable String projectId,
+            @RequestParam(required = false) String protocol,
+            @RequestParam(required = false) String cursor,
+            @RequestParam(required = false) Integer limit) {
+        return dataSources.listPaged(projectId, protocol, cursor, limit)
+                .map(DataSourceResponse::from);
     }
 
     @PostMapping

@@ -1,10 +1,13 @@
 package com.ainclusive.iotsim.domain.sample;
 
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
+import com.ainclusive.iotsim.domain.support.Page;
+import com.ainclusive.iotsim.domain.support.PageCursor;
 import com.ainclusive.iotsim.persistence.project.ProjectRepository;
 import com.ainclusive.iotsim.persistence.recording.RecordingRepository;
 import com.ainclusive.iotsim.persistence.sample.SampleRepository;
 import com.ainclusive.iotsim.persistence.sample.SampleRow;
+import java.time.OffsetDateTime;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import tools.jackson.core.type.TypeReference;
@@ -43,6 +46,22 @@ public class SampleService {
     public List<Sample> list(String projectId) {
         requireProject(projectId);
         return samples.findByProject(projectId).stream().map(this::map).toList();
+    }
+
+    public Page<Sample> listPaged(String projectId, String cursor, Integer limit) {
+        requireProject(projectId);
+        int size = PageCursor.clamp(limit);
+        PageCursor.Parts after = PageCursor.decode(cursor);
+        OffsetDateTime afterAt = after != null ? after.at() : null;
+        String afterId = after != null ? after.id() : null;
+        List<SampleRow> rows = samples.findByProjectPaged(projectId, afterAt, afterId, size + 1);
+        String nextCursor = null;
+        if (rows.size() > size) {
+            rows = rows.subList(0, size);
+            SampleRow last = rows.get(rows.size() - 1);
+            nextCursor = PageCursor.encode(last.createdAt(), last.id());
+        }
+        return new Page<>(rows.stream().map(this::map).toList(), nextCursor, size);
     }
 
     public Sample get(String projectId, String id) {

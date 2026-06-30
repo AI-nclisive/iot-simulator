@@ -5,8 +5,8 @@ import com.ainclusive.iotsim.domain.evidence.EvidenceBundle;
 import com.ainclusive.iotsim.domain.evidence.EvidenceFormat;
 import com.ainclusive.iotsim.domain.evidence.EvidenceService;
 import com.ainclusive.iotsim.domain.evidence.EvidenceView;
+import com.ainclusive.iotsim.domain.support.Page;
 import java.time.Instant;
-import java.util.List;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -38,8 +38,11 @@ public class EvidenceController {
     }
 
     @GetMapping
-    public List<EvidenceResponse> list(@PathVariable String projectId) {
-        return evidence.list(projectId).stream().map(this::toResponse).toList();
+    public Page<EvidenceResponse> list(
+            @PathVariable String projectId,
+            @RequestParam(required = false) String cursor,
+            @RequestParam(required = false) Integer limit) {
+        return evidence.listPaged(projectId, cursor, limit).map(this::toResponse);
     }
 
     @GetMapping("/{id}")

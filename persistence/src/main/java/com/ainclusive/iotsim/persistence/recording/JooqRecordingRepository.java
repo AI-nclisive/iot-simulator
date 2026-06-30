@@ -50,6 +50,20 @@ public class JooqRecordingRepository implements RecordingRepository {
     }
 
     @Override
+    public List<RecordingRow> findByProjectPaged(String projectId,
+            OffsetDateTime afterAt, String afterId, int limit) {
+        var q = dsl.selectFrom(RECORDINGS).where(RECORDINGS.PROJECT_ID.eq(projectId));
+        if (afterAt != null) {
+            q = q.and(RECORDINGS.CREATED_AT.lt(afterAt)
+                    .or(RECORDINGS.CREATED_AT.eq(afterAt).and(RECORDINGS.ID.lt(afterId))));
+        }
+        return q.orderBy(RECORDINGS.CREATED_AT.desc(), RECORDINGS.ID.desc())
+                .limit(limit)
+                .fetch()
+                .map(this::map);
+    }
+
+    @Override
     public RecordingRow finalizeStats(String id, OffsetDateTime timeStart, OffsetDateTime timeEnd,
             long valueCount, long sizeBytes) {
         RecordingsRecord record = dsl.update(RECORDINGS)

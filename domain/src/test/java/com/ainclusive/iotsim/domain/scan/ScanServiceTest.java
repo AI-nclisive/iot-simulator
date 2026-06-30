@@ -271,6 +271,12 @@ class ScanServiceTest {
         }
 
         @Override
+        public List<ProjectRow> findAllPaged(String status, java.time.OffsetDateTime afterAt,
+                String afterId, int limit) {
+            return List.of();
+        }
+
+        @Override
         public Optional<ProjectRow> update(String id, String name, String description, long expectedVersion) {
             throw new UnsupportedOperationException();
         }
@@ -304,6 +310,12 @@ class ScanServiceTest {
         @Override
         public List<DataSourceRow> findByProject(String projectId) {
             return rows.stream().filter(r -> r.projectId().equals(projectId)).toList();
+        }
+
+        @Override
+        public List<DataSourceRow> findByProjectPaged(String projectId, String protocol,
+                java.time.OffsetDateTime afterAt, String afterId, int limit) {
+            return List.of();
         }
 
         @Override

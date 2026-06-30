@@ -193,7 +193,7 @@ import/export. Modbus moved to Wave G (deferred) — see the note there.
 - [x] IS-071 [BE] ⬜ [project] Duplicate project — SPEC: Manage Projects
 - [x] IS-072 [BE] ✅ [project] Archive project — SPEC: Manage Projects
 - [ ] IS-073 [BE] ⬜ [io] Project export/import (versioned ZIP+manifest, secret-free) — 06
-- [ ] IS-074 [BE] ⬜ [api] Cursor pagination + filtering on collections — 05
+- [x] IS-074 [BE] ✅ [api] Cursor pagination + filtering on collections — 05
 
 ## Wave E — Shared-team & security · P1→P2
 

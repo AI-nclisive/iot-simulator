@@ -23,6 +23,11 @@ class RepositoryDataSourceProjectResolverTest {
                 throw new UnsupportedOperationException();
             }
             @Override
+            public List<DataSourceRow> findByProjectPaged(String projectId, String protocol,
+                    java.time.OffsetDateTime afterAt, String afterId, int limit) {
+                return List.of();
+            }
+            @Override
             public Optional<DataSourceRow> findById(String id) {
                 return Optional.ofNullable(row);
             }
