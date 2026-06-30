@@ -539,7 +539,7 @@ Parallel execution:
   Done when: role assignment, status validation, and save states are clear
   without assuming product-owned password lifecycle management.
 
-- [ ] `UI-083` Role-change behavior
+- [x] `UI-083` Role-change behavior
   Surface: `Admin UI`
   Depends: `UI-081`
   Done when: role changes are confirmed and traceable in shared activity.
