@@ -10,10 +10,56 @@ export type UserRow = {
   lastActive: string;
 };
 
+export type RoleChangeEntry = {
+  id: string;
+  affectedUserId: string;
+  affectedUserName: string;
+  affectedUserEmail: string;
+  fromRole: UserRole;
+  toRole: UserRole;
+  changedByName: string;
+  changedAt: string;
+};
+
 /** Set to true in tests to simulate a failed save response. */
 export let mockUserSaveShouldFail = false;
 export function setMockUserSaveShouldFail(v: boolean) {
   mockUserSaveShouldFail = v;
+}
+
+export const initialRoleChangeLog: RoleChangeEntry[] = [
+  {
+    id: "rcl-001",
+    affectedUserId: "u-003",
+    affectedUserName: "Sam Chen",
+    affectedUserEmail: "sam.chen@example.com",
+    fromRole: "admin",
+    toRole: "user",
+    changedByName: "Jordan Kim",
+    changedAt: "Yesterday at 11:42",
+  },
+  {
+    id: "rcl-002",
+    affectedUserId: "u-007",
+    affectedUserName: "Riley Wilson",
+    affectedUserEmail: "riley.wilson@example.com",
+    fromRole: "user",
+    toRole: "admin",
+    changedByName: "Morgan Lee",
+    changedAt: "3 days ago",
+  },
+];
+
+const _originalRoleChangeLog = initialRoleChangeLog.slice();
+
+/** Replace the contents of initialRoleChangeLog in tests (e.g. empty it to test the empty-state UI). */
+export function setInitialRoleChangeLog(entries: RoleChangeEntry[]) {
+  initialRoleChangeLog.splice(0, initialRoleChangeLog.length, ...entries);
+}
+
+/** Reset initialRoleChangeLog to its original seeded state after a test. */
+export function resetInitialRoleChangeLog() {
+  initialRoleChangeLog.splice(0, initialRoleChangeLog.length, ..._originalRoleChangeLog);
 }
 
 export const mockUsers: UserRow[] = [

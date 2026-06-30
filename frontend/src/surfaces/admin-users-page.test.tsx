@@ -1,5 +1,5 @@
 /**
- * Tests for AdminUsersPage (UI-081 + UI-082)
+ * Tests for AdminUsersPage (UI-081 + UI-082 + UI-083)
  *
  * Covers:
  * - Access gates: Local mode → table shown; Shared User → locked panel
@@ -12,13 +12,18 @@
  * - Activate: no dialog → success toast + status update
  * - Last-admin validation: warning toast when only one active admin remains
  * - Cancel: dialog closes without mutation
+ * - Role change activity panel: pre-seeded entries visible on load
+ * - Role change activity panel: new entry prepended after a successful change
+ * - Role change activity panel: no new entry added when save fails
+ * - Role change activity panel: shows empty state when log is empty
+ * - Role change activity panel: cancel does not mutate the activity log
  */
 
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { setMockUserSaveShouldFail } from "./mock-users";
+import { resetInitialRoleChangeLog, setInitialRoleChangeLog, setMockUserSaveShouldFail } from "./mock-users";
 import { AdminUsersPage } from "./admin-users-page";
 
 const { mockShellStore } = vi.hoisted(() => ({ mockShellStore: vi.fn() }));
@@ -45,6 +50,7 @@ afterEach(() => {
   cleanup();
   vi.clearAllMocks();
   setMockUserSaveShouldFail(false);
+  resetInitialRoleChangeLog();
 });
 
 beforeEach(() => {
@@ -78,9 +84,10 @@ describe("AdminUsersPage — table", () => {
   it("renders user rows with role and status badges", () => {
     setupStore();
     renderPage();
+    const table = screen.getByRole("table");
     expect(screen.getByText("Jordan Kim")).toBeTruthy();
-    expect(screen.getAllByText("Admin").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Active").length).toBeGreaterThan(0);
+    expect(within(table).getAllByText("Admin").length).toBeGreaterThan(0);
+    expect(within(table).getAllByText("Active").length).toBeGreaterThan(0);
   });
 
   it("filters rows by name", async () => {
@@ -95,7 +102,7 @@ describe("AdminUsersPage — table", () => {
     setupStore();
     renderPage();
     await userEvent.type(screen.getByPlaceholderText(/search by name/i), "sam.chen");
-    expect(screen.getByText("Sam Chen")).toBeTruthy();
+    expect(screen.getAllByText("Sam Chen").length).toBeGreaterThan(0);
     expect(screen.queryByText("Jordan Kim")).toBeNull();
   });
 
@@ -120,11 +127,12 @@ describe("AdminUsersPage — role change (save states)", () => {
   it("shows isProcessing state and resolves with success toast + badge update", async () => {
     setupStore();
     renderPage();
-    const adminCountBefore = screen.getAllByText("Admin").length;
+    const table = screen.getByRole("table");
+    const adminCountBefore = within(table).getAllByText("Admin").length;
     await userEvent.click(screen.getAllByRole("button", { name: /make admin/i })[0]);
     await userEvent.click(screen.getByRole("button", { name: /change role/i }));
     await waitFor(() =>
-      expect(screen.getAllByText("Admin").length).toBe(adminCountBefore + 1),
+      expect(within(table).getAllByText("Admin").length).toBe(adminCountBefore + 1),
     );
     expect(mockNotifyPush).toHaveBeenCalledWith(
       expect.objectContaining({ tone: "success" }),
@@ -147,11 +155,12 @@ describe("AdminUsersPage — role change (save states)", () => {
   it("cancel closes dialog without mutation", async () => {
     setupStore();
     renderPage();
-    const adminCountBefore = screen.getAllByText("Admin").length;
+    const table = screen.getByRole("table");
+    const adminCountBefore = within(table).getAllByText("Admin").length;
     await userEvent.click(screen.getAllByRole("button", { name: /make admin/i })[0]);
     await userEvent.click(screen.getByRole("button", { name: /cancel/i }));
     expect(screen.queryByText(/Change role for/i)).toBeNull();
-    expect(screen.getAllByText("Admin").length).toBe(adminCountBefore);
+    expect(within(table).getAllByText("Admin").length).toBe(adminCountBefore);
   });
 });
 
@@ -207,5 +216,101 @@ describe("AdminUsersPage — last-admin validation", () => {
     expect(mockNotifyPush).toHaveBeenCalledWith(
       expect.objectContaining({ tone: "warning" }),
     );
+  });
+});
+
+describe("AdminUsersPage — role change activity (UI-083)", () => {
+  it("shows the role change activity panel on load with pre-seeded entries", () => {
+    setupStore();
+    renderPage();
+    const panel = screen.getByRole("region", { name: /role change activity/i });
+    expect(panel).toBeTruthy();
+    expect(panel.textContent).toMatch(/Sam Chen/);
+    expect(panel.textContent).toMatch(/Jordan Kim/);
+    expect(screen.getByText("Yesterday at 11:42")).toBeTruthy();
+  });
+
+  it("prepends a new activity entry after a successful role change", async () => {
+    setupStore();
+    renderPage();
+    const logBefore = within(
+      screen.getByRole("list", { name: /role change log/i }),
+    ).getAllByRole("listitem");
+    const countBefore = logBefore.length;
+
+    await userEvent.click(screen.getAllByRole("button", { name: /make admin/i })[0]);
+    await userEvent.click(screen.getByRole("button", { name: /change role/i }));
+
+    await waitFor(() => {
+      const logAfter = within(
+        screen.getByRole("list", { name: /role change log/i }),
+      ).getAllByRole("listitem");
+      expect(logAfter.length).toBe(countBefore + 1);
+    });
+
+    const firstEntry = within(
+      screen.getByRole("list", { name: /role change log/i }),
+    ).getAllByRole("listitem")[0];
+    expect(firstEntry.textContent).toMatch(/Just now/);
+    expect(firstEntry.textContent).toMatch(/by You/);
+  });
+
+  it("does not add an activity entry when the save fails", async () => {
+    setMockUserSaveShouldFail(true);
+    setupStore();
+    renderPage();
+    const logBefore = within(
+      screen.getByRole("list", { name: /role change log/i }),
+    ).getAllByRole("listitem");
+    const countBefore = logBefore.length;
+
+    await userEvent.click(screen.getAllByRole("button", { name: /make admin/i })[0]);
+    await userEvent.click(screen.getByRole("button", { name: /change role/i }));
+
+    await waitFor(() =>
+      expect(mockNotifyPush).toHaveBeenCalledWith(
+        expect.objectContaining({ tone: "error" }),
+      ),
+    );
+
+    const logAfter = within(
+      screen.getByRole("list", { name: /role change log/i }),
+    ).getAllByRole("listitem");
+    expect(logAfter.length).toBe(countBefore);
+  });
+
+  it("shows 'from role → to role' in each activity entry", () => {
+    setupStore();
+    renderPage();
+    const log = screen.getByRole("list", { name: /role change log/i });
+    expect(log.textContent).toMatch(/Admin/);
+    expect(log.textContent).toMatch(/User/);
+  });
+
+  it("shows empty state when no role changes have been made", () => {
+    setInitialRoleChangeLog([]);
+    setupStore();
+    renderPage();
+    const panel = screen.getByRole("region", { name: /role change activity/i });
+    expect(panel).toBeTruthy();
+    expect(panel.textContent).toMatch(/Role changes made by admins will appear here/);
+    expect(screen.queryByRole("list", { name: /role change log/i })).toBeNull();
+  });
+
+  it("cancel does not mutate the activity log", async () => {
+    setupStore();
+    renderPage();
+    const logBefore = within(
+      screen.getByRole("list", { name: /role change log/i }),
+    ).getAllByRole("listitem");
+    const countBefore = logBefore.length;
+
+    await userEvent.click(screen.getAllByRole("button", { name: /make admin/i })[0]);
+    await userEvent.click(screen.getByRole("button", { name: /cancel/i }));
+
+    const logAfter = within(
+      screen.getByRole("list", { name: /role change log/i }),
+    ).getAllByRole("listitem");
+    expect(logAfter.length).toBe(countBefore);
   });
 });

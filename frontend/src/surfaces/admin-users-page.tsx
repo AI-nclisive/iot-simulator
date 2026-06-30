@@ -14,7 +14,13 @@ import {
   type TableRowAction,
   type TableSortState,
 } from "../ui/table-pattern";
-import { mockUserSaveShouldFail, mockUsers, type UserRow } from "./mock-users";
+import {
+  initialRoleChangeLog,
+  mockUserSaveShouldFail,
+  mockUsers,
+  type RoleChangeEntry,
+  type UserRow,
+} from "./mock-users";
 
 type RoleFilter = "all" | "admin" | "user";
 type StatusFilter = "all" | "active" | "inactive";
@@ -49,6 +55,59 @@ function mockSaveUser(): Promise<void> {
   );
 }
 
+let roleChangeIdCounter = initialRoleChangeLog.length + 1;
+
+function nextRoleChangeId(): string {
+  return `rcl-${String(roleChangeIdCounter++).padStart(3, "0")}`;
+}
+
+function RoleChangeActivityPanel({ entries }: { entries: RoleChangeEntry[] }) {
+  if (entries.length === 0) {
+    return (
+      <section className="shell-panel px-5 py-5" aria-label="Role change activity">
+        <h2 className="mb-4 text-base font-semibold text-shell-ink">Role change activity</h2>
+        <SharedStatePanel
+          state="empty"
+          message="Role changes made by admins will appear here. Each entry shows who changed the role, what it changed from and to, and when."
+        />
+      </section>
+    );
+  }
+
+  return (
+    <section className="shell-panel px-5 py-5" aria-label="Role change activity">
+      <h2 className="mb-4 text-base font-semibold text-shell-ink">Role change activity</h2>
+      <ol className="space-y-3" aria-label="Role change log">
+        {entries.map((entry) => (
+          <li
+            key={entry.id}
+            className="flex flex-col gap-1 rounded-md border border-shell-line bg-white px-4 py-3 text-sm sm:flex-row sm:items-start sm:justify-between"
+          >
+            <div className="min-w-0">
+              <p className="font-medium text-shell-ink">
+                {entry.affectedUserName}
+                <span className="ml-1 text-shell-muted font-normal">
+                  &lt;{entry.affectedUserEmail}&gt;
+                </span>
+              </p>
+              <p className="mt-1 text-shell-muted">
+                Role changed from{" "}
+                <StatusBadge label={roleLabel(entry.fromRole)} tone={roleBadgeTone(entry.fromRole)} />{" "}
+                to{" "}
+                <StatusBadge label={roleLabel(entry.toRole)} tone={roleBadgeTone(entry.toRole)} />
+              </p>
+            </div>
+            <div className="shrink-0 text-right text-shell-muted">
+              <p>by {entry.changedByName}</p>
+              <p className="text-xs">{entry.changedAt}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
 export function AdminUsersPage() {
   const accessMode = useShellStore((state) => state.accessMode);
   const sharedRole = useShellStore((state) => state.sharedRole);
@@ -56,6 +115,7 @@ export function AdminUsersPage() {
   const notify = useNotificationStore((s) => s.push);
 
   const [users, setUsers] = useState<UserRow[]>(mockUsers);
+  const [roleChangeLog, setRoleChangeLog] = useState<RoleChangeEntry[]>(initialRoleChangeLog);
   const [searchValue, setSearchValue] = useState("");
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -89,12 +149,26 @@ export function AdminUsersPage() {
   }
 
   async function handleRoleChange(userId: string, newRole: "admin" | "user") {
+    const affectedUser = users.find((u) => u.id === userId);
+    if (!affectedUser) return;
+    const fromRole = affectedUser.role;
     setIsSaving(true);
     try {
       await mockSaveUser();
       setUsers((prev) =>
         prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u)),
       );
+      const entry: RoleChangeEntry = {
+        id: nextRoleChangeId(),
+        affectedUserId: userId,
+        affectedUserName: affectedUser.name,
+        affectedUserEmail: affectedUser.email,
+        fromRole,
+        toRole: newRole,
+        changedByName: "You",
+        changedAt: "Just now",
+      };
+      setRoleChangeLog((prev) => [entry, ...prev]);
       setConfirmRequest(null);
       notify({ tone: "success", title: `Role changed to ${roleLabel(newRole)}.` });
     } catch {
@@ -324,6 +398,8 @@ export function AdminUsersPage() {
           />
         </div>
       </section>
+
+      <RoleChangeActivityPanel entries={roleChangeLog} />
 
       {confirmRequest?.kind === "role-change" && confirmingUser ? (
         <ConfirmationDialog
