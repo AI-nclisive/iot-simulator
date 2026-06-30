@@ -15,7 +15,10 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ProjectEntryPage } from "./project-entry-page";
 
-const { mockShellStore } = vi.hoisted(() => ({ mockShellStore: vi.fn() }));
+const { mockShellStore, mockProjectsStore } = vi.hoisted(() => ({
+  mockShellStore: vi.fn(),
+  mockProjectsStore: vi.fn(),
+}));
 
 vi.mock("react-router-dom", async () => {
   const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
@@ -23,6 +26,11 @@ vi.mock("react-router-dom", async () => {
 });
 
 vi.mock("../shell/shell-store", () => ({ useShellStore: mockShellStore }));
+vi.mock("../shell/projects-store", () => ({ useProjectsStore: mockProjectsStore }));
+vi.mock("../shell/notification-store", () => ({
+  useNotificationStore: (selector: (s: Record<string, unknown>) => unknown) =>
+    selector({ push: vi.fn() }),
+}));
 
 afterEach(() => {
   cleanup();
@@ -35,6 +43,19 @@ function setupAdmin() {
       accessMode: "local",
       sharedRole: "admin",
       setCurrentProjectId: vi.fn(),
+    }),
+  );
+  mockProjectsStore.mockImplementation((selector: (s: Record<string, unknown>) => unknown) =>
+    selector({
+      projects: [],
+      archivedProjects: [],
+      isLoading: false,
+      error: null,
+      loadProjects: vi.fn(),
+      renameProject: vi.fn(),
+      duplicateProject: vi.fn(),
+      archiveProject: vi.fn(),
+      deleteProject: vi.fn(),
     }),
   );
 }

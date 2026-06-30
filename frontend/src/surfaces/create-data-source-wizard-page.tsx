@@ -1,10 +1,34 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { resolveAccess } from "../shell/access-policy";
 import { useDataSourcesStore } from "../shell/data-sources-store";
 import { useShellStore } from "../shell/shell-store";
+import { useNotificationStore } from "../shell/notification-store";
+import { apiFetch } from "../api";
+import type { BackendProtocol } from "../api";
 import { SharedStatePanel } from "../ui/shared-state-panel";
 import { StatusBadge } from "../ui/status-badge";
+
+// Backend scan response shapes
+type ScanJobResponse = {
+  jobId: string;
+  status: string;
+};
+
+type ScanPollResponse = {
+  jobId: string;
+  status: string;
+  truncated: boolean;
+  discoveredCount: number;
+  unknownCount: number;
+  message: string;
+  nodes: unknown[];
+};
+
+type DataSourceResponse = {
+  id: string;
+  [key: string]: unknown;
+};
 
 type ProtocolOption = {
   id: "OPC UA" | "Modbus TCP";
@@ -42,6 +66,7 @@ type WizardFormState = {
   scanState: "complete" | "error" | "idle" | "large" | "partial" | "scanning" | "unknown";
   scanTestResult: "auth-error" | "idle" | "success" | "error";
   scanUsername: string;
+  scanJobId: string | null;
   schemaReviewNote: string;
   syntheticProfile: "steady" | "spike" | "cycle";
   syntheticParameterCount: string;
@@ -390,9 +415,11 @@ export function CreateDataSourceWizardPage() {
   const navigate = useNavigate();
   const accessMode = useShellStore((state) => state.accessMode);
   const sharedRole = useShellStore((state) => state.sharedRole);
-  const createDataSource = useDataSourcesStore((state) => state.createDataSource);
+  const currentProjectId = useShellStore((state) => state.currentProjectId);
   const startDataSource = useDataSourcesStore((state) => state.startDataSource);
+  const push = useNotificationStore((state) => state.push);
   const access = resolveAccess(accessMode, sharedRole);
+  const scanPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [currentStep, setCurrentStep] = useState(0);
   const [showValidation, setShowValidation] = useState(false);
@@ -417,6 +444,7 @@ export function CreateDataSourceWizardPage() {
     scanState: "idle",
     scanTestResult: "idle",
     scanUsername: "",
+    scanJobId: null,
     schemaReviewNote: "",
     syntheticProfile: "steady",
     syntheticParameterCount: "100",
@@ -432,20 +460,14 @@ export function CreateDataSourceWizardPage() {
 
   const reviewItems = useMemo(() => reviewLines(form), [form]);
 
+  // Clean up polling on unmount
   useEffect(() => {
-    if (form.scanState !== "scanning") {
-      return;
-    }
-
-    const timerId = window.setTimeout(() => {
-      setForm((current) => ({
-        ...current,
-        scanState: resolveScanOutcome(current),
-      }));
-    }, 900);
-
-    return () => window.clearTimeout(timerId);
-  }, [form.scanState]);
+    return () => {
+      if (scanPollRef.current !== null) {
+        clearInterval(scanPollRef.current);
+      }
+    };
+  }, []);
 
   if (!access.canCreateSource) {
     return (
@@ -491,23 +513,86 @@ export function CreateDataSourceWizardPage() {
     });
   }
 
-  function testScanDetails() {
-    updateForm({ scanTestResult: resolveScanTestResult(form) });
+  function backendProtocolForForm(protocol: WizardFormState["protocol"]): BackendProtocol {
+    return protocol === "OPC UA" ? "OPC_UA" : "MODBUS_TCP";
   }
 
-  function startScan() {
-    const scanTestResult = resolveScanTestResult(form);
-
-    if (scanTestResult !== "success") {
-      updateForm({ scanState: "error", scanTestResult });
+  async function testScanDetails() {
+    if (!currentProjectId || !form.protocol) {
+      updateForm({ scanTestResult: "error" });
       return;
     }
+    try {
+      const result = await apiFetch<{ status: string; message: string }>(
+        `/api/v1/projects/${currentProjectId}/data-sources/scan/test-connection`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            protocol: backendProtocolForForm(form.protocol),
+            endpointUrl: form.scanEndpoint,
+          }),
+        },
+      );
+      updateForm({ scanTestResult: result.status === "OK" ? "success" : "error" });
+    } catch {
+      updateForm({ scanTestResult: "error" });
+    }
+  }
 
-    updateForm({ scanState: "scanning", scanTestResult });
+  async function startScan() {
+    if (!currentProjectId || !form.protocol) {
+      updateForm({ scanState: "error", scanTestResult: "error" });
+      return;
+    }
+    updateForm({ scanState: "scanning" });
+    try {
+      const job = await apiFetch<ScanJobResponse>(
+        `/api/v1/projects/${currentProjectId}/data-sources/scan`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            protocol: backendProtocolForForm(form.protocol),
+            endpointUrl: form.scanEndpoint,
+          }),
+        },
+      );
+      updateForm({ scanJobId: job.jobId });
+      // Poll every 2 s until done/failed/etc.
+      if (scanPollRef.current !== null) clearInterval(scanPollRef.current);
+      scanPollRef.current = setInterval(async () => {
+        try {
+          const poll = await apiFetch<ScanPollResponse>(
+            `/api/v1/projects/${currentProjectId}/data-sources/scan/${job.jobId}`,
+          );
+          const terminalStatuses = ["DONE", "FAILED", "UNREACHABLE", "AUTH_FAILED", "PARTIAL", "LARGE_SCHEMA"];
+          if (terminalStatuses.includes(poll.status)) {
+            if (scanPollRef.current !== null) clearInterval(scanPollRef.current);
+            if (poll.status === "DONE") {
+              updateForm({ scanState: "complete" });
+            } else if (poll.status === "PARTIAL") {
+              updateForm({ scanState: "partial" });
+            } else if (poll.status === "LARGE_SCHEMA") {
+              updateForm({ scanState: "large" });
+            } else {
+              updateForm({ scanState: "error" });
+            }
+          }
+        } catch {
+          if (scanPollRef.current !== null) clearInterval(scanPollRef.current);
+          updateForm({ scanState: "error" });
+        }
+      }, 2000);
+    } catch {
+      updateForm({ scanState: "error" });
+    }
   }
 
   function retryScan() {
-    updateForm({ scanState: "idle" });
+    if (scanPollRef.current !== null) {
+      clearInterval(scanPollRef.current);
+      scanPollRef.current = null;
+    }
+    updateForm({ scanState: "idle", scanJobId: null });
   }
 
   function handleCredentialModeChange(mode: WizardFormState["scanCredentialMode"]) {
@@ -550,33 +635,65 @@ export function CreateDataSourceWizardPage() {
     navigate("/data-sources");
   }
 
-  function createSource() {
-    if (!form.protocol || !form.basis) {
+  async function createSource() {
+    if (!form.protocol || !form.basis || !currentProjectId) {
       setShowValidation(true);
       return;
     }
 
-    const endpoint =
-      form.basis === "scan"
-        ? form.scanEndpoint
-        : form.basis === "import"
-          ? suggestedEndpoint(form.protocol, form.basis)
-          : suggestedEndpoint(form.protocol, form.basis);
+    try {
+      let createdId: string;
 
-    const createdId = createDataSource({
-      endpoint,
-      name: form.name.trim(),
-      protocol: form.protocol,
-    });
+      if (form.basis === "scan" && form.scanJobId) {
+        // Use the scan job create endpoint
+        const data = await apiFetch<DataSourceResponse>(
+          `/api/v1/projects/${currentProjectId}/data-sources/scan/${form.scanJobId}/create`,
+          {
+            method: "POST",
+            body: JSON.stringify({
+              name: form.name.trim(),
+              endpoint: form.scanEndpoint,
+            }),
+          },
+        );
+        createdId = data.id;
+      } else {
+        // Manual / import / synthetic: POST to data-sources directly
+        const endpoint =
+          form.basis === "scan"
+            ? form.scanEndpoint
+            : suggestedEndpoint(form.protocol, form.basis);
+        const data = await apiFetch<DataSourceResponse>(
+          `/api/v1/projects/${currentProjectId}/data-sources`,
+          {
+            method: "POST",
+            body: JSON.stringify({
+              name: form.name.trim(),
+              endpoint,
+              protocol: backendProtocolForForm(form.protocol),
+              basis: form.basis.toUpperCase(),
+            }),
+          },
+        );
+        createdId = data.id;
+      }
 
-    if (form.runtimeBehavior === "start-now") {
-      startDataSource(createdId);
-    }
+      if (form.runtimeBehavior === "start-now") {
+        try {
+          await startDataSource(createdId, currentProjectId);
+        } catch {
+          // Non-fatal: source was created; start failure is surfaced separately
+        }
+      }
 
-    if (form.basis === "manual") {
-      navigate(`/data-sources/${createdId}?tab=schema`);
-    } else {
-      navigate(`/data-sources/${createdId}`);
+      if (form.basis === "manual") {
+        navigate(`/data-sources/${createdId}?tab=schema`);
+      } else {
+        navigate(`/data-sources/${createdId}`);
+      }
+    } catch (err) {
+      const title = err instanceof Error ? err.message : "Failed to create source";
+      push({ tone: "error", title });
     }
   }
 

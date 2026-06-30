@@ -4,8 +4,23 @@ import { resolveAccess } from "../shell/access-policy";
 import { useArtifactsStore } from "../shell/artifacts-store";
 import { useDataSourcesStore } from "../shell/data-sources-store";
 import { useShellStore } from "../shell/shell-store";
+import { useNotificationStore } from "../shell/notification-store";
+import { apiFetch } from "../api";
 import { SharedStatePanel } from "../ui/shared-state-panel";
 import { StatusBadge, type StatusTone } from "../ui/status-badge";
+
+// Backend response for capture start/stop
+type RecordingResponse = {
+  id: string;
+  projectId: string;
+  dataSourceId: string;
+  schemaVersion: number;
+  origin: string;
+  valueCount: number;
+  createdAt: string;
+  createdBy: string;
+  version: number;
+};
 
 type RecordingUiState =
   | "ready"
@@ -72,10 +87,12 @@ export function RecordingFlowPage() {
   const { sourceId } = useParams();
   const accessMode = useShellStore((state) => state.accessMode);
   const sharedRole = useShellStore((state) => state.sharedRole);
-  const createRecording = useArtifactsStore((state) => state.createRecording);
+  const currentProjectId = useShellStore((state) => state.currentProjectId);
+  const appendRecording = useArtifactsStore((state) => state.appendRecording);
   const source = useDataSourcesStore((state) =>
     state.dataSources.find((row) => row.id === sourceId),
   );
+  const push = useNotificationStore((state) => state.push);
   const access = resolveAccess(accessMode, sharedRole);
   const captureAllowed = access.canRecordSource;
   const [recordingState, setRecordingState] = useState<RecordingUiState>("ready");
@@ -83,6 +100,7 @@ export function RecordingFlowPage() {
   const [valueCount, setValueCount] = useState(0);
   const [lastReceivedHint, setLastReceivedHint] = useState("No values received yet");
   const [savedArtifactId, setSavedArtifactId] = useState<string | null>(null);
+  const [activeRecordingId, setActiveRecordingId] = useState<string | null>(null);
 
   const captureActive =
     recordingState === "recording" || recordingState === "no-values-yet";
@@ -152,29 +170,72 @@ export function RecordingFlowPage() {
     setLastReceivedHint("No values received yet");
     setRecordingState("ready");
     setSavedArtifactId(null);
+    setActiveRecordingId(null);
   }
 
-  function handleStartRecording() {
-    if (!captureAllowed) {
+  async function handleStartRecording() {
+    if (!captureAllowed || !currentProjectId || !activeSource) {
       return;
     }
 
-    setDurationSeconds(0);
-    setValueCount(0);
-    setLastReceivedHint("Waiting for the first value");
-    setRecordingState("no-values-yet");
-    setSavedArtifactId(null);
+    try {
+      const resp = await apiFetch<RecordingResponse>(
+        `/api/v1/projects/${currentProjectId}/data-sources/${activeSource.id}/recording/start`,
+        { method: "POST" },
+      );
+      setActiveRecordingId(resp.id);
+      setDurationSeconds(0);
+      setValueCount(0);
+      setLastReceivedHint("Waiting for the first value");
+      setRecordingState("no-values-yet");
+      setSavedArtifactId(null);
+    } catch (err) {
+      const title = err instanceof Error ? err.message : "Failed to start recording";
+      push({ tone: "error", title });
+    }
   }
 
-  function handleStopRecording() {
-    if (valueCount === 0) {
+  async function handleStopRecording() {
+    if (!currentProjectId || !activeSource || !activeRecordingId) {
+      // Fallback: just reset state if we have no active recording
+      if (valueCount === 0) {
+        setRecordingState("ready");
+        setLastReceivedHint("No values were captured");
+      } else {
+        setRecordingState("save-ready");
+        setLastReceivedHint("Capture stopped and ready to save");
+      }
+      return;
+    }
+
+    try {
+      const resp = await apiFetch<RecordingResponse>(
+        `/api/v1/projects/${currentProjectId}/data-sources/${activeSource.id}/recording/stop`,
+        { method: "POST" },
+      );
+      setValueCount(resp.valueCount);
+      if (resp.valueCount === 0) {
+        setRecordingState("ready");
+        setLastReceivedHint("No values were captured");
+      } else {
+        setRecordingState("save-ready");
+        setLastReceivedHint("Capture stopped and ready to save");
+        // Persist the recording to the artifacts store
+        appendRecording({
+          id: resp.id,
+          createdAt: resp.createdAt,
+          createdBy: resp.createdBy,
+          sourceId: resp.dataSourceId,
+          valueCount: resp.valueCount,
+        });
+        setSavedArtifactId(resp.id);
+      }
+    } catch (err) {
+      const title = err instanceof Error ? err.message : "Failed to stop recording";
+      push({ tone: "error", title });
       setRecordingState("ready");
-      setLastReceivedHint("No values were captured");
-      return;
+      setLastReceivedHint("Stop failed — recording may be incomplete");
     }
-
-    setRecordingState("save-ready");
-    setLastReceivedHint("Capture stopped and ready to save");
   }
 
   function handleDisconnect() {
@@ -183,22 +244,12 @@ export function RecordingFlowPage() {
   }
 
   function saveReadyRecording() {
-    const artifactId = createRecording({
-      createdBy: "You",
-      sourceId: activeSource.id,
-      valueCount,
-    });
-
+    const artifactId = savedArtifactId ?? activeRecordingId ?? "";
     navigate(`/data-sources/${activeSource.id}/replay?artifactId=${artifactId}`);
   }
 
   function savePartialRecording() {
-    const artifactId = createRecording({
-      createdBy: "You",
-      sourceId: activeSource.id,
-      valueCount,
-    });
-
+    const artifactId = savedArtifactId ?? activeRecordingId ?? "";
     setSavedArtifactId(artifactId);
     setRecordingState("partial-save");
   }

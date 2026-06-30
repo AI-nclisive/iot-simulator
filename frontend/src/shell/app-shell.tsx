@@ -1,9 +1,20 @@
 import { Link, NavLink, Outlet } from "react-router-dom";
 import { ToastRegion } from "../ui/notification-pattern";
 import { useNotificationStore } from "./notification-store";
-import { projects, topLevelNav } from "./mock-workspace";
+import { useProjectsStore } from "./projects-store";
 import { useShellStore } from "./shell-store";
 import { resolveAccess } from "./access-policy";
+
+const topLevelNav = [
+  { to: "/overview", label: "Overview" },
+  { to: "/data-sources", label: "Data Sources" },
+  { to: "/recordings", label: "Recordings & Samples" },
+  { to: "/scenarios", label: "Scenarios" },
+  { to: "/evidence", label: "Evidence" },
+  { to: "/activity", label: "Activity" },
+  { to: "/settings", label: "Settings" },
+  { to: "/admin", label: "Admin" },
+] as const;
 
 function navCompactLabel(label: string) {
   const words = label.split(" ");
@@ -37,8 +48,9 @@ export function AppShell() {
 
   const toasts = useNotificationStore((state) => state.toasts);
   const dismissNotification = useNotificationStore((state) => state.dismiss);
+  const projects = useProjectsStore((state) => state.projects);
 
-  const currentProject = projects.find((project) => project.id === currentProjectId) ?? projects[0];
+  const currentProject = projects.find((p) => p.id === currentProjectId) ?? null;
   const access = resolveAccess(accessMode, sharedRole);
 
   return (
@@ -61,7 +73,7 @@ export function AppShell() {
                 {projectRailCollapsed ? (
                   <div className="hidden space-y-2 lg:block">
                     <span className="shell-chip border-shell-line bg-white text-shell-muted">
-                      {projectCompactLabel(currentProject.name)}
+                      {currentProject ? projectCompactLabel(currentProject.name) : "—"}
                     </span>
                     <p className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
                       Project
@@ -70,7 +82,7 @@ export function AppShell() {
                 ) : (
                   <div>
                     <p className="text-sm font-semibold uppercase tracking-[0.08em] text-shell-muted">Project</p>
-                    <p className="mt-2 text-sm text-shell-ink">{currentProject.name}</p>
+                    <p className="mt-2 text-sm text-shell-ink">{currentProject?.name ?? "—"}</p>
                   </div>
                 )}
 
@@ -123,7 +135,7 @@ export function AppShell() {
                       <select
                         aria-label="Current project"
                         className="rounded-md border border-shell-line bg-white px-3 py-2 text-shell-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-shell-accent/40"
-                        value={currentProject.id}
+                        value={currentProject?.id ?? ""}
                         onChange={(event) => setCurrentProjectId(event.target.value)}
                       >
                         {projects.map((project) => (

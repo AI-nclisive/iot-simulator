@@ -12,22 +12,33 @@ import { act, cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+const noop = () => {};
+const mockAsyncNoop = async () => {};
+
+function makeDataSourcesStoreMock(overrides: Record<string, unknown> = {}) {
+  return vi.fn((selector: (s: Record<string, unknown>) => unknown) =>
+    selector({
+      dataSources: [],
+      isLoading: false,
+      error: null,
+      loadDataSources: mockAsyncNoop,
+      startDataSource: mockAsyncNoop,
+      stopDataSource: mockAsyncNoop,
+      duplicateDataSource: mockAsyncNoop,
+      deleteDataSource: mockAsyncNoop,
+      ...overrides,
+    }),
+  );
+}
+
 const mockShellStore = vi.fn((selector: (s: { accessMode: string; sharedRole: string; currentProjectId: string }) => unknown) =>
   selector({ accessMode: "local", sharedRole: "observer", currentProjectId: "p1" }),
 );
 vi.mock("../shell/shell-store", () => ({ useShellStore: mockShellStore }));
-
-const noop = () => {};
-const mockDataSourcesStore = vi.fn((selector: (s: Record<string, unknown>) => unknown) =>
-  selector({
-    dataSources: [],
-    startDataSource: noop,
-    stopDataSource: noop,
-    duplicateDataSource: noop,
-    deleteDataSource: noop,
-  }),
-);
-vi.mock("../shell/data-sources-store", () => ({ useDataSourcesStore: mockDataSourcesStore }));
+vi.mock("../shell/notification-store", () => ({
+  useNotificationStore: (selector: (s: Record<string, unknown>) => unknown) =>
+    selector({ push: noop }),
+}));
 
 vi.mock("react-router-dom", async () => {
   const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
@@ -39,15 +50,12 @@ afterEach(() => {
   vi.resetModules();
 });
 
-// ── DataSourcesListPage stale/error branches ─────────────────────────────────
+// ── DataSourcesListPage error/loading branches ──────────────────────────────
 
 describe("DataSourcesListPage — sourceListError", () => {
-  it("shows error panel when sourceListError is true", async () => {
-    vi.doMock("../shell/mock-workspace", () => ({
-      sourceListError: true,
-      sourceListStale: false,
-      mockExportShouldFail: false,
-      stopActionCopy: { title: "", message: "", confirmLabel: "" },
+  it("shows error panel when store has an error", async () => {
+    vi.doMock("../shell/data-sources-store", () => ({
+      useDataSourcesStore: makeDataSourcesStoreMock({ error: "Could not connect" }),
     }));
     const { DataSourcesListPage } = await import("./data-sources-list-page");
     render(<MemoryRouter><DataSourcesListPage /></MemoryRouter>);
@@ -56,28 +64,22 @@ describe("DataSourcesListPage — sourceListError", () => {
 });
 
 describe("DataSourcesListPage — sourceListStale", () => {
-  it("shows stale banner when sourceListStale is true", async () => {
-    vi.doMock("../shell/mock-workspace", () => ({
-      sourceListError: false,
-      sourceListStale: true,
-      mockExportShouldFail: false,
-      stopActionCopy: { title: "", message: "", confirmLabel: "" },
+  it("shows loading when isLoading is true", async () => {
+    vi.doMock("../shell/data-sources-store", () => ({
+      useDataSourcesStore: makeDataSourcesStoreMock({ isLoading: true }),
     }));
     const { DataSourcesListPage } = await import("./data-sources-list-page");
     render(<MemoryRouter><DataSourcesListPage /></MemoryRouter>);
-    expect(screen.getByText(/Source status may be outdated/)).toBeTruthy();
+    expect(screen.getByText("Loading…")).toBeTruthy();
   });
 
-  it("hides stale banner when sourceListStale is false", async () => {
-    vi.doMock("../shell/mock-workspace", () => ({
-      sourceListError: false,
-      sourceListStale: false,
-      mockExportShouldFail: false,
-      stopActionCopy: { title: "", message: "", confirmLabel: "" },
+  it("hides loading when isLoading is false", async () => {
+    vi.doMock("../shell/data-sources-store", () => ({
+      useDataSourcesStore: makeDataSourcesStoreMock({ isLoading: false }),
     }));
     const { DataSourcesListPage } = await import("./data-sources-list-page");
     render(<MemoryRouter><DataSourcesListPage /></MemoryRouter>);
-    expect(screen.queryByText(/Source status may be outdated/)).toBeNull();
+    expect(screen.queryByText("Loading…")).toBeNull();
   });
 });
 

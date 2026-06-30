@@ -5,6 +5,7 @@ import { type ProjectSummary } from "../shell/mock-workspace";
 import { resolveAccess } from "../shell/access-policy";
 import { useProjectsStore } from "../shell/projects-store";
 import { useShellStore } from "../shell/shell-store";
+import { useNotificationStore } from "../shell/notification-store";
 import { ConfirmationDialog } from "../ui/confirmation-dialog";
 import { SharedStatePanel } from "../ui/shared-state-panel";
 
@@ -253,13 +254,21 @@ export function ProjectEntryPage() {
   const sharedRole = useShellStore((state) => state.sharedRole);
   const setCurrentProjectId = useShellStore((state) => state.setCurrentProjectId);
   const projects = useProjectsStore((state) => state.projects);
+  const isLoading = useProjectsStore((state) => state.isLoading);
+  const error = useProjectsStore((state) => state.error);
+  const loadProjects = useProjectsStore((state) => state.loadProjects);
   const renameProject = useProjectsStore((state) => state.renameProject);
   const duplicateProject = useProjectsStore((state) => state.duplicateProject);
   const archiveProject = useProjectsStore((state) => state.archiveProject);
   const deleteProject = useProjectsStore((state) => state.deleteProject);
+  const push = useNotificationStore((state) => state.push);
   const access = resolveAccess(accessMode, sharedRole);
   const [importOpen, setImportOpen] = useState(false);
   const [lifecycleRequest, setLifecycleRequest] = useState<LifecycleRequest>(null);
+
+  useEffect(() => {
+    loadProjects();
+  }, [loadProjects]);
 
   function openProject(projectId: string) {
     setCurrentProjectId(projectId);
@@ -318,16 +327,47 @@ export function ProjectEntryPage() {
     return null;
   })();
 
-  function confirmLifecycleAction() {
+  async function confirmLifecycleAction() {
     if (!lifecycleRequest) return;
 
-    if (lifecycleRequest.action === "archive") {
-      archiveProject(lifecycleRequest.projectId);
-    } else if (lifecycleRequest.action === "delete") {
-      deleteProject(lifecycleRequest.projectId);
+    try {
+      if (lifecycleRequest.action === "archive") {
+        await archiveProject(lifecycleRequest.projectId);
+      } else if (lifecycleRequest.action === "delete") {
+        await deleteProject(lifecycleRequest.projectId);
+      }
+    } catch (err) {
+      const title = err instanceof Error ? err.message : "Action failed";
+      push({ tone: "error", title });
     }
 
     setLifecycleRequest(null);
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen px-3 py-3 text-shell-ink sm:px-4 lg:px-5">
+        <div className="mx-auto max-w-[1280px] pt-12">
+          <p className="text-sm text-shell-muted">Loading…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen px-3 py-3 text-shell-ink sm:px-4 lg:px-5">
+        <div className="mx-auto max-w-[1280px] pt-8">
+          <section className="shell-panel px-5 py-5">
+            <SharedStatePanel
+              message={error}
+              state="error"
+              title="Projects could not be loaded."
+            />
+          </section>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -440,7 +480,14 @@ export function ProjectEntryPage() {
                           <button
                             className="shell-text-action"
                             type="button"
-                            onClick={() => duplicateProject(project.id)}
+                            onClick={async () => {
+                              try {
+                                await duplicateProject(project.id);
+                              } catch (err) {
+                                const title = err instanceof Error ? err.message : "Duplicate failed";
+                                push({ tone: "error", title });
+                              }
+                            }}
                           >
                             Duplicate
                           </button>
@@ -498,8 +545,13 @@ export function ProjectEntryPage() {
         <RenameProjectDialog
           currentName={lifecycleRequest.currentName}
           onClose={() => setLifecycleRequest(null)}
-          onConfirm={(name) => {
-            renameProject(lifecycleRequest.projectId, name);
+          onConfirm={async (name) => {
+            try {
+              await renameProject(lifecycleRequest.projectId, name);
+            } catch (err) {
+              const title = err instanceof Error ? err.message : "Rename failed";
+              push({ tone: "error", title });
+            }
             setLifecycleRequest(null);
           }}
         />
