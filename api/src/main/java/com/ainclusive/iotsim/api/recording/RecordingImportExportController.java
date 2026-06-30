@@ -23,7 +23,7 @@ import org.springframework.web.multipart.MultipartFile;
  * Recording import and export endpoints (IS-070, backend-specs/05 &amp; 06):
  *
  * <ul>
- *   <li>{@code GET  /api/v1/projects/{projectId}/recordings/{id}/export} — build + stream a ZIP</li>
+ *   <li>{@code POST /api/v1/projects/{projectId}/recordings/{id}/export} — build + stream a ZIP</li>
  *   <li>{@code GET  /api/v1/projects/{projectId}/recordings/{id}/download} — stream a cached ZIP</li>
  *   <li>{@code POST /api/v1/projects/{projectId}/recordings/import} — multipart ZIP upload</li>
  * </ul>

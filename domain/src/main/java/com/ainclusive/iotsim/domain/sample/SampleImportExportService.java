@@ -320,10 +320,8 @@ public class SampleImportExportService {
                 .orElseThrow(() -> new ResourceNotFoundException("Sample", sampleId));
     }
 
-    private static final TypeReference<List<String>> TAG_LIST_TYPE = new TypeReference<>() {};
-
     private Sample map(SampleRow r) {
-        List<String> tags = json.readValue(r.tags() != null ? r.tags() : "[]", TAG_LIST_TYPE);
+        List<String> tags = json.readValue(r.tags() != null ? r.tags() : "[]", STRING_LIST);
         return new Sample(r.id(), r.projectId(), r.derivedFromRecordingId(), r.name(),
                 r.selection(), tags, r.createdAt().toInstant(), r.createdBy(), r.version());
     }
