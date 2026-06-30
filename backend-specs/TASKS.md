@@ -21,7 +21,7 @@ dependency-ordered. (Optimized for "make the simulator real end to end, then
 broaden, then harden for teams" — can be re-weighted if the near-term goal
 differs.)
 
-Snapshot: **build green.** 94 done · 25 todo (119 total). Live status is the board; this line is a periodic snapshot.
+Snapshot: **build green.** 94 done · 26 todo (120 total). Live status is the board; this line is a periodic snapshot.
 
 <details>
 <summary>ID crosswalk — legacy <code>BE-*</code> / <code>SDLC-*</code> → <code>IS-XXX</code></summary>
@@ -91,6 +91,7 @@ Tier 3 — quality automation:
 - [x] IS-107 [SDLC] ✅ JaCoCo coverage (XML+HTML) finalizing `test`
 - [x] IS-108 [SDLC] ✅ Dependabot (gradle + github-actions)
 - [x] IS-112 [SDLC] ✅ Claude PR code review (`anthropics/claude-code-action` on `pull_request`): reviews every PR diff against repo conventions, posts inline + verdict comments, and submits a formal review (APPROVE / REQUEST_CHANGES) that gates merge — the Claude GitHub App's APPROVE supplies branch protection's 1 required review; required check stays `build`. Auth = `CLAUDE_CODE_OAUTH_TOKEN` + Claude GitHub App — see `.github/OWNER_SETUP.md`
+- [ ] IS-121 [SDLC] ⬜ Web-layer (MockMvc) controller test harness — add `spring-boot-starter-test` to the `api` module + `@WebMvcTest` slice pattern (HTTP status via `GlobalExceptionHandler`, JSON, headers); backfill `ScenarioController` then other CRUD controllers. Split out of IS-085.
 
 Tier 4 — parallel-conflict mitigations:
 - [x] IS-109 [SDLC] ✅ Flyway migration version-collision convention (documented)
