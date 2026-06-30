@@ -1,6 +1,5 @@
 import { create } from "zustand";
 import type { AccessMode, SharedRole } from "./access-policy";
-import { projects } from "./mock-workspace";
 
 type ShellState = {
   accessMode: AccessMode;
@@ -15,7 +14,7 @@ type ShellState = {
 
 export const useShellStore = create<ShellState>((set) => ({
   accessMode: "local",
-  currentProjectId: projects[0].id,
+  currentProjectId: "",
   projectRailCollapsed: false,
   setAccessMode: (accessMode) => set({ accessMode }),
   setCurrentProjectId: (currentProjectId) => set({ currentProjectId }),

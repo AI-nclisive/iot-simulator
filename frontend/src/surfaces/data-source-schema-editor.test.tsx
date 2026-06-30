@@ -1,5 +1,5 @@
 /**
- * Tests for DataSourceSchemaEditor dependency warnings (UI-043)
+ * Tests for DataSourceSchemaEditor dependency warnings (UI-043, UI-097)
  *
  * Covers:
  * - No changes → no warnings returned
@@ -8,21 +8,79 @@
 
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type MockedFunction } from "vitest";
 import { detectDependencyWarnings, DataSourceSchemaEditor } from "./data-source-schema-editor";
 import type { SchemaParameter } from "./mock-schema-parameters";
 import type { DataSourceRow } from "./mock-data-sources";
+import { apiFetch } from "../api";
 
-// ---------------------------------------------------------------------------
-// Mock workspace lock so the editor is always unlocked in tests
-// ---------------------------------------------------------------------------
-vi.mock("../shell/mock-workspace", () => ({
-  mockSourceLock: "unlocked",
+vi.mock("../api", () => ({
+  apiFetch: vi.fn(),
+  ApiError: class ApiError extends Error {
+    constructor(
+      public readonly status: number,
+      public readonly title: string,
+      public readonly detail: string | undefined,
+      public readonly type: string | undefined,
+    ) {
+      super(title);
+      this.name = "ApiError";
+    }
+  },
+  mapProtocol: vi.fn(),
+  mapRuntimeStateToStatus: vi.fn(),
+  mapRuntimeStateToHealth: vi.fn(),
+  mapDataType: vi.fn((dt: string) => {
+    if (dt === "FLOAT32" || dt === "FLOAT64") return "float";
+    if (dt === "BOOL") return "bool";
+    if (dt === "STRING") return "string";
+    return "int";
+  }),
 }));
+
+const mockApiFetch = apiFetch as MockedFunction<typeof apiFetch>;
+
+// Mock schema response matching some parameters expected by the tests
+const mockSchemaResponse = {
+  id: "schema-1",
+  dataSourceId: "src-test",
+  version: 1,
+  nodes: [
+    {
+      nodeId: "p-001",
+      parentId: null,
+      path: "oven/zone[1]/temp",
+      name: "zone1.temp",
+      kind: "VARIABLE" as const,
+      dataType: "FLOAT32",
+      valueRank: null,
+      access: null,
+      unit: "°C",
+      description: "Zone 1 temperature sensor",
+    },
+    {
+      nodeId: "p-folder",
+      parentId: null,
+      path: "oven",
+      name: "oven",
+      kind: "FOLDER" as const,
+      dataType: null,
+      valueRank: null,
+      access: null,
+      unit: null,
+      description: null,
+    },
+  ],
+};
 
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+});
+
+beforeEach(() => {
+  // Return schema by default; individual tests can override
+  mockApiFetch.mockResolvedValue(mockSchemaResponse);
 });
 
 // ---------------------------------------------------------------------------
@@ -50,6 +108,8 @@ const mockSource: DataSourceRow = {
   status: "Active",
   health: "Healthy",
 };
+
+const PROJECT_ID = "proj-test";
 
 // ---------------------------------------------------------------------------
 // Unit tests for detectDependencyWarnings helper
@@ -81,8 +141,10 @@ describe("detectDependencyWarnings — description (identifier rename)", () => {
 
 describe("DataSourceSchemaEditor — dependency warnings in UI", () => {
   it("shows no warnings when no changes are made", async () => {
-    render(<DataSourceSchemaEditor source={mockSource} />);
+    render(<DataSourceSchemaEditor source={mockSource} projectId={PROJECT_ID} />);
 
+    // Wait for schema to load
+    await screen.findByText("oven/zone[1]/temp");
     await userEvent.click(screen.getByText("oven/zone[1]/temp"));
 
     // No Dependency impact section without changes
@@ -90,8 +152,9 @@ describe("DataSourceSchemaEditor — dependency warnings in UI", () => {
   });
 
   it("shows identifier warning after changing description", async () => {
-    render(<DataSourceSchemaEditor source={mockSource} />);
+    render(<DataSourceSchemaEditor source={mockSource} projectId={PROJECT_ID} />);
 
+    await screen.findByText("oven/zone[1]/temp");
     await userEvent.click(screen.getByText("oven/zone[1]/temp"));
 
     const descriptionInputs = screen.getAllByRole("textbox");
@@ -111,8 +174,9 @@ describe("DataSourceSchemaEditor — dependency warnings in UI", () => {
 describe("DataSourceSchemaEditor — onUnsavedChanges callback", () => {
   it("calls onUnsavedChanges(true) when a field is edited", async () => {
     const onUnsavedChanges = vi.fn();
-    render(<DataSourceSchemaEditor source={mockSource} onUnsavedChanges={onUnsavedChanges} />);
+    render(<DataSourceSchemaEditor source={mockSource} projectId={PROJECT_ID} onUnsavedChanges={onUnsavedChanges} />);
 
+    await screen.findByText("oven/zone[1]/temp");
     await userEvent.click(screen.getByText("oven/zone[1]/temp"));
     const unitInputs = screen.getAllByRole("textbox");
     const unitInput = unitInputs.find(
@@ -127,8 +191,9 @@ describe("DataSourceSchemaEditor — onUnsavedChanges callback", () => {
 
   it("calls onUnsavedChanges(false) after discarding changes", async () => {
     const onUnsavedChanges = vi.fn();
-    render(<DataSourceSchemaEditor source={mockSource} onUnsavedChanges={onUnsavedChanges} />);
+    render(<DataSourceSchemaEditor source={mockSource} projectId={PROJECT_ID} onUnsavedChanges={onUnsavedChanges} />);
 
+    await screen.findByText("oven/zone[1]/temp");
     await userEvent.click(screen.getByText("oven/zone[1]/temp"));
     const unitInputs = screen.getAllByRole("textbox");
     const unitInput = unitInputs.find(
@@ -147,16 +212,16 @@ describe("DataSourceSchemaEditor — onUnsavedChanges callback", () => {
 
   it("does not require onUnsavedChanges to be provided", async () => {
     expect(() =>
-      render(<DataSourceSchemaEditor source={mockSource} />),
+      render(<DataSourceSchemaEditor source={mockSource} projectId={PROJECT_ID} />),
     ).not.toThrow();
   });
 });
 
 describe("DataSourceSchemaEditor — ConfirmationDialog flow when saving with warnings", () => {
   it("clicking Save when dependency warnings are active opens the ConfirmationDialog", async () => {
-    render(<DataSourceSchemaEditor source={mockSource} />);
+    render(<DataSourceSchemaEditor source={mockSource} projectId={PROJECT_ID} />);
 
-    // Select zone1.temp and change description to trigger warning
+    await screen.findByText("oven/zone[1]/temp");
     await userEvent.click(screen.getByText("oven/zone[1]/temp"));
 
     const descriptionInputs = screen.getAllByRole("textbox");
@@ -178,8 +243,13 @@ describe("DataSourceSchemaEditor — ConfirmationDialog flow when saving with wa
   });
 
   it("confirming the ConfirmationDialog proceeds to save and closes the dialog", async () => {
-    render(<DataSourceSchemaEditor source={mockSource} />);
+    // PUT schema returns the schema response
+    mockApiFetch
+      .mockResolvedValueOnce(mockSchemaResponse) // GET schema on mount
+      .mockResolvedValueOnce(mockSchemaResponse); // PUT schema on save
+    render(<DataSourceSchemaEditor source={mockSource} projectId={PROJECT_ID} />);
 
+    await screen.findByText("oven/zone[1]/temp");
     await userEvent.click(screen.getByText("oven/zone[1]/temp"));
     const descriptionInputs = screen.getAllByRole("textbox");
     const descriptionInput = descriptionInputs.find(
@@ -199,8 +269,9 @@ describe("DataSourceSchemaEditor — ConfirmationDialog flow when saving with wa
   });
 
   it("cancelling the ConfirmationDialog does NOT save and leaves the form dirty", async () => {
-    render(<DataSourceSchemaEditor source={mockSource} />);
+    render(<DataSourceSchemaEditor source={mockSource} projectId={PROJECT_ID} />);
 
+    await screen.findByText("oven/zone[1]/temp");
     await userEvent.click(screen.getByText("oven/zone[1]/temp"));
     const descriptionInputs = screen.getAllByRole("textbox");
     const descriptionInput = descriptionInputs.find(

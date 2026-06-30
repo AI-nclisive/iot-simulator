@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { SharedStatePanel } from "../ui/shared-state-panel";
 import { getEventsForSource, type RuntimeEvent, type RuntimeEventLevel } from "./mock-source-events";
-import type { DataSourceRow } from "./mock-data-sources";
+import type { DataSourceRow } from "../shell/data-sources-store";
 
 function levelIcon(level: RuntimeEventLevel) {
   if (level === "error") return "●";

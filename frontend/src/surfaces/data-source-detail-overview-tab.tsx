@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import type { DataSourceRow } from "./mock-data-sources";
+import type { DataSourceRow } from "../shell/data-sources-store";
 
 function stateLabel(source: DataSourceRow) {
   return source.status === "Active" ? "Run" : "Off";

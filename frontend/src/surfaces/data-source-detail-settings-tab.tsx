@@ -2,11 +2,10 @@ import { useMemo, useState } from "react";
 import { resolveAccess } from "../shell/access-policy";
 import { useDataSourcesStore } from "../shell/data-sources-store";
 import { useShellStore } from "../shell/shell-store";
-import { mockSourceLock } from "../shell/mock-workspace";
 import { EditLockBanner, type EditLockState } from "../ui/edit-lock-banner";
 import { SharedStatePanel } from "../ui/shared-state-panel";
 import { StatusBadge } from "../ui/status-badge";
-import type { DataSourceRow } from "./mock-data-sources";
+import type { DataSourceRow } from "../shell/data-sources-store";
 
 function endpointIsValid(endpoint: string) {
   return endpoint.trim().length > 0 && !endpoint.includes(" ");
@@ -26,18 +25,7 @@ export function DataSourceDetailSettingsTab({
   const [name, setName] = useState(source.name);
   const [endpoint, setEndpoint] = useState(source.endpoint);
   const [savedMessage, setSavedMessage] = useState("");
-  const [lockState, setLockState] = useState<EditLockState>(() => {
-    if (mockSourceLock === "locked-by-self") {
-      return { kind: "locked-by-self", since: "just now", onRelease: () => setLockState({ kind: "unlocked" }) };
-    }
-    if (mockSourceLock === "locked-by-other") {
-      return { kind: "locked-by-other", owner: "Alex M.", since: "3 min ago" };
-    }
-    if (mockSourceLock === "stale") {
-      return { kind: "stale", owner: "Jordan K.", since: "18 min ago", onTake: () => setLockState({ kind: "locked-by-self", since: "just now", onRelease: () => setLockState({ kind: "unlocked" }) }) };
-    }
-    return { kind: "unlocked" };
-  });
+  const [lockState, setLockState] = useState<EditLockState>({ kind: "unlocked" });
 
   const isLockedByOther = lockState.kind === "locked-by-other" || lockState.kind === "stale";
 

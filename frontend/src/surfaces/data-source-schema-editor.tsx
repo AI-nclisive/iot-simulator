@@ -2,9 +2,45 @@ import { useEffect, useState } from "react";
 import { EditLockBanner, EditLockState } from "../ui/edit-lock-banner";
 import { StatusBadge } from "../ui/status-badge";
 import { ConfirmationDialog } from "../ui/confirmation-dialog";
-import { mockSourceLock } from "../shell/mock-workspace";
-import { getParametersForSource, SchemaParameter } from "./mock-schema-parameters";
+import { apiFetch, ApiError, mapDataType } from "../api";
 import type { DataSourceRow } from "./mock-data-sources";
+import type { ParameterType, SchemaParameter } from "./mock-schema-parameters";
+
+// Backend schema shapes from GET/PUT /api/v1/projects/{pid}/data-sources/{id}/schema
+type NodeDto = {
+  nodeId: string;
+  parentId: string | null;
+  path: string;
+  name: string;
+  kind: "FOLDER" | "VARIABLE";
+  dataType: string | null;
+  valueRank: string | null;
+  access: string | null;
+  unit: string | null;
+  description: string | null;
+};
+
+type SchemaResponse = {
+  id: string;
+  dataSourceId: string;
+  version: number;
+  nodes: NodeDto[];
+};
+
+function mapNode(node: NodeDto): SchemaParameter {
+  const rawType = node.dataType
+    ? mapDataType(node.dataType as Parameters<typeof mapDataType>[0])
+    : null;
+  const type: ParameterType = rawType ?? "string";
+  return {
+    id: node.nodeId,
+    name: node.name,
+    path: node.path,
+    type,
+    unit: node.unit ?? "",
+    description: node.description ?? "",
+  };
+}
 
 type EditBuffer = {
   description: string;
@@ -37,9 +73,11 @@ export function detectDependencyWarnings(
 
 export function DataSourceSchemaEditor({
   source,
+  projectId,
   onUnsavedChanges,
 }: {
   source: DataSourceRow;
+  projectId?: string;
   onUnsavedChanges?: (has: boolean) => void;
 }) {
   const [selectedParam, setSelectedParam] = useState<SchemaParameter | null>(null);
@@ -55,23 +93,36 @@ export function DataSourceSchemaEditor({
   });
   const [saving, setSaving] = useState(false);
   const [confirmSaveOpen, setConfirmSaveOpen] = useState(false);
+  const [allParams, setAllParams] = useState<SchemaParameter[]>([]);
+  const [schemaLoading, setSchemaLoading] = useState(false);
+  const [schemaError, setSchemaError] = useState<string | null>(null);
+
+  // Load schema from API when source / projectId is available
+  useEffect(() => {
+    if (!projectId || !source.id) return;
+    setSchemaLoading(true);
+    setSchemaError(null);
+    apiFetch<SchemaResponse>(
+      `/api/v1/projects/${projectId}/data-sources/${source.id}/schema`,
+    )
+      .then((resp) => {
+        setAllParams(resp.nodes.filter((n) => n.kind === "VARIABLE").map(mapNode));
+      })
+      .catch((err) => {
+        const msg = err instanceof ApiError ? err.title : "Failed to load schema";
+        setSchemaError(msg);
+      })
+      .finally(() => setSchemaLoading(false));
+  }, [source.id, projectId]);
 
   useEffect(() => {
     onUnsavedChanges?.(hasUnsavedChanges);
   }, [hasUnsavedChanges, onUnsavedChanges]);
 
-  const lockState: EditLockState =
-    mockSourceLock === "locked-by-other"
-      ? { kind: "locked-by-other", owner: "Jordan K.", since: "14:31" }
-      : mockSourceLock === "stale"
-        ? { kind: "stale", owner: "Jordan K.", since: "14:31", onTake: () => {} }
-        : mockSourceLock === "locked-by-self"
-          ? { kind: "locked-by-self", since: "14:31", onRelease: () => {} }
-          : { kind: "unlocked" };
-  const isLockedByOther =
-    lockState.kind === "locked-by-other" || lockState.kind === "stale";
+  // TODO(UI-097): no backend lock field — lock state is not yet exposed by the API
+  const lockState: EditLockState = { kind: "unlocked" };
+  const isLockedByOther = false;
 
-  const allParams = getParametersForSource(source.id);
   const filteredParams = allParams.filter(
     (p) =>
       searchQuery === "" ||
@@ -96,13 +147,46 @@ export function DataSourceSchemaEditor({
     setEditBuffer((curr) => ({ ...curr, ...patch }));
   }
 
-  function executeSave() {
+  async function executeSave() {
+    if (!projectId || !source.id || !selectedParam) return;
     setSaving(true);
-    setTimeout(() => {
-      setSaving(false);
+    try {
+      // Build updated nodes list with description/unit patched for selected param
+      const updatedNodes: NodeDto[] = allParams.map((p) => ({
+        nodeId: p.id,
+        parentId: null, // TODO(UI-097): no parentId round-tripped through FE state
+        path: p.path,
+        name: p.name,
+        kind: "VARIABLE" as const,
+        dataType: null, // TODO(UI-097): type round-trip not supported yet
+        valueRank: null,
+        access: null,
+        unit: p.id === selectedParam.id ? editBuffer.unit : p.unit,
+        description: p.id === selectedParam.id ? editBuffer.description : p.description,
+      }));
+      await apiFetch<SchemaResponse>(
+        `/api/v1/projects/${projectId}/data-sources/${source.id}/schema`,
+        {
+          method: "PUT",
+          body: JSON.stringify({ nodes: updatedNodes }),
+        },
+      );
+      // Update local state
+      setAllParams((prev) =>
+        prev.map((p) =>
+          p.id === selectedParam.id
+            ? { ...p, description: editBuffer.description, unit: editBuffer.unit }
+            : p,
+        ),
+      );
       setHasUnsavedChanges(false);
       setOriginalBuffer(editBuffer);
-    }, 800);
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.title : "Failed to save schema";
+      setSchemaError(msg);
+    } finally {
+      setSaving(false);
+    }
   }
 
   function handleSave() {
@@ -123,6 +207,18 @@ export function DataSourceSchemaEditor({
       setEditBuffer(originalBuffer);
     }
     setHasUnsavedChanges(false);
+  }
+
+  if (schemaLoading) {
+    return <p className="text-sm text-shell-muted">Loading schema…</p>;
+  }
+
+  if (schemaError) {
+    return (
+      <p className="text-sm text-shell-danger" role="alert">
+        {schemaError}
+      </p>
+    );
   }
 
   return (
