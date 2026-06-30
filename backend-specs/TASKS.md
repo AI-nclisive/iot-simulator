@@ -21,8 +21,7 @@ dependency-ordered. (Optimized for "make the simulator real end to end, then
 broaden, then harden for teams" — can be re-weighted if the near-term goal
 differs.)
 
-Snapshot: **build green, 186 tests / 41 suites, 0 skipped.** 66 done · 1 partial ·
-49 todo (116 total). Live status is the board; this line is a periodic snapshot.
+Snapshot: **build green.** 67 done · 1 partial · 50 todo (117 total). Live status is the board; this line is a periodic snapshot.
 
 <details>
 <summary>ID crosswalk — legacy <code>BE-*</code> / <code>SDLC-*</code> → <code>IS-XXX</code></summary>
@@ -194,6 +193,7 @@ import/export. Modbus moved to Wave G (deferred) — see the note there.
 - [ ] IS-072 [BE] ⬜ [project] Archive project — SPEC: Manage Projects
 - [ ] IS-073 [BE] ⬜ [io] Project export/import (versioned ZIP+manifest, secret-free) — 06
 - [ ] IS-074 [BE] ⬜ [api] Cursor pagination + filtering on collections — 05
+- [ ] IS-119 [BE] ⬜ [runtime] Run synthetic source — continuous live feed (Model B / real-time pacing); low priority, pairs with IS-069 — 02
 
 ## Wave E — Shared-team & security · P1→P2
 
