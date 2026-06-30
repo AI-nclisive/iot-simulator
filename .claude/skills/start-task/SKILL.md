@@ -3,8 +3,9 @@ name: start-task
 description: >-
   Claim and start a board task BEFORE writing any code. Use at the very
   beginning of work on an IS-XXX (backend/SDLC) or UI-XXX (frontend) task:
-  verifies the task is free, flips the board Status to In Progress, and creates
-  the linked feature branch. Invoke as `/start-task IS-038` (or UI-012).
+  verifies the task is free, flips the board Status to In Progress, assigns the
+  issue to you, and creates the linked feature branch. Invoke as
+  `/start-task IS-038` (or UI-012).
 ---
 
 # Start a task (claim-first)
@@ -39,13 +40,19 @@ Stop and report if any check fails; do not claim a taken task.
 
 The catalog checkbox alone is NOT proof of freedom — it can lag the board.
 
-## 2. Claim it — flip board Status → In Progress (FIRST, before any code)
+## 2. Claim it — flip board Status → In Progress AND assign yourself (FIRST, before any code)
 
 This is the opening action, never a backfill. A late flip leaves the board on
-`Todo` and misleads others into taking a claimed task.
+`Todo` and misleads others into taking a claimed task. Assign the issue to
+yourself in the same step: the board Status and the issue assignee are the two
+places contributors look to see who owns a task — flip both together so the
+claim is unambiguous.
 
 ```bash
 ISSUE=<issue#>
+# a) assign the issue to yourself
+gh issue edit "$ISSUE" --add-assignee @me
+# b) flip the board Status to In Progress
 ITEM_ID=$(gh project item-list 1 --owner AI-nclisive --format json --limit 500 \
   | jq -r ".items[] | select(.content.number==$ISSUE) | .id")
 gh project item-edit --id "$ITEM_ID" --project-id PVT_kwDOEatAic4BbjmE \
