@@ -26,7 +26,7 @@ public class SyntheticSourceController {
     @PostMapping
     public ResponseEntity<DataSourceResponse> create(
             @PathVariable String projectId, @RequestBody CreateSyntheticSourceRequest req) {
-        if (req == null || req.name() == null || req.name().isBlank()) {
+        if (req.name() == null || req.name().isBlank()) {
             throw new IllegalArgumentException("name is required");
         }
         if (req.protocol() == null || req.protocol().isBlank()) {
