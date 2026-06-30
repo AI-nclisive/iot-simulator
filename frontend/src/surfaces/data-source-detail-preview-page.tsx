@@ -268,6 +268,12 @@ export function DataSourceDetailPreviewPage() {
           </Link>
         </div>
 
+        {!sourceStarted && !access.isSharedUser ? (
+          <p className="mt-4 text-sm leading-6 text-shell-muted">
+            Start the source to enable recording and replay.
+          </p>
+        ) : null}
+
         {access.isSharedUser ? (
           <p className="mt-4 text-sm leading-6 text-shell-muted">
             Shared User can inspect this source, but configuration and runtime setup

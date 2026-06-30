@@ -352,14 +352,25 @@ export function RecordingsPage() {
         </div>
       </section>
 
-      <section className="shell-panel px-5 py-5">
-        {/* Loading / error states */}
-        {isLoading ? (
-          <p className="text-sm text-shell-muted">Loading recordings…</p>
-        ) : storeError ? (
-          <p className="text-sm text-red-600" role="alert">{storeError}</p>
-        ) : null}
+      {isLoading ? (
+        <section className="shell-panel px-5 py-5">
+          <SharedStatePanel
+            message="Loading recordings and samples from the project."
+            state="loading"
+            title="Loading recordings…"
+          />
+        </section>
+      ) : storeError ? (
+        <section className="shell-panel px-5 py-5">
+          <SharedStatePanel
+            message={storeError}
+            state="error"
+            title="Recordings could not be loaded."
+          />
+        </section>
+      ) : null}
 
+      <section className="shell-panel px-5 py-5">
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-3">
           <input
