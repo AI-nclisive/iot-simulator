@@ -113,19 +113,9 @@ export const useDataSourcesStore = create<DataSourcesState>((set, get) => ({
 
   duplicateDataSource: async (rowId, projectId) => {
     const pid = projectId ?? get().currentProjectId;
-    const source = get().dataSources.find((r) => r.id === rowId);
-    if (!source) return;
     const data = await apiFetch<DataSourceResponse>(
-      `/api/v1/projects/${pid}/data-sources`,
-      {
-        method: "POST",
-        body: JSON.stringify({
-          name: `${source.name} copy`,
-          endpoint: source.endpoint,
-          protocol: backendProtocol(source.protocol),
-          basis: "MANUAL",
-        }),
-      },
+      `/api/v1/projects/${pid}/data-sources/${rowId}/duplicate`,
+      { method: "POST" },
     );
     const row = mapDataSource(data);
     set((state) => ({ dataSources: [...state.dataSources, row] }));
