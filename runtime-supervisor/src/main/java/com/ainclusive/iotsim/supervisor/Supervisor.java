@@ -10,6 +10,7 @@ import com.ainclusive.iotsim.platform.runtime.HealthOrigin;
 import com.ainclusive.iotsim.platform.runtime.LiveValueListener;
 import com.ainclusive.iotsim.platform.runtime.RuntimeActivityEvent;
 import com.ainclusive.iotsim.platform.runtime.RuntimeActivityListener;
+import com.ainclusive.iotsim.platform.runtime.RuntimeCapacityException;
 import com.ainclusive.iotsim.platform.runtime.RuntimeController;
 import com.ainclusive.iotsim.platform.runtime.RuntimeStartSpec;
 import com.ainclusive.iotsim.platform.runtime.SourceError;
@@ -50,6 +51,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -99,6 +101,10 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
     private final LiveValueListener valueListener;
     private final ScheduledExecutorService scheduler;
     private final Map<String, ManagedWorker> running = new ConcurrentHashMap<>();
+    /** Admission permits; {@code null} when unlimited. One permit == one occupied slot. */
+    private final Semaphore admissionPermits;
+    /** The configured cap, for the refusal message. {@code <= 0} means unlimited. */
+    private final int workerCap;
     private volatile boolean closed;
 
     public Supervisor(WorkerLauncher launcher) {
@@ -146,6 +152,23 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
             ClientActivityListener clientActivityListener,
             RuntimeActivityListener runtimeActivityListener,
             LiveValueListener valueListener) {
+        this(launcher, restartPolicy, healthPolicy, clientActivityListener,
+                runtimeActivityListener, valueListener, ResourceGovernancePolicy.DEFAULT);
+    }
+
+    /** Convenience for tests/callers tuning only restart + governance. */
+    public Supervisor(WorkerLauncher launcher, RestartPolicy restartPolicy,
+            ResourceGovernancePolicy governance) {
+        this(launcher, restartPolicy, HealthPolicy.DEFAULT, ClientActivityListener.NONE,
+                RuntimeActivityListener.NONE, LiveValueListener.NONE, governance);
+    }
+
+    /** Canonical constructor: all collaborators plus the resource-governance policy (IS-061). */
+    public Supervisor(WorkerLauncher launcher, RestartPolicy restartPolicy, HealthPolicy healthPolicy,
+            ClientActivityListener clientActivityListener,
+            RuntimeActivityListener runtimeActivityListener,
+            LiveValueListener valueListener,
+            ResourceGovernancePolicy governance) {
         this.launcher = launcher;
         this.restartPolicy = restartPolicy;
         this.healthPolicy = healthPolicy;
@@ -154,6 +177,9 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
         this.runtimeActivityListener = runtimeActivityListener == null
                 ? RuntimeActivityListener.NONE : runtimeActivityListener;
         this.valueListener = valueListener == null ? LiveValueListener.NONE : valueListener;
+        ResourceGovernancePolicy gov = governance == null ? ResourceGovernancePolicy.DEFAULT : governance;
+        this.workerCap = gov.maxConcurrentWorkers();
+        this.admissionPermits = gov.isLimited() ? new Semaphore(gov.maxConcurrentWorkers()) : null;
         AtomicInteger seq = new AtomicInteger();
         // One pool serves restarts and the health-monitoring loop; sized so a probe
         // (bounded by HealthPolicy.probeTimeout) cannot starve a pending restart.
@@ -186,6 +212,18 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
         }
     }
 
+    /** Reserve a slot for a new worker. Always succeeds when unlimited. */
+    private boolean tryAdmit() {
+        return admissionPermits == null || admissionPermits.tryAcquire();
+    }
+
+    /** Release a previously reserved slot. No-op when unlimited. */
+    private void releaseAdmission() {
+        if (admissionPermits != null) {
+            admissionPermits.release();
+        }
+    }
+
     @Override
     public String start(String dataSourceId, RuntimeStartSpec spec) {
         if (closed) {
@@ -201,8 +239,22 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
             if (existing != null && existing.isActive()) {
                 return existing;
             }
+            // Admission control (IS-061): a genuinely new worker needs a free slot.
+            // A recovering worker keeps the permit it already holds, so only fresh
+            // launches are gated here.
+            if (!tryAdmit()) {
+                throw new RuntimeCapacityException(
+                        "concurrent-source cap reached (" + workerCap
+                                + "); stop a running source or raise "
+                                + "iotsim.runtime.governance.max-concurrent-workers");
+            }
             ManagedWorker worker = new ManagedWorker(id, spec);
-            worker.launchAndStart();
+            try {
+                worker.launchAndStart();
+            } catch (RuntimeException e) {
+                worker.releaseSlot(); // a failed launch must not hold a slot
+                throw e;
+            }
             launched.set(worker);
             return worker;
         });
@@ -641,6 +693,7 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
         private boolean stopping;
         private ScheduledFuture<?> pendingRestart;
         private int healthFailures;
+        private final AtomicBoolean slotReleased = new AtomicBoolean();
         private volatile WorkerState state = WorkerState.SPAWNED;
         private volatile boolean stale;
         private volatile SourceError lastError;
@@ -796,6 +849,7 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
                 state = WorkerState.EXITED; // exhausted -> reported as ERROR
                 lastError = new SourceError(HealthOrigin.SIMULATOR,
                         "restart budget exhausted after " + restarts + " attempts", Instant.now());
+                releaseSlot();
                 return true;
             }
             restarts++;
@@ -808,6 +862,7 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
                 state = WorkerState.EXITED; // scheduler shutting down; nothing more to try
                 lastError = new SourceError(HealthOrigin.SIMULATOR,
                         "supervisor shutting down", Instant.now());
+                releaseSlot();
                 return true;
             }
             return false;
@@ -862,6 +917,7 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
                 client = null;
                 cancelStreams();
             }
+            releaseSlot();
             // Tear down outside the lock; onWorkerExit will see stopping=true and skip restart.
             // cancel(true) also interrupts a restart whose handshake is already in flight,
             // so stop() returns promptly instead of waiting out the ready-timeout.
@@ -934,6 +990,13 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
                 emitHealthEvent("SOURCE_STALE", reason);
             } else if (recovered) {
                 emitHealthEvent("SOURCE_RECOVERED", "health restored");
+            }
+        }
+
+        /** Releases this worker's admission permit exactly once (IS-061). */
+        private void releaseSlot() {
+            if (slotReleased.compareAndSet(false, true)) {
+                releaseAdmission();
             }
         }
 
