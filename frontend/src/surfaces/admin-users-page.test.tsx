@@ -15,13 +15,15 @@
  * - Role change activity panel: pre-seeded entries visible on load
  * - Role change activity panel: new entry prepended after a successful change
  * - Role change activity panel: no new entry added when save fails
+ * - Role change activity panel: shows empty state when log is empty
+ * - Role change activity panel: cancel does not mutate the activity log
  */
 
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { setMockUserSaveShouldFail } from "./mock-users";
+import { resetInitialRoleChangeLog, setInitialRoleChangeLog, setMockUserSaveShouldFail } from "./mock-users";
 import { AdminUsersPage } from "./admin-users-page";
 
 const { mockShellStore } = vi.hoisted(() => ({ mockShellStore: vi.fn() }));
@@ -48,6 +50,7 @@ afterEach(() => {
   cleanup();
   vi.clearAllMocks();
   setMockUserSaveShouldFail(false);
+  resetInitialRoleChangeLog();
 });
 
 beforeEach(() => {
@@ -282,5 +285,32 @@ describe("AdminUsersPage — role change activity (UI-083)", () => {
     const log = screen.getByRole("list", { name: /role change log/i });
     expect(log.textContent).toMatch(/Admin/);
     expect(log.textContent).toMatch(/User/);
+  });
+
+  it("shows empty state when no role changes have been made", () => {
+    setInitialRoleChangeLog([]);
+    setupStore();
+    renderPage();
+    const panel = screen.getByRole("region", { name: /role change activity/i });
+    expect(panel).toBeTruthy();
+    expect(panel.textContent).toMatch(/Role changes made by admins will appear here/);
+    expect(screen.queryByRole("list", { name: /role change log/i })).toBeNull();
+  });
+
+  it("cancel does not mutate the activity log", async () => {
+    setupStore();
+    renderPage();
+    const logBefore = within(
+      screen.getByRole("list", { name: /role change log/i }),
+    ).getAllByRole("listitem");
+    const countBefore = logBefore.length;
+
+    await userEvent.click(screen.getAllByRole("button", { name: /make admin/i })[0]);
+    await userEvent.click(screen.getByRole("button", { name: /cancel/i }));
+
+    const logAfter = within(
+      screen.getByRole("list", { name: /role change log/i }),
+    ).getAllByRole("listitem");
+    expect(logAfter.length).toBe(countBefore);
   });
 });

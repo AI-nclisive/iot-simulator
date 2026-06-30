@@ -50,6 +50,18 @@ export const initialRoleChangeLog: RoleChangeEntry[] = [
   },
 ];
 
+const _originalRoleChangeLog = initialRoleChangeLog.slice();
+
+/** Replace the contents of initialRoleChangeLog in tests (e.g. empty it to test the empty-state UI). */
+export function setInitialRoleChangeLog(entries: RoleChangeEntry[]) {
+  initialRoleChangeLog.splice(0, initialRoleChangeLog.length, ...entries);
+}
+
+/** Reset initialRoleChangeLog to its original seeded state after a test. */
+export function resetInitialRoleChangeLog() {
+  initialRoleChangeLog.splice(0, initialRoleChangeLog.length, ..._originalRoleChangeLog);
+}
+
 export const mockUsers: UserRow[] = [
   {
     id: "u-001",
