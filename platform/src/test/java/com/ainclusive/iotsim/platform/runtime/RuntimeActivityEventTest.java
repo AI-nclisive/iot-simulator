@@ -33,4 +33,19 @@ class RuntimeActivityEventTest {
         assertThatThrownBy(() -> new RuntimeActivityEvent("ds1", "T", null, null))
                 .isInstanceOf(NullPointerException.class);
     }
+
+    @Test
+    void fourArgConstructorDefaultsOriginToNull() {
+        RuntimeActivityEvent e =
+                new RuntimeActivityEvent("ds1", "SOURCE_START", Instant.ofEpochSecond(5), null);
+        assertThat(e.origin()).isNull();
+    }
+
+    @Test
+    void carriesExplicitOrigin() {
+        RuntimeActivityEvent e = new RuntimeActivityEvent(
+                "ds1", "SOURCE_STALE", Instant.ofEpochSecond(5), "no health response",
+                HealthOrigin.SIMULATOR);
+        assertThat(e.origin()).isEqualTo(HealthOrigin.SIMULATOR);
+    }
 }
