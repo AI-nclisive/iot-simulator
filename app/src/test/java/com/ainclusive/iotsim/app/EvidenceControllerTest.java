@@ -10,6 +10,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.ainclusive.iotsim.api.evidence.EvidenceController;
+import com.ainclusive.iotsim.domain.evidence.EvidenceBundle;
+import com.ainclusive.iotsim.domain.evidence.EvidenceFormat;
 import com.ainclusive.iotsim.domain.evidence.EvidenceService;
 import com.ainclusive.iotsim.domain.evidence.EvidenceView;
 import java.io.ByteArrayInputStream;
@@ -74,8 +76,9 @@ class EvidenceControllerTest {
     }
 
     @Test
-    void exportReturnsTerminalStatus() throws Exception {
-        given(service.export("p1", "ev-1")).willReturn(view("ev-1", "READY", "evidence/ev-1/bundle.zip"));
+    void exportDefaultsToBundleFormat() throws Exception {
+        given(service.export("p1", "ev-1", EvidenceFormat.BUNDLE))
+                .willReturn(view("ev-1", "READY", "evidence/ev-1/bundle.zip"));
 
         MvcResult result = mvc.perform(post("/api/v1/projects/p1/evidence/ev-1/export"))
                 .andExpect(status().isOk())
@@ -84,10 +87,20 @@ class EvidenceControllerTest {
     }
 
     @Test
+    void exportHonorsTheFormatParameter() throws Exception {
+        given(service.export("p1", "ev-1", EvidenceFormat.SUMMARY))
+                .willReturn(view("ev-1", "READY", "evidence/ev-1/summary.json"));
+
+        mvc.perform(post("/api/v1/projects/p1/evidence/ev-1/export").param("format", "SUMMARY"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void downloadStreamsTheBundleAsZipAttachment() throws Exception {
         byte[] zip = "PK fake-zip".getBytes(StandardCharsets.UTF_8);
         given(service.openBundle(eq("p1"), eq("ev-1")))
-                .willReturn(Optional.of(new ByteArrayInputStream(zip)));
+                .willReturn(Optional.of(
+                        new EvidenceBundle(new ByteArrayInputStream(zip), "application/zip", "evidence-ev-1.zip")));
 
         MvcResult result = mvc.perform(get("/api/v1/projects/p1/evidence/ev-1/download"))
                 .andExpect(status().isOk())
@@ -96,6 +109,19 @@ class EvidenceControllerTest {
                         "attachment; filename=\"evidence-ev-1.zip\""))
                 .andReturn();
         assertThat(result.getResponse().getContentAsByteArray()).isEqualTo(zip);
+    }
+
+    @Test
+    void downloadServesJsonContentTypeForSummaryArtifact() throws Exception {
+        byte[] summary = "{\"summary\":{}}".getBytes(StandardCharsets.UTF_8);
+        given(service.openBundle(eq("p1"), eq("ev-1"))).willReturn(Optional.of(
+                new EvidenceBundle(new ByteArrayInputStream(summary), "application/json", "evidence-ev-1.json")));
+
+        mvc.perform(get("/api/v1/projects/p1/evidence/ev-1/download"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Type", "application/json"))
+                .andExpect(header().string("Content-Disposition",
+                        "attachment; filename=\"evidence-ev-1.json\""));
     }
 
     @Test

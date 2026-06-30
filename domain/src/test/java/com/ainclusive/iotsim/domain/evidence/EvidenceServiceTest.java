@@ -15,11 +15,11 @@ import com.ainclusive.iotsim.persistence.timeline.ValueTimelineRepository;
 import com.ainclusive.iotsim.platform.storage.ObjectStore;
 import com.ainclusive.iotsim.protocolmodel.NeutralValue;
 import com.ainclusive.iotsim.protocolmodel.Quality;
+import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,11 +38,12 @@ class EvidenceServiceTest {
     private final FakeRuntimeEvents runtimeEvents = new FakeRuntimeEvents();
     private final FakeClients clients = new FakeClients();
     private final FakeObjectStore objectStore = new FakeObjectStore();
-    private final EvidenceArtifactWriter writer = new ZipEvidenceArtifactWriter(new ObjectMapper());
+    private final EvidenceArtifactWriter bundleWriter = new ZipEvidenceArtifactWriter(new ObjectMapper());
+    private final EvidenceArtifactWriter summaryWriter = new JsonSummaryEvidenceWriter(new ObjectMapper());
 
     private EvidenceService service() {
         return new EvidenceService(evidence, runs, timeline, runtimeEvents, clients,
-                writer, objectStore, new ObjectMapper());
+                List.of(bundleWriter, summaryWriter), objectStore, new ObjectMapper());
     }
 
     @Test
@@ -98,7 +99,7 @@ class EvidenceServiceTest {
     void exportWritesBundleToObjectStoreAndMarksReady() {
         seedReplayEvidence("COMPLETED");
 
-        EvidenceView result = service().export("p1", "ev-1");
+        EvidenceView result = service().export("p1", "ev-1", EvidenceFormat.BUNDLE);
 
         assertThat(objectStore.lastKey).isEqualTo("evidence/ev-1/bundle.zip");
         assertThat(objectStore.lastContentType).isEqualTo("application/zip");
@@ -109,25 +110,52 @@ class EvidenceServiceTest {
     }
 
     @Test
+    void exportSummaryStoresJsonArtifact() {
+        seedReplayEvidence("COMPLETED");
+
+        EvidenceView result = service().export("p1", "ev-1", EvidenceFormat.SUMMARY);
+
+        assertThat(objectStore.lastKey).isEqualTo("evidence/ev-1/summary.json");
+        assertThat(objectStore.lastContentType).isEqualTo("application/json");
+        assertThat(result.status()).isEqualTo("READY");
+        assertThat(result.objectRef()).isEqualTo("evidence/ev-1/summary.json");
+    }
+
+    @Test
+    void openBundleReportsContentTypeFromStoredArtifact() {
+        seedReplayEvidence("COMPLETED");
+        service().export("p1", "ev-1", EvidenceFormat.SUMMARY);
+
+        EvidenceBundle bundle = service().openBundle("p1", "ev-1").orElseThrow();
+
+        assertThat(bundle.contentType()).isEqualTo("application/json");
+        assertThat(bundle.filename()).isEqualTo("evidence-ev-1.json");
+    }
+
+    @Test
     void exportMarksEvidenceFailedWhenWriterThrows() {
         seedReplayEvidence("COMPLETED");
         EvidenceArtifactWriter boom = new EvidenceArtifactWriter() {
-            public void write(EvidenceContent c, java.io.OutputStream o) {
-                throw new IllegalStateException("disk full");
+            public EvidenceFormat format() {
+                return EvidenceFormat.BUNDLE;
             }
 
-            public String formatVersion() {
-                return "1.0.0";
+            public void write(EvidenceContent c, java.io.OutputStream o) {
+                throw new IllegalStateException("disk full");
             }
 
             public String contentType() {
                 return "application/zip";
             }
+
+            public String artifactFilename() {
+                return "bundle.zip";
+            }
         };
         EvidenceService svc = new EvidenceService(evidence, runs, timeline, runtimeEvents, clients,
-                boom, objectStore, new ObjectMapper());
+                List.of(boom), objectStore, new ObjectMapper());
 
-        EvidenceView result = svc.export("p1", "ev-1");
+        EvidenceView result = svc.export("p1", "ev-1", EvidenceFormat.BUNDLE);
 
         assertThat(result.status()).isEqualTo("EXPORT_FAILED");
         assertThat(result.objectRef()).isNull();
@@ -294,14 +322,14 @@ class EvidenceServiceTest {
         String lastKey;
         byte[] lastBytes;
         String lastContentType;
-        final List<String> stored = new ArrayList<>();
+        final Map<String, byte[]> blobs = new HashMap<>();
 
         public String put(String key, InputStream content, long sizeBytes, String contentType) {
             try {
                 this.lastKey = key;
                 this.lastBytes = content.readAllBytes();
                 this.lastContentType = contentType;
-                this.stored.add(key);
+                this.blobs.put(key, this.lastBytes);
                 return key;
             } catch (java.io.IOException e) {
                 throw new java.io.UncheckedIOException(e);
@@ -309,7 +337,7 @@ class EvidenceServiceTest {
         }
 
         public Optional<InputStream> get(String ref) {
-            throw new UnsupportedOperationException();
+            return Optional.ofNullable(blobs.get(ref)).map(ByteArrayInputStream::new);
         }
 
         public boolean delete(String ref) {

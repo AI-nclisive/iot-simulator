@@ -14,10 +14,11 @@ import com.ainclusive.iotsim.platform.storage.ObjectStore;
 import com.ainclusive.iotsim.protocolmodel.NeutralValue;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.InputStream;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
@@ -41,20 +42,21 @@ public class EvidenceService {
     private final ValueTimelineRepository timeline;
     private final RuntimeEventRepository runtimeEvents;
     private final ClientConnectionRepository clients;
-    private final EvidenceArtifactWriter writer;
+    private final Map<EvidenceFormat, EvidenceArtifactWriter> writers;
     private final ObjectStore objectStore;
     private final ObjectMapper json;
 
     public EvidenceService(EvidenceRepository evidence, RunRepository runs,
             ValueTimelineRepository timeline, RuntimeEventRepository runtimeEvents,
-            ClientConnectionRepository clients, EvidenceArtifactWriter writer,
+            ClientConnectionRepository clients, List<EvidenceArtifactWriter> writers,
             ObjectStore objectStore, ObjectMapper json) {
         this.evidence = evidence;
         this.runs = runs;
         this.timeline = timeline;
         this.runtimeEvents = runtimeEvents;
         this.clients = clients;
-        this.writer = writer;
+        this.writers = new EnumMap<>(EvidenceFormat.class);
+        writers.forEach(w -> this.writers.put(w.format(), w));
         this.objectStore = objectStore;
         this.json = json;
     }
@@ -69,9 +71,20 @@ public class EvidenceService {
         return row(projectId, evidenceId).map(EvidenceView::from);
     }
 
-    /** Opens the exported bundle for download, or empty if not exported / blob missing. */
-    public Optional<InputStream> openBundle(String projectId, String evidenceId) {
-        return row(projectId, evidenceId).map(EvidenceRow::objectRef).flatMap(objectStore::get);
+    /** Opens the exported artifact for download (with its content-type), or empty if not exported. */
+    public Optional<EvidenceBundle> openBundle(String projectId, String evidenceId) {
+        return row(projectId, evidenceId)
+                .filter(e -> e.objectRef() != null)
+                .flatMap(e -> objectStore.get(e.objectRef()).map(in -> new EvidenceBundle(
+                        in, contentTypeFor(e.objectRef()), "evidence-" + evidenceId + extensionFor(e.objectRef()))));
+    }
+
+    private static String contentTypeFor(String objectRef) {
+        return objectRef.endsWith(".json") ? "application/json" : "application/zip";
+    }
+
+    private static String extensionFor(String objectRef) {
+        return objectRef.endsWith(".json") ? ".json" : ".zip";
     }
 
     private Optional<EvidenceRow> row(String projectId, String evidenceId) {
@@ -122,7 +135,7 @@ public class EvidenceService {
         String scenarioId = run != null ? run.scenarioId() : null;
         ScenarioMetadata scenario = scenarioId == null ? null : new ScenarioMetadata(scenarioId, null);
         EvidenceManifest manifest = new EvidenceManifest(
-                writer.formatVersion(),
+                EvidenceArtifactWriter.FORMAT_VERSION,
                 run != null ? run.id() : ev.runId(),
                 run != null ? run.kind() : null,
                 run != null ? run.trigger() : null,
@@ -133,19 +146,24 @@ public class EvidenceService {
     }
 
     /**
-     * Assembles, serializes and stores the artifact, then records the terminal status:
-     * {@code READY} (or {@code PARTIAL} for an incomplete run) on success, or
-     * {@code EXPORT_FAILED} if assembly/serialization/storage fails (re-invoke to retry).
+     * Assembles, serializes (in the requested {@link EvidenceFormat}) and stores the
+     * artifact, then records the terminal status: {@code READY} (or {@code PARTIAL} for
+     * an incomplete run) on success, or {@code EXPORT_FAILED} if assembly/serialization/
+     * storage fails (re-invoke to retry).
      */
-    public EvidenceView export(String projectId, String evidenceId) {
+    public EvidenceView export(String projectId, String evidenceId, EvidenceFormat format) {
         row(projectId, evidenceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Evidence", evidenceId));
+        EvidenceArtifactWriter writer = writers.get(format);
+        if (writer == null) {
+            throw new IllegalArgumentException("unsupported evidence format: " + format);
+        }
         try {
             EvidenceContent content = assemble(evidenceId);
-            byte[] bundle = serialize(content);
-            String key = "evidence/" + evidenceId + "/bundle.zip";
+            byte[] artifact = serialize(content, writer);
+            String key = "evidence/" + evidenceId + "/" + writer.artifactFilename();
             String ref = objectStore.put(
-                    key, new ByteArrayInputStream(bundle), bundle.length, writer.contentType());
+                    key, new ByteArrayInputStream(artifact), artifact.length, writer.contentType());
             evidence.updateManifest(evidenceId, json.writeValueAsString(content.manifest()));
             // evidence.status has no FAILED value (CAPTURING|READY|PARTIAL|EXPORT_FAILED); a
             // failed/incomplete run exports as PARTIAL, with manifest.completeness carrying the detail.
@@ -159,7 +177,7 @@ public class EvidenceService {
         }
     }
 
-    private byte[] serialize(EvidenceContent content) {
+    private static byte[] serialize(EvidenceContent content, EvidenceArtifactWriter writer) {
         ByteArrayOutputStream buffer = new ByteArrayOutputStream();
         writer.write(content, buffer);
         return buffer.toByteArray();

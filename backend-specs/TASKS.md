@@ -173,7 +173,7 @@ Make runs observable and produce the P0 evidence artifact.
 - [x] IS-055 [BE] ✅ [observ] Runtime-event history — SPEC: Runtime Event History
 - [x] IS-056 [BE] ✅ [persist] ObjectStore filesystem adapter — 08
 - [x] IS-057 [BE] ✅ [observ] Evidence assembly + export — SPEC: Export Run Evidence (P0)
-- [ ] IS-058 [BE] ⬜ [io] Evidence export format (bundle + JSON summary) — 06
+- [x] IS-058 [BE] ✅ [io] Evidence export format (bundle + JSON summary) — 06
 
 ## Wave D — Modbus + creation/reuse breadth · P1
 
