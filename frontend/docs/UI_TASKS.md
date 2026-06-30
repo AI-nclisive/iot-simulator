@@ -756,7 +756,7 @@ Parallel execution:
   Depends: `UI-096`; backend IS-055 (✅).
   Done when: Events tab shows real runtime events; live events append without duplicates; mock-source-events.ts removed; no TypeScript errors.
 
-- [ ] `UI-107` Wire project overview counts to /projects/overview
+- [x] `UI-107` Wire project overview counts to /projects/overview
   Goal: replace hardcoded-0 count badges in projects-store.ts with data from GET /api/v1/projects/overview.
   Surface: `Project Entry` — source/artifact count badges
   Work includes: call GET /api/v1/projects/overview after loadProjects; merge by projectId into ProjectSummary; expose sourcesNeedingAttention as optional badge; lastActivity stays updatedAt (no backend field — comment clearly).
@@ -776,6 +776,7 @@ Parallel execution:
   Work includes: store raw NodeDto[] from GET in editor state alongside EditBuffer; executeSave builds PUT payload from original NodeDto + applied edits — nothing dropped; DataType mapping on save: float→FLOAT64, int→INT32, bool→BOOL, string→STRING; BYTES/DATETIME preserved as-is (no FE type, read-only); ETag/If-Match correctly threaded.
   Depends: `UI-096`.
   Done when: GET→PUT round-trip preserves FOLDER nodes, parentId, valueRank, access; editing unit/description works; BYTES/DATETIME shown read-only; no TypeScript errors.
+
 
 ## Recommended Sequence
 

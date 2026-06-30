@@ -4,6 +4,7 @@ export type ProjectSummary = {
   configuredSources: number;
   runningSources: number;
   reusableArtifacts: number;
+  sourcesNeedingAttention?: number;
   lastActivity: string;
 };
 
