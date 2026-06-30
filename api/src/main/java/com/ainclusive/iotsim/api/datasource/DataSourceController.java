@@ -5,8 +5,15 @@ import com.ainclusive.iotsim.api.support.ConnectionConfigRequest;
 import com.ainclusive.iotsim.api.support.CredentialRequests;
 import com.ainclusive.iotsim.domain.datasource.DataSource;
 import com.ainclusive.iotsim.domain.datasource.DataSourceService;
+import com.ainclusive.iotsim.domain.support.Page;
+import com.ainclusive.iotsim.protocolmodel.Access;
+import com.ainclusive.iotsim.protocolmodel.DataType;
+import com.ainclusive.iotsim.protocolmodel.NodeKind;
+import com.ainclusive.iotsim.protocolmodel.SchemaNode;
+import com.ainclusive.iotsim.protocolmodel.ValueRank;
 import java.net.URI;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -17,6 +24,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -35,8 +43,13 @@ public class DataSourceController {
     }
 
     @GetMapping
-    public List<DataSourceResponse> list(@PathVariable String projectId) {
-        return dataSources.list(projectId).stream().map(DataSourceResponse::from).toList();
+    public Page<DataSourceResponse> list(
+            @PathVariable String projectId,
+            @RequestParam(required = false) String protocol,
+            @RequestParam(required = false) String cursor,
+            @RequestParam(required = false) Integer limit) {
+        return dataSources.listPaged(projectId, protocol, cursor, limit)
+                .map(DataSourceResponse::from);
     }
 
     @PostMapping
@@ -45,9 +58,13 @@ public class DataSourceController {
         require(req != null && notBlank(req.name()), "name is required");
         require(notBlank(req.protocol()), "protocol is required");
         require(notBlank(req.basis()), "basis is required");
+        List<SchemaNode> initialNodes = req.initialSchema() != null && !req.initialSchema().isEmpty()
+                ? toNodes(req.initialSchema())
+                : null;
         DataSource ds = dataSources.create(
                 projectId, req.name(), req.protocol(), req.basis(),
-                req.endpoint(), req.runtimeConfig(), CredentialRequests.toCredentials(req.connectionConfig()), "local");
+                req.endpoint(), req.runtimeConfig(), CredentialRequests.toCredentials(req.connectionConfig()),
+                initialNodes, "local");
         return ResponseEntity.created(
                         URI.create("/api/v1/projects/" + projectId + "/data-sources/" + ds.id()))
                 .eTag(etag(ds.version()))
@@ -88,6 +105,20 @@ public class DataSourceController {
         return ResponseEntity.ok().eTag(etag(ds.version())).body(DataSourceResponse.from(ds));
     }
 
+    /**
+     * Deep-copies an existing data source within the same project.
+     * The copy gets a new ID, name {@code "<original name> (copy)"}, enabled=false, and STOPPED state.
+     * Schema nodes are copied when present. Returns 201 with the new resource. See IS-066.
+     */
+    @PostMapping("/{id}/duplicate")
+    public ResponseEntity<DataSourceResponse> duplicate(@PathVariable String projectId, @PathVariable String id) {
+        DataSource ds = dataSources.duplicate(projectId, id, "local");
+        return ResponseEntity.created(
+                        URI.create("/api/v1/projects/" + projectId + "/data-sources/" + ds.id()))
+                .eTag(etag(ds.version()))
+                .body(DataSourceResponse.from(ds));
+    }
+
     @PostMapping("/{id}/start")
     public ResponseEntity<DataSourceResponse> start(@PathVariable String projectId, @PathVariable String id) {
         DataSource ds = dataSources.start(projectId, id);
@@ -98,6 +129,42 @@ public class DataSourceController {
     public ResponseEntity<DataSourceResponse> stop(@PathVariable String projectId, @PathVariable String id) {
         DataSource ds = dataSources.stop(projectId, id);
         return ResponseEntity.ok().eTag(etag(ds.version())).body(DataSourceResponse.from(ds));
+    }
+
+    private static List<SchemaNode> toNodes(List<NodeDto> dtos) {
+        List<SchemaNode> nodes = new ArrayList<>(dtos.size());
+        for (NodeDto d : dtos) {
+            requireText(d.nodeId(), "nodeId");
+            requireText(d.path(), "path");
+            requireText(d.name(), "name");
+            NodeKind kind = parseEnum(NodeKind.class, d.kind(), "kind");
+            DataType dataType = d.dataType() == null ? null : parseEnum(DataType.class, d.dataType(), "dataType");
+            ValueRank valueRank =
+                    d.valueRank() == null ? null : parseEnum(ValueRank.class, d.valueRank(), "valueRank");
+            Access access = d.access() == null ? null : parseEnum(Access.class, d.access(), "access");
+            if (kind == NodeKind.VARIABLE && (dataType == null || valueRank == null || access == null)) {
+                throw new IllegalArgumentException(
+                        "variable node '" + d.path() + "' requires dataType, valueRank and access");
+            }
+            nodes.add(new SchemaNode(
+                    d.nodeId(), d.parentId(), d.path(), d.name(),
+                    kind, dataType, valueRank, access, d.unit(), d.description()));
+        }
+        return nodes;
+    }
+
+    private static void requireText(String value, String field) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(field + " is required");
+        }
+    }
+
+    private static <E extends Enum<E>> E parseEnum(Class<E> type, String value, String field) {
+        try {
+            return Enum.valueOf(type, value);
+        } catch (IllegalArgumentException | NullPointerException e) {
+            throw new IllegalArgumentException("invalid " + field + ": " + value);
+        }
     }
 
     private static void require(boolean condition, String message) {
@@ -127,9 +194,13 @@ public class DataSourceController {
         }
     }
 
+    public record NodeDto(
+            String nodeId, String parentId, String path, String name, String kind,
+            String dataType, String valueRank, String access, String unit, String description) {}
+
     public record CreateDataSourceRequest(
             String name, String protocol, String basis, String endpoint, String runtimeConfig,
-            ConnectionConfigRequest connectionConfig) {}
+            ConnectionConfigRequest connectionConfig, List<NodeDto> initialSchema) {}
 
     public record UpdateDataSourceRequest(
             String name, String endpoint, String runtimeConfig, Boolean enabled,

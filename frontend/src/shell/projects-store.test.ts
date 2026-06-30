@@ -5,7 +5,7 @@
  * Covers:
  * - loadProjects: sets projects from API, handles error
  * - renameProject: updates project name via PUT
- * - duplicateProject: adds a copy via POST copy endpoint (or fallback)
+ * - duplicateProject: adds a copy via POST /projects/{id}/duplicate
  * - archiveProject: moves project to archivedProjects
  * - deleteProject: permanently removes from projects list
  */
@@ -126,7 +126,7 @@ describe("renameProject", () => {
 });
 
 describe("duplicateProject", () => {
-  it("adds a copy via the copy endpoint", async () => {
+  it("calls POST /projects/{id}/duplicate and adds the copy to the list", async () => {
     useProjectsStore.setState({
       projects: [
         { id: "p1", name: "Alpha", configuredSources: 0, runningSources: 0, reusableArtifacts: 0, lastActivity: "" },
@@ -135,30 +135,18 @@ describe("duplicateProject", () => {
     });
     mockApiFetch.mockResolvedValueOnce(makeProjectResponse({ id: "p1-copy", name: "Alpha (copy)" }));
     await useProjectsStore.getState().duplicateProject("p1");
+    expect(mockApiFetch).toHaveBeenCalledWith(
+      "/api/v1/projects/p1/duplicate",
+      expect.objectContaining({ method: "POST" }),
+    );
     expect(useProjectsStore.getState().projects).toHaveLength(2);
     expect(useProjectsStore.getState().projects[1].name).toBe("Alpha (copy)");
   });
 
-  it("falls back to POST /api/v1/projects when copy endpoint fails", async () => {
-    useProjectsStore.setState({
-      projects: [
-        { id: "p1", name: "Alpha", configuredSources: 0, runningSources: 0, reusableArtifacts: 0, lastActivity: "" },
-      ],
-      archivedProjects: [],
-    });
-    // First call (copy endpoint) fails, second (fallback POST) succeeds
-    mockApiFetch
-      .mockRejectedValueOnce(new Error("Not found"))
-      .mockResolvedValueOnce(makeProjectResponse({ id: "p1-copy2", name: "Alpha (copy)" }));
-    await useProjectsStore.getState().duplicateProject("p1");
-    expect(useProjectsStore.getState().projects).toHaveLength(2);
-  });
-
-  it("does nothing when project id is not found", async () => {
+  it("propagates the error when the API call fails", async () => {
     useProjectsStore.setState({ projects: [], archivedProjects: [] });
-    await useProjectsStore.getState().duplicateProject("does-not-exist");
-    expect(useProjectsStore.getState().projects).toHaveLength(0);
-    expect(mockApiFetch).not.toHaveBeenCalled();
+    mockApiFetch.mockRejectedValueOnce(new Error("Not found"));
+    await expect(useProjectsStore.getState().duplicateProject("no-such-id")).rejects.toThrow("Not found");
   });
 });
 

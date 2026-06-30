@@ -97,4 +97,22 @@ class EvidenceRepositoryIT {
         assertThat(rows).extracting(EvidenceRow::id).containsExactlyInAnyOrder(first.id(), second.id());
         assertThat(rows).isSortedAccordingTo(comparing(EvidenceRow::createdAt).reversed());
     }
+
+    @Test
+    void findByProjectPagedReturnsBatchNewestFirst() {
+        String project = projects.insert("Paged", null, "it").id();
+        EvidenceRow a = evidence.create(project, null, "it");
+        EvidenceRow b = evidence.create(project, null, "it");
+        EvidenceRow c = evidence.create(project, null, "it");
+
+        List<EvidenceRow> page1 = evidence.findByProjectPaged(project, null, null, 2);
+        assertThat(page1).hasSize(2);
+        assertThat(page1.get(0).id()).isEqualTo(c.id());
+        assertThat(page1.get(1).id()).isEqualTo(b.id());
+
+        EvidenceRow last = page1.get(page1.size() - 1);
+        List<EvidenceRow> page2 = evidence.findByProjectPaged(project, last.createdAt(), last.id(), 2);
+        assertThat(page2).extracting(EvidenceRow::id).contains(a.id());
+        assertThat(page2).extracting(EvidenceRow::id).doesNotContain(b.id(), c.id());
+    }
 }

@@ -1,5 +1,6 @@
 package com.ainclusive.iotsim.platform.runtime;
 
+import com.ainclusive.iotsim.protocolmodel.DeterministicSettings;
 import com.ainclusive.iotsim.protocolmodel.SchemaNode;
 import java.util.List;
 
@@ -12,9 +13,15 @@ public record RuntimeStartSpec(
         String protocol,
         int schemaVersion,
         List<SchemaNode> schemaNodes,
-        int listenPort) {
+        int listenPort,
+        DeterministicSettings deterministicSettings) {
 
     public RuntimeStartSpec {
         schemaNodes = schemaNodes == null ? List.of() : List.copyOf(schemaNodes);
+    }
+
+    /** Convenience constructor for callers that do not supply deterministic settings. */
+    public RuntimeStartSpec(String protocol, int schemaVersion, List<SchemaNode> schemaNodes, int listenPort) {
+        this(protocol, schemaVersion, schemaNodes, listenPort, null);
     }
 }

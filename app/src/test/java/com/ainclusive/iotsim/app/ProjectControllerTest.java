@@ -104,6 +104,46 @@ class ProjectControllerTest {
     }
 
     @Test
+    void duplicateHappyPathReturns201WithLocation() {
+        Instant now = Instant.now();
+        Project copy = new Project("p2", "Line 1 (copy)", "desc",
+                Project.ProjectStatus.ACTIVE, now, now, "local", 0);
+        given(service.duplicate("p1")).willReturn(copy);
+        ResponseEntity<ProjectResponse> resp = controller.duplicate("p1");
+        assertThat(resp.getStatusCode().value()).isEqualTo(201);
+        assertThat(resp.getHeaders().getLocation()).hasPath("/api/v1/projects/p2");
+        assertThat(resp.getHeaders().getETag()).isEqualTo("\"0\"");
+        assertThat(resp.getBody()).isNotNull();
+        assertThat(resp.getBody().name()).isEqualTo("Line 1 (copy)");
+    }
+
+    @Test
+    void duplicateMissingSourcePropagatesNotFound() {
+        given(service.duplicate("missing")).willThrow(new ResourceNotFoundException("Project", "missing"));
+        assertThatThrownBy(() -> controller.duplicate("missing"))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void archiveHappyPathReturns200WithArchivedStatus() {
+        Instant now = Instant.now();
+        Project archived = new Project("p1", "Line 1", "desc",
+                Project.ProjectStatus.ARCHIVED, now, now, "local", 0);
+        given(service.archive("p1")).willReturn(archived);
+        ResponseEntity<ProjectResponse> resp = controller.archive("p1");
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(resp.getBody()).isNotNull();
+        assertThat(resp.getBody().status()).isEqualTo("ARCHIVED");
+    }
+
+    @Test
+    void archiveMissingProjectPropagatesNotFound() {
+        given(service.archive("missing")).willThrow(new ResourceNotFoundException("Project", "missing"));
+        assertThatThrownBy(() -> controller.archive("missing"))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
     void exceptionHandlerMapsStatuses() {
         assertThat(handler.notFound(new ResourceNotFoundException("Project", "x")).getStatus())
                 .isEqualTo(HttpStatus.NOT_FOUND.value());

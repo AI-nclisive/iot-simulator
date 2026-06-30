@@ -2,6 +2,7 @@ package com.ainclusive.iotsim.persistence.project;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.List;
 import java.util.Optional;
 import org.flywaydb.core.Flyway;
 import org.jooq.DSLContext;
@@ -59,5 +60,28 @@ class ProjectRepositoryIT {
         ProjectRow created = repository.insert("Stale", null, "bob");
         Optional<ProjectRow> result = repository.update(created.id(), "x", null, 999);
         assertThat(result).isEmpty();
+    }
+
+    @Test
+    void findAllPagedReturnsBatchNewestFirst() {
+        ProjectRow a = repository.insert("Paged-A", null, "it");
+        ProjectRow b = repository.insert("Paged-B", null, "it");
+        ProjectRow c = repository.insert("Paged-C", null, "it");
+
+        List<ProjectRow> page1 = repository.findAllPaged(null, null, null, 2);
+        assertThat(page1).hasSize(2);
+        // newest first
+        assertThat(page1.get(0).id()).isEqualTo(c.id());
+        assertThat(page1.get(1).id()).isEqualTo(b.id());
+
+        // second page using keyset cursor from last item of page1
+        ProjectRow last = page1.get(page1.size() - 1);
+        List<ProjectRow> page2 = repository.findAllPaged(null, last.createdAt(), last.id(), 2);
+        assertThat(page2).extracting(ProjectRow::id).contains(a.id());
+        assertThat(page2).extracting(ProjectRow::id).doesNotContain(b.id(), c.id());
+
+        repository.deleteById(a.id());
+        repository.deleteById(b.id());
+        repository.deleteById(c.id());
     }
 }

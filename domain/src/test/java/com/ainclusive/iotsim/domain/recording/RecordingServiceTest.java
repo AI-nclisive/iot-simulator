@@ -6,6 +6,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRepository;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRow;
+import com.ainclusive.iotsim.persistence.project.ProjectRepository;
+import com.ainclusive.iotsim.persistence.project.ProjectRow;
 import com.ainclusive.iotsim.persistence.recording.RecordingRepository;
 import com.ainclusive.iotsim.persistence.recording.RecordingRow;
 import com.ainclusive.iotsim.persistence.schema.SchemaRepository;
@@ -57,7 +59,8 @@ class RecordingServiceTest {
                 sources,
                 schemas,
                 new InMemoryCredentialStore(),
-                capturer);
+                capturer,
+                fakeProjects());
     }
 
     @Test
@@ -151,6 +154,64 @@ class RecordingServiceTest {
                 .hasMessageContaining("no active capture");
     }
 
+    @Test
+    void listPagedThrowsNotFoundForMissingProject() {
+        assertThatThrownBy(() -> service.listPaged("no-such-project", null, null))
+                .isInstanceOf(com.ainclusive.iotsim.domain.common.ResourceNotFoundException.class);
+    }
+
+    @Test
+    void listPagedEmitsCursorWhenResultsExceedLimit() {
+        service.create(PROJECT, SOURCE, "alice");
+        service.create(PROJECT, SOURCE, "bob");
+        service.create(PROJECT, SOURCE, "carol");
+
+        // fakeProjects returns empty → requireProject throws; rebuild with a present project repo
+        ProjectRepository existingProject = new ProjectRepository() {
+            @Override public Optional<ProjectRow> findById(String id) {
+                return PROJECT.equals(id)
+                        ? Optional.of(new ProjectRow(id, "n", null, "ACTIVE",
+                                OffsetDateTime.now(ZoneOffset.UTC), null, "it", 0))
+                        : Optional.empty();
+            }
+            @Override public ProjectRow insert(String n, String d, String c) { throw new UnsupportedOperationException(); }
+            @Override public List<ProjectRow> findAll() { return List.of(); }
+            @Override public List<ProjectRow> findAllPaged(String s, OffsetDateTime a, String i, int l) { return List.of(); }
+            @Override public Optional<ProjectRow> update(String id, String n, String d, long v) { throw new UnsupportedOperationException(); }
+            @Override public Optional<ProjectRow> archive(String id) { throw new UnsupportedOperationException(); }
+            @Override public boolean deleteById(String id) { throw new UnsupportedOperationException(); }
+        };
+        // share the same InMemoryRecordingRepository used by `service`
+        InMemoryRecordingRepository recRepo = new InMemoryRecordingRepository();
+        RecordingService svc = new RecordingService(recRepo,
+                new InMemoryValueTimelineRepository(), sources, schemas,
+                new com.ainclusive.iotsim.platform.secret.InMemoryCredentialStore(),
+                capturer, existingProject);
+        svc.create(PROJECT, SOURCE, "alice");
+        svc.create(PROJECT, SOURCE, "bob");
+        svc.create(PROJECT, SOURCE, "carol");
+
+        com.ainclusive.iotsim.domain.support.Page<Recording> page = svc.listPaged(PROJECT, null, 2);
+        assertThat(page.items()).hasSize(2);
+        assertThat(page.nextCursor()).isNotNull();
+
+        com.ainclusive.iotsim.domain.support.Page<Recording> page2 = svc.listPaged(PROJECT, page.nextCursor(), 2);
+        assertThat(page2.items()).hasSize(1);
+        assertThat(page2.nextCursor()).isNull();
+    }
+
+    private static ProjectRepository fakeProjects() {
+        return new ProjectRepository() {
+            @Override public Optional<ProjectRow> findById(String id) { return Optional.empty(); }
+            @Override public ProjectRow insert(String n, String d, String c) { throw new UnsupportedOperationException(); }
+            @Override public List<ProjectRow> findAll() { return List.of(); }
+            @Override public List<ProjectRow> findAllPaged(String s, java.time.OffsetDateTime a, String i, int l) { return List.of(); }
+            @Override public Optional<ProjectRow> update(String id, String n, String d, long v) { throw new UnsupportedOperationException(); }
+            @Override public Optional<ProjectRow> archive(String id) { throw new UnsupportedOperationException(); }
+            @Override public boolean deleteById(String id) { throw new UnsupportedOperationException(); }
+        };
+    }
+
     private static SchemaNode variable(String nodeId, DataType type) {
         return new SchemaNode(nodeId, null, "/" + nodeId, nodeId, NodeKind.VARIABLE,
                 type, ValueRank.SCALAR, Access.READ, null, null);
@@ -220,6 +281,19 @@ class RecordingServiceTest {
         @Override
         public List<RecordingRow> findByProject(String projectId) {
             return rows.values().stream().filter(r -> r.projectId().equals(projectId)).toList();
+        }
+
+        @Override
+        public List<RecordingRow> findByProjectPaged(String projectId,
+                OffsetDateTime afterAt, String afterId, int limit) {
+            return rows.values().stream()
+                    .filter(r -> r.projectId().equals(projectId))
+                    .filter(r -> afterAt == null || r.createdAt().isBefore(afterAt)
+                            || (r.createdAt().isEqual(afterAt) && r.id().compareTo(afterId) < 0))
+                    .sorted(java.util.Comparator.comparing(RecordingRow::createdAt).reversed()
+                            .thenComparing(java.util.Comparator.comparing(RecordingRow::id).reversed()))
+                    .limit(limit)
+                    .toList();
         }
 
         @Override
@@ -294,8 +368,19 @@ class RecordingServiceTest {
         }
 
         @Override
+        public List<DataSourceRow> findByProjectPaged(String projectId, String protocol,
+                OffsetDateTime afterAt, String afterId, int limit) {
+            return List.of();
+        }
+
+        @Override
         public Optional<DataSourceRow> update(String id, String name, String endpointJson,
                 String runtimeConfigJson, boolean enabled, long expectedVersion) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Optional<DataSourceRow> duplicate(String sourceId, String newName, String createdBy) {
             throw new UnsupportedOperationException();
         }
 

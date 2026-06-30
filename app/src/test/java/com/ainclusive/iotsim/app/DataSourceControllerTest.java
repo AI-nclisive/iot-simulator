@@ -12,6 +12,7 @@ import static org.mockito.Mockito.verify;
 import com.ainclusive.iotsim.api.datasource.DataSourceController;
 import com.ainclusive.iotsim.api.datasource.DataSourceController.CreateDataSourceRequest;
 import com.ainclusive.iotsim.api.datasource.DataSourceController.DataSourceResponse;
+import com.ainclusive.iotsim.api.datasource.DataSourceController.NodeDto;
 import com.ainclusive.iotsim.api.error.PreconditionRequiredException;
 import com.ainclusive.iotsim.api.support.ConnectionConfigRequest;
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
@@ -23,6 +24,7 @@ import com.ainclusive.iotsim.domain.datasource.RuntimeState;
 import com.ainclusive.iotsim.domain.datasource.SourceBasis;
 import com.ainclusive.iotsim.platform.secret.ConnectionCredentials;
 import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -54,10 +56,10 @@ class DataSourceControllerTest {
 
     @Test
     void createReturns201WithEtag() {
-        given(service.create(eq(PROJECT), any(), any(), any(), any(), any(), any(), any()))
+        given(service.create(eq(PROJECT), any(), any(), any(), any(), any(), any(), any(), any()))
                 .willReturn(sample(0, RuntimeState.STOPPED));
         ResponseEntity<DataSourceResponse> resp = controller.create(
-                PROJECT, new CreateDataSourceRequest("Pump", "OPC_UA", "MANUAL", null, null, null));
+                PROJECT, new CreateDataSourceRequest("Pump", "OPC_UA", "MANUAL", null, null, null, null));
         assertThat(resp.getStatusCode().value()).isEqualTo(201);
         assertThat(resp.getHeaders().getETag()).isEqualTo("\"0\"");
         assertThat(resp.getBody()).isNotNull();
@@ -69,28 +71,28 @@ class DataSourceControllerTest {
     @Test
     void createWithBlankNameThrowsBadRequest() {
         assertThatThrownBy(() -> controller.create(
-                PROJECT, new CreateDataSourceRequest(" ", "OPC_UA", "MANUAL", null, null, null)))
+                PROJECT, new CreateDataSourceRequest(" ", "OPC_UA", "MANUAL", null, null, null, null)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void createWithMissingProtocolThrowsBadRequest() {
         assertThatThrownBy(() -> controller.create(
-                PROJECT, new CreateDataSourceRequest("Pump", null, "MANUAL", null, null, null)))
+                PROJECT, new CreateDataSourceRequest("Pump", null, "MANUAL", null, null, null, null)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void createPassesSessionCredentialsToServiceButResponseNeverEchoesTheSecret() {
-        given(service.create(eq(PROJECT), any(), any(), any(), any(), any(), any(), any()))
+        given(service.create(eq(PROJECT), any(), any(), any(), any(), any(), any(), any(), any()))
                 .willReturn(sample(0, RuntimeState.STOPPED, CredentialState.SESSION_ONLY));
         ConnectionConfigRequest cfg = new ConnectionConfigRequest("password", "operator", "s3cr3t", null);
 
         ResponseEntity<DataSourceResponse> resp = controller.create(
-                PROJECT, new CreateDataSourceRequest("Pump", "OPC_UA", "MANUAL", null, null, cfg));
+                PROJECT, new CreateDataSourceRequest("Pump", "OPC_UA", "MANUAL", null, null, cfg, null));
 
         ArgumentCaptor<ConnectionCredentials> creds = ArgumentCaptor.forClass(ConnectionCredentials.class);
-        verify(service).create(eq(PROJECT), any(), any(), any(), any(), any(), creds.capture(), any());
+        verify(service).create(eq(PROJECT), any(), any(), any(), any(), any(), creds.capture(), any(), any());
         assertThat(creds.getValue().mode()).isEqualTo(ConnectionCredentials.Mode.PASSWORD);
         assertThat(creds.getValue().secret()).isEqualTo("s3cr3t");
 
@@ -104,7 +106,7 @@ class DataSourceControllerTest {
     void createWithUnknownCredentialModeThrowsBadRequest() {
         ConnectionConfigRequest cfg = new ConnectionConfigRequest("totally-bogus", null, null, null);
         assertThatThrownBy(() -> controller.create(
-                PROJECT, new CreateDataSourceRequest("Pump", "OPC_UA", "MANUAL", null, null, cfg)))
+                PROJECT, new CreateDataSourceRequest("Pump", "OPC_UA", "MANUAL", null, null, cfg, null)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -155,53 +157,54 @@ class DataSourceControllerTest {
     @Test
     void createWithMissingBasisThrowsBadRequest() {
         assertThatThrownBy(() -> controller.create(
-                PROJECT, new CreateDataSourceRequest("Pump", "OPC_UA", null, null, null, null)))
+                PROJECT, new CreateDataSourceRequest("Pump", "OPC_UA", null, null, null, null, null)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void createMapsHyphenatedExternalRefModeToExternalRefCredentials() {
-        given(service.create(eq(PROJECT), any(), any(), any(), any(), any(), any(), any()))
+        given(service.create(eq(PROJECT), any(), any(), any(), any(), any(), any(), any(), any()))
                 .willReturn(sample(0, RuntimeState.STOPPED, CredentialState.SESSION_ONLY));
         // The UI sends "external-ref" (hyphen); the controller normalizes it to EXTERNAL_REF.
         ConnectionConfigRequest cfg = new ConnectionConfigRequest("external-ref", null, null, "vault://pump");
 
-        controller.create(PROJECT, new CreateDataSourceRequest("Pump", "OPC_UA", "MANUAL", null, null, cfg));
+        controller.create(PROJECT, new CreateDataSourceRequest("Pump", "OPC_UA", "MANUAL", null, null, cfg, null));
 
         ArgumentCaptor<ConnectionCredentials> creds = ArgumentCaptor.forClass(ConnectionCredentials.class);
-        verify(service).create(eq(PROJECT), any(), any(), any(), any(), any(), creds.capture(), any());
+        verify(service).create(eq(PROJECT), any(), any(), any(), any(), any(), creds.capture(), any(), any());
         assertThat(creds.getValue().mode()).isEqualTo(ConnectionCredentials.Mode.EXTERNAL_REF);
         assertThat(creds.getValue().secretRef()).isEqualTo("vault://pump");
     }
 
     @Test
     void createMapsBlankAndAnonymousModesToAnonymousCredentialsCaseInsensitively() {
-        given(service.create(eq(PROJECT), any(), any(), any(), any(), any(), any(), any()))
+        given(service.create(eq(PROJECT), any(), any(), any(), any(), any(), any(), any(), any()))
                 .willReturn(sample(0, RuntimeState.STOPPED));
 
         // Empty mode and mixed-case "Anonymous" both resolve to anonymous credentials
         // ("Anonymous" only matches the lowercase switch case via the controller's toLowerCase).
         controller.create(PROJECT, new CreateDataSourceRequest(
-                "Pump", "OPC_UA", "MANUAL", null, null, new ConnectionConfigRequest("", null, null, null)));
+                "Pump", "OPC_UA", "MANUAL", null, null, new ConnectionConfigRequest("", null, null, null), null));
         controller.create(PROJECT, new CreateDataSourceRequest(
-                "Pump", "OPC_UA", "MANUAL", null, null, new ConnectionConfigRequest("Anonymous", null, null, null)));
+                "Pump", "OPC_UA", "MANUAL", null, null,
+                new ConnectionConfigRequest("Anonymous", null, null, null), null));
 
         ArgumentCaptor<ConnectionCredentials> creds = ArgumentCaptor.forClass(ConnectionCredentials.class);
-        verify(service, times(2)).create(eq(PROJECT), any(), any(), any(), any(), any(), creds.capture(), any());
+        verify(service, times(2)).create(eq(PROJECT), any(), any(), any(), any(), any(), creds.capture(), any(), any());
         assertThat(creds.getAllValues()).allSatisfy(c ->
                 assertThat(c.mode()).isEqualTo(ConnectionCredentials.Mode.ANONYMOUS));
     }
 
     @Test
     void createMapsMixedCasePasswordMode() {
-        given(service.create(eq(PROJECT), any(), any(), any(), any(), any(), any(), any()))
+        given(service.create(eq(PROJECT), any(), any(), any(), any(), any(), any(), any(), any()))
                 .willReturn(sample(0, RuntimeState.STOPPED, CredentialState.SESSION_ONLY));
         ConnectionConfigRequest cfg = new ConnectionConfigRequest("Password", "operator", "s3cr3t", null);
 
-        controller.create(PROJECT, new CreateDataSourceRequest("Pump", "OPC_UA", "MANUAL", null, null, cfg));
+        controller.create(PROJECT, new CreateDataSourceRequest("Pump", "OPC_UA", "MANUAL", null, null, cfg, null));
 
         ArgumentCaptor<ConnectionCredentials> creds = ArgumentCaptor.forClass(ConnectionCredentials.class);
-        verify(service).create(eq(PROJECT), any(), any(), any(), any(), any(), creds.capture(), any());
+        verify(service).create(eq(PROJECT), any(), any(), any(), any(), any(), creds.capture(), any(), any());
         assertThat(creds.getValue().mode()).isEqualTo(ConnectionCredentials.Mode.PASSWORD);
         assertThat(creds.getValue().secret()).isEqualTo("s3cr3t");
     }
@@ -221,5 +224,103 @@ class DataSourceControllerTest {
         assertThat(resp.getBody()).isNotNull();
         assertThat(resp.getBody().credentialState()).isEqualTo("SESSION_ONLY");
         assertThat(resp.getBody().toString()).doesNotContain("s3cr3t");
+    }
+
+    @Test
+    void duplicateReturns201WithNewIdAndCopyName() {
+        Instant now = Instant.now();
+        DataSource copy = new DataSource("ds2", PROJECT, "Pump (copy)", Protocol.OPC_UA, SourceBasis.MANUAL,
+                null, null, "{}", "{}", false, RuntimeState.STOPPED, CredentialState.MISSING, now, now, "local", 0);
+        given(service.duplicate(PROJECT, "ds1", "local")).willReturn(copy);
+
+        ResponseEntity<DataSourceResponse> resp = controller.duplicate(PROJECT, "ds1");
+
+        assertThat(resp.getStatusCode().value()).isEqualTo(201);
+        assertThat(resp.getHeaders().getLocation()).isNotNull();
+        assertThat(resp.getHeaders().getLocation().toString()).contains("/data-sources/ds2");
+        assertThat(resp.getHeaders().getETag()).isEqualTo("\"0\"");
+        assertThat(resp.getBody()).isNotNull();
+        assertThat(resp.getBody().id()).isEqualTo("ds2");
+        assertThat(resp.getBody().name()).isEqualTo("Pump (copy)");
+        assertThat(resp.getBody().enabled()).isFalse();
+        assertThat(resp.getBody().runtimeState()).isEqualTo("STOPPED");
+    }
+
+    @Test
+    void duplicatePropagatesNotFoundWhenSourceMissing() {
+        given(service.duplicate(PROJECT, "missing", "local"))
+                .willThrow(new ResourceNotFoundException("DataSource", "missing"));
+        assertThatThrownBy(() -> controller.duplicate(PROJECT, "missing"))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void createWithInitialSchemaPassesNodesToService() {
+        Instant now = Instant.now();
+        DataSource imported = new DataSource("ds1", PROJECT, "Sensor", Protocol.OPC_UA, SourceBasis.IMPORT,
+                "schema-1", 1, "{}", "{}", false, RuntimeState.STOPPED, CredentialState.MISSING,
+                now, now, "local", 0);
+        given(service.create(eq(PROJECT), any(), any(), any(), any(), any(), any(), any(), any()))
+                .willReturn(imported);
+
+        NodeDto node = new NodeDto("n1", null, "/root/temp", "Temperature", "VARIABLE",
+                "FLOAT32", "SCALAR", "READ", "°C", null);
+        ResponseEntity<DataSourceResponse> resp = controller.create(
+                PROJECT, new CreateDataSourceRequest("Sensor", "OPC_UA", "IMPORT", null, null, null, List.of(node)));
+
+        assertThat(resp.getStatusCode().value()).isEqualTo(201);
+        assertThat(resp.getBody()).isNotNull();
+        assertThat(resp.getBody().schemaVersion()).isEqualTo(1);
+        assertThat(resp.getBody().basis()).isEqualTo("IMPORT");
+    }
+
+    @Test
+    void createWithBlankNodeIdInInitialSchemaIsRejected() {
+        NodeDto bad = new NodeDto("", null, "/root/temp", "Temperature", "VARIABLE",
+                "FLOAT32", "SCALAR", "READ", null, null);
+        assertThatThrownBy(() -> controller.create(
+                PROJECT, new CreateDataSourceRequest("Sensor", "OPC_UA", "IMPORT", null, null, null, List.of(bad))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("nodeId");
+    }
+
+    @Test
+    void createWithBlankNameInInitialSchemaIsRejected() {
+        NodeDto bad = new NodeDto("n1", null, "/root/temp", "  ", "VARIABLE",
+                "FLOAT32", "SCALAR", "READ", null, null);
+        assertThatThrownBy(() -> controller.create(
+                PROJECT, new CreateDataSourceRequest("Sensor", "OPC_UA", "IMPORT", null, null, null, List.of(bad))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("name");
+    }
+
+    @Test
+    void createWithBlankPathInInitialSchemaIsRejected() {
+        NodeDto bad = new NodeDto("n1", null, "  ", "Temperature", "VARIABLE",
+                "FLOAT32", "SCALAR", "READ", null, null);
+        assertThatThrownBy(() -> controller.create(
+                PROJECT, new CreateDataSourceRequest("Sensor", "OPC_UA", "IMPORT", null, null, null, List.of(bad))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("path");
+    }
+
+    @Test
+    void createWithUnknownNodeKindInInitialSchemaIsRejected() {
+        NodeDto bad = new NodeDto("n1", null, "/root/temp", "Temperature", "BOGUS_KIND",
+                null, null, null, null, null);
+        assertThatThrownBy(() -> controller.create(
+                PROJECT, new CreateDataSourceRequest("Sensor", "OPC_UA", "IMPORT", null, null, null, List.of(bad))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("kind");
+    }
+
+    @Test
+    void createWithVariableNodeMissingDataTypeIsRejected() {
+        NodeDto bad = new NodeDto("n1", null, "/root/temp", "Temperature", "VARIABLE",
+                null, "SCALAR", "READ", null, null);
+        assertThatThrownBy(() -> controller.create(
+                PROJECT, new CreateDataSourceRequest("Sensor", "OPC_UA", "IMPORT", null, null, null, List.of(bad))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("dataType");
     }
 }

@@ -73,7 +73,7 @@ class ProjectOverviewServiceTest {
     private static ProjectOverviewService service(List<Project> projects,
             Map<String, List<DataSource>> sourcesByProject,
             Map<String, List<Recording>> recordingsByProject) {
-        ProjectService projectService = new ProjectService(null) {
+        ProjectService projectService = new ProjectService(null, null, null, null) {
             @Override
             public List<Project> list() {
                 return projects;
@@ -85,7 +85,7 @@ class ProjectOverviewServiceTest {
                 return sourcesByProject.getOrDefault(projectId, List.of());
             }
         };
-        RecordingService recordingService = new RecordingService(null, null, null, null, null, null) {
+        RecordingService recordingService = new RecordingService(null, null, null, null, null, null, null) {
             @Override
             public List<Recording> list(String projectId) {
                 return recordingsByProject.getOrDefault(projectId, List.of());

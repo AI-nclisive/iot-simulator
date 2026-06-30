@@ -1,11 +1,16 @@
 package com.ainclusive.iotsim.domain.evidence;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
+import com.ainclusive.iotsim.domain.support.Page;
 import com.ainclusive.iotsim.persistence.clientconnection.ClientConnectionRepository;
 import com.ainclusive.iotsim.persistence.clientconnection.ClientConnectionRow;
 import com.ainclusive.iotsim.persistence.evidence.EvidenceRepository;
 import com.ainclusive.iotsim.persistence.evidence.EvidenceRow;
+import com.ainclusive.iotsim.persistence.project.ProjectRepository;
+import com.ainclusive.iotsim.persistence.project.ProjectRow;
 import com.ainclusive.iotsim.persistence.run.RunRepository;
 import com.ainclusive.iotsim.persistence.run.RunRow;
 import com.ainclusive.iotsim.persistence.runtimeevent.RuntimeEventQuery;
@@ -43,7 +48,89 @@ class EvidenceServiceTest {
 
     private EvidenceService service() {
         return new EvidenceService(evidence, runs, timeline, runtimeEvents, clients,
-                List.of(bundleWriter, summaryWriter), objectStore, new ObjectMapper());
+                List.of(bundleWriter, summaryWriter), objectStore, new ObjectMapper(), fakeProjects());
+    }
+
+    @Test
+    void listPagedThrowsNotFoundForMissingProject() {
+        assertThatThrownBy(() -> service().listPaged("no-such-project", null, null))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void listPagedEmitsCursorWhenResultsExceedLimit() {
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        for (int i = 0; i < 3; i++) {
+            String evId = "paged-ev-" + i;
+            evidence.byId.put(evId, new EvidenceRow(evId, "page-proj", null, "CAPTURING",
+                    "{}", null, now.minusSeconds(i), "local"));
+        }
+        EvidenceService svc = new EvidenceService(evidence, runs, timeline, runtimeEvents, clients,
+                List.of(bundleWriter, summaryWriter), objectStore, new ObjectMapper(), existsProjects("page-proj"));
+
+        Page<EvidenceView> page = svc.listPaged("page-proj", null, 2);
+
+        assertThat(page.items()).hasSize(2);
+        assertThat(page.nextCursor()).isNotNull();
+        assertThat(page.limit()).isEqualTo(2);
+
+        // second page using the cursor returns the remaining item and no further cursor
+        Page<EvidenceView> page2 = svc.listPaged("page-proj", page.nextCursor(), 2);
+        assertThat(page2.items()).hasSize(1);
+        assertThat(page2.nextCursor()).isNull();
+    }
+
+    private static ProjectRepository existsProjects(String... ids) {
+        java.util.Set<String> known = java.util.Set.of(ids);
+        return new ProjectRepository() {
+            @Override
+            public Optional<ProjectRow> findById(String id) {
+                if (!known.contains(id)) {
+                    return Optional.empty();
+                }
+                return Optional.of(new ProjectRow(id, "n", null, "ACTIVE",
+                        OffsetDateTime.now(ZoneOffset.UTC), null, "it", 0));
+            }
+            @Override public ProjectRow insert(String n, String d, String c) { throw new UnsupportedOperationException(); }
+            @Override public List<ProjectRow> findAll() { return List.of(); }
+            @Override public List<ProjectRow> findAllPaged(String s, java.time.OffsetDateTime a, String i, int l) { return List.of(); }
+            @Override public Optional<ProjectRow> update(String id, String n, String d, long v) { throw new UnsupportedOperationException(); }
+            @Override public Optional<ProjectRow> archive(String id) { throw new UnsupportedOperationException(); }
+            @Override public boolean deleteById(String id) { throw new UnsupportedOperationException(); }
+        };
+    }
+
+    private static ProjectRepository fakeProjects() {
+        return new ProjectRepository() {
+            @Override
+            public Optional<ProjectRow> findById(String id) {
+                return Optional.empty();
+            }
+            @Override
+            public ProjectRow insert(String n, String d, String c) {
+                throw new UnsupportedOperationException();
+            }
+            @Override
+            public List<ProjectRow> findAll() {
+                return List.of();
+            }
+            @Override
+            public List<ProjectRow> findAllPaged(String s, java.time.OffsetDateTime a, String i, int l) {
+                return List.of();
+            }
+            @Override
+            public Optional<ProjectRow> update(String id, String n, String d, long v) {
+                throw new UnsupportedOperationException();
+            }
+            @Override
+            public Optional<ProjectRow> archive(String id) {
+                throw new UnsupportedOperationException();
+            }
+            @Override
+            public boolean deleteById(String id) {
+                throw new UnsupportedOperationException();
+            }
+        };
     }
 
     @Test
@@ -153,7 +240,7 @@ class EvidenceServiceTest {
             }
         };
         EvidenceService svc = new EvidenceService(evidence, runs, timeline, runtimeEvents, clients,
-                List.of(boom), objectStore, new ObjectMapper());
+                List.of(boom), objectStore, new ObjectMapper(), fakeProjects());
 
         EvidenceView result = svc.export("p1", "ev-1", EvidenceFormat.BUNDLE);
 
@@ -195,6 +282,19 @@ class EvidenceServiceTest {
 
         public List<EvidenceRow> findByProject(String projectId) {
             return byId.values().stream().filter(e -> e.projectId().equals(projectId)).toList();
+        }
+
+        @Override
+        public List<EvidenceRow> findByProjectPaged(String projectId,
+                java.time.OffsetDateTime afterAt, String afterId, int limit) {
+            return byId.values().stream()
+                    .filter(e -> e.projectId().equals(projectId))
+                    .filter(e -> afterAt == null || e.createdAt().isBefore(afterAt)
+                            || (e.createdAt().isEqual(afterAt) && e.id().compareTo(afterId) < 0))
+                    .sorted(java.util.Comparator.comparing(EvidenceRow::createdAt).reversed()
+                            .thenComparing(java.util.Comparator.comparing(EvidenceRow::id).reversed()))
+                    .limit(limit)
+                    .toList();
         }
 
         public EvidenceRow updateManifest(String id, String manifestJson) {

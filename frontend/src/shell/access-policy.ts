@@ -21,6 +21,12 @@ export function resolveAccess(accessMode: AccessMode, sharedRole: SharedRole) {
     canImportProject: isAdmin,
     canManageAdmin: isShared && sharedRole === "admin",
     canRecordSource: isAdmin,
+    // Scenarios (UI-060): admins create/edit/duplicate; everyone can run/stop.
+    canCreateScenario: isAdmin,
+    canEditScenario: isAdmin,
+    canDuplicateScenario: isAdmin,
+    canRunScenario: true,
+    canStopScenario: true,
     canStopSource: true,
     canStartStoppedSource: true,
     effectiveRoleLabel: isLocal ? "Trusted local" : roleLabel(sharedRole),

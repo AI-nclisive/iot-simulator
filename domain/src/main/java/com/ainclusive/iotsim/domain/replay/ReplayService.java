@@ -1,7 +1,7 @@
 package com.ainclusive.iotsim.domain.replay;
 
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
-import com.ainclusive.iotsim.domain.datasource.RuntimeStartSpecs;
+import com.ainclusive.iotsim.domain.common.SchemaVersionMismatchException;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRepository;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRow;
 import com.ainclusive.iotsim.persistence.evidence.EvidenceRepository;
@@ -11,9 +11,13 @@ import com.ainclusive.iotsim.persistence.recording.RecordingRow;
 import com.ainclusive.iotsim.persistence.run.RunRepository;
 import com.ainclusive.iotsim.persistence.run.RunRow;
 import com.ainclusive.iotsim.persistence.schema.SchemaRepository;
+import com.ainclusive.iotsim.persistence.schema.SchemaWithNodes;
 import com.ainclusive.iotsim.persistence.timeline.ValueTimelineRepository;
 import com.ainclusive.iotsim.platform.runtime.RuntimeController;
+import com.ainclusive.iotsim.platform.runtime.RuntimeStartSpec;
+import com.ainclusive.iotsim.protocolmodel.DeterministicSettings;
 import com.ainclusive.iotsim.protocolmodel.NeutralValue;
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -55,9 +59,35 @@ public class ReplayService {
         this.json = json;
     }
 
-    public ReplaySummary replay(String projectId, String dataSourceId, String recordingId) {
+    /**
+     * Starts a replay run for {@code recordingId} on {@code dataSourceId}.
+     *
+     * <p>If the recording's {@code schemaVersion} differs from the data source's current schema
+     * version, a {@link SchemaVersionMismatchException} is thrown unless
+     * {@code compatibilityAck=true} (IS-069).
+     *
+     * @param deterministicSettings the seed and logical start-time for the run; if {@code null}
+     *                              a random seed is chosen and captured for traceability
+     */
+    public ReplaySummary replay(String projectId, String dataSourceId, String recordingId,
+            DeterministicSettings deterministicSettings, boolean compatibilityAck) {
         DataSourceRow source = requireSource(projectId, dataSourceId);
-        requireRecording(projectId, recordingId);
+        RecordingRow recording = requireRecording(projectId, recordingId);
+
+        // Load schema once — used both for the compat check and to build the RuntimeStartSpec.
+        var currentSchema = schemas.findCurrent(dataSourceId);
+        int currentSchemaVersion = currentSchema.map(SchemaWithNodes::version).orElse(0);
+
+        // Schema compatibility check (IS-069): guard if the recording was captured against a
+        // different schema version than the data source currently has.
+        if (recording.schemaVersion() != currentSchemaVersion && !compatibilityAck) {
+            throw new SchemaVersionMismatchException(recordingId, recording.schemaVersion(), currentSchemaVersion);
+        }
+
+        // Capture the seed used so the run is always reproducible from the evidence manifest.
+        DeterministicSettings settings = deterministicSettings != null
+                ? deterministicSettings
+                : DeterministicSettings.withRandomSeed(Instant.now());
 
         RunRow run = runs.create(projectId, "REPLAY", "MANUAL", "local", List.of(dataSourceId), null);
         // Everything after the run exists is guarded: any failure (evidence setup, worker
@@ -66,22 +96,31 @@ public class ReplayService {
             runs.start(run.id(), now());
             EvidenceRow evidenceRow = evidence.create(projectId, run.id(), "local");
             runs.linkEvidence(run.id(), evidenceRow.id());
-            evidence.updateManifest(evidenceRow.id(), seed(recordingId));
+            evidence.updateManifest(evidenceRow.id(), seed(recordingId, settings));
 
+            RuntimeStartSpec startSpec = new RuntimeStartSpec(
+                    source.protocol(),
+                    currentSchemaVersion,
+                    currentSchema.map(SchemaWithNodes::nodes).orElse(List.of()),
+                    0,
+                    settings);
             List<NeutralValue> values = timeline.readAll(recordingId);
-            runtime.start(dataSourceId, RuntimeStartSpecs.of(schemas, source));
+            runtime.start(dataSourceId, startSpec);
             long applied = runtime.applyValues(dataSourceId, values);
             runs.end(run.id(), "COMPLETED", now());
-            return new ReplaySummary(recordingId, dataSourceId, applied, run.id(), evidenceRow.id());
+            return new ReplaySummary(recordingId, dataSourceId, applied, run.id(), evidenceRow.id(), settings);
         } catch (RuntimeException e) {
             runs.end(run.id(), "FAILED", now());
             throw e;
         }
     }
 
-    /** Evidence manifest seed: just the replayed recording, so assembly can read the timeline back. */
-    private String seed(String recordingId) {
-        return json.writeValueAsString(Map.of("recordingId", recordingId));
+    /** Evidence manifest: recording ref + deterministic settings for run reproducibility. */
+    private String seed(String recordingId, DeterministicSettings settings) {
+        return json.writeValueAsString(Map.of(
+                "recordingId", recordingId,
+                "seed", settings.seed(),
+                "startTime", settings.startTime().toString()));
     }
 
     private static OffsetDateTime now() {

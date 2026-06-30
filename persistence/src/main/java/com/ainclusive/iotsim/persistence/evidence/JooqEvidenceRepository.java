@@ -4,6 +4,7 @@ import static com.ainclusive.iotsim.persistence.jooq.tables.Evidence.EVIDENCE;
 
 import com.ainclusive.iotsim.persistence.jooq.tables.records.EvidenceRecord;
 import com.ainclusive.iotsim.platform.Ids;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.jooq.DSLContext;
@@ -54,6 +55,20 @@ public class JooqEvidenceRepository implements EvidenceRepository {
         return dsl.selectFrom(EVIDENCE)
                 .where(EVIDENCE.PROJECT_ID.eq(projectId))
                 .orderBy(EVIDENCE.CREATED_AT.desc(), EVIDENCE.ID.desc())
+                .fetch()
+                .map(this::map);
+    }
+
+    @Override
+    public List<EvidenceRow> findByProjectPaged(String projectId,
+            OffsetDateTime afterAt, String afterId, int limit) {
+        var q = dsl.selectFrom(EVIDENCE).where(EVIDENCE.PROJECT_ID.eq(projectId));
+        if (afterAt != null) {
+            q = q.and(EVIDENCE.CREATED_AT.lt(afterAt)
+                    .or(EVIDENCE.CREATED_AT.eq(afterAt).and(EVIDENCE.ID.lt(afterId))));
+        }
+        return q.orderBy(EVIDENCE.CREATED_AT.desc(), EVIDENCE.ID.desc())
+                .limit(limit)
                 .fetch()
                 .map(this::map);
     }

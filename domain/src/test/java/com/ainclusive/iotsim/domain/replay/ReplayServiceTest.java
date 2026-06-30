@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
+import com.ainclusive.iotsim.domain.common.SchemaVersionMismatchException;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRepository;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRow;
 import com.ainclusive.iotsim.persistence.evidence.EvidenceRepository;
@@ -18,6 +19,7 @@ import com.ainclusive.iotsim.persistence.timeline.ValueTimelineRepository;
 import com.ainclusive.iotsim.platform.runtime.InMemoryRuntimeController;
 import com.ainclusive.iotsim.platform.runtime.RuntimeController;
 import com.ainclusive.iotsim.platform.runtime.RuntimeStartSpec;
+import com.ainclusive.iotsim.protocolmodel.DeterministicSettings;
 import com.ainclusive.iotsim.protocolmodel.NeutralValue;
 import com.ainclusive.iotsim.protocolmodel.SchemaNode;
 import java.time.Instant;
@@ -67,7 +69,7 @@ class ReplayServiceTest {
 
     @Test
     void replayStartsSourceAndStreamsAllValues() {
-        ReplaySummary summary = service.replay(PROJECT, SOURCE, RECORDING);
+        ReplaySummary summary = service.replay(PROJECT, SOURCE, RECORDING, null, true);
         assertThat(summary.valueCount()).isEqualTo(3);
         assertThat(runtime.state(SOURCE)).isEqualTo("RUNNING");
         assertThat(runtime.appliedCount(SOURCE)).isEqualTo(3);
@@ -75,7 +77,7 @@ class ReplayServiceTest {
 
     @Test
     void replayOpensRunAndEvidenceAndReturnsTheirIds() {
-        ReplaySummary summary = service.replay(PROJECT, SOURCE, RECORDING);
+        ReplaySummary summary = service.replay(PROJECT, SOURCE, RECORDING, null, true);
 
         assertThat(summary.runId()).isNotBlank();
         assertThat(summary.evidenceId()).isNotBlank();
@@ -91,15 +93,16 @@ class ReplayServiceTest {
 
         EvidenceRow ev = evidence.byId.get(summary.evidenceId());
         assertThat(ev.runId()).isEqualTo(summary.runId());
-        // recordingId is seeded so export assembly can find the replayed timeline.
+        // recordingId and seed are seeded so export assembly can reproduce the run.
         assertThat(ev.manifestJson()).contains("\"recordingId\":\"" + RECORDING + "\"");
+        assertThat(ev.manifestJson()).contains("\"seed\":");
     }
 
     @Test
     void replayFailureEndsRunFailedAndPropagates() {
         ReplayService failing = build(new ThrowingRuntime());
 
-        assertThatThrownBy(() -> failing.replay(PROJECT, SOURCE, RECORDING))
+        assertThatThrownBy(() -> failing.replay(PROJECT, SOURCE, RECORDING, null, true))
                 .isInstanceOf(IllegalStateException.class);
 
         assertThat(runs.byId.values()).singleElement()
@@ -110,7 +113,7 @@ class ReplayServiceTest {
     void evidenceSetupFailureEndsRunFailedNotOrphaned() {
         evidence.failCreate = true;
 
-        assertThatThrownBy(() -> service.replay(PROJECT, SOURCE, RECORDING))
+        assertThatThrownBy(() -> service.replay(PROJECT, SOURCE, RECORDING, null, true))
                 .isInstanceOf(IllegalStateException.class);
 
         // The run was opened, so it must reach a terminal state rather than be left RUNNING.
@@ -120,7 +123,7 @@ class ReplayServiceTest {
 
     @Test
     void replayMissingRecordingThrowsNotFoundWithoutOpeningARun() {
-        assertThatThrownBy(() -> service.replay(PROJECT, SOURCE, "nope"))
+        assertThatThrownBy(() -> service.replay(PROJECT, SOURCE, "nope", null, false))
                 .isInstanceOf(ResourceNotFoundException.class);
         assertThat(runs.byId).isEmpty();
         assertThat(evidence.byId).isEmpty();
@@ -128,8 +131,66 @@ class ReplayServiceTest {
 
     @Test
     void replayMissingSourceThrowsNotFound() {
-        assertThatThrownBy(() -> service.replay(PROJECT, "nope", RECORDING))
+        assertThatThrownBy(() -> service.replay(PROJECT, "nope", RECORDING, null, false))
                 .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    // -------------------------------------------------------------------------
+    // IS-069 — timing/ordering/compat checks
+    // -------------------------------------------------------------------------
+
+    @Test
+    void schemaVersionMismatchWithoutAckThrows() {
+        // FakeRecordings returns schemaVersion=1, EmptySchemas returns version 0 → mismatch.
+        assertThatThrownBy(() -> service.replay(PROJECT, SOURCE, RECORDING, null, false))
+                .isInstanceOf(SchemaVersionMismatchException.class)
+                .hasMessageContaining("schema version")
+                .hasMessageContaining("compatibilityAck=true");
+    }
+
+    @Test
+    void schemaVersionMismatchWithAckSucceeds() {
+        // Same mismatch, but ack=true bypasses the guard.
+        ReplaySummary summary = service.replay(PROJECT, SOURCE, RECORDING, null, true);
+        assertThat(summary.recordingId()).isEqualTo(RECORDING);
+    }
+
+    @Test
+    void schemaVersionMatchAllowsReplayWithoutAck() {
+        // Build a service where recording.schemaVersion() == currentSchemaVersion (both 0).
+        ReplayService aligned = buildWithSchemaVersion(0);
+        ReplaySummary summary = aligned.replay(PROJECT, SOURCE, RECORDING, null, false);
+        assertThat(summary.recordingId()).isEqualTo(RECORDING);
+    }
+
+    @Test
+    void explicitDeterministicSettingsAreEchoedInSummary() {
+        DeterministicSettings explicit = new DeterministicSettings(42L, Instant.parse("2026-01-01T00:00:00Z"));
+        ReplaySummary summary = service.replay(PROJECT, SOURCE, RECORDING, explicit, true);
+        assertThat(summary.deterministicSettings().seed()).isEqualTo(42L);
+        assertThat(summary.deterministicSettings().startTime()).isEqualTo(Instant.parse("2026-01-01T00:00:00Z"));
+    }
+
+    @Test
+    void nullDeterministicSettingsAreAutoGeneratedAndReturned() {
+        ReplaySummary summary = service.replay(PROJECT, SOURCE, RECORDING, null, true);
+        assertThat(summary.deterministicSettings()).isNotNull();
+        assertThat(summary.deterministicSettings().startTime()).isNotNull();
+    }
+
+    /** Replay service with recording schemaVersion=0 and source schemaVersion=0 — perfectly aligned. */
+    private ReplayService buildWithSchemaVersion(int version) {
+        List<NeutralValue> values = List.of(
+                NeutralValue.good("temp", Instant.parse("2026-01-01T00:00:00Z"), 1.0));
+        return new ReplayService(
+                new FakeDataSources(SOURCE, PROJECT),
+                new FakeRecordingsAtVersion(RECORDING, PROJECT, version),
+                new FakeTimeline(values),
+                new EmptySchemas(),
+                runtime,
+                runs,
+                evidence,
+                new ObjectMapper());
     }
 
     // --- fakes ---
@@ -242,6 +303,12 @@ class ReplayServiceTest {
             throw new UnsupportedOperationException();
         }
 
+        @Override
+        public List<EvidenceRow> findByProjectPaged(String projectId,
+                java.time.OffsetDateTime afterAt, String afterId, int limit) {
+            return List.of();
+        }
+
         public EvidenceRow updateStatus(String id, String status, String objectRef) {
             throw new UnsupportedOperationException();
         }
@@ -269,7 +336,18 @@ class ReplayServiceTest {
         }
 
         @Override
+        public List<DataSourceRow> findByProjectPaged(String projectId, String protocol,
+                OffsetDateTime afterAt, String afterId, int limit) {
+            return List.of();
+        }
+
+        @Override
         public Optional<DataSourceRow> update(String i, String n, String e, String rc, boolean en, long v) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Optional<DataSourceRow> duplicate(String sourceId, String newName, String createdBy) {
             throw new UnsupportedOperationException();
         }
 
@@ -297,6 +375,12 @@ class ReplayServiceTest {
 
         @Override
         public List<RecordingRow> findByProject(String projectId) {
+            return List.of();
+        }
+
+        @Override
+        public List<RecordingRow> findByProjectPaged(String projectId,
+                OffsetDateTime afterAt, String afterId, int limit) {
             return List.of();
         }
 
@@ -336,6 +420,41 @@ class ReplayServiceTest {
 
         @Override
         public SchemaWithNodes saveNewVersion(String dataSourceId, List<SchemaNode> nodes) {
+            throw new UnsupportedOperationException();
+        }
+    }
+
+    /** A recording fake that returns a specific schema version (for compat check tests). */
+    private record FakeRecordingsAtVersion(String id, String projectId, int schemaVersion)
+            implements RecordingRepository {
+        @Override
+        public Optional<RecordingRow> findById(String id) {
+            if (!this.id.equals(id)) {
+                return Optional.empty();
+            }
+            OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+            return Optional.of(new RecordingRow(id, projectId, "ds1", schemaVersion, "SCAN_RECORD",
+                    null, null, 0, 0, now, now, "local", 0));
+        }
+
+        @Override
+        public RecordingRow create(String p, String d, int sv, String o, String c) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<RecordingRow> findByProject(String projectId) {
+            return List.of();
+        }
+
+        @Override
+        public List<RecordingRow> findByProjectPaged(String projectId,
+                OffsetDateTime afterAt, String afterId, int limit) {
+            return List.of();
+        }
+
+        @Override
+        public RecordingRow finalizeStats(String i, OffsetDateTime s, OffsetDateTime e, long c, long b) {
             throw new UnsupportedOperationException();
         }
     }

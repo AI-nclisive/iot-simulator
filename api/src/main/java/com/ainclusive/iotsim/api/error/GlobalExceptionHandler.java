@@ -2,6 +2,7 @@ package com.ainclusive.iotsim.api.error;
 
 import com.ainclusive.iotsim.domain.common.ConcurrencyConflictException;
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
+import com.ainclusive.iotsim.domain.common.SchemaVersionMismatchException;
 import com.ainclusive.iotsim.platform.capture.CaptureException;
 import com.ainclusive.iotsim.platform.runtime.RuntimeCapacityException;
 import org.springframework.http.HttpStatus;
@@ -26,6 +27,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(PreconditionRequiredException.class)
     public ProblemDetail preconditionRequired(PreconditionRequiredException e) {
         return problem(HttpStatus.PRECONDITION_REQUIRED, e.getMessage());
+    }
+
+    @ExceptionHandler(SchemaVersionMismatchException.class)
+    public ProblemDetail schemaVersionMismatch(SchemaVersionMismatchException e) {
+        return problem(HttpStatus.CONFLICT, e.getMessage());
     }
 
     @ExceptionHandler(CaptureException.class)

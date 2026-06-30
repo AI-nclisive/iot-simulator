@@ -3,9 +3,9 @@ package com.ainclusive.iotsim.api.project;
 import com.ainclusive.iotsim.api.error.PreconditionRequiredException;
 import com.ainclusive.iotsim.domain.project.Project;
 import com.ainclusive.iotsim.domain.project.ProjectService;
+import com.ainclusive.iotsim.domain.support.Page;
 import java.net.URI;
 import java.time.Instant;
-import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -32,8 +33,12 @@ public class ProjectController {
     }
 
     @GetMapping
-    public List<ProjectResponse> list() {
-        return projects.list().stream().map(ProjectResponse::from).toList();
+    public Page<ProjectResponse> list(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String cursor,
+            @RequestParam(required = false) Integer limit) {
+        return projects.listPaged(status, cursor, limit)
+                .map(ProjectResponse::from);
     }
 
     @PostMapping
@@ -62,6 +67,20 @@ public class ProjectController {
             throw new PreconditionRequiredException("If-Match header with the current version is required");
         }
         Project p = projects.update(id, req.name(), req.description(), parseVersion(ifMatch));
+        return ResponseEntity.ok().eTag(etag(p.version())).body(ProjectResponse.from(p));
+    }
+
+    @PostMapping("/{id}/duplicate")
+    public ResponseEntity<ProjectResponse> duplicate(@PathVariable String id) {
+        Project p = projects.duplicate(id);
+        return ResponseEntity.created(URI.create("/api/v1/projects/" + p.id()))
+                .eTag(etag(p.version()))
+                .body(ProjectResponse.from(p));
+    }
+
+    @PostMapping("/{id}/archive")
+    public ResponseEntity<ProjectResponse> archive(@PathVariable String id) {
+        Project p = projects.archive(id);
         return ResponseEntity.ok().eTag(etag(p.version())).body(ProjectResponse.from(p));
     }
 
