@@ -194,7 +194,10 @@ export function ScenariosPage() {
 
   function rowActions(row: ScenarioRow): TableRowAction<ScenarioRow>[] {
     const actions: TableRowAction<ScenarioRow>[] = [];
-    const lockedByOther = row.lockedBy !== null && row.lockedBy !== access.effectiveRoleLabel;
+    // Mock phase: there is no current-user identity to compare against, so any
+    // lock is treated as held by someone else. When the scenarios API lands,
+    // compare row.lockedBy against the current user's identity (not a role label).
+    const lockedByOther = row.lockedBy !== null;
 
     actions.push({ label: "Open", onClick: () => handleOpen(row) });
 
