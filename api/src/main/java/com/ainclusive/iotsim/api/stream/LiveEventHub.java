@@ -56,6 +56,9 @@ public final class LiveEventHub implements ClientActivityListener, RuntimeActivi
             data.put("type", event.type());
             data.put("at", event.at().toString());
             data.put("detail", event.detail() == null ? "" : event.detail());
+            if (event.origin() != null) {
+                data.put("origin", event.origin().name());
+            }
             publisher.publish(StreamKey.runtime(projectId), event.type(), data, event.at());
         });
     }

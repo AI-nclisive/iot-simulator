@@ -3,6 +3,7 @@ package com.ainclusive.iotsim.api.stream;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.ainclusive.iotsim.platform.runtime.ClientActivityEvent;
+import com.ainclusive.iotsim.platform.runtime.HealthOrigin;
 import com.ainclusive.iotsim.platform.runtime.RuntimeActivityEvent;
 import java.time.Instant;
 import java.util.ArrayDeque;
@@ -106,5 +107,34 @@ class LiveEventHubTest {
         assertThat(pub.events).isEmpty(); // nothing published on the calling (IPC) thread
         deferred.poll().run();
         assertThat(pub.events).hasSize(1);
+    }
+
+    @Test
+    void healthEventCarriesOriginInData() {
+        RecordingPublisher pub = new RecordingPublisher();
+        LiveEventHub hub = new LiveEventHub(pub, ds -> Optional.of("p"), INLINE);
+
+        hub.onRuntimeActivity(new RuntimeActivityEvent(
+                "d1", "SOURCE_STALE", Instant.EPOCH, "stale", HealthOrigin.SIMULATOR));
+
+        assertThat(pub.events).singleElement().satisfies(p -> {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> data = (Map<String, Object>) p.data();
+            assertThat(data).containsEntry("origin", "SIMULATOR");
+        });
+    }
+
+    @Test
+    void nonHealthEventOmitsOrigin() {
+        RecordingPublisher pub = new RecordingPublisher();
+        LiveEventHub hub = new LiveEventHub(pub, ds -> Optional.of("p"), INLINE);
+
+        hub.onRuntimeActivity(new RuntimeActivityEvent("d1", "SOURCE_START", Instant.EPOCH, "ok"));
+
+        assertThat(pub.events).singleElement().satisfies(p -> {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> data = (Map<String, Object>) p.data();
+            assertThat(data).doesNotContainKey("origin");
+        });
     }
 }
