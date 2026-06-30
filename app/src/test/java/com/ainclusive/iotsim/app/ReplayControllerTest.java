@@ -28,10 +28,12 @@ class ReplayControllerTest {
     @Test
     void replayReturnsSummary() {
         given(service.replay("p1", "ds1", "rec1"))
-                .willReturn(new ReplaySummary("rec1", "ds1", 5));
+                .willReturn(new ReplaySummary("rec1", "ds1", 5, "run-1", "ev-1"));
         ReplayResponse resp = controller.replay("p1", "ds1", new ReplayRequest("rec1"));
         assertThat(resp.recordingId()).isEqualTo("rec1");
         assertThat(resp.valueCount()).isEqualTo(5);
+        assertThat(resp.runId()).isEqualTo("run-1");
+        assertThat(resp.evidenceId()).isEqualTo("ev-1");
     }
 
     @Test

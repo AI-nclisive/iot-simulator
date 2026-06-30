@@ -68,6 +68,8 @@ API layer enforces authz) and decisions D6 (SSE-only) and D7 (`/api/v1`).
 ### Evidence
 - `GET …/evidence` · `GET …/evidence/{id}` · `POST …/evidence/{id}/export`
   (format + scope; secret exclusion explicit) · export-failure retry
+- `GET …/evidence/{id}/download` → the exported bundle (`application/zip`
+  attachment); 404 until an export has produced a blob (IS-057)
 
 ### Observability (history; live is via SSE below)
 - `GET …/runtime-events` (filter by source/run/type/time)
