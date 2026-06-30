@@ -202,6 +202,24 @@ describe("renameProject", () => {
     await useProjectsStore.getState().renameProject("p1", "Alpha Renamed");
     expect(useProjectsStore.getState().projects[0].name).toBe("Alpha Renamed");
   });
+
+  it("preserves overview counts when renaming", async () => {
+    useProjectsStore.setState({
+      projects: [
+        { id: "p1", name: "Alpha", configuredSources: 12, runningSources: 3,
+          reusableArtifacts: 28, sourcesNeedingAttention: 1, lastActivity: "" },
+      ],
+      archivedProjects: [],
+    });
+    mockApiFetch.mockResolvedValueOnce(makeProjectResponse({ id: "p1", name: "Alpha Renamed" }));
+    await useProjectsStore.getState().renameProject("p1", "Alpha Renamed");
+    const p = useProjectsStore.getState().projects[0];
+    expect(p.name).toBe("Alpha Renamed");
+    expect(p.configuredSources).toBe(12);
+    expect(p.runningSources).toBe(3);
+    expect(p.reusableArtifacts).toBe(28);
+    expect(p.sourcesNeedingAttention).toBe(1);
+  });
 });
 
 describe("duplicateProject", () => {
