@@ -222,4 +222,32 @@ class DataSourceControllerTest {
         assertThat(resp.getBody().credentialState()).isEqualTo("SESSION_ONLY");
         assertThat(resp.getBody().toString()).doesNotContain("s3cr3t");
     }
+
+    @Test
+    void duplicateReturns201WithNewIdAndCopyName() {
+        Instant now = Instant.now();
+        DataSource copy = new DataSource("ds2", PROJECT, "Pump (copy)", Protocol.OPC_UA, SourceBasis.MANUAL,
+                null, null, "{}", "{}", false, RuntimeState.STOPPED, CredentialState.MISSING, now, now, "local", 0);
+        given(service.duplicate(PROJECT, "ds1", "local")).willReturn(copy);
+
+        ResponseEntity<DataSourceResponse> resp = controller.duplicate(PROJECT, "ds1");
+
+        assertThat(resp.getStatusCode().value()).isEqualTo(201);
+        assertThat(resp.getHeaders().getLocation()).isNotNull();
+        assertThat(resp.getHeaders().getLocation().toString()).contains("/data-sources/ds2");
+        assertThat(resp.getHeaders().getETag()).isEqualTo("\"0\"");
+        assertThat(resp.getBody()).isNotNull();
+        assertThat(resp.getBody().id()).isEqualTo("ds2");
+        assertThat(resp.getBody().name()).isEqualTo("Pump (copy)");
+        assertThat(resp.getBody().enabled()).isFalse();
+        assertThat(resp.getBody().runtimeState()).isEqualTo("STOPPED");
+    }
+
+    @Test
+    void duplicatePropagatesNotFoundWhenSourceMissing() {
+        given(service.duplicate(PROJECT, "missing", "local"))
+                .willThrow(new ResourceNotFoundException("DataSource", "missing"));
+        assertThatThrownBy(() -> controller.duplicate(PROJECT, "missing"))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
 }
