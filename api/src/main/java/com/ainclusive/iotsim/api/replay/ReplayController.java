@@ -27,10 +27,12 @@ public class ReplayController {
             throw new IllegalArgumentException("recordingId is required");
         }
         ReplaySummary summary = replays.replay(projectId, dataSourceId, req.recordingId());
-        return new ReplayResponse(summary.recordingId(), summary.dataSourceId(), summary.valueCount());
+        return new ReplayResponse(summary.recordingId(), summary.dataSourceId(),
+                summary.valueCount(), summary.runId(), summary.evidenceId());
     }
 
     public record ReplayRequest(String recordingId) {}
 
-    public record ReplayResponse(String recordingId, String dataSourceId, long valueCount) {}
+    public record ReplayResponse(
+            String recordingId, String dataSourceId, long valueCount, String runId, String evidenceId) {}
 }
