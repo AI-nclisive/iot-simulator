@@ -156,6 +156,23 @@ class ProjectServiceTest {
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
+    // -------------------------------------------------------------------------
+    // archive()
+    // -------------------------------------------------------------------------
+
+    @Test
+    void archiveSetsStatusToArchived() {
+        Project p = service.create("Factory", null, "alice");
+        Project archived = service.archive(p.id());
+        assertThat(archived.status()).isEqualTo(Project.ProjectStatus.ARCHIVED);
+    }
+
+    @Test
+    void archiveMissingProjectThrowsNotFound() {
+        assertThatThrownBy(() -> service.archive("no-such-project"))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
     // =========================================================================
     // In-memory fakes
     // =========================================================================
@@ -194,6 +211,21 @@ class ProjectServiceTest {
                             OffsetDateTime.now(ZoneOffset.UTC), r.createdBy(), r.version() + 1);
                     rows.set(i, updated);
                     return Optional.of(updated);
+                }
+            }
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<ProjectRow> archive(String id) {
+            for (int i = 0; i < rows.size(); i++) {
+                ProjectRow r = rows.get(i);
+                if (r.id().equals(id)) {
+                    ProjectRow archived = new ProjectRow(
+                            id, r.name(), r.description(), "ARCHIVED", r.createdAt(),
+                            OffsetDateTime.now(ZoneOffset.UTC), r.createdBy(), r.version() + 1);
+                    rows.set(i, archived);
+                    return Optional.of(archived);
                 }
             }
             return Optional.empty();

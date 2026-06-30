@@ -73,6 +73,12 @@ public class ProjectController {
                 .body(ProjectResponse.from(p));
     }
 
+    @PostMapping("/{id}/archive")
+    public ResponseEntity<ProjectResponse> archive(@PathVariable String id) {
+        Project p = projects.archive(id);
+        return ResponseEntity.ok().eTag(etag(p.version())).body(ProjectResponse.from(p));
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable String id) {
         projects.delete(id);

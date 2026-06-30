@@ -125,6 +125,25 @@ class ProjectControllerTest {
     }
 
     @Test
+    void archiveHappyPathReturns200WithArchivedStatus() {
+        Instant now = Instant.now();
+        Project archived = new Project("p1", "Line 1", "desc",
+                Project.ProjectStatus.ARCHIVED, now, now, "local", 0);
+        given(service.archive("p1")).willReturn(archived);
+        ResponseEntity<ProjectResponse> resp = controller.archive("p1");
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(resp.getBody()).isNotNull();
+        assertThat(resp.getBody().status()).isEqualTo("ARCHIVED");
+    }
+
+    @Test
+    void archiveMissingProjectPropagatesNotFound() {
+        given(service.archive("missing")).willThrow(new ResourceNotFoundException("Project", "missing"));
+        assertThatThrownBy(() -> controller.archive("missing"))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
     void exceptionHandlerMapsStatuses() {
         assertThat(handler.notFound(new ResourceNotFoundException("Project", "x")).getStatus())
                 .isEqualTo(HttpStatus.NOT_FOUND.value());

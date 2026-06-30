@@ -60,6 +60,11 @@ public class ProjectService {
                 });
     }
 
+    public Project archive(String id) {
+        return repository.archive(id).map(this::toDomain)
+                .orElseThrow(() -> new ResourceNotFoundException("Project", id));
+    }
+
     public void delete(String id) {
         if (!repository.deleteById(id)) {
             throw new ResourceNotFoundException("Project", id);

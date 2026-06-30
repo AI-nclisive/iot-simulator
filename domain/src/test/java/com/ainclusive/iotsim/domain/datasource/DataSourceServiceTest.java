@@ -370,6 +370,11 @@ class DataSourceServiceTest {
         }
 
         @Override
+        public java.util.Optional<com.ainclusive.iotsim.persistence.project.ProjectRow> archive(String id) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public boolean deleteById(String id) {
             throw new UnsupportedOperationException();
         }

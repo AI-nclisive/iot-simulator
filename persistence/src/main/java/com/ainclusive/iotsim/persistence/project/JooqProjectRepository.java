@@ -62,6 +62,18 @@ public class JooqProjectRepository implements ProjectRepository {
     }
 
     @Override
+    public Optional<ProjectRow> archive(String id) {
+        ProjectsRecord record = dsl.update(PROJECTS)
+                .set(PROJECTS.STATUS, "ARCHIVED")
+                .set(PROJECTS.UPDATED_AT, OffsetDateTime.now(ZoneOffset.UTC))
+                .set(PROJECTS.VERSION, PROJECTS.VERSION.plus(1))
+                .where(PROJECTS.ID.eq(id))
+                .returning()
+                .fetchOne();
+        return Optional.ofNullable(record).map(this::map);
+    }
+
+    @Override
     public boolean deleteById(String id) {
         return dsl.deleteFrom(PROJECTS).where(PROJECTS.ID.eq(id)).execute() > 0;
     }
