@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRepository;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRow;
 import com.ainclusive.iotsim.persistence.runtimeevent.RuntimeEventRepository;
+import com.ainclusive.iotsim.platform.runtime.HealthOrigin;
 import com.ainclusive.iotsim.platform.runtime.RuntimeActivityEvent;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -60,5 +61,18 @@ class PersistingRuntimeActivityListenerTest {
                 new RuntimeActivityEvent("gone", "SOURCE_STOP", Instant.ofEpochSecond(9), null));
 
         verifyNoInteractions(events);
+    }
+
+    @Test
+    void includesOriginInPayloadWhenPresent() {
+        when(sources.findById("ds1")).thenReturn(Optional.of(row("ds1", "p1")));
+
+        listener.onRuntimeActivity(new RuntimeActivityEvent(
+                "ds1", "SOURCE_STALE", Instant.ofEpochSecond(8), "no health response",
+                HealthOrigin.SIMULATOR));
+
+        verify(events).append(eq("p1"), eq("ds1"), isNull(), eq("SOURCE_STALE"),
+                eq(Instant.ofEpochSecond(8).atOffset(ZoneOffset.UTC)),
+                eq("{\"detail\":\"no health response\",\"origin\":\"SIMULATOR\"}"));
     }
 }

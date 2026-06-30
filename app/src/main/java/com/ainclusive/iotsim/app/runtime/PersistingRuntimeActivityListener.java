@@ -6,6 +6,7 @@ import com.ainclusive.iotsim.persistence.runtimeevent.RuntimeEventRepository;
 import com.ainclusive.iotsim.platform.runtime.RuntimeActivityEvent;
 import com.ainclusive.iotsim.platform.runtime.RuntimeActivityListener;
 import java.time.ZoneOffset;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.Executor;
@@ -53,19 +54,26 @@ public final class PersistingRuntimeActivityListener implements RuntimeActivityL
                 return;
             }
             runtimeEvents.append(projectId.get(), event.dataSourceId(), null, event.type(),
-                    event.at().atOffset(ZoneOffset.UTC), payload(event.detail()));
+                    event.at().atOffset(ZoneOffset.UTC), payload(event));
         } catch (RuntimeException e) {
             log.warn("failed to persist runtime event {} for {}",
                     event.type(), event.dataSourceId(), e);
         }
     }
 
-    private String payload(String detail) {
-        if (detail == null || detail.isBlank()) {
+    private String payload(RuntimeActivityEvent event) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        if (event.detail() != null && !event.detail().isBlank()) {
+            map.put("detail", event.detail());
+        }
+        if (event.origin() != null) {
+            map.put("origin", event.origin().name());
+        }
+        if (map.isEmpty()) {
             return EMPTY_PAYLOAD;
         }
         try {
-            return json.writeValueAsString(Map.of("detail", detail));
+            return json.writeValueAsString(map);
         } catch (JacksonException e) {
             return EMPTY_PAYLOAD;
         }
