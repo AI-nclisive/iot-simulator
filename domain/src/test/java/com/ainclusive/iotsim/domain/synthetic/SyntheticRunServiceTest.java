@@ -203,6 +203,15 @@ class SyntheticRunServiceTest {
         public boolean deleteById(String id) {
             throw new UnsupportedOperationException();
         }
+
+        public List<DataSourceRow> findByProjectPaged(String projectId, String protocol,
+                OffsetDateTime afterAt, String afterId, int limit) {
+            return List.of();
+        }
+
+        public Optional<DataSourceRow> duplicate(String sourceId, String newName, String createdBy) {
+            throw new UnsupportedOperationException();
+        }
     }
 
     private record EmptySchemas() implements SchemaRepository {
@@ -295,6 +304,11 @@ class SyntheticRunServiceTest {
 
         public EvidenceRow updateStatus(String id, String status, String objectRef) {
             throw new UnsupportedOperationException();
+        }
+
+        public List<EvidenceRow> findByProjectPaged(String projectId, OffsetDateTime afterAt,
+                String afterId, int limit) {
+            return List.of();
         }
     }
 }

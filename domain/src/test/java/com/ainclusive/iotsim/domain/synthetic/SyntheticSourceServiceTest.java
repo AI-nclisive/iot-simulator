@@ -58,7 +58,7 @@ class SyntheticSourceServiceTest {
     @Test
     void createStoresSyntheticBasisAndSerializedConfigAndBuildsSchema() {
         given(dataSources.create(eq(PROJECT), eq("Gen"), eq("OPC_UA"), eq("SYNTHETIC"),
-                any(), any(), any(), eq("local"))).willReturn(sample("ds1"));
+                any(), any(), any(), any(), eq("local"))).willReturn(sample("ds1"));
         given(dataSources.get(PROJECT, "ds1")).willReturn(sample("ds1"));
 
         DataSource result = service.create(PROJECT, "Gen", "OPC_UA", "{}", config(), "local");
@@ -67,7 +67,7 @@ class SyntheticSourceServiceTest {
 
         ArgumentCaptor<String> runtimeConfig = ArgumentCaptor.forClass(String.class);
         verify(dataSources).create(eq(PROJECT), eq("Gen"), eq("OPC_UA"), eq("SYNTHETIC"),
-                eq("{}"), runtimeConfig.capture(), any(), eq("local"));
+                eq("{}"), runtimeConfig.capture(), any(), any(), eq("local"));
         assertThat(runtimeConfig.getValue()).contains("\"seed\":9").contains("temp").contains("level");
 
         @SuppressWarnings("unchecked")
