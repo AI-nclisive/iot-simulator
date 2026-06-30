@@ -742,6 +742,41 @@ Parallel execution:
   Depends: backend IS-066.
   Done when: `duplicateDataSource` calls `POST /api/v1/projects/{pid}/data-sources/{rowId}/duplicate` directly; manual create path removed; no TypeScript errors.
 
+- [ ] `UI-105` Wire Evidence surfaces to live API
+  Goal: replace mock-evidence.ts with real backend calls on Evidence List and Evidence Detail.
+  Surface: `Evidence List`, `Evidence Detail`
+  Work includes: GET /api/v1/projects/{projectId}/evidence (list); GET /{id} (detail, parse manifest JsonNode); POST /{id}/export?format=BUNDLE + GET /{id}/download (export/download); status mapping CAPTURING→"In progress", READY→"Ready", PARTIAL→"Incomplete", EXPORT_FAILED→"Export failed"; remove mock-evidence.ts.
+  Depends: `UI-096`; spike on manifest JSON shape from EvidenceService.
+  Done when: Evidence list and detail load from /api/v1; export/download work; mock-evidence.ts removed; no TypeScript errors.
+
+- [x] `UI-106` Wire Events tab to runtime-events API + SSE
+  Goal: replace mock-source-events.ts with real backend history + live SSE events on the Events tab.
+  Surface: `Data Source Detail` — Events tab
+  Work includes: GET /api/v1/projects/{projectId}/runtime-events?source={sourceId} for history; live append from existing use-live-runtime SSE hook (filter by dataSourceId); type→level mapping (SOURCE_ERROR/ERROR→error, SOURCE_STALE→warning, rest→info); type→category mapping; remove mock-source-events.ts.
+  Depends: `UI-096`; backend IS-055 (✅).
+  Done when: Events tab shows real runtime events; live events append without duplicates; mock-source-events.ts removed; no TypeScript errors.
+
+- [ ] `UI-107` Wire project overview counts to /projects/overview
+  Goal: replace hardcoded-0 count badges in projects-store.ts with data from GET /api/v1/projects/overview.
+  Surface: `Project Entry` — source/artifact count badges
+  Work includes: call GET /api/v1/projects/overview after loadProjects; merge by projectId into ProjectSummary; expose sourcesNeedingAttention as optional badge; lastActivity stays updatedAt (no backend field — comment clearly).
+  Depends: `UI-096`; backend IS-054 (✅).
+  Done when: configuredSources, runningSources, reusableArtifacts reflect real backend data; no TypeScript errors.
+
+- [ ] `UI-108` Wire Recordings page to live store + add Samples surface
+  Goal: switch recordings-page.tsx from mockRecordings to artifacts-store (already calls live API); add Samples surface.
+  Surface: `Recordings & Samples`
+  Work includes: recordings-page.tsx reads from useArtifactsStore instead of mockRecordings; remove mock-recordings.ts import; add samples methods to artifacts-store.ts (GET/POST/DELETE /api/v1/projects/{pid}/samples); add Samples section to recordings page; SampleResponse = {id, projectId, derivedFromRecordingId, name, selection, tags[], createdAt, createdBy, version}.
+  Depends: `UI-096`; backend IS-068 (✅).
+  Done when: recordings load from store (live API); samples list/create/delete work; mock-recordings.ts no longer imported; no TypeScript errors.
+
+- [ ] `UI-109` Fix schema editor round-trip — preserve all NodeDto fields on save
+  Goal: schema PUT currently drops parentId/kind/dataType/valueRank/access; only saves unit+description for selected param. This corrupts folder structure and type metadata on every save.
+  Surface: `Data Source Detail` — Schema tab
+  Work includes: store raw NodeDto[] from GET in editor state alongside EditBuffer; executeSave builds PUT payload from original NodeDto + applied edits — nothing dropped; DataType mapping on save: float→FLOAT64, int→INT32, bool→BOOL, string→STRING; BYTES/DATETIME preserved as-is (no FE type, read-only); ETag/If-Match correctly threaded.
+  Depends: `UI-096`.
+  Done when: GET→PUT round-trip preserves FOLDER nodes, parentId, valueRank, access; editing unit/description works; BYTES/DATETIME shown read-only; no TypeScript errors.
+
 ## Recommended Sequence
 
 1. Complete the P0 shell and shared-pattern tasks first.

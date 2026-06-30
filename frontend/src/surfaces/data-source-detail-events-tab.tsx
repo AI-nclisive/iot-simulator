@@ -1,7 +1,82 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { SharedStatePanel } from "../ui/shared-state-panel";
-import { getEventsForSource, type RuntimeEvent, type RuntimeEventLevel } from "./mock-source-events";
+import { apiFetch } from "../api/client";
+import { useShellStore } from "../shell/shell-store";
+import { useLiveRuntime } from "../shell/use-live-runtime";
 import type { DataSourceRow } from "../shell/data-sources-store";
+
+export type RuntimeEventLevel = "info" | "warning" | "error";
+
+export type RuntimeEvent = {
+  id: string;
+  level: RuntimeEventLevel;
+  timestamp: string;
+  message: string;
+  category: "connection" | "runtime" | "recording" | "replay";
+};
+
+/** DTO shape returned by GET /api/v1/projects/{pid}/runtime-events */
+interface RuntimeEventDto {
+  id: number;
+  type: string;
+  at: string;
+  dataSourceId: string | null;
+  runId: string | null;
+  payload: Record<string, unknown>;
+}
+
+interface RuntimeEventsResponse {
+  events: RuntimeEventDto[];
+  nextCursor: string | null;
+}
+
+function humanize(type: string): string {
+  switch (type) {
+    case "SOURCE_START":
+      return "Source started";
+    case "SOURCE_STOP":
+      return "Source stopped";
+    case "SOURCE_STALE":
+      return "Source went stale";
+    case "SOURCE_RECOVERED":
+      return "Source recovered";
+    case "SOURCE_ERROR":
+      return "Source error";
+    case "ERROR":
+      return "Error";
+    default:
+      return type.toLowerCase().replace(/_/g, " ");
+  }
+}
+
+function typeToLevel(type: string): RuntimeEventLevel {
+  if (type === "SOURCE_ERROR" || type === "ERROR") return "error";
+  if (type === "SOURCE_STALE") return "warning";
+  return "info";
+}
+
+function typeToCategory(type: string): RuntimeEvent["category"] {
+  if (
+    type === "SOURCE_START" ||
+    type === "SOURCE_STOP" ||
+    type === "SOURCE_STALE" ||
+    type === "SOURCE_RECOVERED"
+  ) {
+    return "connection";
+  }
+  return "runtime";
+}
+
+function mapDtoToEvent(dto: RuntimeEventDto): RuntimeEvent {
+  const detail = typeof dto.payload?.detail === "string" ? dto.payload.detail : null;
+  return {
+    id: String(dto.id),
+    level: typeToLevel(dto.type),
+    timestamp: dto.at,
+    message: detail ?? humanize(dto.type),
+    category: typeToCategory(dto.type),
+  };
+}
 
 function levelIcon(level: RuntimeEventLevel) {
   if (level === "error") return "●";
@@ -31,16 +106,114 @@ const levelOptions = [
 ] as const;
 
 export function DataSourceDetailEventsTab({ source }: { source: DataSourceRow }) {
-  const allEvents = getEventsForSource(source.id);
+  const projectId = useShellStore((state) => state.currentProjectId);
+
+  // Historical events from REST API
+  const [apiEvents, setApiEvents] = useState<RuntimeEvent[]>([]);
+  // Live events from SSE, prepended in front
+  const [liveEventsList, setLiveEventsList] = useState<RuntimeEvent[]>([]);
+
+  const [isLoading, setIsLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<typeof categoryOptions[number]["value"]>("all");
   const [levelFilter, setLevelFilter] = useState<typeof levelOptions[number]["value"]>("all");
   const [expandedId, setExpandedId] = useState<RuntimeEvent["id"] | null>(null);
+
+  // Fetch initial events from REST API
+  useEffect(() => {
+    if (!projectId) {
+      setIsLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setIsLoading(true);
+    setFetchError(null);
+
+    apiFetch<RuntimeEventsResponse>(
+      `/api/v1/projects/${projectId}/runtime-events?source=${encodeURIComponent(source.id)}&limit=100`,
+    )
+      .then((res) => {
+        if (cancelled) return;
+        setApiEvents(res.events.map(mapDtoToEvent));
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setFetchError(err instanceof Error ? err.message : "Failed to load events");
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, source.id]);
+
+  // Subscribe to live SSE events and prepend matching ones (no duplicates)
+  const { events: liveEvents } = useLiveRuntime(projectId, !!projectId);
+
+  useEffect(() => {
+    if (liveEvents.length === 0) return;
+    const latest = liveEvents[0];
+    if (latest.dataSourceId !== source.id) return;
+
+    // Map SSE delta to RuntimeEvent — use at+type as stable key since SSE has no numeric id
+    const mappedId = `live-${latest.at}-${latest.type}`;
+    const mapped: RuntimeEvent = {
+      id: mappedId,
+      level: typeToLevel(latest.type),
+      timestamp: latest.at,
+      message: latest.detail ?? humanize(latest.type),
+      category: typeToCategory(latest.type),
+    };
+
+    setLiveEventsList((prev) => {
+      // Deduplicate by id
+      if (prev.some((e) => e.id === mapped.id)) return prev;
+      return [mapped, ...prev];
+    });
+  // liveEvents reference changes on each new SSE event; source.id is stable
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveEvents, source.id]);
+
+  // Merge: live events (newest first) + API events, deduplicated by id
+  const allEvents = useMemo(() => {
+    const seen = new Set<string>();
+    const merged: RuntimeEvent[] = [];
+    for (const e of [...liveEventsList, ...apiEvents]) {
+      if (!seen.has(e.id)) {
+        seen.add(e.id);
+        merged.push(e);
+      }
+    }
+    return merged;
+  }, [liveEventsList, apiEvents]);
 
   const visibleEvents = allEvents.filter((event) => {
     const categoryMatch = categoryFilter === "all" || event.category === categoryFilter;
     const levelMatch = levelFilter === "all" || event.level === levelFilter;
     return categoryMatch && levelMatch;
   });
+
+  if (isLoading) {
+    return (
+      <SharedStatePanel
+        message="Fetching runtime events from the server…"
+        state="loading"
+        title="Loading events"
+      />
+    );
+  }
+
+  if (fetchError) {
+    return (
+      <SharedStatePanel
+        message={fetchError}
+        state="error"
+        title="Failed to load events"
+      />
+    );
+  }
 
   if (allEvents.length === 0) {
     return (
