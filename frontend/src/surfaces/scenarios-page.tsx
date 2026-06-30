@@ -12,6 +12,7 @@
  */
 
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { resolveAccess } from "../shell/access-policy";
 import { useNotificationStore } from "../shell/notification-store";
 import { useScenariosStore } from "../shell/scenarios-store";
@@ -56,6 +57,7 @@ function lastRunSummary(row: ScenarioRow): string {
 }
 
 export function ScenariosPage() {
+  const navigate = useNavigate();
   const accessMode = useShellStore((state) => state.accessMode);
   const sharedRole = useShellStore((state) => state.sharedRole);
   const access = resolveAccess(accessMode, sharedRole);
@@ -64,6 +66,7 @@ export function ScenariosPage() {
   const runScenario = useScenariosStore((state) => state.runScenario);
   const stopScenario = useScenariosStore((state) => state.stopScenario);
   const duplicateScenario = useScenariosStore((state) => state.duplicateScenario);
+  const createScenario = useScenariosStore((state) => state.createScenario);
   const pushNotification = useNotificationStore((state) => state.push);
 
   const [searchValue, setSearchValue] = useState("");
@@ -166,13 +169,8 @@ export function ScenariosPage() {
   ];
 
   function handleOpen(row: ScenarioRow) {
-    // The builder shell (UI-061) is the open target; until it exists, surface a
-    // clear acknowledgement rather than navigating into an empty route.
-    pushNotification({
-      tone: "success",
-      title: `Opening "${row.name}"…`,
-      message: "The scenario builder opens here once it is available.",
-    });
+    // Open the scenario in the builder shell (UI-061).
+    navigate(`/scenarios/${row.id}`);
   }
 
   function handleRun(row: ScenarioRow) {
@@ -189,6 +187,7 @@ export function ScenariosPage() {
     const newId = duplicateScenario(row.id);
     if (newId) {
       pushNotification({ tone: "success", title: `Duplicated "${row.name}".` });
+      navigate(`/scenarios/${newId}`);
     }
   }
 
@@ -234,13 +233,10 @@ export function ScenariosPage() {
           <button
             className="shell-action"
             type="button"
-            onClick={() =>
-              pushNotification({
-                tone: "success",
-                title: "New scenario",
-                message: "The scenario builder opens here once it is available.",
-              })
-            }
+            onClick={() => {
+              const id = createScenario();
+              navigate(`/scenarios/${id}`);
+            }}
           >
             New scenario
           </button>
