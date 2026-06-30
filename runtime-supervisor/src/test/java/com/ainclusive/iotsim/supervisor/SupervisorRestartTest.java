@@ -3,9 +3,13 @@ package com.ainclusive.iotsim.supervisor;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.ainclusive.iotsim.platform.runtime.ClientActivityListener;
+import com.ainclusive.iotsim.platform.runtime.HealthOrigin;
+import com.ainclusive.iotsim.platform.runtime.RuntimeActivityEvent;
 import com.ainclusive.iotsim.platform.runtime.RuntimeStartSpec;
 import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
 import org.junit.jupiter.api.AfterEach;
@@ -181,6 +185,27 @@ class SupervisorRestartTest {
             await(raceLauncher::allServersShutDown);
             raceLauncher.closeAll();
         }
+    }
+
+    @Test
+    void reachingRestartCapEmitsErrorHealthEventWithSimulatorOrigin() {
+        List<RuntimeActivityEvent> events = new CopyOnWriteArrayList<>();
+        supervisor = new Supervisor(launcher, fastPolicy, HealthPolicy.DEFAULT,
+                ClientActivityListener.NONE, events::add);
+        supervisor.start("ds1", spec());
+
+        launcher.crashLast();
+        awaitRunning(2);
+        launcher.crashLast();
+        awaitRunning(3);
+        launcher.crashLast();
+
+        await(() -> "ERROR".equals(supervisor.state("ds1")));
+        await(() -> events.stream().anyMatch(e -> e.type().equals("SOURCE_ERROR")));
+        RuntimeActivityEvent err = events.stream()
+                .filter(e -> e.type().equals("SOURCE_ERROR")).findFirst().orElseThrow();
+        assertThat(err.origin()).isEqualTo(HealthOrigin.SIMULATOR);
+        assertThat(supervisor.health("ds1").lastError().origin()).isEqualTo(HealthOrigin.SIMULATOR);
     }
 
     /** Polls until the condition holds, up to ~5s. */

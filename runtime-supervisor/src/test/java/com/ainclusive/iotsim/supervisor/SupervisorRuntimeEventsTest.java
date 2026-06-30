@@ -3,8 +3,10 @@ package com.ainclusive.iotsim.supervisor;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.ainclusive.iotsim.platform.runtime.HealthOrigin;
 import com.ainclusive.iotsim.platform.runtime.RuntimeActivityEvent;
 import com.ainclusive.iotsim.platform.runtime.RuntimeStartSpec;
+import com.ainclusive.iotsim.workercontract.v1.RuntimeEvent;
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
@@ -67,5 +69,26 @@ class SupervisorRuntimeEventsTest {
         supervisor = new Supervisor(launcher);
         assertThat(supervisor.start("ds1", spec())).isEqualTo("RUNNING");
         assertThat(supervisor.state("ds1")).isEqualTo("RUNNING");
+    }
+
+    @Test
+    void mapsWorkerErrorEventToProtocolOrigin() {
+        RuntimeEvent error = RuntimeEvent.newBuilder()
+                .setType("ERROR").setAtMicros(3_000_000L).setDetail("connection refused").build();
+
+        RuntimeActivityEvent activity = Supervisor.toRuntimeActivity("ds1", error);
+
+        assertThat(activity.type()).isEqualTo("ERROR");
+        assertThat(activity.origin()).isEqualTo(HealthOrigin.PROTOCOL);
+        assertThat(activity.detail()).isEqualTo("connection refused");
+        assertThat(activity.at()).isEqualTo(Instant.ofEpochSecond(3));
+    }
+
+    @Test
+    void mapsLifecycleEventsWithoutOrigin() {
+        RuntimeEvent start = RuntimeEvent.newBuilder()
+                .setType("SOURCE_START").setAtMicros(2_000_000L).build();
+
+        assertThat(Supervisor.toRuntimeActivity("ds1", start).origin()).isNull();
     }
 }

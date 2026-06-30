@@ -22,6 +22,15 @@ public interface RuntimeController {
     /** Current runtime state; STOPPED when not running. */
     String state(String dataSourceId);
 
+    /**
+     * Current health: the runtime {@link #state} plus the most recent error, if
+     * any. The default reports {@code state} with no error detail; the runtime
+     * supervisor overrides it to surface staleness/exit reasons.
+     */
+    default SourceHealth health(String dataSourceId) {
+        return new SourceHealth(state(dataSourceId), null);
+    }
+
     /** Pushes neutral values to the running data-source (replay/synthetic). Returns the count applied. */
     long applyValues(String dataSourceId, List<NeutralValue> values);
 }

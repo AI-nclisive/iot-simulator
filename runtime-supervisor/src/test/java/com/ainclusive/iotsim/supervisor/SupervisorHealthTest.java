@@ -2,9 +2,14 @@ package com.ainclusive.iotsim.supervisor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.ainclusive.iotsim.platform.runtime.ClientActivityListener;
+import com.ainclusive.iotsim.platform.runtime.HealthOrigin;
+import com.ainclusive.iotsim.platform.runtime.RuntimeActivityEvent;
 import com.ainclusive.iotsim.platform.runtime.RuntimeStartSpec;
+import com.ainclusive.iotsim.platform.runtime.SourceHealth;
 import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
 import org.junit.jupiter.api.AfterEach;
@@ -91,6 +96,59 @@ class SupervisorHealthTest {
 
         // The health loop must not resurrect or re-state a stopped source.
         assertStable(() -> "STOPPED".equals(supervisor.state("ds1")));
+    }
+
+    @Test
+    void staleTransitionEmitsHealthEventWithSimulatorOrigin() {
+        List<RuntimeActivityEvent> events = new CopyOnWriteArrayList<>();
+        supervisor = new Supervisor(launcher, RestartPolicy.DEFAULT, fastHealth,
+                ClientActivityListener.NONE, events::add);
+        supervisor.start("ds1", spec());
+
+        launcher.last().service().setHealthLive(false);
+
+        await(() -> events.stream().anyMatch(e -> e.type().equals("SOURCE_STALE")));
+        RuntimeActivityEvent stale = events.stream()
+                .filter(e -> e.type().equals("SOURCE_STALE")).findFirst().orElseThrow();
+        assertThat(stale.origin()).isEqualTo(HealthOrigin.SIMULATOR);
+        assertThat(stale.dataSourceId()).isEqualTo("ds1");
+
+        SourceHealth h = supervisor.health("ds1");
+        assertThat(h.state()).isEqualTo("STALE");
+        assertThat(h.lastError()).isNotNull();
+        assertThat(h.lastError().origin()).isEqualTo(HealthOrigin.SIMULATOR);
+    }
+
+    @Test
+    void recoveryEmitsRecoveredEventAndRetainsLastError() {
+        List<RuntimeActivityEvent> events = new CopyOnWriteArrayList<>();
+        supervisor = new Supervisor(launcher, RestartPolicy.DEFAULT, fastHealth,
+                ClientActivityListener.NONE, events::add);
+        supervisor.start("ds1", spec());
+
+        launcher.last().service().setHealthLive(false);
+        await(() -> "STALE".equals(supervisor.state("ds1")));
+        launcher.last().service().setHealthLive(true);
+
+        await(() -> events.stream().anyMatch(e -> e.type().equals("SOURCE_RECOVERED")));
+        SourceHealth h = supervisor.health("ds1");
+        assertThat(h.state()).isEqualTo("RUNNING");
+        assertThat(h.lastError()).isNotNull(); // retained after recovery
+    }
+
+    @Test
+    void staleEventIsEmittedOnlyOncePerTransition() {
+        List<RuntimeActivityEvent> events = new CopyOnWriteArrayList<>();
+        supervisor = new Supervisor(launcher, RestartPolicy.DEFAULT, fastHealth,
+                ClientActivityListener.NONE, events::add);
+        supervisor.start("ds1", spec());
+
+        launcher.last().service().setHealthLive(false);
+        await(() -> "STALE".equals(supervisor.state("ds1")));
+        sleep(300); // several more poll cycles while still unhealthy
+
+        long staleCount = events.stream().filter(e -> e.type().equals("SOURCE_STALE")).count();
+        assertThat(staleCount).isEqualTo(1);
     }
 
     /** Polls until the condition holds, up to ~5s. */
