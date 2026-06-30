@@ -65,6 +65,14 @@ public class ProjectController {
         return ResponseEntity.ok().eTag(etag(p.version())).body(ProjectResponse.from(p));
     }
 
+    @PostMapping("/{id}/duplicate")
+    public ResponseEntity<ProjectResponse> duplicate(@PathVariable String id) {
+        Project p = projects.duplicate(id);
+        return ResponseEntity.created(URI.create("/api/v1/projects/" + p.id()))
+                .eTag(etag(p.version()))
+                .body(ProjectResponse.from(p));
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable String id) {
         projects.delete(id);

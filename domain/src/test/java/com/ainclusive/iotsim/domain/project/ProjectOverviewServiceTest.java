@@ -73,7 +73,7 @@ class ProjectOverviewServiceTest {
     private static ProjectOverviewService service(List<Project> projects,
             Map<String, List<DataSource>> sourcesByProject,
             Map<String, List<Recording>> recordingsByProject) {
-        ProjectService projectService = new ProjectService(null) {
+        ProjectService projectService = new ProjectService(null, null, null, null) {
             @Override
             public List<Project> list() {
                 return projects;
