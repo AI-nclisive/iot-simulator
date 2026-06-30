@@ -1,4 +1,5 @@
 export { apiFetch, ApiError } from "./client";
+export type { Page } from "./client";
 export {
   mapProtocol,
   mapRuntimeStateToStatus,

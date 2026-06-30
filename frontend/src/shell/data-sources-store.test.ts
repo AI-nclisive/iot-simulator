@@ -79,10 +79,14 @@ afterEach(() => {
 
 describe("loadDataSources", () => {
   it("populates dataSources from API response", async () => {
-    mockApiFetch.mockResolvedValueOnce([
-      makeDataSourceResponse({ id: "src-01", name: "Source A" }),
-      makeDataSourceResponse({ id: "src-02", name: "Source B" }),
-    ]);
+    mockApiFetch.mockResolvedValueOnce({
+      items: [
+        makeDataSourceResponse({ id: "src-01", name: "Source A" }),
+        makeDataSourceResponse({ id: "src-02", name: "Source B" }),
+      ],
+      nextCursor: null,
+      limit: 50,
+    });
     await useDataSourcesStore.getState().loadDataSources("proj-1");
     const { dataSources, isLoading, error } = useDataSourcesStore.getState();
     expect(dataSources).toHaveLength(2);
@@ -100,7 +104,7 @@ describe("loadDataSources", () => {
   });
 
   it("stores currentProjectId", async () => {
-    mockApiFetch.mockResolvedValueOnce([]);
+    mockApiFetch.mockResolvedValueOnce({ items: [], nextCursor: null, limit: 50 });
     await useDataSourcesStore.getState().loadDataSources("proj-42");
     expect(useDataSourcesStore.getState().currentProjectId).toBe("proj-42");
   });

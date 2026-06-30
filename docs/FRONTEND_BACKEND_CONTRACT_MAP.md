@@ -9,9 +9,12 @@ schema, scan, recordings, replay** (`IS-022…032`, `IS-035…045`). Live
 observability, evidence, scenarios, faults and auth are **not** covered here —
 they need backend tasks first (see the gap index at the end).
 
-Status when written: frontend has **no API client** — every screen reads Zustand
-stores seeded from `frontend/src/**/mock-*.ts`. The backend exposes the contracts
-below. This document is the join.
+Status: the frontend now has an API client (`frontend/src/api/client.ts`,
+`apiFetch`) and the ready-core stores — **projects, data sources, recordings** —
+read the live `/api/v1` surface. Surfaces without backend support yet (e.g.
+scenarios, seeded live-value rows) still read Zustand stores from
+`frontend/src/**/mock-*.ts`. This document remains the join and the field-level
+contract reference for wired and not-yet-wired surfaces alike.
 
 > Ground truth: backend DTOs read from `api/.../**Controller.java` + DTO records;
 > FE shapes read from `frontend/src/**`. Enum values read from
@@ -24,25 +27,30 @@ below. This document is the join.
 
 These apply to every call and are the bulk of the wiring work.
 
-1. **Base URL / proxy.** All endpoints live under `/api/v1`. Add
-   `VITE_API_BASE_URL` and a dev proxy in `vite.config.ts` (currently none).
-2. **Generate the client from OpenAPI.** The backend already serves OpenAPI +
-   Swagger (`IS-030`, `/openapi.json`, `/swagger-ui`). Generate the TS client and
-   types from it instead of hand-writing — it makes the OpenAPI doc the single
-   source of truth and kills the enum/field drift listed below.
+1. **Base URL / proxy.** All endpoints live under `/api/v1`. `VITE_API_BASE_URL`
+   and a dev proxy (`/api` → `:8080`) are wired in `vite.config.ts`; the client
+   reads `VITE_API_BASE_URL` (empty in dev → relative `/api`, proxied).
+2. **Generate the client from OpenAPI.** The backend serves OpenAPI + Swagger
+   (`IS-030`, `/openapi.json`, `/swagger-ui`), and an `npm run generate:api`
+   script (openapi-typescript → `frontend/src/generated/api.ts`) exists — but is
+   **not yet adopted**: the stores still hand-write DTO types (`ProjectResponse`,
+   …). Generating from OpenAPI instead would make the doc the single source of
+   truth and kill the enum/field drift listed below.
 3. **Optimistic concurrency (ETag/If-Match).** `GET`/`POST`/`PUT` on **projects,
    data-sources, schema** return an `ETag: "<version>"` header and the body
    carries `version`. Mutations (`PUT`) **require** `If-Match: "<version>"`; a
-   stale value returns **409**. The FE stores currently drop `version` — it must
-   be threaded through every read so edits/saves can send `If-Match`. This also
-   backs the UI edit-lock/stale patterns (`UI-005`).
+   stale value returns **409**. The API client now handles this at the edge — it
+   captures each response `ETag` (keyed by path) and automatically sends
+   `If-Match` on `PUT`/`DELETE` — so stores no longer thread `version` themselves.
+   This backs the UI edit-lock/stale patterns (`UI-005`).
 4. **Errors are `application/problem+json`** (RFC 9457, `IS-032`): `status`,
-   `title`, `detail`, `type`. Map to the shared error/toast patterns
-   (`UI-002`, `UI-095`). Notable codes: `409` concurrency, `428` precondition
-   required (missing `If-Match`), `404`, `400`.
+   `title`, `detail`, `type`. The client parses these into a typed `ApiError`;
+   map it to the shared error/toast patterns (`UI-002`, `UI-095`). Notable codes:
+   `409` concurrency, `428` precondition required (missing `If-Match`), `404`, `400`.
 5. **Auth header.** Local mode (default) needs no header. Shared mode expects
-   `Authorization: Bearer <jwt>` — attach the token when present. (Shared-mode
-   enforcement itself is still a backend todo, `IS-075…077`.)
+   `Authorization: Bearer <jwt>`; the client attaches it from `sessionStorage`
+   when present. (Shared-mode enforcement itself is still a backend todo,
+   `IS-075…077`.)
 6. **Enum value alignment.** Backend serializes Java enum **names**
    (`OPC_UA`, `RUNNING`, `FLOAT64`, `READ_WRITE`). The FE uses display unions
    (`"OPC UA"`, `"Active"`, `"float"`). Either map at the client edge or align
@@ -50,6 +58,13 @@ These apply to every call and are the bulk of the wiring work.
 7. **Secrets are write-only.** `connectionConfig.secret`/`secretRef` are sent on
    create/scan, **never returned** in any response (`IS-042`). The FE masking
    behavior (`UI-039A`) already matches this — never read secrets back.
+8. **Collections are cursor-paginated** (`IS-074`). Every list `GET` returns a
+   `Page<T>` envelope — `{ items: T[], nextCursor: string | null, limit: number }`
+   — **not a bare array**. The FE client must read `.items`; follow the opaque
+   keyset `nextCursor` (`null` on the last page) for "load more", and pass
+   `?cursor=&limit=` to page. Lists also accept simple filters (projects
+   `?status`, data-sources `?protocol`). Single-resource `GET /{id}` and all
+   mutations still return one DTO (unchanged).
 
 ### Path corrections (FE assumptions → real backend)
 
@@ -69,7 +84,7 @@ The FE invented endpoint names that don't exist. Real paths:
 
 | Method | Path | Request | Response | Headers |
 | --- | --- | --- | --- | --- |
-| GET | `/projects` | — | `ProjectResponse[]` | — |
+| GET | `/projects` | `?status, cursor, limit` | `Page<ProjectResponse>` | — |
 | POST | `/projects` | `CreateProjectRequest{name, description}` | `ProjectResponse` (201) | sets `ETag`, `Location` |
 | GET | `/projects/{id}` | — | `ProjectResponse` | sets `ETag` |
 | PUT | `/projects/{id}` | `UpdateProjectRequest{name, description}` | `ProjectResponse` | needs `If-Match`, sets `ETag` |
@@ -103,7 +118,7 @@ a backend task.
 
 | Method | Path | Request | Response |
 | --- | --- | --- | --- |
-| GET | `` | — | `DataSourceResponse[]` |
+| GET | `` | `?protocol, cursor, limit` | `Page<DataSourceResponse>` |
 | POST | `` | `CreateDataSourceRequest` | `DataSourceResponse` (201, ETag, Location) |
 | GET | `/{id}` | — | `DataSourceResponse` (ETag) |
 | PUT | `/{id}` | `UpdateDataSourceRequest` | `DataSourceResponse` (If-Match, ETag) |
@@ -226,7 +241,7 @@ status-value mapping.
 
 | Method | Path | Request | Response |
 | --- | --- | --- | --- |
-| GET | `…/recordings` | — | `RecordingResponse[]` |
+| GET | `…/recordings` | `?cursor, limit` | `Page<RecordingResponse>` |
 | POST | `…/recordings` | `CreateRecordingRequest{dataSourceId}` | `RecordingResponse` (201) |
 | GET | `…/recordings/{id}` | — | `RecordingResponse` |
 | POST | `…/{dataSourceId}/recording/start` | — | `RecordingResponse` (201) |
@@ -310,15 +325,15 @@ register tasks (so the UI knows what to stub vs. wait for):
 | Login / roles / permissions | `IS-075`, `IS-076`, `IS-077` |
 | Edit leases (stale-lock) | `IS-079`, `IS-080`, `IS-081` |
 | Project import/export | `IS-073` |
-| List pagination/filtering | `IS-074` |
 | Admin user-management endpoints | *(new)* `IS-118` |
 
 ## Bottom line
 
-- **Wire today (with enum mapping + ETag plumbing + scan polling):** Project
-  Entry/CRUD, Data Sources list & detail (config/start/stop/credentials), full
-  Schema editor, the entire Scan→create flow, recording capture start/stop +
-  basic list, fire-and-return Replay.
+- **Wire today (with enum mapping + ETag plumbing + scan polling + `Page<T>`
+  unwrapping):** Project Entry/CRUD, Data Sources list & detail
+  (config/start/stop/credentials), full Schema editor, the entire Scan→create
+  flow, recording capture start/stop + basic list, fire-and-return Replay. All
+  list `GET`s return a cursor-paged `Page<T>` envelope (`IS-074`).
 - **Needs a backend task first:** everything *live* (values/clients/events/health/
   runs), evidence, named recordings & samples, deterministic replay, auth/admin,
-  import/export, pagination.
+  import/export.
