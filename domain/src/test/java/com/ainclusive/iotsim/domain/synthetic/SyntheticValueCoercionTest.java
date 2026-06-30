@@ -5,8 +5,10 @@ import static com.ainclusive.iotsim.protocolmodel.DataType.FLOAT32;
 import static com.ainclusive.iotsim.protocolmodel.DataType.FLOAT64;
 import static com.ainclusive.iotsim.protocolmodel.DataType.INT16;
 import static com.ainclusive.iotsim.protocolmodel.DataType.INT32;
+import static com.ainclusive.iotsim.protocolmodel.DataType.INT64;
 import static com.ainclusive.iotsim.protocolmodel.DataType.STRING;
 import static com.ainclusive.iotsim.protocolmodel.DataType.UINT16;
+import static com.ainclusive.iotsim.protocolmodel.DataType.UINT32;
 import static com.ainclusive.iotsim.protocolmodel.DataType.UINT64;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
@@ -24,6 +26,17 @@ class SyntheticValueCoercionTest {
         assertThat(SyntheticValueCoercion.coerce(-5.0, UINT16)).isEqualTo(0L);
         assertThat(SyntheticValueCoercion.coerce(-1.0, UINT64)).isEqualTo(0L);
         assertThat(SyntheticValueCoercion.coerce(123.4, INT32)).isEqualTo(123L);
+    }
+
+    @Test
+    void uint32HasItsOwnRangeAndInt64SaturatesBeyondDoublePrecision() {
+        assertThat(SyntheticValueCoercion.coerce(100.5, UINT32)).isEqualTo(101L);
+        assertThat(SyntheticValueCoercion.coerce(5_000_000_000.0, UINT32)).isEqualTo(4_294_967_295L);
+        assertThat(SyntheticValueCoercion.coerce(-1.0, UINT32)).isEqualTo(0L);
+
+        assertThat(SyntheticValueCoercion.coerce(42.4, INT64)).isEqualTo(42L);
+        assertThat(SyntheticValueCoercion.coerce(1e30, INT64)).isEqualTo(Long.MAX_VALUE);
+        assertThat(SyntheticValueCoercion.coerce(-1e30, INT64)).isEqualTo(Long.MIN_VALUE);
     }
 
     @Test

@@ -113,6 +113,8 @@ public sealed interface SyntheticPattern {
         @Override
         public Signal bind(RandomGenerator rng) {
             double[] current = {(min + max) / 2.0};
+            // Stateful: each call advances the walk regardless of tick/elapsed,
+            // so it must be sampled strictly in tick order (cannot be seeked).
             return (tick, elapsed) -> {
                 double next = current[0] + rng.nextGaussian() * volatility;
                 current[0] = Math.clamp(next, min, max);
