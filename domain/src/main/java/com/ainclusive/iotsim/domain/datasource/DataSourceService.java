@@ -10,6 +10,7 @@ import com.ainclusive.iotsim.persistence.schema.SchemaWithNodes;
 import com.ainclusive.iotsim.platform.runtime.RuntimeController;
 import com.ainclusive.iotsim.platform.secret.ConnectionCredentials;
 import com.ainclusive.iotsim.platform.secret.CredentialStore;
+import com.ainclusive.iotsim.protocolmodel.SchemaNode;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
@@ -34,14 +35,26 @@ public class DataSourceService {
         this.credentials = credentials;
     }
 
+    /**
+     * Creates a new data source. If {@code initialNodes} is non-null and non-empty the nodes
+     * are saved as schema version 1 atomically with the insert (IS-067: create from import /
+     * prepared data).
+     */
+    @Transactional
     public DataSource create(String projectId, String name, String protocol, String basis,
-            String endpoint, String runtimeConfig, ConnectionCredentials connectionCredentials, String actor) {
+            String endpoint, String runtimeConfig, ConnectionCredentials connectionCredentials,
+            List<SchemaNode> initialNodes, String actor) {
         requireProject(projectId);
         // Validate enum inputs early (invalid -> IllegalArgumentException -> 400).
         Protocol.valueOf(protocol);
         SourceBasis.valueOf(basis);
         DataSourceRow row = dataSources.insert(projectId, name, protocol, basis, endpoint, runtimeConfig, actor);
         applyCredentials(row.id(), connectionCredentials);
+        if (initialNodes != null && !initialNodes.isEmpty()) {
+            schemas.saveNewVersion(row.id(), initialNodes);
+            return map(dataSources.findById(row.id())
+                    .orElseThrow(() -> new ResourceNotFoundException("DataSource", row.id())));
+        }
         return map(row);
     }
 
