@@ -65,7 +65,9 @@ export function DataSourceDetailOverviewTab({
         <div>
           <p className="text-sm font-medium text-shell-ink">Source</p>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-shell-muted">
-            The source is available. Open Schema to review parameters, or Values to see current readings.
+            {source.status === "Active"
+              ? "The source is running. Open Schema to review parameters, or Values to see current readings."
+              : "The source is stopped. Start it to enable recording, replay, and live values."}
           </p>
 
           <dl className="mt-5 grid gap-3 text-sm text-shell-muted sm:grid-cols-2">
