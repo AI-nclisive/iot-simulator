@@ -11,6 +11,7 @@ import com.ainclusive.iotsim.protocolmodel.Quality;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -154,13 +155,16 @@ public class SampleImportExportService {
 
     private record ImportPayload(SampleExportManifest manifest, List<NeutralValue> values) {}
 
+    /** Maximum decompressed size per ZIP entry (100 MiB). Prevents ZIP-bomb attacks. */
+    private static final long MAX_ENTRY_BYTES = 100L * 1024 * 1024;
+
     private ImportPayload parseZip(byte[] zipContent) {
         SampleExportManifest manifest = null;
         List<NeutralValue> values = null;
         try (ZipInputStream zip = new ZipInputStream(new ByteArrayInputStream(zipContent))) {
             ZipEntry entry;
             while ((entry = zip.getNextEntry()) != null) {
-                byte[] bytes = zip.readAllBytes();
+                byte[] bytes = readBounded(zip, entry.getName());
                 if ("manifest.json".equals(entry.getName())) {
                     manifest = json.readValue(bytes, SampleExportManifest.class);
                 } else if ("value-timeline.json".equals(entry.getName())) {
@@ -175,6 +179,27 @@ public class SampleImportExportService {
             throw new IllegalArgumentException("import ZIP is missing manifest.json");
         }
         return new ImportPayload(manifest, values != null ? values : List.of());
+    }
+
+    /**
+     * Reads at most {@link #MAX_ENTRY_BYTES} from an {@link InputStream}, throwing
+     * {@link IllegalArgumentException} if the entry exceeds the limit.
+     */
+    private static byte[] readBounded(InputStream in, String entryName) throws IOException {
+        ByteArrayOutputStream buf = new ByteArrayOutputStream();
+        byte[] block = new byte[8192];
+        long total = 0;
+        int read;
+        while ((read = in.read(block)) != -1) {
+            total += read;
+            if (total > MAX_ENTRY_BYTES) {
+                throw new IllegalArgumentException(
+                        "ZIP entry '" + entryName + "' exceeds the maximum allowed size of "
+                        + MAX_ENTRY_BYTES + " bytes");
+            }
+            buf.write(block, 0, read);
+        }
+        return buf.toByteArray();
     }
 
     private List<NeutralValue> parseValues(byte[] bytes) {
