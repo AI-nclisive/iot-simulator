@@ -3,19 +3,36 @@ package com.ainclusive.iotsim.domain.project;
 import com.ainclusive.iotsim.domain.common.ConcurrencyConflictException;
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.domain.project.Project.ProjectStatus;
+import com.ainclusive.iotsim.persistence.datasource.DataSourceRepository;
+import com.ainclusive.iotsim.persistence.datasource.DataSourceRow;
 import com.ainclusive.iotsim.persistence.project.ProjectRepository;
 import com.ainclusive.iotsim.persistence.project.ProjectRow;
+import com.ainclusive.iotsim.persistence.recording.RecordingRepository;
+import com.ainclusive.iotsim.persistence.recording.RecordingRow;
+import com.ainclusive.iotsim.persistence.schema.SchemaRepository;
+import com.ainclusive.iotsim.persistence.schema.SchemaWithNodes;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /** Project lifecycle (backend-specs/03_DOMAIN_MODEL.md). */
 @Service
 public class ProjectService {
 
     private final ProjectRepository repository;
+    private final DataSourceRepository dataSources;
+    private final SchemaRepository schemas;
+    private final RecordingRepository recordings;
 
-    public ProjectService(ProjectRepository repository) {
+    public ProjectService(ProjectRepository repository, DataSourceRepository dataSources,
+            SchemaRepository schemas, RecordingRepository recordings) {
         this.repository = repository;
+        this.dataSources = dataSources;
+        this.schemas = schemas;
+        this.recordings = recordings;
     }
 
     public Project create(String name, String description, String actor) {
@@ -47,6 +64,52 @@ public class ProjectService {
         if (!repository.deleteById(id)) {
             throw new ResourceNotFoundException("Project", id);
         }
+    }
+
+    /**
+     * Deep-copies a project: project metadata, all data sources (config + schema),
+     * and recording metadata rows (no timeline data). The copy gets a new ID,
+     * name = "&lt;original name&gt; (copy)", createdAt = now, data sources are disabled
+     * with runtimeState = STOPPED. Returns 404 if the source project does not exist.
+     */
+    @Transactional
+    public Project duplicate(String sourceId) {
+        ProjectRow source = repository.findById(sourceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Project", sourceId));
+
+        // Create the new project.
+        ProjectRow copy = repository.insert(
+                source.name() + " (copy)", source.description(), source.createdBy());
+
+        // Copy each data source, tracking old->new ID mapping for recording re-pointing.
+        Map<String, String> dsIdMap = new HashMap<>();
+        Map<String, Integer> dsSchemaVersionMap = new HashMap<>();
+        for (DataSourceRow ds : dataSources.findByProject(sourceId)) {
+            DataSourceRow newDs = dataSources.insert(
+                    copy.id(), ds.name(), ds.protocol(), ds.basis(),
+                    ds.endpoint(), ds.runtimeConfig(), ds.createdBy());
+            dsIdMap.put(ds.id(), newDs.id());
+
+            // Copy schema if present and non-empty (mirrors DataSourceService.duplicate() guard).
+            Optional<SchemaWithNodes> schema = schemas.findCurrent(ds.id());
+            if (schema.isPresent() && !schema.get().nodes().isEmpty()) {
+                SchemaWithNodes saved = schemas.saveNewVersion(newDs.id(), schema.get().nodes());
+                dsSchemaVersionMap.put(ds.id(), saved.version());
+            }
+        }
+
+        // Copy recording metadata rows, re-pointing to the new data source IDs.
+        for (RecordingRow rec : recordings.findByProject(sourceId)) {
+            String newDsId = dsIdMap.get(rec.dataSourceId());
+            if (newDsId == null) {
+                throw new IllegalStateException(
+                        "Recording " + rec.id() + " references unknown data source " + rec.dataSourceId());
+            }
+            int newSchemaVersion = dsSchemaVersionMap.getOrDefault(rec.dataSourceId(), rec.schemaVersion());
+            recordings.create(copy.id(), newDsId, newSchemaVersion, rec.origin(), rec.createdBy());
+        }
+
+        return toDomain(copy);
     }
 
     private Project toDomain(ProjectRow r) {

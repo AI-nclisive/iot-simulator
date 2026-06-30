@@ -5,12 +5,22 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.ainclusive.iotsim.domain.common.ConcurrencyConflictException;
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
+import com.ainclusive.iotsim.persistence.datasource.DataSourceRepository;
+import com.ainclusive.iotsim.persistence.datasource.DataSourceRow;
 import com.ainclusive.iotsim.persistence.project.ProjectRepository;
 import com.ainclusive.iotsim.persistence.project.ProjectRow;
+import com.ainclusive.iotsim.persistence.recording.RecordingRepository;
+import com.ainclusive.iotsim.persistence.recording.RecordingRow;
+import com.ainclusive.iotsim.persistence.schema.SchemaRepository;
+import com.ainclusive.iotsim.persistence.schema.SchemaWithNodes;
+import com.ainclusive.iotsim.protocolmodel.NodeKind;
+import com.ainclusive.iotsim.protocolmodel.SchemaNode;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,10 +28,18 @@ import org.junit.jupiter.api.Test;
 class ProjectServiceTest {
 
     private ProjectService service;
+    private InMemoryProjectRepository projectRepo;
+    private InMemoryDataSourceRepository dsRepo;
+    private InMemorySchemaRepository schemaRepo;
+    private InMemoryRecordingRepository recordingRepo;
 
     @BeforeEach
     void setUp() {
-        service = new ProjectService(new InMemoryProjectRepository());
+        projectRepo = new InMemoryProjectRepository();
+        dsRepo = new InMemoryDataSourceRepository();
+        schemaRepo = new InMemorySchemaRepository();
+        recordingRepo = new InMemoryRecordingRepository();
+        service = new ProjectService(projectRepo, dsRepo, schemaRepo, recordingRepo);
     }
 
     @Test
@@ -67,6 +85,81 @@ class ProjectServiceTest {
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
+    // -------------------------------------------------------------------------
+    // duplicate() — happy path
+    // -------------------------------------------------------------------------
+
+    @Test
+    void duplicateCreatesCopyWithSuffix() {
+        Project src = service.create("Factory", "desc", "alice");
+        Project copy = service.duplicate(src.id());
+
+        assertThat(copy.id()).isNotEqualTo(src.id());
+        assertThat(copy.name()).isEqualTo("Factory (copy)");
+        assertThat(copy.description()).isEqualTo("desc");
+        assertThat(copy.createdBy()).isEqualTo("alice");
+        assertThat(copy.version()).isZero();
+    }
+
+    @Test
+    void duplicateCopiesDataSources() {
+        Project src = service.create("Factory", null, "alice");
+        dsRepo.insert(src.id(), "Sensor A", "OPC_UA", "SCAN", null, null, "alice");
+        dsRepo.insert(src.id(), "Sensor B", "MODBUS_TCP", "MANUAL", null, null, "alice");
+
+        Project copy = service.duplicate(src.id());
+
+        List<DataSourceRow> copiedDs = dsRepo.findByProject(copy.id());
+        assertThat(copiedDs).hasSize(2);
+        assertThat(copiedDs.stream().map(DataSourceRow::name))
+                .containsExactlyInAnyOrder("Sensor A", "Sensor B");
+        // Copies must have new IDs distinct from the originals.
+        List<DataSourceRow> originalDs = dsRepo.findByProject(src.id());
+        assertThat(copiedDs.stream().map(DataSourceRow::id))
+                .doesNotContainAnyElementsOf(originalDs.stream().map(DataSourceRow::id).toList());
+    }
+
+    @Test
+    void duplicateCopiesRecordingsWithUpdatedDataSourceIds() {
+        Project src = service.create("Factory", null, "alice");
+        DataSourceRow ds = dsRepo.insert(src.id(), "Sensor A", "OPC_UA", "SCAN", null, null, "alice");
+        recordingRepo.create(src.id(), ds.id(), 1, "SCAN_RECORD", "alice");
+
+        Project copy = service.duplicate(src.id());
+
+        List<RecordingRow> copiedRecs = recordingRepo.findByProject(copy.id());
+        assertThat(copiedRecs).hasSize(1);
+        // The copied recording must point to the new data source, not the original.
+        List<DataSourceRow> copiedDs = dsRepo.findByProject(copy.id());
+        assertThat(copiedRecs.get(0).dataSourceId()).isEqualTo(copiedDs.get(0).id());
+        assertThat(copiedRecs.get(0).dataSourceId()).isNotEqualTo(ds.id());
+    }
+
+    @Test
+    void duplicateCopiesSchemaToNewDataSource() {
+        Project src = service.create("Factory", null, "alice");
+        DataSourceRow ds = dsRepo.insert(src.id(), "Sensor A", "OPC_UA", "SCAN", null, null, "alice");
+        SchemaNode node = new SchemaNode("n1", null, "/root", "root", NodeKind.FOLDER,
+                null, null, null, null, null);
+        schemaRepo.saveNewVersion(ds.id(), List.of(node));
+
+        Project copy = service.duplicate(src.id());
+
+        DataSourceRow copiedDs = dsRepo.findByProject(copy.id()).get(0);
+        assertThat(schemaRepo.findCurrent(copiedDs.id())).isPresent();
+        assertThat(schemaRepo.findCurrent(ds.id())).isPresent(); // original untouched
+    }
+
+    @Test
+    void duplicateMissingSourceThrowsNotFound() {
+        assertThatThrownBy(() -> service.duplicate("no-such-project"))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    // =========================================================================
+    // In-memory fakes
+    // =========================================================================
+
     /** Minimal in-memory repository — keeps the service test free of a database. */
     private static final class InMemoryProjectRepository implements ProjectRepository {
         private final List<ProjectRow> rows = new ArrayList<>();
@@ -109,6 +202,111 @@ class ProjectServiceTest {
         @Override
         public boolean deleteById(String id) {
             return rows.removeIf(r -> r.id().equals(id));
+        }
+    }
+
+    private static final class InMemoryDataSourceRepository implements DataSourceRepository {
+        private final List<DataSourceRow> rows = new ArrayList<>();
+        private int seq;
+
+        @Override
+        public DataSourceRow insert(String projectId, String name, String protocol, String basis,
+                String endpointJson, String runtimeConfigJson, String createdBy) {
+            OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+            DataSourceRow row = new DataSourceRow(
+                    "ds-" + (++seq), projectId, name, protocol, basis,
+                    null, null, endpointJson, runtimeConfigJson, false,
+                    now, now, createdBy, 0);
+            rows.add(row);
+            return row;
+        }
+
+        @Override
+        public List<DataSourceRow> findByProject(String projectId) {
+            return rows.stream().filter(r -> r.projectId().equals(projectId)).toList();
+        }
+
+        @Override
+        public Optional<DataSourceRow> findById(String id) {
+            return rows.stream().filter(r -> r.id().equals(id)).findFirst();
+        }
+
+        @Override
+        public Optional<DataSourceRow> duplicate(String sourceId, String newName, String createdBy) {
+            return rows.stream()
+                    .filter(r -> r.id().equals(sourceId))
+                    .findFirst()
+                    .map(source -> {
+                        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+                        DataSourceRow copy = new DataSourceRow(
+                                "ds-" + (++seq), source.projectId(), newName,
+                                source.protocol(), source.basis(), null, null,
+                                source.endpoint(), source.runtimeConfig(),
+                                false, now, now, createdBy, 0);
+                        rows.add(copy);
+                        return copy;
+                    });
+        }
+
+        @Override
+        public Optional<DataSourceRow> update(String id, String name, String endpointJson,
+                String runtimeConfigJson, boolean enabled, long expectedVersion) {
+            return Optional.empty();
+        }
+
+        @Override
+        public boolean deleteById(String id) {
+            return rows.removeIf(r -> r.id().equals(id));
+        }
+    }
+
+    private static final class InMemorySchemaRepository implements SchemaRepository {
+        private final Map<String, SchemaWithNodes> store = new HashMap<>();
+        private int seq;
+
+        @Override
+        public Optional<SchemaWithNodes> findCurrent(String dataSourceId) {
+            return Optional.ofNullable(store.get(dataSourceId));
+        }
+
+        @Override
+        public SchemaWithNodes saveNewVersion(String dataSourceId, List<SchemaNode> nodes) {
+            SchemaWithNodes sw = new SchemaWithNodes(
+                    "schema-" + (++seq), dataSourceId, 1, OffsetDateTime.now(ZoneOffset.UTC), nodes);
+            store.put(dataSourceId, sw);
+            return sw;
+        }
+    }
+
+    private static final class InMemoryRecordingRepository implements RecordingRepository {
+        private final List<RecordingRow> rows = new ArrayList<>();
+        private int seq;
+
+        @Override
+        public RecordingRow create(String projectId, String dataSourceId, int schemaVersion,
+                String origin, String createdBy) {
+            OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+            RecordingRow row = new RecordingRow(
+                    "rec-" + (++seq), projectId, dataSourceId, schemaVersion, origin,
+                    null, null, 0L, 0L, now, now, createdBy, 0);
+            rows.add(row);
+            return row;
+        }
+
+        @Override
+        public Optional<RecordingRow> findById(String id) {
+            return rows.stream().filter(r -> r.id().equals(id)).findFirst();
+        }
+
+        @Override
+        public List<RecordingRow> findByProject(String projectId) {
+            return rows.stream().filter(r -> r.projectId().equals(projectId)).toList();
+        }
+
+        @Override
+        public RecordingRow finalizeStats(String id, java.time.OffsetDateTime timeStart,
+                java.time.OffsetDateTime timeEnd, long valueCount, long sizeBytes) {
+            throw new UnsupportedOperationException();
         }
     }
 }
