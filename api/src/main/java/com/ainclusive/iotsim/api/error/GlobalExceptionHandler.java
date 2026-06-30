@@ -3,6 +3,7 @@ package com.ainclusive.iotsim.api.error;
 import com.ainclusive.iotsim.domain.common.ConcurrencyConflictException;
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.domain.common.SchemaVersionMismatchException;
+import com.ainclusive.iotsim.domain.io.ProjectImportException;
 import com.ainclusive.iotsim.platform.capture.CaptureException;
 import com.ainclusive.iotsim.platform.runtime.RuntimeCapacityException;
 import org.springframework.http.HttpStatus;
@@ -52,6 +53,11 @@ public class GlobalExceptionHandler {
         // The request is valid; the supervisor is simply at its concurrent-worker cap.
         // Retryable once a running source is stopped or the cap is raised (IS-061).
         return problem(HttpStatus.SERVICE_UNAVAILABLE, e.getMessage());
+    }
+
+    @ExceptionHandler(ProjectImportException.class)
+    public ProblemDetail projectImportFailed(ProjectImportException e) {
+        return problem(HttpStatus.UNPROCESSABLE_ENTITY, e.getMessage());
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
