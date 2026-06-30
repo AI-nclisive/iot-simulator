@@ -693,7 +693,7 @@ Parallel execution:
   `/api/v1` with mocks removed; gaps with no backend field are clearly stubbed
   and flagged, never faked silently.
 
-- [ ] `UI-098` Live SSE subscriptions
+- [x] `UI-098` Live SSE subscriptions
   Goal: drive live surfaces from server-sent events instead of static mocks.
   Surface: `Data Source Detail` (Values/Clients/Events), `Runtime Dashboard`,
   `Project Overview`
