@@ -610,7 +610,7 @@ Parallel execution:
 3. After `UI-061`, run `UI-062`, `UI-064`, and `UI-065` in parallel.
 4. After `UI-062`, run `UI-063`.
 
-- [ ] `UI-060` Scenarios
+- [x] `UI-060` Scenarios
   Surface: `Scenarios`
   Depends: `UI-003`, `UI-006`
   Done when: saved scenarios show state, last run, owner or editor context, and
