@@ -59,7 +59,8 @@ public class RuntimeConfig {
                     new CompositeClientActivityListener(clientPersister, liveEventHub);
             return new Supervisor(
                     new ProcessWorkerLauncher(props.workers()), props.restartPolicy(),
-                    HealthPolicy.DEFAULT, clientListener, runtimeListener, liveValuesHub);
+                    HealthPolicy.DEFAULT, clientListener, runtimeListener, liveValuesHub,
+                    props.governancePolicy());
         }
         return new InMemoryRuntimeController();
     }
