@@ -14,6 +14,7 @@ import { ProjectEntryPage } from "./surfaces/project-entry-page";
 import { RecordingFlowPage } from "./surfaces/recording-flow-page";
 import { RecordingsPage } from "./surfaces/recordings-page";
 import { ReplayFlowPage } from "./surfaces/replay-flow-page";
+import { ScenarioBuilderPage } from "./surfaces/scenario-builder-page";
 import { ScenariosPage } from "./surfaces/scenarios-page";
 import { SettingsPage } from "./surfaces/settings-page";
 import { SurfaceStubPage } from "./surfaces/surface-stub-page";
@@ -123,6 +124,10 @@ export const router = createBrowserRouter([
       {
         path: "scenarios",
         element: <ScenariosPage />,
+      },
+      {
+        path: "scenarios/:scenarioId",
+        element: <ScenarioBuilderPage />,
       },
       {
         path: "evidence",

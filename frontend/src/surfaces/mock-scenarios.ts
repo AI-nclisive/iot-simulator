@@ -73,3 +73,23 @@ export const scenarioRows: ScenarioRow[] = [
     updatedAt: "2026-06-27T15:30:00Z",
   },
 ];
+
+// Seed steps per scenario id for the builder shell (UI-061). Step config is left
+// open/partial here — the typed field editors are UI-062/063. `configured`
+// reflects whether required config is present so validation has something real
+// to report.
+export const stepsByScenario: Record<string, import("./scenario-steps").ScenarioStep[]> = {
+  "scn-01": [
+    { id: "st-1", type: "start", label: "Line A telemetry", config: { sourceId: "src-01" }, configured: true },
+    { id: "st-2", type: "replay", label: "Calibration recording", config: { recordingId: "rec-12" }, configured: true },
+    { id: "st-3", type: "wait", label: "Hold 30s", config: { seconds: 30 }, configured: true },
+  ],
+  "scn-02": [
+    { id: "st-1", type: "start", label: "Packaging cell stream", config: { sourceId: "src-02" }, configured: true },
+    { id: "st-2", type: "fault", label: "Quality fault", config: {}, configured: false },
+  ],
+  "scn-03": [
+    { id: "st-1", type: "synthetic", label: "Field sources", config: { pattern: "ramp" }, configured: true },
+  ],
+  "scn-04": [],
+};
