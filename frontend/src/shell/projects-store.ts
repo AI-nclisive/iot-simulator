@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { apiFetch, ApiError } from "../api";
+import { apiFetch, ApiError, type Page } from "../api";
 import type { ProjectSummary } from "./mock-workspace";
 
 // Backend response shape from GET/POST/PUT /api/v1/projects
@@ -64,13 +64,14 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       // Fetch projects list and overview counts in parallel
-      const [data, overviewData] = await Promise.all([
-        apiFetch<ProjectResponse[]>("/api/v1/projects"),
+      const [projectsPage, overviewData] = await Promise.all([
+        apiFetch<Page<ProjectResponse>>("/api/v1/projects"),
         apiFetch<ProjectOverviewResponse[]>("/api/v1/projects/overview").catch((err) => {
           console.warn("Failed to load project overview counts; falling back to 0:", err);
           return [] as ProjectOverviewResponse[];
         }),
       ]);
+      const data = projectsPage.items;
 
       const overviewMap = new Map<string, ProjectOverviewResponse>(
         overviewData.map((o) => [o.projectId, o]),

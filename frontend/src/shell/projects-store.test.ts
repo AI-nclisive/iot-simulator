@@ -85,10 +85,14 @@ afterEach(() => {
 describe("loadProjects", () => {
   it("sets active projects from API response", async () => {
     mockApiFetch
-      .mockResolvedValueOnce([
-        makeProjectResponse({ id: "p1", name: "Alpha" }),
-        makeProjectResponse({ id: "p2", name: "Beta" }),
-      ])
+      .mockResolvedValueOnce({
+        items: [
+          makeProjectResponse({ id: "p1", name: "Alpha" }),
+          makeProjectResponse({ id: "p2", name: "Beta" }),
+        ],
+        nextCursor: null,
+        limit: 50,
+      })
       .mockResolvedValueOnce([]);
     await useProjectsStore.getState().loadProjects();
     const { projects, archivedProjects, isLoading, error } = useProjectsStore.getState();
@@ -102,10 +106,14 @@ describe("loadProjects", () => {
 
   it("separates archived projects", async () => {
     mockApiFetch
-      .mockResolvedValueOnce([
-        makeProjectResponse({ id: "p1", status: "ACTIVE" }),
-        makeProjectResponse({ id: "p2", status: "ARCHIVED" }),
-      ])
+      .mockResolvedValueOnce({
+        items: [
+          makeProjectResponse({ id: "p1", status: "ACTIVE" }),
+          makeProjectResponse({ id: "p2", status: "ARCHIVED" }),
+        ],
+        nextCursor: null,
+        limit: 50,
+      })
       .mockResolvedValueOnce([]);
     await useProjectsStore.getState().loadProjects();
     expect(useProjectsStore.getState().projects).toHaveLength(1);
@@ -114,10 +122,14 @@ describe("loadProjects", () => {
 
   it("merges overview counts into projects by projectId", async () => {
     mockApiFetch
-      .mockResolvedValueOnce([
-        makeProjectResponse({ id: "p1", name: "Alpha" }),
-        makeProjectResponse({ id: "p2", name: "Beta" }),
-      ])
+      .mockResolvedValueOnce({
+        items: [
+          makeProjectResponse({ id: "p1", name: "Alpha" }),
+          makeProjectResponse({ id: "p2", name: "Beta" }),
+        ],
+        nextCursor: null,
+        limit: 50,
+      })
       .mockResolvedValueOnce([
         makeOverviewResponse({ projectId: "p1", configuredSources: 12, runningSources: 3, reusableArtifacts: 28, sourcesNeedingAttention: 1 }),
         makeOverviewResponse({ projectId: "p2", configuredSources: 5, runningSources: 0, reusableArtifacts: 7, sourcesNeedingAttention: 0 }),
@@ -137,7 +149,11 @@ describe("loadProjects", () => {
   it("falls back to 0 counts when overview fetch fails", async () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     mockApiFetch
-      .mockResolvedValueOnce([makeProjectResponse({ id: "p1", name: "Alpha" })])
+      .mockResolvedValueOnce({
+        items: [makeProjectResponse({ id: "p1", name: "Alpha" })],
+        nextCursor: null,
+        limit: 50,
+      })
       .mockRejectedValueOnce(new Error("Network error"));
     await useProjectsStore.getState().loadProjects();
     const { projects, error } = useProjectsStore.getState();
@@ -154,7 +170,11 @@ describe("loadProjects", () => {
 
   it("fetches projects list and overview in parallel (both apiFetch calls happen)", async () => {
     mockApiFetch
-      .mockResolvedValueOnce([makeProjectResponse({ id: "p1" })])
+      .mockResolvedValueOnce({
+        items: [makeProjectResponse({ id: "p1" })],
+        nextCursor: null,
+        limit: 50,
+      })
       .mockResolvedValueOnce([makeOverviewResponse({ projectId: "p1" })]);
     await useProjectsStore.getState().loadProjects();
     expect(mockApiFetch).toHaveBeenCalledTimes(2);
@@ -184,7 +204,7 @@ describe("loadProjects", () => {
       .mockResolvedValueOnce([]);
     const loadPromise = useProjectsStore.getState().loadProjects();
     expect(useProjectsStore.getState().isLoading).toBe(true);
-    resolveProjects([]);
+    resolveProjects({ items: [], nextCursor: null, limit: 50 });
     await loadPromise;
     expect(useProjectsStore.getState().isLoading).toBe(false);
   });

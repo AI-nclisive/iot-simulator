@@ -87,7 +87,7 @@ afterEach(() => {
 
 describe("loadRecordings", () => {
   it("populates artifacts from API response", async () => {
-    mockApiFetch.mockResolvedValueOnce([makeRecordingResponse()]);
+    mockApiFetch.mockResolvedValueOnce({ items: [makeRecordingResponse()], nextCursor: null, limit: 50 });
     await useArtifactsStore.getState().loadRecordings("proj-1");
     const { artifacts } = useArtifactsStore.getState();
     expect(artifacts).toHaveLength(1);
@@ -96,13 +96,13 @@ describe("loadRecordings", () => {
   });
 
   it("maps SCAN_RECORD origin to captured", async () => {
-    mockApiFetch.mockResolvedValueOnce([makeRecordingResponse({ origin: "SCAN_RECORD" })]);
+    mockApiFetch.mockResolvedValueOnce({ items: [makeRecordingResponse({ origin: "SCAN_RECORD" })], nextCursor: null, limit: 50 });
     await useArtifactsStore.getState().loadRecordings("proj-1");
     expect(useArtifactsStore.getState().artifacts[0].origin).toBe("captured");
   });
 
   it("maps IMPORTED origin to imported", async () => {
-    mockApiFetch.mockResolvedValueOnce([makeRecordingResponse({ origin: "IMPORTED" })]);
+    mockApiFetch.mockResolvedValueOnce({ items: [makeRecordingResponse({ origin: "IMPORTED" })], nextCursor: null, limit: 50 });
     await useArtifactsStore.getState().loadRecordings("proj-1");
     expect(useArtifactsStore.getState().artifacts[0].origin).toBe("imported");
   });

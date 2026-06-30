@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { apiFetch, ApiError, mapProtocol, mapRuntimeStateToStatus, mapRuntimeStateToHealth } from "../api";
 import type { DataSourceRow } from "../surfaces/mock-data-sources";
-import type { BackendProtocol, BackendRuntimeState } from "../api";
+import type { BackendProtocol, BackendRuntimeState, Page } from "../api";
 
 // Backend response shape from GET/POST/PUT /api/v1/projects/{pid}/data-sources
 type DataSourceResponse = {
@@ -72,10 +72,10 @@ export const useDataSourcesStore = create<DataSourcesState>((set, get) => ({
   loadDataSources: async (projectId: string) => {
     set({ isLoading: true, error: null, currentProjectId: projectId });
     try {
-      const data = await apiFetch<DataSourceResponse[]>(
+      const { items } = await apiFetch<Page<DataSourceResponse>>(
         `/api/v1/projects/${projectId}/data-sources`,
       );
-      set({ dataSources: data.map(mapDataSource), isLoading: false });
+      set({ dataSources: items.map(mapDataSource), isLoading: false });
     } catch (err) {
       const message = err instanceof ApiError ? err.title : "Failed to load data sources";
       set({ error: message, isLoading: false });
