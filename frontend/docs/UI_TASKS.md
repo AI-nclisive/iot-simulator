@@ -770,13 +770,12 @@ Parallel execution:
   Depends: `UI-096`; backend IS-068 (✅).
   Done when: recordings load from store (live API); samples list/create/delete work; mock-recordings.ts no longer imported; no TypeScript errors.
 
-- [ ] `UI-109` Fix schema editor round-trip — preserve all NodeDto fields on save
+- [x] `UI-109` Fix schema editor round-trip — preserve all NodeDto fields on save
   Goal: schema PUT currently drops parentId/kind/dataType/valueRank/access; only saves unit+description for selected param. This corrupts folder structure and type metadata on every save.
   Surface: `Data Source Detail` — Schema tab
   Work includes: store raw NodeDto[] from GET in editor state alongside EditBuffer; executeSave builds PUT payload from original NodeDto + applied edits — nothing dropped; DataType mapping on save: float→FLOAT64, int→INT32, bool→BOOL, string→STRING; BYTES/DATETIME preserved as-is (no FE type, read-only); ETag/If-Match correctly threaded.
   Depends: `UI-096`.
   Done when: GET→PUT round-trip preserves FOLDER nodes, parentId, valueRank, access; editing unit/description works; BYTES/DATETIME shown read-only; no TypeScript errors.
-
 
 ## Recommended Sequence
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { EditLockBanner, EditLockState } from "../ui/edit-lock-banner";
 import { StatusBadge } from "../ui/status-badge";
 import { ConfirmationDialog } from "../ui/confirmation-dialog";
@@ -97,6 +97,11 @@ export function DataSourceSchemaEditor({
   const [schemaLoading, setSchemaLoading] = useState(false);
   const [schemaError, setSchemaError] = useState<string | null>(null);
 
+  // Preserve the full NodeDto[] from GET so PUT can round-trip all fields.
+  // This ensures parentId, kind, dataType, valueRank, and access are never
+  // dropped or corrupted during a save — FOLDER nodes are included here too.
+  const rawNodesRef = useRef<NodeDto[]>([]);
+
   // Load schema from API when source / projectId is available
   useEffect(() => {
     if (!projectId || !source.id) return;
@@ -106,6 +111,7 @@ export function DataSourceSchemaEditor({
       `/api/v1/projects/${projectId}/data-sources/${source.id}/schema`,
     )
       .then((resp) => {
+        rawNodesRef.current = resp.nodes;
         setAllParams(resp.nodes.filter((n) => n.kind === "VARIABLE").map(mapNode));
       })
       .catch((err) => {
@@ -151,19 +157,29 @@ export function DataSourceSchemaEditor({
     if (!projectId || !source.id || !selectedParam) return;
     setSaving(true);
     try {
-      // Build updated nodes list with description/unit patched for selected param
-      const updatedNodes: NodeDto[] = allParams.map((p) => ({
-        nodeId: p.id,
-        parentId: null, // TODO(UI-097): no parentId round-tripped through FE state
-        path: p.path,
-        name: p.name,
-        kind: "VARIABLE" as const,
-        dataType: null, // TODO(UI-097): type round-trip not supported yet
-        valueRank: null,
-        access: null,
-        unit: p.id === selectedParam.id ? editBuffer.unit : p.unit,
-        description: p.id === selectedParam.id ? editBuffer.description : p.description,
-      }));
+      // Build PUT payload by merging rawNodes with EditBuffer.
+      // All NodeDto fields are preserved from the original GET response;
+      // only unit and description are overwritten from the EditBuffer for
+      // the selected parameter. FOLDER nodes and all other fields
+      // (parentId, kind, dataType, valueRank, access) are passed through
+      // unchanged so the backend never sees a corrupted schema.
+      const updatedNodes: NodeDto[] = rawNodesRef.current.map((raw) => {
+        if (raw.nodeId === selectedParam.id) {
+          return {
+            ...raw,
+            unit: editBuffer.unit,
+            description: editBuffer.description,
+          };
+        }
+        // For non-selected VARIABLE nodes, reflect any unit/description that was
+        // updated in a previous save during this session.
+        const param = allParams.find((p) => p.id === raw.nodeId);
+        if (param) {
+          return { ...raw, unit: param.unit, description: param.description };
+        }
+        // FOLDER nodes and any other nodes not in allParams pass through as-is.
+        return raw;
+      });
       await apiFetch<SchemaResponse>(
         `/api/v1/projects/${projectId}/data-sources/${source.id}/schema`,
         {
@@ -171,13 +187,19 @@ export function DataSourceSchemaEditor({
           body: JSON.stringify({ nodes: updatedNodes }),
         },
       );
-      // Update local state
+      // Update local display state
       setAllParams((prev) =>
         prev.map((p) =>
           p.id === selectedParam.id
             ? { ...p, description: editBuffer.description, unit: editBuffer.unit }
             : p,
         ),
+      );
+      // Keep rawNodesRef in sync so subsequent saves within this session remain correct
+      rawNodesRef.current = rawNodesRef.current.map((raw) =>
+        raw.nodeId === selectedParam.id
+          ? { ...raw, unit: editBuffer.unit, description: editBuffer.description }
+          : raw,
       );
       setHasUnsavedChanges(false);
       setOriginalBuffer(editBuffer);
