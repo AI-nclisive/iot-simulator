@@ -183,7 +183,7 @@ import/export. Modbus moved to Wave G (deferred) — see the note there.
 - [x] IS-062 [BE] ✅ [gen] Synthetic generation (patterns + range + seed) — SPEC: Generate Synthetic
 - [x] IS-063 [BE] ✅ [gen] Deterministic run settings — SPEC: Run Deterministic
 - [x] IS-064 [BE] ✅ [model] Injectable clock + seeded RNG — 01
-- [ ] IS-065 [BE] ⬜ [source] Create from synthetic setup — SPEC: Manually Create / Synthetic
+- [x] IS-065 [BE] ✅ [source] Create from synthetic setup — SPEC: Manually Create / Synthetic
 - [ ] IS-066 [BE] ⬜ [source] Duplicate data source — SPEC: Manage Data Sources
 - [ ] IS-067 [BE] ⬜ [source] Create from import / prepared data — SPEC: Manually Create
 - [ ] IS-068 [BE] ⬜ [recording] Samples (named subset/snapshot) — SPEC: Store Multiple/Samples
