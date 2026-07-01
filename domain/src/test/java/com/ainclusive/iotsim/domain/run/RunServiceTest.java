@@ -142,6 +142,7 @@ class RunServiceTest {
         when(runs.findById("run-9")).thenReturn(Optional.of(row("run-9", "SYNTHETIC", "RUNNING", List.of("ds1"))));
         RunView v = service.start(PROJECT, new StartRunCommand("SYNTHETIC", "ci-bot", "ds1", null, 5000L, null, null, null, null));
         assertThat(v.id()).isEqualTo("run-9");
+        assertThat(v.state()).isEqualTo("RUNNING");
         verify(syntheticLive).start(eq(PROJECT), eq("ds1"), eq(5000L), eq("AUTOMATION"), eq("ci-bot"));
     }
 
