@@ -83,7 +83,9 @@ public class ScenarioValidationService {
 
     private void validateReplay(String projectId, ScenarioStepRow step, List<ValidationIssue> issues) {
         int at = step.ordinal();
-        requireSource(projectId, step.targetSourceId(), at, issues);
+        if (requireSource(projectId, step.targetSourceId(), at, issues).isEmpty()) {
+            return;
+        }
         String recordingId = text(step.params(), "recordingId");
         if (recordingId == null || recordingId.isBlank()) {
             issues.add(new ValidationIssue(at, ValidationIssue.ERROR, "REPLAY step requires params.recordingId"));

@@ -74,6 +74,35 @@ class ScenarioValidationServiceTest {
     }
 
     @Test
+    void stopStepWithMissingTargetIsInvalid() {
+        var f = new Fixture();
+        String id = f.scenario(new ScenarioStepRow(0, "STOP", "no-such-src", "{}"));
+        assertThat(f.service.validate(f.PROJECT, id).status()).isEqualTo("INVALID");
+    }
+
+    @Test
+    void syntheticStepTargetingNonSyntheticSourceIsInvalid() {
+        var f = new Fixture();
+        String id = f.scenario(new ScenarioStepRow(0, "SYNTHETIC", f.SOURCE_SCAN, "{\"durationMs\":1000}"));
+        assertThat(f.service.validate(f.PROJECT, id).status()).isEqualTo("INVALID");
+    }
+
+    @Test
+    void replayWithMissingSourceProducesOneErrorAndNoWarning() {
+        var f = new Fixture();
+        String id = f.scenario(new ScenarioStepRow(0, "REPLAY", "no-such-src",
+                "{\"recordingId\":\"" + f.RECORDING + "\"}"));
+        ScenarioValidation v = f.service.validate(f.PROJECT, id);
+        assertThat(v.status()).isEqualTo("INVALID");
+        List<ValidationIssue> atOrdinal = v.issues().stream()
+                .filter(i -> i.ordinal() == 0).toList();
+        assertThat(atOrdinal).hasSize(1);
+        assertThat(atOrdinal.get(0).severity()).isEqualTo(ValidationIssue.ERROR);
+        assertThat(v.issues()).noneMatch(i -> i.ordinal() == 0
+                && ValidationIssue.WARNING.equals(i.severity()));
+    }
+
+    @Test
     void markerAndValidStartAreReadyAndStatusPersisted() {
         var f = new Fixture();
         String id = f.scenario(new ScenarioStepRow(0, "START", f.SOURCE, "{}"),
@@ -87,6 +116,7 @@ class ScenarioValidationServiceTest {
     private static final class Fixture {
         final String PROJECT = "proj-1";
         final String SOURCE = "src-synthetic-1";
+        final String SOURCE_SCAN = "src-scan-1";
         final String RECORDING = "rec-1";
 
         private final InMemoryScenarioRepository scenarioRepo = new InMemoryScenarioRepository();
@@ -95,7 +125,7 @@ class ScenarioValidationServiceTest {
         Fixture() {
             service = new ScenarioValidationService(
                     scenarioRepo,
-                    new FakeDataSourceRepository(PROJECT, SOURCE),
+                    new FakeDataSourceRepository(PROJECT, SOURCE, SOURCE_SCAN),
                     new FakeRecordingRepository(PROJECT, RECORDING),
                     new FakeSchemaRepository(SOURCE),
                     new ObjectMapper());
@@ -174,20 +204,26 @@ class ScenarioValidationServiceTest {
     private static final class FakeDataSourceRepository implements DataSourceRepository {
         private final String projectId;
         private final String sourceId;
+        private final String scanSourceId;
 
-        FakeDataSourceRepository(String projectId, String sourceId) {
+        FakeDataSourceRepository(String projectId, String sourceId, String scanSourceId) {
             this.projectId = projectId;
             this.sourceId = sourceId;
+            this.scanSourceId = scanSourceId;
         }
 
         @Override
         public Optional<DataSourceRow> findById(String id) {
-            if (!sourceId.equals(id)) {
-                return Optional.empty();
-            }
             OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-            return Optional.of(new DataSourceRow(sourceId, projectId, "Synthetic Src",
-                    "OPC_UA", "SYNTHETIC", null, null, null, null, true, now, now, "tester", 0));
+            if (sourceId.equals(id)) {
+                return Optional.of(new DataSourceRow(sourceId, projectId, "Synthetic Src",
+                        "OPC_UA", "SYNTHETIC", null, null, null, null, true, now, now, "tester", 0));
+            }
+            if (scanSourceId.equals(id)) {
+                return Optional.of(new DataSourceRow(scanSourceId, projectId, "Scan Src",
+                        "OPC_UA", "SCAN", null, null, null, null, true, now, now, "tester", 0));
+            }
+            return Optional.empty();
         }
 
         @Override
