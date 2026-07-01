@@ -21,7 +21,7 @@ dependency-ordered. (Optimized for "make the simulator real end to end, then
 broaden, then harden for teams" — can be re-weighted if the near-term goal
 differs.)
 
-Snapshot: **build green.** 109 done · 16 todo (125 total). Live status is the board; this line is a periodic snapshot.
+Snapshot: **build green.** 110 done · 17 todo (127 total). Live status is the board; this line is a periodic snapshot.
 
 <details>
 <summary>ID crosswalk — legacy <code>BE-*</code> / <code>SDLC-*</code> → <code>IS-XXX</code></summary>
@@ -86,6 +86,7 @@ Tier 2 — contribution hygiene:
 - [x] IS-120 [SDLC] ✅ Local e2e run tooling — `/run-local` skill (cross-platform: Postgres + backend + Vite dev proxy, with teardown) + README run/test instructions + `docs/FRONTEND_BACKEND_CONTRACT_MAP.md` refresh for IS-074; wire FE list stores (projects/data-sources/recordings) to the `Page<T>` pagination envelope so they stop failing to load
 - [x] IS-123 [SDLC] ✅ `/run-local` runs **supervisor mode by default** — builds `worker-opcua` (`installDist`) + backend with `IOTSIM_RUNTIME_MODE=supervisor` (worker wired via `SPRING_APPLICATION_JSON`) + frontend; teardown also stops worker processes (stopgap until IS-090). Starting a source in the UI spawns a real Milo server on `runtimeConfig.listenPort` → `opc.tcp://…/iotsim` for an edge device. Memory stub dropped from the skill (stays app default for tests). Enablers: IS-124 (listen port), IS-125 (supervisor boot). Surfaced from IS-086.
 - [x] IS-126 [BE+SDLC] ✅ Fix data-source JSONB 500s: (1) validate `runtimeConfig` JSON at service layer (400 not 500); (2) encode plain URL `endpoint` (e.g. `opc.tcp://host:4840`) as JSON string scalar so it round-trips through the `jsonb` column; (3) add cross-platform run-local scripts (`scripts/run-local.sh` + `scripts/run-local.ps1`) mirroring the `/run-local` skill for non-Claude-Code users.
+- [ ] IS-127 [BE] Data-source payload redesign: split the overloaded `endpoint` into a first-class `simulatorPort` (local serve port; user-set; per-protocol default 4840/502; uniqueness enforced among RUNNING sources — fixes the dead IS-124 check) + nullable `realDeviceEndpoint` (real device address for scan/capture only; null for SYNTHETIC); derive read-only `serveUrl` from `iotsim.simulator.advertised-host`; surface worker bind failures as source `ERROR`; Flyway migration moves `listenPort` out of `runtimeConfig` and nulls SYNTHETIC endpoints. Supersedes the deferred "move real scanned URL out of endpoint" item in IS-123/IS-124. FE half: UI-115. Spec: `docs/superpowers/specs/2026-07-02-is-127-datasource-payload-redesign-design.md`.
 
 Tier 3 — quality automation:
 - [x] IS-105 [SDLC] ✅ Spotless (import order + whitespace hygiene) — runs in `check`/CI
