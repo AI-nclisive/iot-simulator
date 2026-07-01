@@ -28,7 +28,7 @@ skill by typing its slash command.
 | Skill | Use it to |
 | --- | --- |
 | `/start-task IS-XXX` | Claim a task before coding: verify free → board **In Progress** → linked branch. |
-| `/open-pr` | Run DoD checks, flip the catalog box in-PR, open the PR, arm auto-merge, board **In review**. |
+| `/open-pr` | Run DoD checks, open the PR (with `Closes #`), arm auto-merge, board **In review**. The catalog box is ticked automatically — see "Task tracking". |
 | `/review-loop` | Work the Claude PR review to completion (fix/rebut → push → repeat). |
 | `/new-worker <proto>` | Scaffold a new out-of-process protocol worker (contract impl; no supervisor change). |
 | `/flyway-migration <name>` | Add a collision-safe, append-only DB migration. |
@@ -114,17 +114,19 @@ with catalog checkboxes. Move it in lockstep with the work:
   `Status` → create the linked branch → then implement. Never backfill it after
   coding, or the board still shows `Todo` and misleads other contributors.
 - **In review** — as soon as you **open the PR** (don't wait for the reviewer's verdict).
-- **Done** — flip the catalog checkbox to `[x]` ✅ **in the implementing PR** (this
-  avoids a catalog-only PR that branch protection on `master` would otherwise force),
-  then move the board to **Done** and close the issue **after the PR merges**.
+- **Done** — the catalog checkbox is ticked **automatically**. While the PR is open,
+  the `auto-tick-catalog` workflow (`.github/workflows/auto-tick-catalog.yml`) flips
+  the task's box `[ ]`→`[x]` and commits it onto the PR branch, so it merges in with
+  the work — no manual edit, no catalog-only PR. The board moves to **Done** on merge
+  (GitHub Projects' built-in "merged → Done" workflow) and the issue closes via
+  `Closes #…`. Both keep the catalog and board in sync with zero human steps.
 
-Each PR edits only its own task line, so conflicts are rare. CI enforces the pairing:
-a PR whose body has `Implements: IS-/UI-…` must edit that task's catalog line in the
-same PR (`.github/workflows/ci.yml` → `catalog-sync`), so a merged task never leaves a
-stale `[ ]`. (`Closes: #…` is not the trigger — it can reference non-task issues such
-as bug reports; only `Implements: IS-/UI-…` arms catalog-sync.) **On conflict the board
-wins** — a task with a merged PR but an unchecked
-box is done; fix the box in your next related PR, don't re-implement.
+The auto-tick finds the task from the PR's **linked issue** (`Closes #…`, read via the
+native `closingIssuesReferences` link), falling back to the branch name (`feat/IS-XXX-…`)
+if no issue is linked — so link the issue and name the branch the `/start-task` way and
+it just works. It only ever edits that one task's line, so conflicts stay rare.
+**On conflict the board wins** — a task with a merged PR but an unchecked box is done;
+it will be corrected on the next related PR, don't re-implement.
 
 File tasks with the **Task** issue form (labels in `.github/labels.yml`); board fields
 are `Status`, `Task ID`, and `Area` (BE/FE/SDLC).
