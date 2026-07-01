@@ -11,7 +11,7 @@
  * canEdit through.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { sourceRows } from "./mock-data-sources";
 import { mockRecordings } from "./mock-recordings";
 import {
@@ -51,12 +51,9 @@ export function ScenarioStepEditor({ step, canEdit, onChange }: StepEditorProps)
   const specs = STEP_FIELD_SPECS[step.type];
 
   // Local working copy of config so typing feels immediate; committed on change.
+  // The parent passes key={step.id}, so this component remounts on step change
+  // and useState re-captures the correct initial config — no sync effect needed.
   const [config, setConfig] = useState<Record<string, unknown>>(step.config);
-
-  // Re-sync when the selected step changes (different step id or type).
-  useEffect(() => {
-    setConfig(step.config);
-  }, [step.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sourceOptions = useMemo(
     () => sourceRows.map((s) => ({ value: s.id, label: s.name })),
@@ -129,7 +126,10 @@ export function ScenarioStepEditor({ step, canEdit, onChange }: StepEditorProps)
                   disabled={!canEdit}
                   value={typeof value === "number" ? value : (value as string) ?? ""}
                   onChange={(e) =>
-                    setField(field.key, e.target.value === "" ? undefined : Number(e.target.value))
+                    setField(
+                      field.key,
+                      e.target.value === "" ? undefined : Math.max(0, Number(e.target.value)),
+                    )
                   }
                 />
               ) : field.kind === "text" ? (

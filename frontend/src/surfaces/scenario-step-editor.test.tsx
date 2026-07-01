@@ -67,6 +67,17 @@ describe("ScenarioStepEditor", () => {
     expect(last.configured).toBe(true);
   });
 
+  it("clamps a negative duration to 0 (min guard, not just advisory)", async () => {
+    const onChange = vi.fn();
+    const user = userEvent.setup();
+    render(<ScenarioStepEditor step={makeStep("wait")} canEdit onChange={onChange} />);
+    const input = screen.getByLabelText(/Duration/);
+    // Typing a negative value must be clamped to 0, not accepted as -5.
+    await user.type(input, "-5");
+    const last = onChange.mock.calls.at(-1)![0];
+    expect(last.config.seconds).toBe(0);
+  });
+
   it("marker step has a text note field", async () => {
     const onChange = vi.fn();
     const user = userEvent.setup();
