@@ -1,6 +1,7 @@
 export type ProjectSummary = {
   id: string;
   name: string;
+  version: number;
   configuredSources: number;
   runningSources: number;
   reusableArtifacts: number;
@@ -32,6 +33,7 @@ export const projects: ProjectSummary[] = [
   {
     id: "assembly-line-a",
     name: "Assembly Line A",
+    version: 0,
     configuredSources: 12,
     runningSources: 3,
     reusableArtifacts: 28,
@@ -40,6 +42,7 @@ export const projects: ProjectSummary[] = [
   {
     id: "packaging-regression",
     name: "Packaging Regression",
+    version: 0,
     configuredSources: 8,
     runningSources: 2,
     reusableArtifacts: 16,
@@ -48,6 +51,7 @@ export const projects: ProjectSummary[] = [
   {
     id: "field-replay-lab",
     name: "Field Replay Lab",
+    version: 0,
     configuredSources: 5,
     runningSources: 1,
     reusableArtifacts: 11,

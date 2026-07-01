@@ -13,6 +13,20 @@ function summaryLabel(value: number, singular: string, plural: string) {
   return `${value} ${value === 1 ? singular : plural}`;
 }
 
+function formatDate(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
 type ImportState =
   | { phase: "idle" }
   | { phase: "ready"; fileName: string; compatible: boolean; overwriteTarget: string | null }
@@ -529,7 +543,7 @@ export function ProjectEntryPage() {
                   <div className="min-w-0">
                     <p className="text-base font-semibold text-shell-ink">{project.name}</p>
                     <p className="mt-2 text-sm leading-6 text-shell-muted">
-                      {project.lastActivity}
+                      {formatDate(project.lastActivity)}
                     </p>
                   </div>
 
@@ -552,10 +566,10 @@ export function ProjectEntryPage() {
                     </div>
                     <div>
                       <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
-                        Reusable data
+                        Recordings
                       </dt>
                       <dd className="mt-2 text-sm font-medium text-shell-ink">
-                        {summaryLabel(project.reusableArtifacts, "artifact", "artifacts")}
+                        {summaryLabel(project.reusableArtifacts, "recording", "recordings")}
                       </dd>
                     </div>
                   </dl>

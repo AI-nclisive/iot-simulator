@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { resolveAccess } from "../shell/access-policy";
 import { useArtifactsStore } from "../shell/artifacts-store";
+import { useDataSourcesStore } from "../shell/data-sources-store";
 import { useShellStore } from "../shell/shell-store";
 import { SharedStatePanel } from "../ui/shared-state-panel";
 import { StatusBadge } from "../ui/status-badge";
@@ -11,6 +13,7 @@ import { RecordingImportDialog } from "./recording-import-dialog";
 export type RecordingRow = {
   id: string;
   sourceId: string;
+  sourceName: string;
   origin: "captured" | "imported";
   valueCount: number;
   capturedAt: string;
@@ -21,6 +24,20 @@ type OriginFilter = "all" | "captured" | "imported";
 
 function originLabel(origin: "captured" | "imported"): string {
   return origin === "captured" ? "Recorded" : "Imported";
+}
+
+function formatDate(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
 }
 
 // ─── Fitness warning component ────────────────────────────────────────────────
@@ -55,23 +72,27 @@ function RecordingPreviewPanel({
   selected,
   isAdmin,
   onExport,
+  onAssignToReplay,
 }: {
   selected: RecordingRow;
   isAdmin: boolean;
   onExport: () => void;
+  onAssignToReplay: () => void;
 }) {
   return (
     <div className="space-y-4">
       {/* Header + metadata */}
       <section className="rounded-md border border-shell-line bg-white px-4 py-4">
         <p className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
-          Preview
+          Recording
         </p>
-        <p className="mt-2 font-medium text-shell-ink">{selected.id}</p>
+        <p className="mt-2 font-medium text-shell-ink">
+          {selected.sourceName || selected.sourceId}
+        </p>
         <dl className="mt-4 space-y-3 text-sm">
           <div>
-            <dt className="text-shell-muted">Source ID</dt>
-            <dd className="mt-1 text-shell-ink">{selected.sourceId}</dd>
+            <dt className="text-shell-muted">Data source</dt>
+            <dd className="mt-1 text-shell-ink">{selected.sourceName || selected.sourceId}</dd>
           </div>
           <div>
             <dt className="text-shell-muted">Type</dt>
@@ -83,7 +104,7 @@ function RecordingPreviewPanel({
           </div>
           <div>
             <dt className="text-shell-muted">Recorded at</dt>
-            <dd className="mt-1 text-shell-ink">{selected.capturedAt}</dd>
+            <dd className="mt-1 text-shell-ink">{formatDate(selected.capturedAt)}</dd>
           </div>
           <div>
             <dt className="text-shell-muted">Values recorded</dt>
@@ -92,20 +113,16 @@ function RecordingPreviewPanel({
         </dl>
       </section>
 
-      {/* Replay readiness */}
-      <section className="rounded-md border border-shell-line bg-white px-4 py-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
-          Replay readiness
-        </p>
-        <p className="mt-2 text-xs text-shell-muted">
-          No protocol information available until API is wired.
-        </p>
-      </section>
-
       {/* Action buttons */}
       <section className="rounded-md border border-shell-line bg-white px-4 py-4">
         <div className="flex flex-wrap gap-2">
-          <button className="shell-action" disabled={!isAdmin} type="button">
+          <button
+            className="shell-action"
+            disabled={!isAdmin || !selected.sourceId}
+            type="button"
+            title={!selected.sourceId ? "No data source associated with this recording" : undefined}
+            onClick={isAdmin ? onAssignToReplay : undefined}
+          >
             Assign to replay
           </button>
           <button
@@ -265,11 +282,15 @@ export function RecordingsPage() {
   const sharedRole = useShellStore((s) => s.sharedRole);
   const currentProjectId = useShellStore((s) => s.currentProjectId);
   const access = resolveAccess(accessMode, sharedRole);
+  const navigate = useNavigate();
 
   const storeArtifacts = useArtifactsStore((s) => s.artifacts);
   const isLoading = useArtifactsStore((s) => s.isLoading);
   const storeError = useArtifactsStore((s) => s.error);
   const loadRecordings = useArtifactsStore((s) => s.loadRecordings);
+
+  const dataSources = useDataSourcesStore((s) => s.dataSources);
+  const sourceNameById = new Map(dataSources.map((ds) => [ds.id, ds.name]));
 
   const [originFilter, setOriginFilter] = useState<OriginFilter>("all");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
@@ -291,6 +312,7 @@ export function RecordingsPage() {
   const storeRows: RecordingRow[] = storeArtifacts.map((a) => ({
     id: a.id,
     sourceId: a.sourceId ?? "",
+    sourceName: sourceNameById.get(a.sourceId ?? "") ?? "",
     origin: a.origin ?? "captured",
     valueCount: a.valueCount,
     capturedAt: a.createdAt,
@@ -309,7 +331,9 @@ export function RecordingsPage() {
     localRecordings.map((r) => [r.id, r]),
   );
 
-  const uniqueSourceIds = Array.from(new Set(localRecordings.map((r) => r.sourceId)));
+  const uniqueSources = Array.from(
+    new Map(localRecordings.map((r) => [r.sourceId, r.sourceName || r.sourceId])).entries(),
+  );
 
   const filtered = localRecordings.filter((row) => {
     if (originFilter !== "all" && row.origin !== originFilter) return false;
@@ -317,8 +341,8 @@ export function RecordingsPage() {
     if (searchQuery.trim() !== "") {
       const q = searchQuery.toLowerCase();
       const capturedByMatch = row.capturedBy.toLowerCase().includes(q);
-      const sourceIdMatch = row.sourceId.toLowerCase().includes(q);
-      if (!capturedByMatch && !sourceIdMatch) return false;
+      const nameMatch = (row.sourceName || row.sourceId).toLowerCase().includes(q);
+      if (!capturedByMatch && !nameMatch) return false;
     }
     return true;
   });
@@ -402,9 +426,9 @@ export function RecordingsPage() {
               onChange={(e) => setSourceFilter(e.target.value)}
             >
               <option value="all">All sources</option>
-              {uniqueSourceIds.map((id) => (
+              {uniqueSources.map(([id, name]) => (
                 <option key={id} value={id}>
-                  {id}
+                  {name}
                 </option>
               ))}
             </select>
@@ -445,10 +469,10 @@ export function RecordingsPage() {
                         <div className="flex flex-wrap items-start justify-between gap-2">
                           <div className="min-w-0">
                             <p className="font-medium text-sm text-shell-ink">
-                              {row.sourceId}
+                              {row.sourceName || row.sourceId}
                             </p>
                             <p className="mt-1 text-xs text-shell-muted">
-                              {row.capturedAt} · {row.capturedBy}
+                              {formatDate(row.capturedAt)} · {row.capturedBy}
                             </p>
                           </div>
                           <div className="flex flex-wrap gap-1 shrink-0">
@@ -469,7 +493,7 @@ export function RecordingsPage() {
                               Date
                             </dt>
                             <dd className="mt-1 text-shell-ink">
-                              {row.capturedAt}
+                              {formatDate(row.capturedAt)}
                             </dd>
                           </div>
                         </dl>
@@ -487,6 +511,11 @@ export function RecordingsPage() {
               selected={selected}
               isAdmin={access.isAdmin}
               onExport={() => setExportDialogOpen(true)}
+              onAssignToReplay={() => {
+                navigate(
+                  `data-sources/${selected.sourceId}/replay?artifactId=${selected.id}`,
+                );
+              }}
             />
           ) : (
             <section className="hidden rounded-md border border-shell-line bg-white px-4 py-6 xl:block">

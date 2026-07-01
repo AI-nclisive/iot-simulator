@@ -100,7 +100,7 @@ export function ScenariosPage() {
       onChange: setStateFilter,
       options: [
         { label: "All states", value: "all" },
-        { label: "Idle", value: "Idle" },
+        { label: "Not running", value: "Not running" },
         { label: "Running", value: "Running" },
         { label: "Stopped", value: "Stopped" },
         { label: "Failed", value: "Failed" },
@@ -268,8 +268,8 @@ export function ScenariosPage() {
         emptyTitle="No scenarios yet."
         emptyMessage={
           access.canCreateScenario
-            ? "Create a scenario to compose start, replay, synthetic, and fault steps."
-            : "Scenarios created by an admin will appear here."
+            ? "A scenario is an ordered sequence of steps — start a source, replay a recording, inject synthetic data, or trigger a fault — that runs as a single automated flow. Use New scenario to create one."
+            : "Scenarios let you automate source control flows. An admin can create scenarios that you can inspect and run."
         }
         noResultsTitle="No matching scenarios."
         noResultsMessage="Adjust the search or run-state filter."

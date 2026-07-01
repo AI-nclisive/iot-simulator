@@ -8,6 +8,7 @@ const mockRecording: RecordingRow = {
   id: "rec-001",
   origin: "captured",
   sourceId: "src-01",
+  sourceName: "Test Source",
   valueCount: 18400,
   capturedAt: "2026-06-24 09:15",
   capturedBy: "Jordan K.",

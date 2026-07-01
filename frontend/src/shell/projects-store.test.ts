@@ -214,7 +214,7 @@ describe("renameProject", () => {
   it("updates the project name via PUT", async () => {
     useProjectsStore.setState({
       projects: [
-        { id: "p1", name: "Alpha", configuredSources: 0, runningSources: 0, reusableArtifacts: 0, lastActivity: "" },
+        { id: "p1", name: "Alpha", version: 0, configuredSources: 0, runningSources: 0, reusableArtifacts: 0, lastActivity: "" },
       ],
       archivedProjects: [],
     });
@@ -226,7 +226,7 @@ describe("renameProject", () => {
   it("preserves overview counts when renaming", async () => {
     useProjectsStore.setState({
       projects: [
-        { id: "p1", name: "Alpha", configuredSources: 12, runningSources: 3,
+        { id: "p1", name: "Alpha", version: 0, configuredSources: 12, runningSources: 3,
           reusableArtifacts: 28, sourcesNeedingAttention: 1, lastActivity: "" },
       ],
       archivedProjects: [],
@@ -246,7 +246,7 @@ describe("duplicateProject", () => {
   it("calls POST /projects/{id}/duplicate and adds the copy to the list", async () => {
     useProjectsStore.setState({
       projects: [
-        { id: "p1", name: "Alpha", configuredSources: 0, runningSources: 0, reusableArtifacts: 0, lastActivity: "" },
+        { id: "p1", name: "Alpha", version: 0, configuredSources: 0, runningSources: 0, reusableArtifacts: 0, lastActivity: "" },
       ],
       archivedProjects: [],
     });
@@ -271,7 +271,7 @@ describe("archiveProject", () => {
   it("removes the project from active projects and moves to archived", async () => {
     useProjectsStore.setState({
       projects: [
-        { id: "p1", name: "Archive Me", configuredSources: 0, runningSources: 0, reusableArtifacts: 0, lastActivity: "" },
+        { id: "p1", name: "Archive Me", version: 0, configuredSources: 0, runningSources: 0, reusableArtifacts: 0, lastActivity: "" },
       ],
       archivedProjects: [],
     });
@@ -287,7 +287,7 @@ describe("deleteProject", () => {
   it("permanently removes the project from projects", async () => {
     useProjectsStore.setState({
       projects: [
-        { id: "p1", name: "Delete Me", configuredSources: 0, runningSources: 0, reusableArtifacts: 0, lastActivity: "" },
+        { id: "p1", name: "Delete Me", version: 0, configuredSources: 0, runningSources: 0, reusableArtifacts: 0, lastActivity: "" },
       ],
       archivedProjects: [],
     });

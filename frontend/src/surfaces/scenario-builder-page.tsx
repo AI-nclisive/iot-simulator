@@ -12,7 +12,7 @@
  * edit it; an Admin can edit. A scenario locked by another editor is read-only.
  */
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { resolveAccess } from "../shell/access-policy";
 import { useNotificationStore } from "../shell/notification-store";
@@ -75,6 +75,10 @@ export function ScenarioBuilderPage() {
 
   const [selectedStepId, setSelectedStepId] = useState<string | null>(steps[0]?.id ?? null);
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState(false);
+  const [nameValue, setNameValue] = useState(scenario?.name ?? "");
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const renameScenario = useScenariosStore((s) => s.renameScenario);
 
   const validation = useMemo(() => validateScenario(steps), [steps]);
   const stepIssueIds = useMemo(
@@ -147,7 +151,34 @@ export function ScenarioBuilderPage() {
             ← Scenarios
           </button>
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-xl font-semibold text-shell-ink">{scenario.name}</h1>
+            {canEdit && editingName ? (
+              <input
+                ref={nameInputRef}
+                className="shell-field text-xl font-semibold py-0.5"
+                value={nameValue}
+                autoFocus
+                onChange={(e) => setNameValue(e.target.value)}
+                onBlur={() => {
+                  renameScenario(scenario.id, nameValue);
+                  setEditingName(false);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") nameInputRef.current?.blur();
+                  if (e.key === "Escape") {
+                    setNameValue(scenario.name);
+                    setEditingName(false);
+                  }
+                }}
+              />
+            ) : (
+              <h1
+                className={`text-xl font-semibold text-shell-ink ${canEdit ? "cursor-pointer hover:text-shell-accent" : ""}`}
+                title={canEdit ? "Click to rename" : undefined}
+                onClick={canEdit ? () => { setNameValue(scenario.name); setEditingName(true); } : undefined}
+              >
+                {scenario.name}
+              </h1>
+            )}
             <StatusBadge label={statusLabel(status)} tone={statusTone(status)} />
           </div>
           <p className="mt-1 text-sm text-shell-muted">{scenario.description}</p>
