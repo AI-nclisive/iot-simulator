@@ -103,8 +103,8 @@ public class DataSourceController {
                 : null;
         DataSource ds = dataSources.create(
                 projectId, req.name(), req.protocol(), req.basis(),
-                req.endpoint(), req.runtimeConfig(), CredentialRequests.toCredentials(req.connectionConfig()),
-                initialNodes, "local");
+                req.simulatorPort(), req.realDeviceEndpoint(), req.runtimeConfig(),
+                CredentialRequests.toCredentials(req.connectionConfig()), initialNodes, "local");
         return ResponseEntity.created(
                         URI.create("/api/v1/projects/" + projectId + "/data-sources/" + ds.id()))
                 .eTag(etag(ds.version()))
@@ -135,8 +135,9 @@ public class DataSourceController {
             throw new PreconditionRequiredException("If-Match header with the current version is required");
         }
         DataSource ds = dataSources.update(
-                projectId, id, req.name(), req.endpoint(), req.runtimeConfig(),
-                req.enabled(), CredentialRequests.toCredentials(req.connectionConfig()), parseVersion(ifMatch));
+                projectId, id, req.name(), req.simulatorPort(), req.realDeviceEndpoint(),
+                req.runtimeConfig(), req.enabled(),
+                CredentialRequests.toCredentials(req.connectionConfig()), parseVersion(ifMatch));
         return ResponseEntity.ok().eTag(etag(ds.version())).body(DataSourceResponse.from(ds));
     }
 
@@ -271,25 +272,26 @@ public class DataSourceController {
             String dataType, String valueRank, String access, String unit, String description) {}
 
     public record CreateDataSourceRequest(
-            String name, String protocol, String basis, String endpoint, String runtimeConfig,
+            String name, String protocol, String basis, Integer simulatorPort,
+            String realDeviceEndpoint, String runtimeConfig,
             ConnectionConfigRequest connectionConfig, List<NodeDto> initialSchema) {}
 
     public record UpdateDataSourceRequest(
-            String name, String endpoint, String runtimeConfig, Boolean enabled,
-            ConnectionConfigRequest connectionConfig) {}
+            String name, Integer simulatorPort, String realDeviceEndpoint, String runtimeConfig,
+            Boolean enabled, ConnectionConfigRequest connectionConfig) {}
 
     public record DataSourceResponse(
             String id, String projectId, String name, String protocol, String basis,
-            String schemaId, Integer schemaVersion, String endpoint, String runtimeConfig,
-            boolean enabled, String runtimeState, String credentialState,
-            Instant createdAt, Instant updatedAt, String createdBy, long version) {
+            String schemaId, Integer schemaVersion, int simulatorPort, String realDeviceEndpoint,
+            String runtimeConfig, boolean enabled, String runtimeState, String credentialState,
+            String serveUrl, Instant createdAt, Instant updatedAt, String createdBy, long version) {
 
         public static DataSourceResponse from(DataSource d) {
             return new DataSourceResponse(
                     d.id(), d.projectId(), d.name(), d.protocol().name(), d.basis().name(),
-                    d.schemaId(), d.schemaVersion(), d.endpoint(), d.runtimeConfig(),
-                    d.enabled(), d.runtimeState().name(), d.credentialState().name(),
-                    d.createdAt(), d.updatedAt(), d.createdBy(), d.version());
+                    d.schemaId(), d.schemaVersion(), d.simulatorPort(), d.realDeviceEndpoint(),
+                    d.runtimeConfig(), d.enabled(), d.runtimeState().name(), d.credentialState().name(),
+                    d.serveUrl(), d.createdAt(), d.updatedAt(), d.createdBy(), d.version());
         }
     }
 }

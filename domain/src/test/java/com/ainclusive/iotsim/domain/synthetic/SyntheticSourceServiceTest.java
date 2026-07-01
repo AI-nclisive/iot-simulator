@@ -61,13 +61,13 @@ class SyntheticSourceServiceTest {
                 any(), any(), any(), any(), any(), eq("local"))).willReturn(sample("ds1"));
         given(dataSources.get(PROJECT, "ds1")).willReturn(sample("ds1"));
 
-        DataSource result = service.create(PROJECT, "Gen", "OPC_UA", "{}", config(), "local");
+        DataSource result = service.create(PROJECT, "Gen", "OPC_UA", null, config(), "local");
 
         assertThat(result.id()).isEqualTo("ds1");
 
         ArgumentCaptor<String> runtimeConfig = ArgumentCaptor.forClass(String.class);
         verify(dataSources).create(eq(PROJECT), eq("Gen"), eq("OPC_UA"), eq("SYNTHETIC"),
-                any(), eq("{}"), runtimeConfig.capture(), any(), any(), eq("local"));
+                any(), eq((String) null), runtimeConfig.capture(), any(), any(), eq("local"));
         assertThat(runtimeConfig.getValue()).contains("\"seed\":9").contains("temp").contains("level");
 
         @SuppressWarnings("unchecked")
@@ -82,7 +82,7 @@ class SyntheticSourceServiceTest {
 
     @Test
     void createWithNullConfigRejected() {
-        assertThatThrownBy(() -> service.create(PROJECT, "Gen", "OPC_UA", "{}", null, "local"))
+        assertThatThrownBy(() -> service.create(PROJECT, "Gen", "OPC_UA", null, null, "local"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("config is required");
     }
@@ -92,7 +92,7 @@ class SyntheticSourceServiceTest {
         var bad = new SyntheticConfig(1L, List.of(
                 new SyntheticVariableConfig("x", DataType.FLOAT64,
                         new PatternSpec("RAMP", null, 0.0, 10.0, null, null, null, null), 100)));
-        assertThatThrownBy(() -> service.create(PROJECT, "Gen", "OPC_UA", "{}", bad, "local"))
+        assertThatThrownBy(() -> service.create(PROJECT, "Gen", "OPC_UA", null, bad, "local"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("periodMs");
     }
