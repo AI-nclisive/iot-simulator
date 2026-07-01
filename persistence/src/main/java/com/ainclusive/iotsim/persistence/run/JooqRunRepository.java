@@ -87,6 +87,25 @@ public class JooqRunRepository implements RunRepository {
     }
 
     @Override
+    public List<RunRow> findActiveByProject(String projectId) {
+        Result<RunsRecord> records = dsl.selectFrom(RUNS)
+                .where(RUNS.PROJECT_ID.eq(projectId))
+                .and(RUNS.STATE.in("RUNNING", "QUEUED"))
+                .orderBy(RUNS.CREATED_AT.desc(), RUNS.ID.desc())
+                .fetch();
+        if (records.isEmpty()) {
+            return List.of();
+        }
+        Map<String, List<String>> sourcesByRun = dsl.select(
+                        RUN_SOURCES.RUN_ID, RUN_SOURCES.DATA_SOURCE_ID)
+                .from(RUN_SOURCES)
+                .where(RUN_SOURCES.RUN_ID.in(records.map(RunsRecord::getId)))
+                .orderBy(RUN_SOURCES.DATA_SOURCE_ID.asc())
+                .fetchGroups(RUN_SOURCES.RUN_ID, RUN_SOURCES.DATA_SOURCE_ID);
+        return records.map(r -> map(r, sourcesByRun.getOrDefault(r.getId(), List.of())));
+    }
+
+    @Override
     public RunRow start(String id, OffsetDateTime startedAt) {
         return map(dsl.update(RUNS)
                 .set(RUNS.STATE, "RUNNING")
