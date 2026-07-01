@@ -1,5 +1,6 @@
 package com.ainclusive.iotsim.api.schema;
 
+import com.ainclusive.iotsim.api.security.Permission;
 import com.ainclusive.iotsim.domain.schema.Schema;
 import com.ainclusive.iotsim.domain.schema.SchemaService;
 import com.ainclusive.iotsim.protocolmodel.Access;
@@ -10,6 +11,7 @@ import com.ainclusive.iotsim.protocolmodel.ValueRank;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -20,10 +22,19 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * The protocol-neutral schema of a data-source. GET returns the current version;
  * PUT saves a new version (full-editor save). See backend-specs/05_API_CONTRACT.md.
+ *
+ * <p>Authorization (IS-077): GET — {@link Permission#OBSERVE}; PUT — {@link Permission#SCHEMA_EDIT}.
  */
 @RestController
 @RequestMapping("/api/v1/projects/{projectId}/data-sources/{dataSourceId}/schema")
 public class SchemaController {
+
+    private static final String OBSERVE =
+            "@permissionService.hasPermission(authentication,"
+            + " T(com.ainclusive.iotsim.api.security.Permission).OBSERVE)";
+    private static final String SCHEMA_EDIT =
+            "@permissionService.hasPermission(authentication,"
+            + " T(com.ainclusive.iotsim.api.security.Permission).SCHEMA_EDIT)";
 
     private final SchemaService schemas;
 
@@ -32,6 +43,7 @@ public class SchemaController {
     }
 
     @GetMapping
+    @PreAuthorize(OBSERVE)
     public ResponseEntity<SchemaResponse> get(
             @PathVariable String projectId, @PathVariable String dataSourceId) {
         Schema schema = schemas.get(projectId, dataSourceId);
@@ -39,6 +51,7 @@ public class SchemaController {
     }
 
     @PutMapping
+    @PreAuthorize(SCHEMA_EDIT)
     public ResponseEntity<SchemaResponse> save(
             @PathVariable String projectId, @PathVariable String dataSourceId,
             @RequestBody SaveSchemaRequest req) {

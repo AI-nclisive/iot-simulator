@@ -1,19 +1,30 @@
 package com.ainclusive.iotsim.api.replay;
 
+import com.ainclusive.iotsim.api.security.Permission;
 import com.ainclusive.iotsim.domain.replay.ReplayService;
 import com.ainclusive.iotsim.domain.replay.ReplaySummary;
 import com.ainclusive.iotsim.protocolmodel.DeterministicSettings;
 import java.time.Instant;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Replays a recording through a data-source (backend-specs/05_API_CONTRACT.md). */
+/**
+ * Replays a recording through a data-source (backend-specs/05_API_CONTRACT.md).
+ *
+ * <p>Authorization (IS-077): replay is a runtime-operate action —
+ * {@link Permission#REPLAY_START} (user + admin).
+ */
 @RestController
 @RequestMapping("/api/v1/projects/{projectId}/data-sources/{dataSourceId}/replay")
 public class ReplayController {
+
+    private static final String REPLAY_START =
+            "@permissionService.hasPermission(authentication,"
+            + " T(com.ainclusive.iotsim.api.security.Permission).REPLAY_START)";
 
     private final ReplayService replays;
 
@@ -22,6 +33,7 @@ public class ReplayController {
     }
 
     @PostMapping
+    @PreAuthorize(REPLAY_START)
     public ReplayResponse replay(
             @PathVariable String projectId, @PathVariable String dataSourceId,
             @RequestBody ReplayRequest req) {

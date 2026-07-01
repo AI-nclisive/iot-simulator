@@ -8,6 +8,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -28,7 +29,9 @@ import org.springframework.security.web.access.intercept.AuthorizationFilter;
  * <ul>
  *   <li><b>local</b> ({@code iotsim.mode=local}, default): authentication is off;
  *       every request runs as the implicit {@code local} principal with full
- *       control ({@link LocalPrincipalFilter}).
+ *       control ({@link LocalPrincipalFilter}).  Method-security annotations
+ *       ({@code @PreAuthorize}) are evaluated but always pass via
+ *       {@link LocalPermissionService}.
  *   <li><b>shared</b> ({@code iotsim.mode=shared}): workspace endpoints require an
  *       authenticated bearer JWT (OAuth2/OIDC resource server). JWTs are validated
  *       via JWKS using the issuer URI from
@@ -39,11 +42,16 @@ import org.springframework.security.web.access.intercept.AuthorizationFilter;
  *       {@code GrantedAuthority} values. Health probes and API docs stay public.
  * </ul>
  *
- * Exactly one chain is active per startup ({@link ConditionalOnProperty}).
+ * <p>{@link EnableMethodSecurity} activates {@code @PreAuthorize} on controllers.
+ * Permission checks delegate to {@link PermissionService} — a no-op in local mode
+ * and a role-backed resolver in shared mode (IS-077).
+ *
+ * <p>Exactly one chain is active per startup ({@link ConditionalOnProperty}).
  * See backend-specs/08_AUTH_AND_MODES.md.
  */
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 @EnableConfigurationProperties({DeploymentProperties.class, OidcProperties.class})
 public class SecurityConfig {
 

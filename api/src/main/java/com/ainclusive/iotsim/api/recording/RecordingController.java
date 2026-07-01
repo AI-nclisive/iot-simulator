@@ -1,11 +1,13 @@
 package com.ainclusive.iotsim.api.recording;
 
+import com.ainclusive.iotsim.api.security.Permission;
 import com.ainclusive.iotsim.domain.recording.Recording;
 import com.ainclusive.iotsim.domain.recording.RecordingService;
 import com.ainclusive.iotsim.domain.support.Page;
 import java.net.URI;
 import java.time.Instant;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -14,10 +16,23 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Recordings within a project (backend-specs/05_API_CONTRACT.md). */
+/**
+ * Recordings within a project (backend-specs/05_API_CONTRACT.md).
+ *
+ * <p>Authorization (IS-077): list/get — {@link Permission#OBSERVE};
+ * create (manual recording shell) — {@link Permission#SOURCE_EDIT} (admin-level: creating
+ * a recording entity is a configuration action distinct from starting live capture).
+ */
 @RestController
 @RequestMapping("/api/v1/projects/{projectId}/recordings")
 public class RecordingController {
+
+    private static final String OBSERVE =
+            "@permissionService.hasPermission(authentication,"
+            + " T(com.ainclusive.iotsim.api.security.Permission).OBSERVE)";
+    private static final String SOURCE_EDIT =
+            "@permissionService.hasPermission(authentication,"
+            + " T(com.ainclusive.iotsim.api.security.Permission).SOURCE_EDIT)";
 
     private final RecordingService recordings;
 
@@ -26,6 +41,7 @@ public class RecordingController {
     }
 
     @GetMapping
+    @PreAuthorize(OBSERVE)
     public Page<RecordingResponse> list(
             @PathVariable String projectId,
             @RequestParam(required = false) String cursor,
@@ -34,6 +50,7 @@ public class RecordingController {
     }
 
     @PostMapping
+    @PreAuthorize(SOURCE_EDIT)
     public ResponseEntity<RecordingResponse> create(
             @PathVariable String projectId, @RequestBody CreateRecordingRequest req) {
         if (req == null || req.dataSourceId() == null || req.dataSourceId().isBlank()) {
@@ -47,6 +64,7 @@ public class RecordingController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize(OBSERVE)
     public ResponseEntity<RecordingResponse> get(@PathVariable String projectId, @PathVariable String id) {
         Recording recording = recordings.get(projectId, id);
         return ResponseEntity.ok().eTag(etag(recording.version())).body(RecordingResponse.from(recording));

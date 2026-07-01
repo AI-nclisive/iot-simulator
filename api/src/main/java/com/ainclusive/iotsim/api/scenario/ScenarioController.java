@@ -1,6 +1,7 @@
 package com.ainclusive.iotsim.api.scenario;
 
 import com.ainclusive.iotsim.api.error.PreconditionRequiredException;
+import com.ainclusive.iotsim.api.security.Permission;
 import com.ainclusive.iotsim.domain.scenario.Scenario;
 import com.ainclusive.iotsim.domain.scenario.ScenarioService;
 import com.ainclusive.iotsim.domain.scenario.ScenarioStep;
@@ -9,6 +10,7 @@ import java.net.URI;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -20,10 +22,22 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Scenario authoring CRUD within a project (backend-specs/05_API_CONTRACT.md, IS-085). */
+/**
+ * Scenario authoring CRUD within a project (backend-specs/05_API_CONTRACT.md, IS-085).
+ *
+ * <p>Authorization (IS-077): list/get — {@link Permission#OBSERVE};
+ * create/update/delete/duplicate — {@link Permission#SCENARIO_EDIT} (admin).
+ */
 @RestController
 @RequestMapping("/api/v1/projects/{projectId}/scenarios")
 public class ScenarioController {
+
+    private static final String OBSERVE =
+            "@permissionService.hasPermission(authentication,"
+            + " T(com.ainclusive.iotsim.api.security.Permission).OBSERVE)";
+    private static final String SCENARIO_EDIT =
+            "@permissionService.hasPermission(authentication,"
+            + " T(com.ainclusive.iotsim.api.security.Permission).SCENARIO_EDIT)";
 
     private final ScenarioService scenarios;
 
@@ -32,6 +46,7 @@ public class ScenarioController {
     }
 
     @GetMapping
+    @PreAuthorize(OBSERVE)
     public Page<ScenarioResponse> list(
             @PathVariable String projectId,
             @RequestParam(required = false) String cursor,
@@ -40,6 +55,7 @@ public class ScenarioController {
     }
 
     @PostMapping
+    @PreAuthorize(SCENARIO_EDIT)
     public ResponseEntity<ScenarioResponse> create(
             @PathVariable String projectId, @RequestBody CreateScenarioRequest req) {
         if (req == null || req.name() == null || req.name().isBlank()) {
@@ -54,12 +70,14 @@ public class ScenarioController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize(OBSERVE)
     public ResponseEntity<ScenarioResponse> get(@PathVariable String projectId, @PathVariable String id) {
         Scenario s = scenarios.get(projectId, id);
         return ResponseEntity.ok().eTag(etag(s.version())).body(ScenarioResponse.from(s));
     }
 
     @PatchMapping("/{id}")
+    @PreAuthorize(SCENARIO_EDIT)
     public ResponseEntity<ScenarioResponse> update(
             @PathVariable String projectId,
             @PathVariable String id,
@@ -77,12 +95,14 @@ public class ScenarioController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize(SCENARIO_EDIT)
     public ResponseEntity<Void> delete(@PathVariable String projectId, @PathVariable String id) {
         scenarios.delete(projectId, id);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{id}/duplicate")
+    @PreAuthorize(SCENARIO_EDIT)
     public ResponseEntity<ScenarioResponse> duplicate(
             @PathVariable String projectId, @PathVariable String id) {
         Scenario s = scenarios.duplicate(projectId, id, "local");

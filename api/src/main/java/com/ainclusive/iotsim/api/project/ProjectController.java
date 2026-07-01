@@ -1,12 +1,14 @@
 package com.ainclusive.iotsim.api.project;
 
 import com.ainclusive.iotsim.api.error.PreconditionRequiredException;
+import com.ainclusive.iotsim.api.security.Permission;
 import com.ainclusive.iotsim.domain.project.Project;
 import com.ainclusive.iotsim.domain.project.ProjectService;
 import com.ainclusive.iotsim.domain.support.Page;
 import java.net.URI;
 import java.time.Instant;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -21,10 +23,23 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * Projects resource. Path-based versioning (/api/v1); optimistic concurrency via
  * ETag / If-Match (decision D4). See backend-specs/05_API_CONTRACT.md.
+ *
+ * <p>Authorization (IS-077, backend-specs/08 §Authorization):
+ * <ul>
+ *   <li>List / get — {@link Permission#OBSERVE} (user + admin).
+ *   <li>Create / update / duplicate / archive / delete — {@link Permission#PROJECT_EDIT} (admin).
+ * </ul>
  */
 @RestController
 @RequestMapping("/api/v1/projects")
 public class ProjectController {
+
+    private static final String OBSERVE =
+            "@permissionService.hasPermission(authentication,"
+            + " T(com.ainclusive.iotsim.api.security.Permission).OBSERVE)";
+    private static final String PROJECT_EDIT =
+            "@permissionService.hasPermission(authentication,"
+            + " T(com.ainclusive.iotsim.api.security.Permission).PROJECT_EDIT)";
 
     private final ProjectService projects;
 
@@ -33,6 +48,7 @@ public class ProjectController {
     }
 
     @GetMapping
+    @PreAuthorize(OBSERVE)
     public Page<ProjectResponse> list(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String cursor,
@@ -42,6 +58,7 @@ public class ProjectController {
     }
 
     @PostMapping
+    @PreAuthorize(PROJECT_EDIT)
     public ResponseEntity<ProjectResponse> create(@RequestBody CreateProjectRequest req) {
         if (req == null || req.name() == null || req.name().isBlank()) {
             throw new IllegalArgumentException("name is required");
@@ -53,12 +70,14 @@ public class ProjectController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize(OBSERVE)
     public ResponseEntity<ProjectResponse> get(@PathVariable String id) {
         Project p = projects.get(id);
         return ResponseEntity.ok().eTag(etag(p.version())).body(ProjectResponse.from(p));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize(PROJECT_EDIT)
     public ResponseEntity<ProjectResponse> update(
             @PathVariable String id,
             @RequestHeader(value = "If-Match", required = false) String ifMatch,
@@ -71,6 +90,7 @@ public class ProjectController {
     }
 
     @PostMapping("/{id}/duplicate")
+    @PreAuthorize(PROJECT_EDIT)
     public ResponseEntity<ProjectResponse> duplicate(@PathVariable String id) {
         Project p = projects.duplicate(id);
         return ResponseEntity.created(URI.create("/api/v1/projects/" + p.id()))
@@ -79,12 +99,14 @@ public class ProjectController {
     }
 
     @PostMapping("/{id}/archive")
+    @PreAuthorize(PROJECT_EDIT)
     public ResponseEntity<ProjectResponse> archive(@PathVariable String id) {
         Project p = projects.archive(id);
         return ResponseEntity.ok().eTag(etag(p.version())).body(ProjectResponse.from(p));
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize(PROJECT_EDIT)
     public ResponseEntity<Void> delete(@PathVariable String id) {
         projects.delete(id);
         return ResponseEntity.noContent().build();

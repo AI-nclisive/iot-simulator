@@ -1,6 +1,7 @@
 package com.ainclusive.iotsim.api.datasource;
 
 import com.ainclusive.iotsim.api.error.PreconditionRequiredException;
+import com.ainclusive.iotsim.api.security.Permission;
 import com.ainclusive.iotsim.api.support.ConnectionConfigRequest;
 import com.ainclusive.iotsim.api.support.CredentialRequests;
 import com.ainclusive.iotsim.domain.datasource.DataSource;
@@ -16,6 +17,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -31,10 +33,31 @@ import org.springframework.web.bind.annotation.RestController;
  * Data-sources under a project. Mirrors the Projects resource conventions:
  * /api/v1, ETag / If-Match optimistic concurrency, start/stop runtime control.
  * See backend-specs/05_API_CONTRACT.md.
+ *
+ * <p>Authorization (IS-077, backend-specs/08 §Authorization):
+ * <ul>
+ *   <li>List / get — {@link Permission#OBSERVE} (user + admin).
+ *   <li>Create / update / delete / duplicate / credentials — {@link Permission#SOURCE_EDIT} (admin).
+ *   <li>Start — {@link Permission#SOURCE_START} (user + admin).
+ *   <li>Stop — {@link Permission#SOURCE_STOP} (user + admin).
+ * </ul>
  */
 @RestController
 @RequestMapping("/api/v1/projects/{projectId}/data-sources")
 public class DataSourceController {
+
+    private static final String OBSERVE =
+            "@permissionService.hasPermission(authentication,"
+            + " T(com.ainclusive.iotsim.api.security.Permission).OBSERVE)";
+    private static final String SOURCE_EDIT =
+            "@permissionService.hasPermission(authentication,"
+            + " T(com.ainclusive.iotsim.api.security.Permission).SOURCE_EDIT)";
+    private static final String SOURCE_START =
+            "@permissionService.hasPermission(authentication,"
+            + " T(com.ainclusive.iotsim.api.security.Permission).SOURCE_START)";
+    private static final String SOURCE_STOP =
+            "@permissionService.hasPermission(authentication,"
+            + " T(com.ainclusive.iotsim.api.security.Permission).SOURCE_STOP)";
 
     private final DataSourceService dataSources;
 
@@ -43,6 +66,7 @@ public class DataSourceController {
     }
 
     @GetMapping
+    @PreAuthorize(OBSERVE)
     public Page<DataSourceResponse> list(
             @PathVariable String projectId,
             @RequestParam(required = false) String protocol,
@@ -53,6 +77,7 @@ public class DataSourceController {
     }
 
     @PostMapping
+    @PreAuthorize(SOURCE_EDIT)
     public ResponseEntity<DataSourceResponse> create(
             @PathVariable String projectId, @RequestBody CreateDataSourceRequest req) {
         require(req != null && notBlank(req.name()), "name is required");
@@ -72,12 +97,14 @@ public class DataSourceController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize(OBSERVE)
     public ResponseEntity<DataSourceResponse> get(@PathVariable String projectId, @PathVariable String id) {
         DataSource ds = dataSources.get(projectId, id);
         return ResponseEntity.ok().eTag(etag(ds.version())).body(DataSourceResponse.from(ds));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize(SOURCE_EDIT)
     public ResponseEntity<DataSourceResponse> update(
             @PathVariable String projectId, @PathVariable String id,
             @RequestHeader(value = "If-Match", required = false) String ifMatch,
@@ -92,6 +119,7 @@ public class DataSourceController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize(SOURCE_EDIT)
     public ResponseEntity<Void> delete(@PathVariable String projectId, @PathVariable String id) {
         dataSources.delete(projectId, id);
         return ResponseEntity.noContent().build();
@@ -99,6 +127,7 @@ public class DataSourceController {
 
     /** Clears any held connection credentials ("clear value" in the Credential Handling surface). */
     @DeleteMapping("/{id}/credentials")
+    @PreAuthorize(SOURCE_EDIT)
     public ResponseEntity<DataSourceResponse> clearCredentials(
             @PathVariable String projectId, @PathVariable String id) {
         DataSource ds = dataSources.clearCredentials(projectId, id);
@@ -111,6 +140,7 @@ public class DataSourceController {
      * Schema nodes are copied when present. Returns 201 with the new resource. See IS-066.
      */
     @PostMapping("/{id}/duplicate")
+    @PreAuthorize(SOURCE_EDIT)
     public ResponseEntity<DataSourceResponse> duplicate(@PathVariable String projectId, @PathVariable String id) {
         DataSource ds = dataSources.duplicate(projectId, id, "local");
         return ResponseEntity.created(
@@ -120,12 +150,14 @@ public class DataSourceController {
     }
 
     @PostMapping("/{id}/start")
+    @PreAuthorize(SOURCE_START)
     public ResponseEntity<DataSourceResponse> start(@PathVariable String projectId, @PathVariable String id) {
         DataSource ds = dataSources.start(projectId, id);
         return ResponseEntity.ok().eTag(etag(ds.version())).body(DataSourceResponse.from(ds));
     }
 
     @PostMapping("/{id}/stop")
+    @PreAuthorize(SOURCE_STOP)
     public ResponseEntity<DataSourceResponse> stop(@PathVariable String projectId, @PathVariable String id) {
         DataSource ds = dataSources.stop(projectId, id);
         return ResponseEntity.ok().eTag(etag(ds.version())).body(DataSourceResponse.from(ds));

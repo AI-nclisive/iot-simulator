@@ -8,6 +8,7 @@ import com.ainclusive.iotsim.platform.capture.CaptureException;
 import com.ainclusive.iotsim.platform.runtime.RuntimeCapacityException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -58,6 +59,22 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ProjectImportException.class)
     public ProblemDetail projectImportFailed(ProjectImportException e) {
         return problem(HttpStatus.UNPROCESSABLE_ENTITY, e.getMessage());
+    }
+
+    /**
+     * Spring Security throws {@link AccessDeniedException} when a {@code @PreAuthorize}
+     * check fails (IS-077). Map to 403 with a problem+json body (backend-specs/05).
+     *
+     * <p>Note: Spring Security's default behaviour is to propagate this exception to the
+     * {@code ExceptionTranslationFilter}, which sends 403 before {@code @RestControllerAdvice}
+     * can intercept it. Declaring the handler here works in the {@code @WebMvcTest} / MockMvc
+     * slice and in production because {@code @RestControllerAdvice} runs inside the MVC
+     * dispatch pipeline — the exception is thrown after the security chain has already
+     * authenticated the request.
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ProblemDetail forbidden(AccessDeniedException e) {
+        return problem(HttpStatus.FORBIDDEN, "Access denied: insufficient permissions");
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
