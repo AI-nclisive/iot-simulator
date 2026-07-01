@@ -253,7 +253,7 @@ class EvidenceServiceTest {
 
     private void seedReplayEvidence(String runState) {
         runs.byId.put("run-1", new RunRow("run-1", "p1", "REPLAY", "MANUAL", "local", runState,
-                null, "ev-1", off(START), off(END), off(START), List.of("src-1")));
+                null, "ev-1", off(START), off(END), off(START), List.of("src-1"), null));
         evidence.byId.put("ev-1", new EvidenceRow("ev-1", "p1", "run-1", "CAPTURING",
                 "{\"recordingId\":\"rec-1\"}", null, off(START), "local"));
     }
@@ -329,7 +329,8 @@ class EvidenceServiceTest {
             return Optional.ofNullable(byId.get(id));
         }
 
-        public RunRow create(String p, String k, String t, String i, List<String> s, String sc) {
+        public RunRow create(String p, String k, String t, String i, List<String> s, String sc,
+                String parentRunId) {
             throw new UnsupportedOperationException();
         }
 

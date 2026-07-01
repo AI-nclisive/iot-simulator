@@ -14,12 +14,18 @@ public interface RunRepository {
 
     /**
      * Creates a run in {@code QUEUED} state and records its participating sources.
-     * {@code trigger} and {@code initiator} may be {@code null} to fall through to the
-     * column defaults ({@code MANUAL} / {@code local}); {@code scenarioId} is nullable;
-     * {@code sourceIds} may be empty.
+     * {@code trigger}/{@code initiator} may be {@code null} (fall through to column
+     * defaults {@code MANUAL}/{@code local}); {@code scenarioId} and
+     * {@code parentRunId} are nullable; {@code sourceIds} may be empty.
      */
     RunRow create(String projectId, String kind, String trigger, String initiator,
-            List<String> sourceIds, String scenarioId);
+            List<String> sourceIds, String scenarioId, String parentRunId);
+
+    /** Backwards-compatible create for standalone (non-child) runs: {@code parentRunId = null}. */
+    default RunRow create(String projectId, String kind, String trigger, String initiator,
+            List<String> sourceIds, String scenarioId) {
+        return create(projectId, kind, trigger, initiator, sourceIds, scenarioId, null);
+    }
 
     /** The run with its {@code sourceIds}, if present. */
     Optional<RunRow> findById(String id);

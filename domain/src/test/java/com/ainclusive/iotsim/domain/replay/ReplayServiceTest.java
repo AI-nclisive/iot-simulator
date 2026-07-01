@@ -222,11 +222,11 @@ class ReplayServiceTest {
         private int seq;
 
         public RunRow create(String projectId, String kind, String trigger, String initiator,
-                List<String> sourceIds, String scenarioId) {
+                List<String> sourceIds, String scenarioId, String parentRunId) {
             String id = "run-" + (++seq);
             RunRow row = new RunRow(id, projectId, kind, trigger, initiator, "QUEUED",
                     scenarioId, null, null, null, OffsetDateTime.now(ZoneOffset.UTC),
-                    new ArrayList<>(sourceIds));
+                    new ArrayList<>(sourceIds), parentRunId);
             byId.put(id, row);
             return row;
         }
@@ -235,7 +235,7 @@ class ReplayServiceTest {
             RunRow r = byId.get(id);
             RunRow updated = new RunRow(r.id(), r.projectId(), r.kind(), r.trigger(), r.initiator(),
                     "RUNNING", r.scenarioId(), r.evidenceId(), startedAt, r.endedAt(), r.createdAt(),
-                    r.sourceIds());
+                    r.sourceIds(), r.parentRunId());
             byId.put(id, updated);
             return updated;
         }
@@ -244,7 +244,7 @@ class ReplayServiceTest {
             RunRow r = byId.get(id);
             RunRow updated = new RunRow(r.id(), r.projectId(), r.kind(), r.trigger(), r.initiator(),
                     terminalState, r.scenarioId(), r.evidenceId(), r.startedAt(), endedAt, r.createdAt(),
-                    r.sourceIds());
+                    r.sourceIds(), r.parentRunId());
             byId.put(id, updated);
             return updated;
         }
@@ -253,7 +253,7 @@ class ReplayServiceTest {
             RunRow r = byId.get(runId);
             RunRow updated = new RunRow(r.id(), r.projectId(), r.kind(), r.trigger(), r.initiator(),
                     r.state(), r.scenarioId(), evidenceId, r.startedAt(), r.endedAt(), r.createdAt(),
-                    r.sourceIds());
+                    r.sourceIds(), r.parentRunId());
             byId.put(runId, updated);
             return updated;
         }

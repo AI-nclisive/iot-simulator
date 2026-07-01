@@ -25,5 +25,6 @@ public record RunRow(
         OffsetDateTime startedAt,
         OffsetDateTime endedAt,
         OffsetDateTime createdAt,
-        List<String> sourceIds) {
+        List<String> sourceIds,
+        String parentRunId) {
 }
