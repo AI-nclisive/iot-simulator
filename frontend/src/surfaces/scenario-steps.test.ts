@@ -100,4 +100,25 @@ describe("validateScenario", () => {
     ]);
     expect(v.issues.some((i) => i.stepId === "bad-stop")).toBe(true);
   });
+
+  it("does not let an unconfigured start suppress a downstream lifecycle error", () => {
+    // Unconfigured start must NOT add src-01 to running, so the replay is still
+    // flagged as acting on a not-started source (no false negative).
+    const v = validateScenario([
+      step({ id: "s1", type: "start", configured: false, config: { sourceId: "src-01" } }),
+      step({ id: "s2", type: "replay", configured: true, config: { sourceId: "src-01", recordingId: "r1" } }),
+    ]);
+    expect(v.issues.some((i) => i.stepId === "s2" && /has not been started/.test(i.message))).toBe(true);
+  });
+
+  it("does not let an unconfigured stop invalidate a later valid step", () => {
+    // Unconfigured stop must NOT remove src-01 from running, so the fault after
+    // a valid start is not spuriously flagged (no false positive).
+    const v = validateScenario([
+      step({ id: "s1", type: "start", configured: true, config: { sourceId: "src-01" } }),
+      step({ id: "s2", type: "stop", configured: false, config: { sourceId: "src-01" } }),
+      step({ id: "s3", type: "fault", configured: true, config: { sourceId: "src-01", kind: "drop", dropRate: 10 } }),
+    ]);
+    expect(v.issues.some((i) => i.stepId === "s3")).toBe(false);
+  });
 });

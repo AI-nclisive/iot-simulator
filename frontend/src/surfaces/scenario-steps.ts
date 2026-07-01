@@ -176,12 +176,14 @@ export function validateScenario(steps: ScenarioStep[]): ScenarioValidation {
 
   // ── Semantic lifecycle checks (UI-064) ────────────────────────────────────
   // Walk the steps in order, tracking which sources are running, so we can flag
-  // steps that act on a source that is not running at that point. Only steps
-  // whose target is known (configured sourceId) are checked — unconfigured
-  // steps are already reported above.
+  // steps that act on a source that is not running at that point. Unconfigured
+  // steps are skipped here — they are already reported above, and letting a
+  // partially-filled step drive the state machine would produce false
+  // negatives (an unconfigured start hiding real errors) or false positives
+  // (an unconfigured stop invalidating later valid steps).
   const running = new Set<string>();
-  const started = new Set<string>();
   for (const step of steps) {
+    if (!step.configured) continue;
     const sourceId = typeof step.config.sourceId === "string" ? step.config.sourceId : null;
     const label = step.label || STEP_TYPE_LABELS[step.type];
 
@@ -195,7 +197,6 @@ export function validateScenario(steps: ScenarioStep[]): ScenarioValidation {
             });
           }
           running.add(sourceId);
-          started.add(sourceId);
         }
         break;
       case "stop":
@@ -225,11 +226,10 @@ export function validateScenario(steps: ScenarioStep[]): ScenarioValidation {
   }
 
   // Sources started but never stopped — advisory (the run teardown stops them).
-  const leftRunning = [...running];
-  if (leftRunning.length > 0) {
+  if (running.size > 0) {
     warnings.push({
       stepId: null,
-      message: `${leftRunning.length} source${leftRunning.length === 1 ? "" : "s"} left running at scenario end; they stop on teardown.`,
+      message: `${running.size} source${running.size === 1 ? "" : "s"} left running at scenario end; they stop on teardown.`,
     });
   }
 
