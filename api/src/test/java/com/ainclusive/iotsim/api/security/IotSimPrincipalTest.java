@@ -23,7 +23,22 @@ class IotSimPrincipalTest {
 
     @Test
     void jwtPrincipalIsAuthenticated() {
-        IotSimPrincipal principal = new IotSimPrincipal("user-42", Map.of(), List.of());
+        // JWT tokens always carry at least iss/iat/exp/sub, so claims are non-empty.
+        IotSimPrincipal principal = new IotSimPrincipal(
+                "user-42",
+                Map.of("iss", "https://idp.example/realms/iotsim"),
+                List.of());
+
+        assertThat(principal.isAuthenticated()).isTrue();
+    }
+
+    @Test
+    void jwtPrincipalWithSubEqualToLocalSentinelIsStillAuthenticated() {
+        // An IdP that issues sub="local" must not be mis-identified as the local principal.
+        IotSimPrincipal principal = new IotSimPrincipal(
+                LocalPrincipalFilter.LOCAL_PRINCIPAL,
+                Map.of("iss", "https://idp.example/realms/iotsim"),
+                List.of());
 
         assertThat(principal.isAuthenticated()).isTrue();
     }

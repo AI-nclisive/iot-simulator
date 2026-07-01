@@ -7,6 +7,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -55,6 +56,13 @@ public class SecurityConfig {
         "/swagger-ui/**",
     };
 
+    /**
+     * Spring Boot auto-configuration property for the OIDC issuer URI.
+     * Used as a fallback when {@link OidcProperties#issuerUri()} is not set.
+     */
+    private static final String SPRING_ISSUER_URI_PROP =
+            "spring.security.oauth2.resourceserver.jwt.issuer-uri";
+
     @Bean
     @ConditionalOnProperty(name = "iotsim.mode", havingValue = "local", matchIfMissing = true)
     SecurityFilterChain localSecurityFilterChain(HttpSecurity http) throws Exception {
@@ -80,12 +88,18 @@ public class SecurityConfig {
      * {@link NimbusJwtDecoder} is wrapped with an audience validator so that tokens
      * missing the expected {@code aud} value are rejected at the decoding stage,
      * honouring the contract stated in the Javadoc of {@link OidcProperties}.
+     *
+     * <p>The effective issuer URI for audience-mode validation is resolved by
+     * preferring {@code iotsim.oidc.issuer-uri} and falling back to
+     * {@code spring.security.oauth2.resourceserver.jwt.issuer-uri} so that operators
+     * who rely solely on the Spring Boot property do not lose issuer-claim enforcement.
      */
     @Bean
     @ConditionalOnProperty(name = "iotsim.mode", havingValue = "shared")
     SecurityFilterChain sharedSecurityFilterChain(HttpSecurity http,
             ObjectProvider<JwtDecoder> jwtDecoders,
-            OidcProperties oidcProperties) throws Exception {
+            OidcProperties oidcProperties,
+            Environment env) throws Exception {
         JwtDecoder jwtDecoder = jwtDecoders.getIfAvailable();
         if (jwtDecoder == null) {
             throw new IllegalStateException(
@@ -93,8 +107,9 @@ public class SecurityConfig {
                     + "spring.security.oauth2.resourceserver.jwt.issuer-uri so bearer "
                     + "JWTs validate via JWKS. See backend-specs/08_AUTH_AND_MODES.md.");
         }
+        String effectiveIssuer = effectiveIssuerUri(oidcProperties.issuerUri(), env);
         JwtDecoder validatingDecoder = applyAudienceValidation(
-                jwtDecoder, oidcProperties.audience(), oidcProperties.issuerUri());
+                jwtDecoder, oidcProperties.audience(), effectiveIssuer);
         JwtPrincipalConverter converter = new JwtPrincipalConverter(oidcProperties.rolesClaim());
         http
                 .csrf(csrf -> csrf.disable())
@@ -108,6 +123,18 @@ public class SecurityConfig {
                                 .decoder(validatingDecoder)
                                 .jwtAuthenticationConverter(converter)));
         return http.build();
+    }
+
+    /**
+     * Returns the issuer URI to use for validation, preferring the custom
+     * {@code iotsim.oidc.issuer-uri} and falling back to the Spring Boot standard
+     * {@code spring.security.oauth2.resourceserver.jwt.issuer-uri}.
+     */
+    private static String effectiveIssuerUri(String oidcIssuerUri, Environment env) {
+        if (oidcIssuerUri != null && !oidcIssuerUri.isBlank()) {
+            return oidcIssuerUri;
+        }
+        return env.getProperty(SPRING_ISSUER_URI_PROP);
     }
 
     /**

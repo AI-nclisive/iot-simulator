@@ -43,9 +43,14 @@ public record IotSimPrincipal(
     /**
      * Returns {@code true} when this principal was created from a validated OIDC/JWT
      * token (shared mode). Returns {@code false} for the implicit local principal.
+     *
+     * <p>Detection is based on whether the claims map is non-empty: JWT tokens always
+     * carry at least {@code iss}, {@code iat}, {@code exp}, and {@code sub}; the local
+     * implicit principal is constructed with an empty claims map. This avoids a
+     * false-negative when an IdP assigns {@code sub="local"}.
      */
     public boolean isAuthenticated() {
-        return !subject.equals(LocalPrincipalFilter.LOCAL_PRINCIPAL);
+        return !claims.isEmpty();
     }
 
     /**

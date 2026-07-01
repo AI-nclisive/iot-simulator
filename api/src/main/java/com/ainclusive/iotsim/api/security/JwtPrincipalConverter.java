@@ -1,12 +1,15 @@
 package com.ainclusive.iotsim.api.security;
 
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
+import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 /**
@@ -20,8 +23,9 @@ import org.springframework.security.oauth2.jwt.Jwt;
  * absent claims produce an empty authority list — the request is authenticated but
  * carries no product roles, which IS-077 will enforce.
  *
- * <p>The {@code sub} claim is mandatory per RFC 7519 §4.1.2. Tokens without a
- * subject are rejected upstream by Spring's JWT decoder.
+ * <p>The {@code sub} claim is mandatory per RFC 7519 §4.1.2. NimbusJwtDecoder does
+ * not enforce it by default; a missing {@code sub} is rejected here with a 401 rather
+ * than a 500.
  *
  * <p>See backend-specs/08_AUTH_AND_MODES.md.
  */
@@ -47,10 +51,28 @@ public class JwtPrincipalConverter implements Converter<Jwt, AbstractAuthenticat
 
     @Override
     public AbstractAuthenticationToken convert(Jwt jwt) {
+        String subject = jwt.getSubject();
+        if (subject == null || subject.isBlank()) {
+            throw new OAuth2AuthenticationException(
+                    new OAuth2Error("missing_sub",
+                            "JWT is missing required 'sub' claim", null));
+        }
         Collection<GrantedAuthority> authorities = extractAuthorities(jwt);
-        IotSimPrincipal principal = new IotSimPrincipal(jwt.getSubject(),
-                Map.copyOf(jwt.getClaims()), authorities);
+        // Map.copyOf rejects null values; use a defensive copy to tolerate IdPs that
+        // emit null-valued optional claims (e.g. "email": null).
+        Map<String, Object> claims = nullSafeCopy(jwt.getClaims());
+        IotSimPrincipal principal = new IotSimPrincipal(subject, claims, authorities);
         return new IotSimAuthentication(jwt, principal, authorities);
+    }
+
+    /**
+     * Returns an unmodifiable copy of {@code source} that preserves null values.
+     * {@code Map.copyOf} throws {@link NullPointerException} on null values, which
+     * occurs with IdPs that emit optional claims as {@code null}.
+     */
+    private static Map<String, Object> nullSafeCopy(Map<String, Object> source) {
+        Map<String, Object> copy = new HashMap<>(source);
+        return java.util.Collections.unmodifiableMap(copy);
     }
 
     private Collection<GrantedAuthority> extractAuthorities(Jwt jwt) {
