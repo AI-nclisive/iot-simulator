@@ -11,6 +11,7 @@ import com.ainclusive.iotsim.domain.run.RunState;
 import com.ainclusive.iotsim.domain.run.RunView;
 import com.ainclusive.iotsim.domain.run.SourceState;
 import com.ainclusive.iotsim.domain.run.StartRunCommand;
+import com.ainclusive.iotsim.domain.support.Page;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -26,6 +27,9 @@ class RunControllerTest {
 
     private static final class FakeService extends RunService {
         String startedKind;
+        String listedProjectId;
+        String listedCursor;
+        Integer listedLimit;
         FakeService() { super(null, null, null, null, null, null, null); }
         @Override public RunView get(String p, String id) { return view(id, "RUNNING"); }
         @Override public RunState stateOf(String p, String id) {
@@ -33,6 +37,12 @@ class RunControllerTest {
         }
         @Override public RunView stop(String p, String id) { return view(id, "STOPPED"); }
         @Override public RunView start(String p, StartRunCommand cmd) { this.startedKind = cmd.kind(); return view("run-new", "COMPLETED"); }
+        @Override public Page<RunView> listPaged(String projectId, String cursor, Integer limit) {
+            listedProjectId = projectId;
+            listedCursor = cursor;
+            listedLimit = limit;
+            return new Page<>(List.of(view("r42", "RUNNING")), "next-tok", 20);
+        }
     }
 
     @Test
@@ -62,6 +72,19 @@ class RunControllerTest {
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(resp.getHeaders().getLocation()).hasToString("/api/v1/projects/p1/runs/run-new");
         assertThat(svc.startedKind).isEqualTo("REPLAY");
+    }
+
+    @Test
+    void listMapsPageOfRuns() {
+        FakeService svc = new FakeService();
+        Page<RunResponse> page = new RunController(svc).list("p1", "cur1", 20);
+        assertThat(svc.listedProjectId).isEqualTo("p1");
+        assertThat(svc.listedCursor).isEqualTo("cur1");
+        assertThat(svc.listedLimit).isEqualTo(20);
+        assertThat(page.items()).hasSize(1);
+        assertThat(page.items().get(0).id()).isEqualTo("r42");
+        assertThat(page.items().get(0).kind()).isEqualTo("REPLAY");
+        assertThat(page.nextCursor()).isEqualTo("next-tok");
     }
 
     @Test
