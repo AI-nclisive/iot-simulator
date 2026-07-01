@@ -28,6 +28,7 @@ type ScenariosState = {
   duplicateScenario: (id: string) => string | null;
   createScenario: () => string;
   // Builder step operations
+  renameScenario: (id: string, name: string) => void;
   addStep: (scenarioId: string, type: ScenarioStepType) => string;
   updateStep: (
     scenarioId: string,
@@ -66,7 +67,7 @@ export const useScenariosStore = create<ScenariosState>((set, get) => ({
       ...source,
       id: newId,
       name: `${source.name} (copy)`,
-      runState: "Idle",
+      runState: "Not running",
       lastRun: { at: null, outcome: null },
       lockedBy: null,
       updatedAt: new Date().toISOString(),
@@ -86,7 +87,7 @@ export const useScenariosStore = create<ScenariosState>((set, get) => ({
       name: "Untitled scenario",
       description: "New scenario.",
       stepCount: 0,
-      runState: "Idle",
+      runState: "Not running",
       lastRun: { at: null, outcome: null },
       owner: "You",
       lockedBy: null,
@@ -98,6 +99,13 @@ export const useScenariosStore = create<ScenariosState>((set, get) => ({
     }));
     return newId;
   },
+
+  renameScenario: (id, name) =>
+    set((state) => ({
+      scenarios: state.scenarios.map((s) =>
+        s.id === id ? { ...s, name: name.trim() || s.name } : s,
+      ),
+    })),
 
   addStep: (scenarioId, type) => {
     const stepId = `st-${++stepSeq}`;

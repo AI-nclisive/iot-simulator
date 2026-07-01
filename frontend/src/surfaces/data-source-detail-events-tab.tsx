@@ -32,48 +32,47 @@ interface RuntimeEventsResponse {
 
 function humanize(type: string): string {
   switch (type) {
-    case "SOURCE_START":
-      return "Source started";
-    case "SOURCE_STOP":
-      return "Source stopped";
-    case "SOURCE_STALE":
-      return "Source went stale";
-    case "SOURCE_RECOVERED":
-      return "Source recovered";
-    case "SOURCE_ERROR":
-      return "Source error";
-    case "ERROR":
-      return "Error";
-    default:
-      return type.toLowerCase().replace(/_/g, " ");
+    case "SOURCE_STARTED":    return "Source started";
+    case "SOURCE_STOPPED":   return "Source stopped";
+    case "SOURCE_STALE":     return "Source went stale";
+    case "SOURCE_RECOVERED": return "Source recovered";
+    case "SOURCE_ERROR":     return "Source error";
+    case "HEALTH_WARNING":   return "Health warning";
+    case "HEALTH_ERROR":     return "Health error";
+    case "REPLAY_STARTED":   return "Replay started";
+    case "REPLAY_STOPPED":   return "Replay stopped";
+    case "RECORDING_STARTED": return "Recording started";
+    case "RECORDING_STOPPED": return "Recording stopped";
+    case "CLIENT_CONNECTED":    return "Client connected";
+    case "CLIENT_DISCONNECTED": return "Client disconnected";
+    default: return type.toLowerCase().replace(/_/g, " ");
   }
 }
 
 function typeToLevel(type: string): RuntimeEventLevel {
-  if (type === "SOURCE_ERROR" || type === "ERROR") return "error";
-  if (type === "SOURCE_STALE") return "warning";
+  if (type === "SOURCE_ERROR" || type === "HEALTH_ERROR") return "error";
+  if (type === "SOURCE_STALE" || type === "HEALTH_WARNING") return "warning";
   return "info";
 }
 
 function typeToCategory(type: string): RuntimeEvent["category"] {
-  if (
-    type === "SOURCE_START" ||
-    type === "SOURCE_STOP" ||
-    type === "SOURCE_STALE" ||
-    type === "SOURCE_RECOVERED"
-  ) {
-    return "connection";
-  }
+  if (["SOURCE_STARTED", "SOURCE_STOPPED", "SOURCE_STALE", "SOURCE_RECOVERED",
+       "CLIENT_CONNECTED", "CLIENT_DISCONNECTED"].includes(type)) return "connection";
+  if (["REPLAY_STARTED", "REPLAY_STOPPED"].includes(type)) return "replay";
+  if (["RECORDING_STARTED", "RECORDING_STOPPED"].includes(type)) return "recording";
   return "runtime";
 }
 
 function mapDtoToEvent(dto: RuntimeEventDto): RuntimeEvent {
-  const detail = typeof dto.payload?.detail === "string" ? dto.payload.detail : null;
+  const message =
+    typeof dto.payload?.message === "string" ? dto.payload.message :
+    typeof dto.payload?.detail === "string" ? dto.payload.detail :
+    humanize(dto.type);
   return {
     id: String(dto.id),
     level: typeToLevel(dto.type),
     timestamp: dto.at,
-    message: detail ?? humanize(dto.type),
+    message,
     category: typeToCategory(dto.type),
   };
 }

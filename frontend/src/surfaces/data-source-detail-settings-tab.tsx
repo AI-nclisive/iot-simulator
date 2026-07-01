@@ -25,24 +25,22 @@ export function DataSourceDetailSettingsTab({
   const [name, setName] = useState(source.name);
   const [endpoint, setEndpoint] = useState(source.endpoint);
   const [savedMessage, setSavedMessage] = useState("");
-  const [lockState, setLockState] = useState<EditLockState>({ kind: "unlocked" });
+  const [lockState] = useState<EditLockState>({ kind: "unlocked" });
 
   const isLockedByOther = lockState.kind === "locked-by-other" || lockState.kind === "stale";
-
-  const validationMessage = useMemo(() => {
-    if (name.trim().length === 0) {
-      return "Name is required.";
-    }
-
-    if (!endpointIsValid(endpoint)) {
-      return "Endpoint is required and cannot contain spaces.";
-    }
-
-    return "";
-  }, [endpoint, name]);
+  const isEditable = access.isAdmin && !isLockedByOther;
 
   const hasChanges = name !== source.name || endpoint !== source.endpoint;
-  const canSave = access.isAdmin && !isLockedByOther && hasChanges && validationMessage.length === 0;
+
+  // Only validate when the user has made changes — never on initial open or after reset
+  const validationMessage = useMemo(() => {
+    if (!hasChanges) return "";
+    if (name.trim().length === 0) return "Name is required.";
+    if (!endpointIsValid(endpoint)) return "Endpoint is required and cannot contain spaces.";
+    return "";
+  }, [endpoint, name, hasChanges]);
+
+  const canSave = isEditable && hasChanges && validationMessage.length === 0;
 
   function resetForm() {
     setName(source.name);
@@ -51,10 +49,7 @@ export function DataSourceDetailSettingsTab({
   }
 
   function saveChanges() {
-    if (!canSave) {
-      return;
-    }
-
+    if (!canSave) return;
     updateSourceConfiguration(source.id, {
       endpoint: endpoint.trim(),
       name: name.trim(),
@@ -67,7 +62,7 @@ export function DataSourceDetailSettingsTab({
       <EditLockBanner lock={lockState} />
 
       <div className="flex flex-wrap items-center gap-2">
-        {(!access.isAdmin || isLockedByOther) ? (
+        {!isEditable ? (
           <StatusBadge label="Read-only" tone="neutral" />
         ) : null}
         {hasChanges ? <StatusBadge label="Unsaved changes" tone="warning" /> : null}
@@ -95,7 +90,7 @@ export function DataSourceDetailSettingsTab({
           Source name
           <input
             className="shell-field"
-            disabled={!access.isAdmin || isLockedByOther}
+            disabled={!isEditable}
             type="text"
             value={name}
             onChange={(event) => {
@@ -109,7 +104,7 @@ export function DataSourceDetailSettingsTab({
           Endpoint
           <input
             className="shell-field"
-            disabled={!access.isAdmin || isLockedByOther}
+            disabled={!isEditable}
             type="text"
             value={endpoint}
             onChange={(event) => {
@@ -121,24 +116,16 @@ export function DataSourceDetailSettingsTab({
 
         <label className="flex flex-col gap-2 text-sm text-shell-muted">
           Protocol
-          <input
-            className="shell-field"
-            disabled
-            type="text"
-            value={source.protocol}
-            readOnly
-          />
+          <div className="shell-field cursor-default select-none bg-shell-base/40 text-shell-muted">
+            {source.protocol}
+          </div>
         </label>
 
         <label className="flex flex-col gap-2 text-sm text-shell-muted">
           Parameters
-          <input
-            className="shell-field"
-            disabled
-            type="text"
-            value={source.parameterCount.toLocaleString()}
-            readOnly
-          />
+          <div className="shell-field cursor-default select-none bg-shell-base/40 text-shell-muted">
+            {source.parameterCount.toLocaleString()}
+          </div>
         </label>
       </div>
 
@@ -157,7 +144,7 @@ export function DataSourceDetailSettingsTab({
         </button>
         <button
           className="shell-action"
-          disabled={!access.isAdmin || isLockedByOther || !hasChanges}
+          disabled={!isEditable || !hasChanges}
           type="button"
           onClick={resetForm}
         >

@@ -797,6 +797,8 @@ Parallel execution:
   Depends: IS-051 (values SSE stream).
   Done when: no fake timer in `RecordingFlowPage`; value count and state reflect real SSE; TypeScript errors pass.
 
+- [x] `UI-114` UX polish — wizard rework, recordings, scenarios, schema editor fixes
+
 - [x] `UI-113` Fix source detail crash on direct navigation — hooks ordering + load-on-mount
   Goal: `DataSourceDetailPreviewPage` crashed with a Rules of Hooks violation when navigated to directly (e.g. bookmark or refresh) because `useMemo` was called after an early `if (!source) return`. Also, the page showed a permanent "source not found" error on direct URL because the store was empty and nothing triggered a fetch.
   Surface: `Data Source Detail` — all tabs.
