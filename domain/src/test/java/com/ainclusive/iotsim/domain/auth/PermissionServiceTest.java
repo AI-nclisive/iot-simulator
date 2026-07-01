@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.ainclusive.iotsim.persistence.auth.PermissionRepository;
 import com.ainclusive.iotsim.persistence.auth.RoleRepository;
 import com.ainclusive.iotsim.persistence.auth.UserRepository;
 import com.ainclusive.iotsim.persistence.auth.UserRow;
@@ -23,15 +22,13 @@ class PermissionServiceTest {
 
     private RoleRepository roleRepository;
     private UserRepository userRepository;
-    private PermissionRepository permissionRepository;
     private PermissionService service;
 
     @BeforeEach
     void setUp() {
         roleRepository = mock(RoleRepository.class);
         userRepository = mock(UserRepository.class);
-        permissionRepository = mock(PermissionRepository.class);
-        service = new PermissionService(roleRepository, userRepository, permissionRepository);
+        service = new PermissionService(roleRepository, userRepository);
         SecurityContextHolder.clearContext();
     }
 

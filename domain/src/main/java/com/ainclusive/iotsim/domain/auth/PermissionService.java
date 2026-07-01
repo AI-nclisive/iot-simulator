@@ -1,6 +1,5 @@
 package com.ainclusive.iotsim.domain.auth;
 
-import com.ainclusive.iotsim.persistence.auth.PermissionRepository;
 import com.ainclusive.iotsim.persistence.auth.RoleRepository;
 import com.ainclusive.iotsim.persistence.auth.UserRepository;
 import java.util.EnumSet;
@@ -49,15 +48,10 @@ public class PermissionService {
 
     private final RoleRepository roleRepository;
     private final UserRepository userRepository;
-    private final PermissionRepository permissionRepository;
 
-    public PermissionService(
-            RoleRepository roleRepository,
-            UserRepository userRepository,
-            PermissionRepository permissionRepository) {
+    public PermissionService(RoleRepository roleRepository, UserRepository userRepository) {
         this.roleRepository = roleRepository;
         this.userRepository = userRepository;
-        this.permissionRepository = permissionRepository;
     }
 
     /**
@@ -106,9 +100,15 @@ public class PermissionService {
      * permission. This is the user-aware variant used when the caller already has a resolved
      * user subject (e.g. from a JWT claim), rather than reading from the security context.
      *
+     * <p><b>Warning — shared/authenticated mode only.</b> In local trusted mode the implicit
+     * {@code local} principal has no row in the user table, so
+     * {@code userRepository.findBySubject(subject)} returns {@code Optional.empty()} and this
+     * method returns {@code false} for every permission. Use {@link #hasPermission(Permission)}
+     * (the security-context variant) when the caller may be running in local mode.
+     *
      * @param subject    OIDC subject of the user
      * @param permission the capability to check
-     * @return {@code true} iff the user holds this permission
+     * @return {@code true} iff the user holds this permission; always {@code false} in local mode
      */
     public boolean hasPermission(String subject, Permission permission) {
         return userRepository.findBySubject(subject)
