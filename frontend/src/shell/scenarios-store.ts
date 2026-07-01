@@ -11,6 +11,7 @@ import { create } from "zustand";
 import { scenarioRows, stepsByScenario, type ScenarioRow } from "../surfaces/mock-scenarios";
 import {
   STEP_TYPE_LABELS,
+  isStepConfigured,
   type ScenarioStep,
   type ScenarioStepType,
 } from "../surfaces/scenario-steps";
@@ -28,6 +29,11 @@ type ScenariosState = {
   createScenario: () => string;
   // Builder step operations
   addStep: (scenarioId: string, type: ScenarioStepType) => string;
+  updateStep: (
+    scenarioId: string,
+    stepId: string,
+    patch: { label?: string; config?: Record<string, unknown>; configured?: boolean },
+  ) => void;
   removeStep: (scenarioId: string, stepId: string) => void;
   moveStep: (scenarioId: string, stepId: string, direction: "up" | "down") => void;
 };
@@ -95,8 +101,10 @@ export const useScenariosStore = create<ScenariosState>((set, get) => ({
 
   addStep: (scenarioId, type) => {
     const stepId = `st-${++stepSeq}`;
-    // wait/marker have no required target config, so they start configured.
-    const configured = type === "wait" || type === "marker";
+    // Derive from the same source of truth the editor and validateScenario use,
+    // so a freshly-added step with empty config is only "configured" if the type
+    // genuinely has no required fields (not a hard-coded per-type assumption).
+    const configured = isStepConfigured(type, {});
     const step: ScenarioStep = {
       id: stepId,
       type,
@@ -115,6 +123,23 @@ export const useScenariosStore = create<ScenariosState>((set, get) => ({
       steps: {
         ...state.steps,
         [scenarioId]: (state.steps[scenarioId] ?? []).filter((s) => s.id !== stepId),
+      },
+    })),
+
+  updateStep: (scenarioId, stepId, patch) =>
+    set((state) => ({
+      steps: {
+        ...state.steps,
+        [scenarioId]: (state.steps[scenarioId] ?? []).map((s) =>
+          s.id === stepId
+            ? {
+                ...s,
+                ...(patch.label !== undefined ? { label: patch.label } : {}),
+                ...(patch.config !== undefined ? { config: patch.config } : {}),
+                ...(patch.configured !== undefined ? { configured: patch.configured } : {}),
+              }
+            : s,
+        ),
       },
     })),
 
