@@ -161,6 +161,17 @@ for p in 8080 4173; do lsof -ti tcp:$p | xargs kill 2>/dev/null; done
 Get-NetTCPConnection -LocalPort 8080,4173 -State Listen | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
 ```
 
+> **Supervisor mode — also stop worker processes (STOPGAP, IS-123).** In
+> `IOTSIM_RUNTIME_MODE=supervisor`, starting a source spawns `worker-opcua` child
+> processes that do **not** yet shut down gracefully when the backend is killed —
+> graceful Shutdown RPC is **IS-090** (not yet implemented). Until IS-090 lands,
+> teardown must also kill lingering workers:
+> - bash: `pkill -f worker-opcua` (best-effort; ignore "no process")
+> - PowerShell: `Get-Process worker-opcua -ErrorAction SilentlyContinue | Stop-Process -Force`
+>
+> **Revisit when IS-090 is implemented:** once workers stop gracefully on backend
+> shutdown, drop this explicit kill (or downgrade it to a fallback).
+
 Only wipe the database when the user explicitly wants a clean slate:
 `docker compose down -v`.
 
