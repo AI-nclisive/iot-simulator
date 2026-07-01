@@ -43,15 +43,25 @@ can't claim the same port.
 (JSON) for an integer `listenPort` and passes it to `RuntimeStartSpec` instead of
 the hardcoded `0`. Absent/blank/unparseable/≤0 → `0`.
 
-Mechanics: `RuntimeStartSpecs.of` is a static helper with no `ObjectMapper`. It
-gains an `ObjectMapper` parameter (its three callers — `DataSourceService.start`,
-`ReplayService`, `SyntheticRunService` — all already hold one and pass it
-through). A small private `listenPort(String runtimeConfig, ObjectMapper json)`
-does the tolerant parse (return `0` on any problem, mirroring how
-`ScenarioService`/`ScenarioRunService` read JSON fields defensively).
+Mechanics: expose a `public static int RuntimeStartSpecs.listenPort(String
+runtimeConfig, ObjectMapper json)` that does the tolerant parse (return `0` on
+null/blank/unparseable/≤0, mirroring how `ScenarioRunService` reads JSON fields
+defensively). `RuntimeStartSpecs.of` gains an `ObjectMapper` parameter and uses it
+instead of the hardcoded `0`.
+
+Build sites that must honor the port (verified):
+- `RuntimeStartSpecs.of(...)` — called by **`DataSourceService.start`** (line 120)
+  and **`SyntheticRunService.run`** (line 100). Both get an `ObjectMapper`
+  argument; `SyntheticRunService` already holds `json`, and `DataSourceService`
+  gains an `ObjectMapper` (constructor param — see §2).
+- **`ReplayService`** builds a `RuntimeStartSpec` **inline** (line 112, hardcoded
+  `0`) and does **not** call `RuntimeStartSpecs.of`. Replace its `0` with
+  `RuntimeStartSpecs.listenPort(source.runtimeConfig(), json)` (it already holds
+  `json`) so replay-started sources bind the same configured port.
 
 ### 2. Uniqueness at start — `DataSourceService.start`
-Before `runtime.start(...)`:
+`DataSourceService` gains an injected `ObjectMapper` (new constructor param — its
+tests construct it manually, so they update too). Before `runtime.start(...)`:
 - Parse the target source's `listenPort` (same helper).
 - If `listenPort != 0`: enumerate all sources via a new
   `DataSourceRepository.findAll()`, and for each whose
