@@ -62,15 +62,8 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * Spring Security throws {@link AccessDeniedException} when a {@code @PreAuthorize}
-     * check fails (IS-077). Map to 403 with a problem+json body (backend-specs/05).
-     *
-     * <p>Note: Spring Security's default behaviour is to propagate this exception to the
-     * {@code ExceptionTranslationFilter}, which sends 403 before {@code @RestControllerAdvice}
-     * can intercept it. Declaring the handler here works in the {@code @WebMvcTest} / MockMvc
-     * slice and in production because {@code @RestControllerAdvice} runs inside the MVC
-     * dispatch pipeline — the exception is thrown after the security chain has already
-     * authenticated the request.
+     * Maps {@link AccessDeniedException} thrown by {@code @PreAuthorize} to RFC 9457 403
+     * (backend-specs/05).
      */
     @ExceptionHandler(AccessDeniedException.class)
     public ProblemDetail forbidden(AccessDeniedException e) {
