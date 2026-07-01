@@ -1,0 +1,148 @@
+package com.ainclusive.iotsim.domain.scenario;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import com.ainclusive.iotsim.domain.common.FeatureNotAvailableException;
+import com.ainclusive.iotsim.domain.common.ScenarioInvalidException;
+import com.ainclusive.iotsim.domain.datasource.DataSourceService;
+import com.ainclusive.iotsim.domain.replay.ReplayService;
+import com.ainclusive.iotsim.domain.replay.ReplaySummary;
+import com.ainclusive.iotsim.domain.synthetic.SyntheticRunService;
+import com.ainclusive.iotsim.persistence.evidence.EvidenceRepository;
+import com.ainclusive.iotsim.persistence.evidence.EvidenceRow;
+import com.ainclusive.iotsim.persistence.run.RunRepository;
+import com.ainclusive.iotsim.persistence.run.RunRow;
+import com.ainclusive.iotsim.persistence.runtimeevent.RuntimeEventRepository;
+import com.ainclusive.iotsim.persistence.scenario.ScenarioRepository;
+import com.ainclusive.iotsim.persistence.scenario.ScenarioRow;
+import com.ainclusive.iotsim.persistence.scenario.ScenarioStepRow;
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import tools.jackson.databind.ObjectMapper;
+
+class ScenarioRunServiceTest {
+
+    private static final String PROJECT = "p1";
+    private static final String SCENARIO = "scn-1";
+    private static final String SOURCE = "ds-1";
+    private static final String RECORDING = "rec-1";
+
+    private ScenarioRepository scenarios;
+    private ScenarioValidationService validation;
+    private RunRepository runs;
+    private EvidenceRepository evidence;
+    private RuntimeEventRepository events;
+    private DataSourceService dataSources;
+    private ReplayService replay;
+    private SyntheticRunService synthetic;
+    private ScenarioRunService service;
+
+    @BeforeEach
+    void setUp() {
+        scenarios = mock(ScenarioRepository.class);
+        validation = mock(ScenarioValidationService.class);
+        runs = mock(RunRepository.class);
+        evidence = mock(EvidenceRepository.class);
+        events = mock(RuntimeEventRepository.class);
+        dataSources = mock(DataSourceService.class);
+        replay = mock(ReplayService.class);
+        synthetic = mock(SyntheticRunService.class);
+        service = new ScenarioRunService(scenarios, validation, runs, evidence, events,
+                dataSources, replay, synthetic, new ObjectMapper());
+    }
+
+    private void stubScenario(ScenarioStepRow... steps) {
+        when(scenarios.findById(SCENARIO)).thenReturn(Optional.of(new ScenarioRow(
+                SCENARIO, PROJECT, "Flow", "READY", "{}", List.of(steps),
+                OffsetDateTime.now(), OffsetDateTime.now(), "local", 1)));
+    }
+
+    private void stubValidReady() {
+        when(validation.validate(PROJECT, SCENARIO))
+                .thenReturn(new ScenarioValidation("READY", List.of()));
+    }
+
+    private RunRow parentRun() {
+        return new RunRow("run-parent", PROJECT, "SCENARIO", "MANUAL", "local", "RUNNING",
+                SCENARIO, null, OffsetDateTime.now(), null, OffsetDateTime.now(), List.of(SOURCE), null);
+    }
+
+    @Test
+    void faultStepIsRejectedWithoutCreatingARun() {
+        stubScenario(new ScenarioStepRow(0, "FAULT", null, "{}"));
+        assertThatThrownBy(() -> service.run(PROJECT, SCENARIO, "MANUAL", "local"))
+                .isInstanceOf(FeatureNotAvailableException.class);
+        verify(runs, never()).create(anyString(), anyString(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void invalidScenarioIsRejected() {
+        stubScenario(new ScenarioStepRow(0, "START", "missing", "{}"));
+        when(validation.validate(PROJECT, SCENARIO))
+                .thenReturn(new ScenarioValidation("INVALID",
+                        List.of(new ValidationIssue(0, "ERROR", "targetSourceId does not exist"))));
+        assertThatThrownBy(() -> service.run(PROJECT, SCENARIO, "MANUAL", "local"))
+                .isInstanceOf(ScenarioInvalidException.class);
+        verify(runs, never()).create(anyString(), anyString(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void happyPathRunsStepsUnderOneScenarioRunAndCompletes() {
+        stubScenario(
+                new ScenarioStepRow(0, "START", SOURCE, "{}"),
+                new ScenarioStepRow(1, "REPLAY", SOURCE, "{\"recordingId\":\"" + RECORDING + "\"}"),
+                new ScenarioStepRow(2, "STOP", SOURCE, "{}"));
+        stubValidReady();
+        RunRow parent = parentRun();
+        when(runs.create(eq(PROJECT), eq("SCENARIO"), eq("MANUAL"), eq("local"), any(), eq(SCENARIO), eq((String) null)))
+                .thenReturn(parent);
+        when(runs.start(eq("run-parent"), any())).thenReturn(parent);
+        when(runs.end(eq("run-parent"), anyString(), any())).thenReturn(parent);
+        // EvidenceRow has 8 fields: (id, projectId, runId, status, manifestJson, objectRef, createdAt, createdBy)
+        when(evidence.create(eq(PROJECT), eq("run-parent"), anyString()))
+                .thenReturn(new EvidenceRow("ev-1", PROJECT, "run-parent", "CAPTURING", "{}", null, null, "local"));
+        when(replay.replay(eq(PROJECT), eq(SOURCE), eq(RECORDING), any(), eq(false), eq("run-parent")))
+                .thenReturn(new ReplaySummary(RECORDING, SOURCE, 42, "child-replay", "ev-2", null));
+
+        ScenarioRunSummary summary = service.run(PROJECT, SCENARIO, "MANUAL", "local");
+
+        assertThat(summary.runId()).isEqualTo("run-parent");
+        assertThat(summary.status()).isEqualTo("RUNNING"); // ended.state() from stubbed RunRow
+        assertThat(summary.steps()).extracting(StepOutcome::type).containsExactly("START", "REPLAY", "STOP");
+        verify(dataSources).start(PROJECT, SOURCE);
+        verify(dataSources).stop(PROJECT, SOURCE);
+        verify(replay).replay(eq(PROJECT), eq(SOURCE), eq(RECORDING), any(), eq(false), eq("run-parent"));
+        verify(runs).end(eq("run-parent"), eq("COMPLETED"), any());
+    }
+
+    @Test
+    void stepFailureEndsParentRunFailedAndSkipsRest() {
+        stubScenario(
+                new ScenarioStepRow(0, "START", SOURCE, "{}"),
+                new ScenarioStepRow(1, "STOP", SOURCE, "{}"));
+        stubValidReady();
+        RunRow parent = parentRun();
+        when(runs.create(eq(PROJECT), eq("SCENARIO"), any(), any(), any(), eq(SCENARIO), eq((String) null)))
+                .thenReturn(parent);
+        when(runs.start(anyString(), any())).thenReturn(parent);
+        when(evidence.create(anyString(), anyString(), anyString()))
+                .thenReturn(new EvidenceRow("ev-1", PROJECT, "run-parent", "CAPTURING", "{}", null, null, "local"));
+        org.mockito.Mockito.doThrow(new RuntimeException("boom")).when(dataSources).start(PROJECT, SOURCE);
+
+        assertThatThrownBy(() -> service.run(PROJECT, SCENARIO, "MANUAL", "local"))
+                .isInstanceOf(RuntimeException.class);
+        verify(runs).end(eq("run-parent"), eq("FAILED"), any());
+        verify(dataSources, never()).stop(PROJECT, SOURCE);
+    }
+}
