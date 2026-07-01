@@ -39,6 +39,14 @@ public class JooqDataSourceRepository implements DataSourceRepository {
     }
 
     @Override
+    public List<DataSourceRow> findAll() {
+        return dsl.selectFrom(DATA_SOURCES)
+                .orderBy(DATA_SOURCES.CREATED_AT.desc())
+                .fetch()
+                .map(this::map);
+    }
+
+    @Override
     public List<DataSourceRow> findByProject(String projectId) {
         return dsl.selectFrom(DATA_SOURCES)
                 .where(DATA_SOURCES.PROJECT_ID.eq(projectId))
