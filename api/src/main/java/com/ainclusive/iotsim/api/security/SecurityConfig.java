@@ -13,17 +13,21 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
 
 /**
- * Enforces the deployment-mode flag (IS-078): one build, two security postures.
+ * Enforces the deployment-mode flag (IS-078) and wires OIDC JWT validation (IS-075):
+ * one build, two security postures.
  *
  * <ul>
  *   <li><b>local</b> ({@code iotsim.mode=local}, default): authentication is off;
  *       every request runs as the implicit {@code local} principal with full
  *       control ({@link LocalPrincipalFilter}).
  *   <li><b>shared</b> ({@code iotsim.mode=shared}): workspace endpoints require an
- *       authenticated bearer JWT (OAuth2/OIDC resource server). Health probes and
- *       API docs stay public. JWKS-based validation is configured via
- *       {@code spring.security.oauth2.resourceserver.jwt.*}; full provider support
- *       (issuer/audience/role mapping) lands in IS-075/IS-076/IS-077.
+ *       authenticated bearer JWT (OAuth2/OIDC resource server). JWTs are validated
+ *       via JWKS using the issuer URI from
+ *       {@code spring.security.oauth2.resourceserver.jwt.issuer-uri} (or the
+ *       explicit {@code iotsim.oidc.jwks-uri} override).  The validated token is
+ *       converted to an {@link IotSimPrincipal} via {@link JwtPrincipalConverter},
+ *       which maps the configurable {@code iotsim.oidc.roles-claim} to Spring
+ *       {@code GrantedAuthority} values. Health probes and API docs stay public.
  * </ul>
  *
  * Exactly one chain is active per startup ({@link ConditionalOnProperty}).
@@ -31,7 +35,7 @@ import org.springframework.security.web.access.intercept.AuthorizationFilter;
  */
 @Configuration
 @EnableWebSecurity
-@EnableConfigurationProperties(DeploymentProperties.class)
+@EnableConfigurationProperties({DeploymentProperties.class, OidcProperties.class})
 public class SecurityConfig {
 
     /** Reachable without authentication in shared mode (health probes, API docs). */
@@ -55,17 +59,28 @@ public class SecurityConfig {
         return http.build();
     }
 
+    /**
+     * Shared-mode chain: validates bearer JWTs via JWKS and converts them to
+     * {@link IotSimPrincipal} using {@link JwtPrincipalConverter} (IS-075).
+     *
+     * <p>A {@link JwtDecoder} bean is required — Spring Boot auto-configures one
+     * when {@code spring.security.oauth2.resourceserver.jwt.issuer-uri} is set.
+     * An absent decoder causes a fail-fast error at startup with an actionable
+     * message.
+     */
     @Bean
     @ConditionalOnProperty(name = "iotsim.mode", havingValue = "shared")
     SecurityFilterChain sharedSecurityFilterChain(HttpSecurity http,
-            ObjectProvider<JwtDecoder> jwtDecoders) throws Exception {
+            ObjectProvider<JwtDecoder> jwtDecoders,
+            OidcProperties oidcProperties) throws Exception {
         JwtDecoder jwtDecoder = jwtDecoders.getIfAvailable();
         if (jwtDecoder == null) {
             throw new IllegalStateException(
                     "iotsim.mode=shared requires an OIDC issuer: set "
-                    + "spring.security.oauth2.resourceserver.jwt.issuer-uri so bearer JWTs "
-                    + "validate via JWKS (full provider support lands in IS-075).");
+                    + "spring.security.oauth2.resourceserver.jwt.issuer-uri so bearer "
+                    + "JWTs validate via JWKS. See backend-specs/08_AUTH_AND_MODES.md.");
         }
+        JwtPrincipalConverter converter = new JwtPrincipalConverter(oidcProperties.rolesClaim());
         http
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session ->
@@ -73,7 +88,10 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
                         .anyRequest().authenticated())
-                .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(jwtDecoder)));
+                .oauth2ResourceServer(oauth2 -> oauth2
+                        .jwt(jwt -> jwt
+                                .decoder(jwtDecoder)
+                                .jwtAuthenticationConverter(converter)));
         return http.build();
     }
 }

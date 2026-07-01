@@ -15,4 +15,6 @@ dependencies {
     implementation(libs.springdoc.openapi.webmvc)
 
     testImplementation(project(":persistence"))
+    testImplementation(libs.spring.boot.starter.test)
+    testImplementation(libs.spring.security.test)
 }
