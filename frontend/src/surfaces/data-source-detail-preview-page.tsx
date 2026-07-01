@@ -101,11 +101,11 @@ export function DataSourceDetailPreviewPage() {
   const isLoading = useDataSourcesStore((state) => state.isLoading);
   const loadDataSources = useDataSourcesStore((state) => state.loadDataSources);
   const access = resolveAccess(accessMode, sharedRole);
-  const fetchedRef = useRef(false);
+  const fetchedForProjectRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (currentProjectId && !source && !isLoading && !fetchedRef.current) {
-      fetchedRef.current = true;
+    if (currentProjectId && !source && !isLoading && fetchedForProjectRef.current !== currentProjectId) {
+      fetchedForProjectRef.current = currentProjectId;
       loadDataSources(currentProjectId);
     }
   }, [currentProjectId, source, isLoading, loadDataSources]);
