@@ -72,6 +72,7 @@ class SyntheticLiveRunServiceTest {
         assertThat(run.trigger()).isEqualTo("MANUAL");
         assertThat(evidence.byId.get(summary.evidenceId()).manifestJson())
                 .contains("\"seed\":5").contains("\"live\":true");
+        assertThat(run.evidenceId()).isEqualTo(summary.evidenceId());
     }
 
     private SyntheticConfig config(Long seed) {

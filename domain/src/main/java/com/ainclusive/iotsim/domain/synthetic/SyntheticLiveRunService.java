@@ -141,8 +141,8 @@ public class SyntheticLiveRunService {
                 .orElseThrow(() -> new ResourceNotFoundException("DataSource", dataSourceId));
     }
 
-    private static OffsetDateTime now() {
-        return OffsetDateTime.now(ZoneOffset.UTC);
+    private OffsetDateTime now() {
+        return OffsetDateTime.ofInstant(wallClock.instant(), ZoneOffset.UTC);
     }
 
     static final Comparator<NeutralValue> ORDER =
