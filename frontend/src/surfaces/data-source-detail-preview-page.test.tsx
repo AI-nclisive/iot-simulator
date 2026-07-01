@@ -186,13 +186,11 @@ describe("DataSourceDetailPreviewPage — load-on-mount", () => {
 describe("DataSourceDetailPreviewPage — error state", () => {
   it("shows error panel when source is not found after load", () => {
     setupShellStore();
-    // Store has loaded but source not present
+    // loadDataSources is a no-op mock, so store stays empty after the effect runs;
+    // the error panel renders because source is never populated
     setupDataSourcesStore({ dataSources: [], isLoading: false });
-    // Mark as already fetched so the error panel renders immediately
     renderPage();
 
-    // Initially might show loading; after effect settles show error
-    // Since loadDataSources is a no-op mock here, source stays absent
     expect(screen.getByText(/This source could not be found/i)).toBeTruthy();
   });
 });
