@@ -206,7 +206,11 @@ public class SyntheticLiveRunService {
     static final class VariableFeed {
         final SyntheticGenerator generator;
         final long updateRateMs;
-        long emitted;
+        // Written only by the pacer thread in tickOne; read by a request thread via
+        // totalEmitted() on stop. volatile gives that single-writer/reader hand-off a
+        // happens-before edge (no torn/stale count). A stop racing an in-flight tick may
+        // still let that tick push one final batch before runtime.stop — benign and expected.
+        volatile long emitted;
 
         VariableFeed(SyntheticGenerator generator, long updateRateMs) {
             this.generator = generator;
