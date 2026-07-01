@@ -165,14 +165,6 @@ describe("RecordingFlowPage — useLiveValues wiring", () => {
     expect(mockUseLiveValues).toHaveBeenCalledWith("src-1", false);
   });
 
-  it("calls useLiveValues with enabled=false when not capturing (ready state)", () => {
-    mockUseLiveValues.mockReturnValue({ rows: [], status: "connecting" });
-    renderPage();
-
-    // In ready state captureActive=false
-    const calls = mockUseLiveValues.mock.calls;
-    expect(calls.some(([, enabled]) => enabled === false)).toBe(true);
-  });
 });
 
 describe("RecordingFlowPage — SSE status open → Recording state", () => {
