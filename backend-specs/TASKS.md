@@ -21,7 +21,7 @@ dependency-ordered. (Optimized for "make the simulator real end to end, then
 broaden, then harden for teams" — can be re-weighted if the near-term goal
 differs.)
 
-Snapshot: **build green.** 107 done · 18 todo (125 total). Live status is the board; this line is a periodic snapshot.
+Snapshot: **build green.** 108 done · 17 todo (125 total). Live status is the board; this line is a periodic snapshot.
 
 <details>
 <summary>ID crosswalk — legacy <code>BE-*</code> / <code>SDLC-*</code> → <code>IS-XXX</code></summary>
@@ -221,7 +221,7 @@ import/export. Modbus moved to Wave G (deferred) — see the note there.
 - [x] IS-086 [BE] ✅ [gen] Scenario validation + run execution — SPEC: Run Scenarios
 - [ ] IS-087 [BE] ⬜ [gen] Fault model + injection (neutral & protocol; never auto-healed) — SPEC: Simulate Faults
 - [ ] IS-088 [BE] ⬜ [ipc] InjectFault RPC — 02
-- [ ] IS-089 [BE] ⬜ [api] Runs resource + test-control endpoints (start/state/stop) — 05/SPEC: Control From Tests
+- [x] IS-089 [BE] ✅ [api] Runs resource + test-control endpoints (start/state/stop) — 05/SPEC: Control From Tests
 - [ ] IS-090 [BE] ⬜ [ipc] Shutdown RPC handling — 02
 - [ ] IS-091 [BE] ⬜ [io] Artifact version compatibility (reject newer-than-supported) — 06
 - [ ] IS-092 [BE] ⬜ [io] Retention & cleanup (size/age/dependency-aware) — SPEC + 06
