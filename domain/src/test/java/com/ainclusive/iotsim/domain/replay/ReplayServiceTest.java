@@ -178,6 +178,12 @@ class ReplayServiceTest {
         assertThat(summary.deterministicSettings().startTime()).isNotNull();
     }
 
+    @Test
+    void replayWithParentRunIdLinksChildRun() {
+        ReplaySummary summary = service.replay(PROJECT, SOURCE, RECORDING, null, true, "parent-run-1");
+        assertThat(runs.parentOf(summary.runId())).isEqualTo("parent-run-1");
+    }
+
     /** Replay service with recording schemaVersion=0 and source schemaVersion=0 — perfectly aligned. */
     private ReplayService buildWithSchemaVersion(int version) {
         List<NeutralValue> values = List.of(
@@ -229,6 +235,12 @@ class ReplayServiceTest {
                     new ArrayList<>(sourceIds), parentRunId);
             byId.put(id, row);
             return row;
+        }
+
+        /** Returns the {@code parentRunId} stored for the given run, or {@code null} if none. */
+        public String parentOf(String runId) {
+            RunRow row = byId.get(runId);
+            return row == null ? null : row.parentRunId();
         }
 
         public RunRow start(String id, OffsetDateTime startedAt) {

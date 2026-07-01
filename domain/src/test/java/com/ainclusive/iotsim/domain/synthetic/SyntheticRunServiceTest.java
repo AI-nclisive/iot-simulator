@@ -126,6 +126,13 @@ class SyntheticRunServiceTest {
                 .extracting(RunRow::state).isEqualTo("FAILED");
     }
 
+    @Test
+    void runWithParentRunIdPassesItToRunCreate() {
+        SyntheticRunService service = service("SYNTHETIC", config(5L));
+        SyntheticRunSummary summary = service.run(PROJECT, SOURCE, 1000L, "parent-run-9");
+        assertThat(runs.byId.get(summary.runId()).parentRunId()).isEqualTo("parent-run-9");
+    }
+
     // --- fakes ---
 
     private static final class CapturingRuntime implements RuntimeController {

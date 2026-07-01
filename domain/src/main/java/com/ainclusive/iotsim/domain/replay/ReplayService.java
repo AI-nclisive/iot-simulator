@@ -71,6 +71,17 @@ public class ReplayService {
      */
     public ReplaySummary replay(String projectId, String dataSourceId, String recordingId,
             DeterministicSettings deterministicSettings, boolean compatibilityAck) {
+        return replay(projectId, dataSourceId, recordingId, deterministicSettings, compatibilityAck, null);
+    }
+
+    /**
+     * Starts a replay run linked to a parent (scenario) run.
+     *
+     * <p>Delegates all logic to the main overload; {@code parentRunId} is forwarded to
+     * {@link RunRepository#create} so the child run is linked in {@code runs.parent_run_id}.
+     */
+    public ReplaySummary replay(String projectId, String dataSourceId, String recordingId,
+            DeterministicSettings deterministicSettings, boolean compatibilityAck, String parentRunId) {
         DataSourceRow source = requireSource(projectId, dataSourceId);
         RecordingRow recording = requireRecording(projectId, recordingId);
 
@@ -89,7 +100,7 @@ public class ReplayService {
                 ? deterministicSettings
                 : DeterministicSettings.withRandomSeed(Instant.now());
 
-        RunRow run = runs.create(projectId, "REPLAY", "MANUAL", "local", List.of(dataSourceId), null);
+        RunRow run = runs.create(projectId, "REPLAY", "MANUAL", "local", List.of(dataSourceId), null, parentRunId);
         // Everything after the run exists is guarded: any failure (evidence setup, worker
         // launch, value streaming) must end the run FAILED rather than leave it RUNNING.
         try {
