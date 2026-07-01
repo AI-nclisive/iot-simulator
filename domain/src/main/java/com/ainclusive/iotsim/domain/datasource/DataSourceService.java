@@ -32,16 +32,20 @@ public class DataSourceService {
     private final RuntimeController runtime;
     private final CredentialStore credentials;
     private final ObjectMapper json;
+    private final String advertisedHost;
 
     public DataSourceService(DataSourceRepository dataSources, ProjectRepository projects,
             SchemaRepository schemas, RuntimeController runtime, CredentialStore credentials,
-            ObjectMapper json) {
+            ObjectMapper json,
+            @org.springframework.beans.factory.annotation.Value(
+                    "${iotsim.simulator.advertised-host:localhost}") String advertisedHost) {
         this.dataSources = dataSources;
         this.projects = projects;
         this.schemas = schemas;
         this.runtime = runtime;
         this.credentials = credentials;
         this.json = json;
+        this.advertisedHost = advertisedHost;
     }
 
     /**
@@ -51,14 +55,18 @@ public class DataSourceService {
      */
     @Transactional
     public DataSource create(String projectId, String name, String protocol, String basis,
-            String endpoint, String runtimeConfig, ConnectionCredentials connectionCredentials,
-            List<SchemaNode> initialNodes, String actor) {
+            Integer simulatorPort, String realDeviceEndpoint, String runtimeConfig,
+            ConnectionCredentials connectionCredentials, List<SchemaNode> initialNodes, String actor) {
         requireProject(projectId);
         // Validate enum inputs early (invalid -> IllegalArgumentException -> 400).
-        Protocol.valueOf(protocol);
+        Protocol parsedProtocol = Protocol.valueOf(protocol);
         SourceBasis.valueOf(basis);
         requireValidJson(runtimeConfig, "runtimeConfig");
-        DataSourceRow row = dataSources.insert(projectId, name, protocol, basis, endpoint, runtimeConfig, actor);
+        int port = simulatorPort != null
+                ? validatePort(simulatorPort)
+                : SimulatorUrl.defaultPort(parsedProtocol);
+        DataSourceRow row = dataSources.insert(
+                projectId, name, protocol, basis, port, realDeviceEndpoint, runtimeConfig, actor);
         applyCredentials(row.id(), connectionCredentials);
         if (initialNodes != null && !initialNodes.isEmpty()) {
             schemas.saveNewVersion(row.id(), initialNodes);
@@ -93,16 +101,19 @@ public class DataSourceService {
         return map(requireRow(projectId, id));
     }
 
-    public DataSource update(String projectId, String id, String name, String endpoint,
-            String runtimeConfig, Boolean enabled, ConnectionCredentials connectionCredentials,
-            long expectedVersion) {
+    public DataSource update(String projectId, String id, String name, Integer simulatorPort,
+            String realDeviceEndpoint, String runtimeConfig, Boolean enabled,
+            ConnectionCredentials connectionCredentials, long expectedVersion) {
         DataSourceRow existing = requireRow(projectId, id);
         requireValidJson(runtimeConfig, "runtimeConfig");
         String newName = name != null ? name : existing.name();
-        String newEndpoint = endpoint != null ? endpoint : existing.endpoint();
+        // A null simulatorPort keeps the persisted port unchanged; an explicit value is validated.
+        int newPort = simulatorPort != null ? validatePort(simulatorPort) : existing.simulatorPort();
+        String newEndpoint = realDeviceEndpoint != null ? realDeviceEndpoint : existing.realDeviceEndpoint();
         String newRuntimeConfig = runtimeConfig != null ? runtimeConfig : existing.runtimeConfig();
         boolean newEnabled = enabled != null ? enabled : existing.enabled();
-        DataSourceRow updated = dataSources.update(id, newName, newEndpoint, newRuntimeConfig, newEnabled, expectedVersion)
+        DataSourceRow updated = dataSources.update(
+                id, newName, newPort, newEndpoint, newRuntimeConfig, newEnabled, expectedVersion)
                 .orElseThrow(() -> new ConcurrencyConflictException("DataSource", id, expectedVersion));
         // Apply credentials only after the version check passes, so a stale write touches no secret.
         applyCredentials(id, connectionCredentials);
@@ -125,17 +136,17 @@ public class DataSourceService {
 
     public DataSource start(String projectId, String id) {
         DataSourceRow row = requireRow(projectId, id);
-        int port = RuntimeStartSpecs.listenPort(row.runtimeConfig(), json);
+        int port = row.simulatorPort();
         if (port != 0) {
             for (DataSourceRow other : dataSources.findAll()) {
                 if (!other.id().equals(id)
                         && "RUNNING".equals(runtime.state(other.id()))
-                        && RuntimeStartSpecs.listenPort(other.runtimeConfig(), json) == port) {
+                        && other.simulatorPort() == port) {
                     throw new PortInUseException(port, other.id());
                 }
             }
         }
-        runtime.start(id, RuntimeStartSpecs.of(schemas, row, json));
+        runtime.start(id, RuntimeStartSpecs.of(schemas, row));
         return map(row);
     }
 
@@ -211,20 +222,32 @@ public class DataSourceService {
                 .orElseThrow(() -> new ResourceNotFoundException("DataSource", id));
     }
 
+    /** Validates an explicit simulator port; the port range is 1..65535. */
+    private static int validatePort(int port) {
+        if (port < 1 || port > 65535) {
+            throw new IllegalArgumentException("simulatorPort must be between 1 and 65535, got: " + port);
+        }
+        return port;
+    }
+
     private DataSource map(DataSourceRow r) {
+        Protocol protocol = Protocol.valueOf(r.protocol());
+        String serveUrl = SimulatorUrl.of(protocol, advertisedHost, r.simulatorPort());
         return new DataSource(
                 r.id(),
                 r.projectId(),
                 r.name(),
-                Protocol.valueOf(r.protocol()),
+                protocol,
                 SourceBasis.valueOf(r.basis()),
                 r.schemaId(),
                 r.schemaVersion(),
-                r.endpoint(),
+                r.simulatorPort(),
+                r.realDeviceEndpoint(),
                 r.runtimeConfig(),
                 r.enabled(),
                 RuntimeState.valueOf(runtime.state(r.id())),
                 credentials.has(r.id()) ? CredentialState.SESSION_ONLY : CredentialState.MISSING,
+                serveUrl,
                 r.createdAt().toInstant(),
                 r.updatedAt().toInstant(),
                 r.createdBy(),

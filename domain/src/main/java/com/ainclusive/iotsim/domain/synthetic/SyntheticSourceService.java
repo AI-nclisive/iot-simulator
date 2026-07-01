@@ -42,7 +42,8 @@ public class SyntheticSourceService {
         // initialNodes=null: keep the two-step (create, then save schema) like ScanService;
         // DataSourceService.create gained an atomic initialNodes arg (IS-067) we don't use here.
         DataSource created = dataSources.create(
-                projectId, name, protocol, "SYNTHETIC", endpoint, json.writeValueAsString(config), null, null, actor);
+                projectId, name, protocol, "SYNTHETIC", null, endpoint,
+                json.writeValueAsString(config), null, null, actor);
         schemas.save(projectId, created.id(), nodes);
         // Re-read so the response carries the linked schemaId/schemaVersion.
         return dataSources.get(projectId, created.id());
