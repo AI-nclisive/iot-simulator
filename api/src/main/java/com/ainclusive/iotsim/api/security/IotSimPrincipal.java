@@ -1,6 +1,8 @@
 package com.ainclusive.iotsim.api.security;
 
 import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -36,7 +38,7 @@ public record IotSimPrincipal(
         if (subject.isBlank()) {
             throw new IllegalArgumentException("subject must not be blank");
         }
-        claims = claims == null ? Map.of() : Map.copyOf(claims);
+        claims = claims == null ? Map.of() : Collections.unmodifiableMap(new HashMap<>(claims));
         authorities = authorities == null ? List.of() : List.copyOf(authorities);
     }
 
