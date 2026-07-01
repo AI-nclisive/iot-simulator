@@ -2,6 +2,8 @@ package com.ainclusive.iotsim.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -30,11 +32,11 @@ class SyntheticRunControllerTest {
     @Test
     void runReturnsRunningState() {
         when(liveRuns.start(
-                org.mockito.ArgumentMatchers.eq(PROJECT),
-                org.mockito.ArgumentMatchers.eq(SOURCE),
-                org.mockito.ArgumentMatchers.isNull(),
-                org.mockito.ArgumentMatchers.eq("MANUAL"),
-                org.mockito.ArgumentMatchers.eq("local")))
+                eq(PROJECT),
+                eq(SOURCE),
+                isNull(),
+                eq("MANUAL"),
+                eq("local")))
             .thenReturn(new SyntheticLiveRunSummary("ds1", 5L, "run-1", "ev-1", "RUNNING"));
 
         SyntheticRunResponse resp = controller.run(PROJECT, SOURCE, null);
@@ -48,11 +50,11 @@ class SyntheticRunControllerTest {
     @Test
     void runWithMaxDurationPropagatesCap() {
         when(liveRuns.start(
-                org.mockito.ArgumentMatchers.eq(PROJECT),
-                org.mockito.ArgumentMatchers.eq(SOURCE),
-                org.mockito.ArgumentMatchers.eq(5000L),
-                org.mockito.ArgumentMatchers.eq("MANUAL"),
-                org.mockito.ArgumentMatchers.eq("local")))
+                eq(PROJECT),
+                eq(SOURCE),
+                eq(5000L),
+                eq("MANUAL"),
+                eq("local")))
             .thenReturn(new SyntheticLiveRunSummary("ds1", 7L, "run-2", "ev-2", "RUNNING"));
 
         SyntheticRunResponse resp = controller.run(PROJECT, SOURCE, new SyntheticRunRequest(5000L));
@@ -64,11 +66,11 @@ class SyntheticRunControllerTest {
     @Test
     void invalidMaxDurationPropagatesException() {
         when(liveRuns.start(
-                org.mockito.ArgumentMatchers.eq(PROJECT),
-                org.mockito.ArgumentMatchers.eq(SOURCE),
-                org.mockito.ArgumentMatchers.eq(0L),
-                org.mockito.ArgumentMatchers.eq("MANUAL"),
-                org.mockito.ArgumentMatchers.eq("local")))
+                eq(PROJECT),
+                eq(SOURCE),
+                eq(0L),
+                eq("MANUAL"),
+                eq("local")))
             .thenThrow(new IllegalArgumentException("maxDurationMs must be > 0 when set: 0"));
 
         assertThatThrownBy(() -> controller.run(PROJECT, SOURCE, new SyntheticRunRequest(0L)))
