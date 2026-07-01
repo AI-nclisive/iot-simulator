@@ -71,7 +71,7 @@ class ScenarioControllerTest {
         var req = new CreateScenarioRequest("Flow", "{}",
                 List.of(new StepDto("START", "ds-1", "{}"), new StepDto("STOP", "ds-1", "{}")));
 
-        ResponseEntity<ScenarioResponse> resp = new ScenarioController(svc).create("p1", req);
+        ResponseEntity<ScenarioResponse> resp = new ScenarioController(svc, null, null).create("p1", req);
 
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(resp.getHeaders().getETag()).isEqualTo("\"0\"");
@@ -81,21 +81,21 @@ class ScenarioControllerTest {
 
     @Test
     void createWithBlankNameThrows() {
-        ScenarioController c = new ScenarioController(new FakeService());
+        ScenarioController c = new ScenarioController(new FakeService(), null, null);
         assertThatThrownBy(() -> c.create("p1", new CreateScenarioRequest("  ", "{}", List.of())))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void getReturnsEtagFromVersion() {
-        ResponseEntity<ScenarioResponse> resp = new ScenarioController(new FakeService()).get("p1", "scn-1");
+        ResponseEntity<ScenarioResponse> resp = new ScenarioController(new FakeService(), null, null).get("p1", "scn-1");
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(resp.getHeaders().getETag()).isEqualTo("\"3\"");
     }
 
     @Test
     void updateWithoutIfMatchThrowsPreconditionRequired() {
-        ScenarioController c = new ScenarioController(new FakeService());
+        ScenarioController c = new ScenarioController(new FakeService(), null, null);
         assertThatThrownBy(() -> c.update("p1", "scn-1", null, new UpdateScenarioRequest("X", null, null)))
                 .isInstanceOf(PreconditionRequiredException.class);
     }
@@ -103,7 +103,7 @@ class ScenarioControllerTest {
     @Test
     void updateParsesIfMatchVersionAndReturnsBumpedEtag() {
         FakeService svc = new FakeService();
-        ResponseEntity<ScenarioResponse> resp = new ScenarioController(svc)
+        ResponseEntity<ScenarioResponse> resp = new ScenarioController(svc, null, null)
                 .update("p1", "scn-1", "\"5\"", new UpdateScenarioRequest("X", null, null));
         assertThat(svc.updatedVersion).isEqualTo(5);
         assertThat(resp.getHeaders().getETag()).isEqualTo("\"6\"");
@@ -111,7 +111,7 @@ class ScenarioControllerTest {
 
     @Test
     void updateWithNonNumericIfMatchThrows() {
-        ScenarioController c = new ScenarioController(new FakeService());
+        ScenarioController c = new ScenarioController(new FakeService(), null, null);
         assertThatThrownBy(() -> c.update("p1", "scn-1", "nope", new UpdateScenarioRequest("X", null, null)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
@@ -119,14 +119,14 @@ class ScenarioControllerTest {
     @Test
     void deleteReturns204() {
         FakeService svc = new FakeService();
-        ResponseEntity<Void> resp = new ScenarioController(svc).delete("p1", "scn-1");
+        ResponseEntity<Void> resp = new ScenarioController(svc, null, null).delete("p1", "scn-1");
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
         assertThat(svc.deleted).isTrue();
     }
 
     @Test
     void duplicateReturns201WithLocation() {
-        ResponseEntity<ScenarioResponse> resp = new ScenarioController(new FakeService()).duplicate("p1", "scn-1");
+        ResponseEntity<ScenarioResponse> resp = new ScenarioController(new FakeService(), null, null).duplicate("p1", "scn-1");
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(resp.getHeaders().getLocation()).isNotNull();
     }

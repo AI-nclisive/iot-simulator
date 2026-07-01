@@ -2,8 +2,14 @@ package com.ainclusive.iotsim.api.scenario;
 
 import com.ainclusive.iotsim.api.error.PreconditionRequiredException;
 import com.ainclusive.iotsim.domain.scenario.Scenario;
+import com.ainclusive.iotsim.domain.scenario.ScenarioRunService;
+import com.ainclusive.iotsim.domain.scenario.ScenarioRunSummary;
 import com.ainclusive.iotsim.domain.scenario.ScenarioService;
 import com.ainclusive.iotsim.domain.scenario.ScenarioStep;
+import com.ainclusive.iotsim.domain.scenario.ScenarioValidation;
+import com.ainclusive.iotsim.domain.scenario.ScenarioValidationService;
+import com.ainclusive.iotsim.domain.scenario.StepOutcome;
+import com.ainclusive.iotsim.domain.scenario.ValidationIssue;
 import com.ainclusive.iotsim.domain.support.Page;
 import java.net.URI;
 import java.time.Instant;
@@ -26,9 +32,14 @@ import org.springframework.web.bind.annotation.RestController;
 public class ScenarioController {
 
     private final ScenarioService scenarios;
+    private final ScenarioValidationService validationService;
+    private final ScenarioRunService runService;
 
-    public ScenarioController(ScenarioService scenarios) {
+    public ScenarioController(ScenarioService scenarios,
+            ScenarioValidationService validationService, ScenarioRunService runService) {
         this.scenarios = scenarios;
+        this.validationService = validationService;
+        this.runService = runService;
     }
 
     @GetMapping
@@ -92,6 +103,19 @@ public class ScenarioController {
                 .body(ScenarioResponse.from(s));
     }
 
+    @GetMapping("/{id}/validate")
+    public ScenarioValidationResponse validate(@PathVariable String projectId, @PathVariable String id) {
+        return ScenarioValidationResponse.from(validationService.validate(projectId, id));
+    }
+
+    @PostMapping("/{id}/run")
+    public ScenarioRunResponse run(@PathVariable String projectId, @PathVariable String id,
+            @RequestBody(required = false) RunScenarioRequest req) {
+        String trigger = req != null ? req.trigger() : null;
+        String initiator = req != null ? req.initiator() : null;
+        return ScenarioRunResponse.from(runService.run(projectId, id, trigger, initiator));
+    }
+
     private static List<ScenarioStep> toSteps(List<StepDto> dtos) {
         if (dtos == null) {
             return List.of();
@@ -118,6 +142,35 @@ public class ScenarioController {
             return Long.parseLong(v);
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException("invalid If-Match version: " + ifMatch);
+        }
+    }
+
+    public record RunScenarioRequest(String trigger, String initiator) {}
+
+    public record ValidationIssueResponse(int ordinal, String severity, String message) {
+        static ValidationIssueResponse from(ValidationIssue i) {
+            return new ValidationIssueResponse(i.ordinal(), i.severity(), i.message());
+        }
+    }
+
+    public record ScenarioValidationResponse(String status, List<ValidationIssueResponse> issues) {
+        static ScenarioValidationResponse from(ScenarioValidation v) {
+            return new ScenarioValidationResponse(v.status(),
+                    v.issues().stream().map(ValidationIssueResponse::from).toList());
+        }
+    }
+
+    public record StepOutcomeResponse(int ordinal, String type, String childRunId, long applied, String state) {
+        static StepOutcomeResponse from(StepOutcome o) {
+            return new StepOutcomeResponse(o.ordinal(), o.type(), o.childRunId(), o.applied(), o.state());
+        }
+    }
+
+    public record ScenarioRunResponse(String runId, String evidenceId, String status,
+            List<StepOutcomeResponse> steps) {
+        static ScenarioRunResponse from(ScenarioRunSummary s) {
+            return new ScenarioRunResponse(s.runId(), s.evidenceId(), s.status(),
+                    s.steps().stream().map(StepOutcomeResponse::from).toList());
         }
     }
 
