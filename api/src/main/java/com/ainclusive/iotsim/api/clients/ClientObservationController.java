@@ -1,7 +1,9 @@
 package com.ainclusive.iotsim.api.clients;
 
+import com.ainclusive.iotsim.api.security.Permission;
 import com.ainclusive.iotsim.domain.clientobservation.ClientObservationService;
 import java.util.List;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
@@ -12,9 +14,15 @@ import org.springframework.web.bind.annotation.RestController;
  * connect/disconnect events are on the SSE stream
  * ({@code GET .../stream/clients}); this is the point-in-time query.
  * See backend-specs/05_API_CONTRACT.md.
+ *
+ * <p>Authorization (IS-077): read-only — {@link Permission#OBSERVE} (user + admin).
  */
 @RestController
 public class ClientObservationController {
+
+    private static final String OBSERVE =
+            "@permissionService.hasPermission(authentication,"
+            + " T(com.ainclusive.iotsim.api.security.Permission).OBSERVE)";
 
     private final ClientObservationService clients;
 
@@ -26,6 +34,7 @@ public class ClientObservationController {
     // sibling SSE observability endpoints (/stream/{values,clients,runtime}), spec 05
     // does not require 404 here, and empty lists are an unambiguous "no clients" answer.
     @GetMapping("/api/v1/data-sources/{id}/clients")
+    @PreAuthorize(OBSERVE)
     public ClientsResponse clients(@PathVariable String id) {
         List<ClientConnectionDto> connected =
                 clients.current(id).stream().map(ClientConnectionDto::from).toList();

@@ -1,5 +1,6 @@
 package com.ainclusive.iotsim.api.io;
 
+import com.ainclusive.iotsim.api.security.Permission;
 import com.ainclusive.iotsim.domain.io.ProjectBundle;
 import com.ainclusive.iotsim.domain.io.ProjectExportService;
 import com.ainclusive.iotsim.domain.io.ProjectImportException;
@@ -14,6 +15,7 @@ import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -33,10 +35,16 @@ import org.springframework.web.multipart.MultipartFile;
  *
  * <p>The export is secret-free (credentials never serialised). The import creates
  * data sources with ANONYMOUS credential state; users supply credentials separately.
+ *
+ * <p>Authorization (IS-077): both endpoints require {@link Permission#IMPORT_EXPORT} (admin).
  */
 @RestController
 @RequestMapping("/api/v1/projects")
 public class ProjectIOController {
+
+    private static final String IMPORT_EXPORT =
+            "@permissionService.hasPermission(authentication,"
+            + " T(com.ainclusive.iotsim.api.security.Permission).IMPORT_EXPORT)";
 
     private final ProjectExportService exportService;
     private final ProjectImportService importService;
@@ -54,6 +62,7 @@ public class ProjectIOController {
      * get a direct download. Responds 404 if the project does not exist.
      */
     @PostMapping("/{id}/export")
+    @PreAuthorize(IMPORT_EXPORT)
     public ResponseEntity<InputStreamResource> export(@PathVariable String id) {
         ProjectBundle bundle = exportService.export(id);
         ContentDisposition disposition = ContentDisposition.attachment()
@@ -73,6 +82,7 @@ public class ProjectIOController {
      * Responds 422 if the ZIP is malformed or uses an unsupported format version.
      */
     @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize(IMPORT_EXPORT)
     public ResponseEntity<ImportedProjectResponse> importProject(
             @RequestParam("file") MultipartFile file) {
         if (file == null || file.isEmpty()) {

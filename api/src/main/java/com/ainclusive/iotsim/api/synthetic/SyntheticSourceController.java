@@ -1,21 +1,32 @@
 package com.ainclusive.iotsim.api.synthetic;
 
 import com.ainclusive.iotsim.api.datasource.DataSourceController.DataSourceResponse;
+import com.ainclusive.iotsim.api.security.Permission;
 import com.ainclusive.iotsim.domain.datasource.DataSource;
 import com.ainclusive.iotsim.domain.synthetic.SyntheticConfig;
 import com.ainclusive.iotsim.domain.synthetic.SyntheticSourceService;
 import java.net.URI;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Create-from-synthetic data sources (backend-specs/05; IS-065). */
+/**
+ * Create-from-synthetic data sources (backend-specs/05; IS-065).
+ *
+ * <p>Authorization (IS-077): creating a synthetic source is admin-level —
+ * {@link Permission#SOURCE_EDIT}.
+ */
 @RestController
 @RequestMapping("/api/v1/projects/{projectId}/data-sources/synthetic")
 public class SyntheticSourceController {
+
+    private static final String SOURCE_EDIT =
+            "@permissionService.hasPermission(authentication,"
+            + " T(com.ainclusive.iotsim.api.security.Permission).SOURCE_EDIT)";
 
     private final SyntheticSourceService syntheticSources;
 
@@ -24,6 +35,7 @@ public class SyntheticSourceController {
     }
 
     @PostMapping
+    @PreAuthorize(SOURCE_EDIT)
     public ResponseEntity<DataSourceResponse> create(
             @PathVariable String projectId, @RequestBody CreateSyntheticSourceRequest req) {
         if (req.name() == null || req.name().isBlank()) {

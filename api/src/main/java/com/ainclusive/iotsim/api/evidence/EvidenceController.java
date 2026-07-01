@@ -1,5 +1,6 @@
 package com.ainclusive.iotsim.api.evidence;
 
+import com.ainclusive.iotsim.api.security.Permission;
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.domain.evidence.EvidenceBundle;
 import com.ainclusive.iotsim.domain.evidence.EvidenceFormat;
@@ -11,6 +12,7 @@ import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -24,10 +26,20 @@ import tools.jackson.databind.ObjectMapper;
  * Evidence resource (IS-057, SPEC "Export Run Evidence"): list/get run evidence,
  * trigger an export, and download the produced bundle. Export is idempotent-ish —
  * re-{@code POST}ing after an {@code EXPORT_FAILED} retries (backend-specs/05).
+ *
+ * <p>Authorization (IS-077): list/get/download — {@link Permission#OBSERVE} (user + admin);
+ * export trigger — {@link Permission#IMPORT_EXPORT} (admin).
  */
 @RestController
 @RequestMapping("/api/v1/projects/{projectId}/evidence")
 public class EvidenceController {
+
+    private static final String OBSERVE =
+            "@permissionService.hasPermission(authentication,"
+            + " T(com.ainclusive.iotsim.api.security.Permission).OBSERVE)";
+    private static final String IMPORT_EXPORT =
+            "@permissionService.hasPermission(authentication,"
+            + " T(com.ainclusive.iotsim.api.security.Permission).IMPORT_EXPORT)";
 
     private final EvidenceService evidence;
     private final ObjectMapper json;
@@ -38,6 +50,7 @@ public class EvidenceController {
     }
 
     @GetMapping
+    @PreAuthorize(OBSERVE)
     public Page<EvidenceResponse> list(
             @PathVariable String projectId,
             @RequestParam(required = false) String cursor,
@@ -46,18 +59,21 @@ public class EvidenceController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize(OBSERVE)
     public EvidenceResponse get(@PathVariable String projectId, @PathVariable String id) {
         return evidence.find(projectId, id).map(this::toResponse)
                 .orElseThrow(() -> new ResourceNotFoundException("Evidence", id));
     }
 
     @PostMapping("/{id}/export")
+    @PreAuthorize(IMPORT_EXPORT)
     public EvidenceResponse export(@PathVariable String projectId, @PathVariable String id,
             @RequestParam(defaultValue = "BUNDLE") EvidenceFormat format) {
         return toResponse(evidence.export(projectId, id, format));
     }
 
     @GetMapping("/{id}/download")
+    @PreAuthorize(OBSERVE)
     public ResponseEntity<InputStreamResource> download(
             @PathVariable String projectId, @PathVariable String id) {
         EvidenceBundle bundle = evidence.openBundle(projectId, id)

@@ -11,6 +11,7 @@ import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -36,6 +37,13 @@ import org.springframework.web.multipart.MultipartFile;
 @RequestMapping("/api/v1/projects/{projectId}/recordings")
 public class RecordingImportExportController {
 
+    private static final String OBSERVE =
+            "@permissionService.hasPermission(authentication,"
+            + " T(com.ainclusive.iotsim.api.security.Permission).OBSERVE)";
+    private static final String IMPORT_EXPORT =
+            "@permissionService.hasPermission(authentication,"
+            + " T(com.ainclusive.iotsim.api.security.Permission).IMPORT_EXPORT)";
+
     private final RecordingImportExportService service;
 
     public RecordingImportExportController(RecordingImportExportService service) {
@@ -47,6 +55,7 @@ public class RecordingImportExportController {
      * export always reflects the current timeline state).
      */
     @PostMapping("/{id}/export")
+    @PreAuthorize(IMPORT_EXPORT)
     public ResponseEntity<InputStreamResource> export(
             @PathVariable String projectId, @PathVariable String id) {
         RecordingBundle bundle = service.export(projectId, id);
@@ -57,6 +66,7 @@ public class RecordingImportExportController {
      * Serves a previously-built export ZIP from the object store; 404 if not yet exported.
      */
     @GetMapping("/{id}/download")
+    @PreAuthorize(OBSERVE)
     public ResponseEntity<InputStreamResource> download(
             @PathVariable String projectId, @PathVariable String id) {
         RecordingBundle bundle = service.openBundle(projectId, id)
@@ -69,6 +79,7 @@ public class RecordingImportExportController {
      * Returns 201 with the new recording resource.
      */
     @PostMapping("/import")
+    @PreAuthorize(IMPORT_EXPORT)
     public ResponseEntity<RecordingResponse> importRecording(
             @PathVariable String projectId,
             @RequestParam("file") MultipartFile file) throws IOException {
