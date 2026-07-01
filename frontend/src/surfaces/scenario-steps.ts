@@ -47,6 +47,93 @@ export interface ScenarioValidationIssue {
   message: string;
 }
 
+// ── Per-type config field specs (UI-062 step editor) ────────────────────────
+//
+// Each step type declares the fields its editor renders. This is the single
+// "same step-editing model" the spec asks for: the editor is generic and driven
+// by these specs, so every type is edited the same way. Fault gets a minimal
+// target here; its detailed parameters are refined by UI-063.
+
+export type StepFieldKind = "source" | "recording" | "number" | "text" | "select";
+
+export interface StepFieldSpec {
+  key: string;
+  label: string;
+  kind: StepFieldKind;
+  required: boolean;
+  /** For kind "select": the allowed options. */
+  options?: { value: string; label: string }[];
+  /** Helper text under the field. */
+  hint?: string;
+}
+
+export const STEP_FIELD_SPECS: Record<ScenarioStepType, StepFieldSpec[]> = {
+  start: [{ key: "sourceId", label: "Target source", kind: "source", required: true }],
+  stop: [{ key: "sourceId", label: "Target source", kind: "source", required: true }],
+  replay: [
+    { key: "sourceId", label: "Target source", kind: "source", required: true },
+    { key: "recordingId", label: "Recording", kind: "recording", required: true },
+  ],
+  synthetic: [
+    { key: "sourceId", label: "Target source", kind: "source", required: true },
+    {
+      key: "pattern",
+      label: "Generation pattern",
+      kind: "select",
+      required: true,
+      options: [
+        { value: "ramp", label: "Ramp" },
+        { value: "sine", label: "Sine" },
+        { value: "random", label: "Random walk" },
+        { value: "constant", label: "Constant" },
+      ],
+    },
+  ],
+  fault: [
+    { key: "sourceId", label: "Target source", kind: "source", required: true },
+    {
+      key: "kind",
+      label: "Fault kind",
+      kind: "select",
+      required: true,
+      options: [
+        { value: "drop", label: "Drop values" },
+        { value: "delay", label: "Delay" },
+        { value: "corrupt", label: "Corrupt values" },
+      ],
+      hint: "Detailed fault parameters are configured in the fault step (UI-063).",
+    },
+  ],
+  wait: [
+    {
+      key: "seconds",
+      label: "Duration (seconds)",
+      kind: "number",
+      required: true,
+      hint: "How long to wait before the next step.",
+    },
+  ],
+  marker: [
+    { key: "note", label: "Marker note", kind: "text", required: true, hint: "Shown on the run timeline." },
+  ],
+};
+
+/**
+ * Whether a step's required config fields are all present. The editor uses this
+ * (via isStepConfigured) to set step.configured, which feeds validateScenario.
+ */
+export function isStepConfigured(type: ScenarioStepType, config: Record<string, unknown>): boolean {
+  return STEP_FIELD_SPECS[type]
+    .filter((f) => f.required)
+    .every((f) => {
+      const v = config[f.key];
+      if (v === undefined || v === null) return false;
+      if (typeof v === "string") return v.trim().length > 0;
+      if (typeof v === "number") return !Number.isNaN(v);
+      return true;
+    });
+}
+
 export interface ScenarioValidation {
   /** No blocking issues — the scenario can run. Warnings do not affect this. */
   ready: boolean;

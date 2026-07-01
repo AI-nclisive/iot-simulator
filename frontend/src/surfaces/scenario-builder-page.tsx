@@ -21,6 +21,7 @@ import { useShellStore } from "../shell/shell-store";
 import { ConfirmationDialog } from "../ui/confirmation-dialog";
 import { SharedStatePanel } from "../ui/shared-state-panel";
 import { StatusBadge, type StatusTone } from "../ui/status-badge";
+import { ScenarioStepEditor } from "./scenario-step-editor";
 import {
   STEP_TYPE_LABELS,
   validateScenario,
@@ -66,6 +67,7 @@ export function ScenarioBuilderPage() {
   const scenario = useScenariosStore((s) => s.scenarios.find((x) => x.id === scenarioId));
   const steps = useScenariosStore((s) => s.steps[scenarioId] ?? EMPTY_STEPS);
   const addStep = useScenariosStore((s) => s.addStep);
+  const updateStep = useScenariosStore((s) => s.updateStep);
   const removeStep = useScenariosStore((s) => s.removeStep);
   const moveStep = useScenariosStore((s) => s.moveStep);
   const runScenario = useScenariosStore((s) => s.runScenario);
@@ -317,46 +319,12 @@ export function ScenarioBuilderPage() {
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
             {selectedStep ? (
-              <div className="space-y-3">
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-shell-muted">Type</p>
-                  <p className="text-sm font-medium text-shell-ink">
-                    {STEP_TYPE_LABELS[selectedStep.type]}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-shell-muted">Label</p>
-                  <p className="text-sm text-shell-ink">
-                    {selectedStep.label || "—"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-shell-muted">Configuration</p>
-                  {selectedStep.configured ? (
-                    <p className="text-sm text-shell-ink">Configured.</p>
-                  ) : (
-                    <p className="text-sm text-shell-warning">
-                      This step still needs its required fields.
-                    </p>
-                  )}
-                </div>
-
-                {canEdit ? (
-                  <button
-                    className="shell-action mt-2"
-                    type="button"
-                    onClick={() =>
-                      pushNotification({
-                        tone: "warning",
-                        title: "Step editor not available yet",
-                        message: "The typed field editor for this step opens here once available.",
-                      })
-                    }
-                  >
-                    Edit step
-                  </button>
-                ) : null}
-              </div>
+              <ScenarioStepEditor
+                key={selectedStep.id}
+                step={selectedStep}
+                canEdit={canEdit}
+                onChange={(patch) => updateStep(scenarioId, selectedStep.id, patch)}
+              />
             ) : (
               <p className="text-sm text-shell-muted">
                 Select a step on the left to see its details.

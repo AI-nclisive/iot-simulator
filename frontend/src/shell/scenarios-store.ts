@@ -28,6 +28,11 @@ type ScenariosState = {
   createScenario: () => string;
   // Builder step operations
   addStep: (scenarioId: string, type: ScenarioStepType) => string;
+  updateStep: (
+    scenarioId: string,
+    stepId: string,
+    patch: { label?: string; config?: Record<string, unknown>; configured?: boolean },
+  ) => void;
   removeStep: (scenarioId: string, stepId: string) => void;
   moveStep: (scenarioId: string, stepId: string, direction: "up" | "down") => void;
 };
@@ -115,6 +120,23 @@ export const useScenariosStore = create<ScenariosState>((set, get) => ({
       steps: {
         ...state.steps,
         [scenarioId]: (state.steps[scenarioId] ?? []).filter((s) => s.id !== stepId),
+      },
+    })),
+
+  updateStep: (scenarioId, stepId, patch) =>
+    set((state) => ({
+      steps: {
+        ...state.steps,
+        [scenarioId]: (state.steps[scenarioId] ?? []).map((s) =>
+          s.id === stepId
+            ? {
+                ...s,
+                ...(patch.label !== undefined ? { label: patch.label } : {}),
+                ...(patch.config !== undefined ? { config: patch.config } : {}),
+                ...(patch.configured !== undefined ? { configured: patch.configured } : {}),
+              }
+            : s,
+        ),
       },
     })),
 
