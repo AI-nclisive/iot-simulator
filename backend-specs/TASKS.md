@@ -84,6 +84,7 @@ Tier 2 — contribution hygiene:
 - [x] IS-115 [SDLC] ✅ Task pre-flight checklist + board-wins tie-break + `catalog-sync` CI guard (a task-linked PR must flip its own catalog checkbox) — `AGENTS.md`/`.github/workflows/ci.yml`
 - [x] IS-117 [SDLC] ✅ Claude Code skills for the contribution workflow under `.claude/skills/` (`/start-task`, `/open-pr`, `/review-loop`, `/new-worker`, `/flyway-migration`, `/board-sync`) + recommended built-in skills documented in `CONTRIBUTING.md` — executable procedures for `CONTRIBUTING.md`/`AGENTS.md`
 - [x] IS-120 [SDLC] ✅ Local e2e run tooling — `/run-local` skill (cross-platform: Postgres + backend + Vite dev proxy, with teardown) + README run/test instructions + `docs/FRONTEND_BACKEND_CONTRACT_MAP.md` refresh for IS-074; wire FE list stores (projects/data-sources/recordings) to the `Page<T>` pagination envelope so they stop failing to load
+- [x] IS-122 [SDLC] ✅ Auto-tick the catalog checkbox on open PRs (bot flips `[ ]`→`[x]` on the PR branch; task id from the native closing-issue link with branch-name fallback) — replaces the unenforced `catalog-sync` guard (IS-115) — `.github/workflows/auto-tick-catalog.yml`/`.github/scripts/auto-tick-catalog.sh`
 
 Tier 3 — quality automation:
 - [x] IS-105 [SDLC] ✅ Spotless (import order + whitespace hygiene) — runs in `check`/CI

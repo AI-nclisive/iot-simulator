@@ -1,0 +1,43 @@
+name: Auto-tick catalog checkbox
+
+# When a PR is open, tick its task's catalog checkbox ([ ] -> [x]) automatically
+# and commit it onto the PR branch, so a finished task never leaves a stale "[ ]".
+# Replaces the old, unenforced `catalog-sync` guard: a bot does the edit instead
+# of nagging a human to remember it. See .github/scripts/auto-tick-catalog.sh.
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+
+# Push the tick onto the (unprotected) PR branch with the default token — no PAT
+# or app token needed. The commit carries [skip ci] and GITHUB_TOKEN-authored
+# commits don't retrigger workflows, so this can't loop.
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: auto-tick-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  auto-tick:
+    # Skip drafts and forks: a fork PR gets a read-only token that can't push
+    # back to its branch. Same-repo branches (the /start-task flow) are fine.
+    if: >-
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - name: Tick the linked task's checkbox
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: bash .github/scripts/auto-tick-catalog.sh

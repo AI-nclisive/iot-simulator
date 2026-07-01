@@ -28,16 +28,17 @@ Repo: `AI-nclisive/iot-simulator`. Run from the task's feature branch.
   but local passes shorten the [[review-loop]]). For behavior-affecting changes,
   `/verify` (or `/run`) to confirm it actually works, not just that it compiles.
 
-## 2. Flip the catalog checkbox in THIS PR (catalog-sync gate)
+## 2. Catalog checkbox — automated, just link the issue
 
-CI (`.github/workflows/ci.yml` → `catalog-sync`) requires that a PR whose body has
-`Implements: IS-/UI-XXX` also edits that task's catalog line in the same PR.
-Flip the box `[ ]` → `[x]` for this task now and commit it on the branch:
+The catalog box is ticked **automatically**: while the PR is open, the
+`auto-tick-catalog` workflow flips this task's `[ ]` → `[x]` (in
+`backend-specs/TASKS.md` for `IS-*`, `frontend/docs/UI_TASKS.md` for `UI-*`) and
+commits it onto the branch. Do **not** flip it by hand.
 
-- `IS-*` → `backend-specs/TASKS.md`   ·   `UI-*` → `frontend/docs/UI_TASKS.md`
-
-Edit only this task's line (one line per PR keeps conflicts rare). The `[x]` maps
-to board **Done** only after the PR *merges* — see step 5.
+Your only job is to make it findable: put **`Closes #<issue>`** in the PR body
+(step 3) so the auto-tick resolves the task from the native issue link — the branch
+name (`feat/IS-XXX-…`) is the fallback. The tick maps to board **Done** only after
+the PR *merges* — see step 5.
 
 ## 3. Push & create the PR
 
