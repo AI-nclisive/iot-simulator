@@ -634,7 +634,7 @@ Parallel execution:
   Done when: target, timing, parameters, and clear behavior are understandable
   before the fault is added.
 
-- [ ] `UI-064` Scenario validation
+- [x] `UI-064` Scenario validation
   Surface: `Scenario Builder`
   Depends: `UI-061`
   Done when: run is blocked until validation passes, and the reason is obvious.
