@@ -16,7 +16,6 @@ import com.ainclusive.iotsim.domain.scenario.ScenarioRunSummary;
 import com.ainclusive.iotsim.domain.synthetic.SyntheticLiveRunService;
 import com.ainclusive.iotsim.domain.synthetic.SyntheticLiveRunSummary;
 import com.ainclusive.iotsim.domain.synthetic.SyntheticRunService;
-import com.ainclusive.iotsim.domain.synthetic.SyntheticRunSummary;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRepository;
 import com.ainclusive.iotsim.persistence.run.RunRepository;
 import com.ainclusive.iotsim.persistence.run.RunRow;
