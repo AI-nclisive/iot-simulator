@@ -23,12 +23,17 @@ there is a single bean and it boots. Supervisor mode has never booted (tests, CI
 
 ## Fix
 
-Mark the resolved `sourceCapturer` and `sourceScanner` beans **`@Primary`** in
-`app/.../config/RuntimeConfig.java`. These are the intended injection targets; the
-raw `runtimeController` bean's incidental match on those interfaces must not compete.
-`@Primary` makes the dedicated bean win. No consumer changes; memory mode is
-unaffected (there `runtimeController` isn't a `SourceCapturer`/`SourceScanner`, so no
-ambiguity existed and `@Primary` is a harmless no-op with a single candidate).
+Mark the **`runtimeController` bean `@Primary`** in `app/.../config/RuntimeConfig.java`.
+In supervisor mode the single `Supervisor` instance is registered under three bean
+names (`runtimeController`, `sourceScanner`, `sourceCapturer`) and satisfies all three
+interfaces — so `@Primary` on the two helper beans would make *two* primaries for
+`SourceScanner`/`SourceCapturer` (they too are the Supervisor) and still fail. Marking
+only `runtimeController` `@Primary` gives exactly one primary among the candidates for
+each of `RuntimeController`/`SourceScanner`/`SourceCapturer`, so every injection
+resolves to the one true Supervisor. No consumer changes; memory mode is unaffected
+(there `runtimeController` = `InMemoryRuntimeController`, not a `SourceScanner`/
+`SourceCapturer`, so those types have a single candidate anyway and `@Primary` is a
+harmless no-op).
 
 ## Test (closes the coverage gap)
 

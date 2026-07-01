@@ -25,6 +25,7 @@ import java.util.concurrent.Executors;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -39,6 +40,7 @@ import tools.jackson.databind.ObjectMapper;
 public class RuntimeConfig {
 
     @Bean
+    @Primary
     public RuntimeController runtimeController(RuntimeProperties props,
             DataSourceRepository dataSources, RuntimeEventRepository runtimeEvents,
             ClientConnectionRepository clientConnections, ObjectMapper json,

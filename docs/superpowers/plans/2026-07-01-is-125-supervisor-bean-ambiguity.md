@@ -83,28 +83,21 @@ TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock \
 ```
 Expected: FAIL — context fails to start with `expected single matching bean but found 2: runtimeController, sourceCapturer`.
 
-- [ ] **Step 3: Add `@Primary` to the two beans**
+- [ ] **Step 3: Add `@Primary` to the `runtimeController` bean**
 
-In `RuntimeConfig.java`, import `org.springframework.context.annotation.Primary` and annotate both bean methods:
+In `RuntimeConfig.java`, import `org.springframework.context.annotation.Primary` and annotate the `runtimeController` bean method (NOT the helper beans — in supervisor mode the Supervisor is registered under all three bean names, so marking the helpers `@Primary` yields two primaries for `SourceScanner`/`SourceCapturer` and still fails; one primary on the controller resolves every interface to the single Supervisor):
 ```java
     @Bean
     @Primary
-    public SourceScanner sourceScanner(RuntimeController runtimeController) {
-        if (runtimeController instanceof SourceScanner scanner) {
-            return scanner;
-        }
-        return new UnsupportedSourceScanner();
-    }
-
-    @Bean
-    @Primary
-    public SourceCapturer sourceCapturer(RuntimeController runtimeController) {
-        if (runtimeController instanceof SourceCapturer capturer) {
-            return capturer;
-        }
-        return new UnsupportedSourceCapturer();
+    public RuntimeController runtimeController(RuntimeProperties props,
+            DataSourceRepository dataSources, RuntimeEventRepository runtimeEvents,
+            ClientConnectionRepository clientConnections, ObjectMapper json,
+            ExecutorService runtimeEventExecutor, LiveEventHub liveEventHub,
+            LiveValuesHub liveValuesHub) {
+        // ... body unchanged (supervisor vs InMemoryRuntimeController)
     }
 ```
+Leave `sourceScanner`/`sourceCapturer` beans unannotated.
 
 - [ ] **Step 4: Run to verify it passes**
 
