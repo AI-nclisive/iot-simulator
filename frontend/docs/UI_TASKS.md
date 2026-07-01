@@ -783,6 +783,13 @@ Parallel execution:
   Depends: `UI-011`, `UI-097`.
   Done when: clicking `Create project` opens a modal; submitting a valid name calls `POST /api/v1/projects`, the new project opens (and appears in the list), and errors are shown without closing the dialog; the `/projects/create` stub route is removed; tests pass and there are no TypeScript errors.
 
+- [x] `UI-111` Wire dashboard active-runs panel to live API
+  Goal: `RuntimeDashboardPanel` currently imports `activeRuns` directly from `mock-workspace` — hardcoded fake data. Wire it to the real `GET /api/v1/projects/{id}/active-runs` endpoint (IS-122).
+  Surface: `Runtime Dashboard` — active-runs list.
+  Work includes: `useActiveRuns(projectId)` hook polling every 5 s; replace mock import with hook result; loading skeleton; empty state when no runs; error handling.
+  Depends: IS-122.
+  Done when: overview shows real active runs from backend; no mock data imported in the component; empty state renders correctly; no TypeScript errors.
+
 ## Recommended Sequence
 
 1. Complete the P0 shell and shared-pattern tasks first.
