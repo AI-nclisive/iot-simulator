@@ -131,11 +131,15 @@ export function RecordingFlowPage() {
     if (!captureActive) return;
     if (liveStatus === "open") {
       setRecordingState("recording");
-      setLastReceivedHint(
-        liveRows.length > 0
-          ? liveRows[liveRows.length - 1].updatedAt
-          : "Waiting for the first value",
-      );
+      if (liveRows.length > 0) {
+        const latest = liveRows.reduce(
+          (max, r) => (r.updatedAt > max.updatedAt ? r : max),
+          liveRows[0],
+        );
+        setLastReceivedHint(latest.updatedAt);
+      } else {
+        setLastReceivedHint("Waiting for the first value");
+      }
     } else if (liveStatus === "stale") {
       setRecordingState("disconnected");
       setLastReceivedHint("Stream went stale — connection may have dropped");
