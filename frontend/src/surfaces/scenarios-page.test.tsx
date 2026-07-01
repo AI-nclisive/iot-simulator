@@ -15,7 +15,7 @@
 
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { mockShellStore } = vi.hoisted(() => ({ mockShellStore: vi.fn() }));
@@ -48,8 +48,12 @@ afterEach(cleanup);
 
 function renderPage() {
   return render(
-    <MemoryRouter>
-      <ScenariosPage />
+    <MemoryRouter initialEntries={["/scenarios"]}>
+      <Routes>
+        <Route path="/scenarios" element={<ScenariosPage />} />
+        <Route path="/scenarios/:scenarioId/run" element={<div>Run view</div>} />
+        <Route path="/scenarios/:scenarioId" element={<div>Builder</div>} />
+      </Routes>
     </MemoryRouter>,
   );
 }
@@ -122,14 +126,31 @@ describe("ScenariosPage", () => {
     );
   });
 
-  it("hides Run/Stop for a scenario locked by another editor", async () => {
-    // scn-02 is locked by "Anna Kosol"; the current shared admin (role label
-    // "Admin") is not that editor, so Stop must be hidden — only Open shows.
+  it("hides Run/Stop for a scenario locked by another editor but still offers View run", async () => {
+    // scn-02 is Running and locked by "Anna Kosol"; the current shared admin
+    // is not that editor, so Stop is hidden. View run is available to all users.
     setRole({ accessMode: "shared", sharedRole: "admin" });
     renderPage();
     const row = screen.getByText("Packaging fault drill").closest("tr")!;
     expect(within(row).queryByRole("button", { name: "Stop" })).toBeNull();
     expect(within(row).getByRole("button", { name: "Open" })).toBeTruthy();
+    expect(within(row).getByRole("button", { name: "View run" })).toBeTruthy();
+  });
+
+  it("navigates to the run view via View run on a running scenario", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    // scn-02 (Packaging fault drill) is Running in the fixtures.
+    const row = screen.getByText("Packaging fault drill").closest("tr")!;
+    await user.click(within(row).getByRole("button", { name: "View run" }));
+    expect(screen.getByText("Run view")).toBeTruthy();
+  });
+
+  it("does not offer View run for a non-running scenario", () => {
+    renderPage();
+    // scn-01 (Morning ramp-up) is Idle.
+    const row = screen.getByText("Morning ramp-up").closest("tr")!;
+    expect(within(row).queryByRole("button", { name: "View run" })).toBeNull();
   });
 
   it("shows a no-results state when the filter matches nothing", async () => {
