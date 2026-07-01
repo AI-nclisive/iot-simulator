@@ -5,8 +5,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -130,9 +132,9 @@ class ScenarioRunServiceTest {
     }
 
     @Test
-    void malformedStartTimeInDeterministicSettingsEndsParentRunFailed() {
+    void malformedStartTimeThrowsBeforeCreatingRun() {
         // Scenario with a valid seed but unparseable startTime — parseSettings throws DateTimeParseException.
-        // The step list has a MARKER so the run would reach the settings parse inside the try block.
+        // With Fix 1, parseSettings is called BEFORE runs.create, so no run row is ever created.
         ScenarioRow scenarioWithBadSettings = new ScenarioRow(
                 SCENARIO, PROJECT, "Flow", "READY",
                 "{\"seed\":123,\"startTime\":\"nope\"}",
@@ -140,13 +142,42 @@ class ScenarioRunServiceTest {
                 OffsetDateTime.now(), OffsetDateTime.now(), "local", 1);
         when(scenarios.findById(SCENARIO)).thenReturn(Optional.of(scenarioWithBadSettings));
         stubValidReady();
-        RunRow parent = parentRun();
-        when(runs.create(eq(PROJECT), eq("SCENARIO"), any(), any(), any(), eq(SCENARIO), eq((String) null)))
-                .thenReturn(parent);
 
         assertThatThrownBy(() -> service.run(PROJECT, SCENARIO, "MANUAL", "local"))
                 .isInstanceOf(RuntimeException.class);
-        verify(runs).end(eq("run-parent"), eq("FAILED"), any());
+        verify(runs, never()).create(anyString(), anyString(), any(), any(), any(), any(), any());
+        verify(runs, never()).end(anyString(), anyString(), any());
+    }
+
+    @Test
+    void markerAndWaitStepsExecuteAndEmitEvents() {
+        // MARKER and WAIT steps have null targetSourceId — prove events.append is called with null
+        // dataSourceId and does not throw (runtime_events.data_source_id is a nullable column).
+        ScenarioRow scenarioWithMarkerWait = new ScenarioRow(
+                SCENARIO, PROJECT, "Flow", "READY", "{}",
+                List.of(
+                        new ScenarioStepRow(0, "MARKER", null, "{\"label\":\"cp\"}"),
+                        new ScenarioStepRow(1, "WAIT", null, "{\"durationMs\":1}")),
+                OffsetDateTime.now(), OffsetDateTime.now(), "local", 1);
+        when(scenarios.findById(SCENARIO)).thenReturn(Optional.of(scenarioWithMarkerWait));
+        stubValidReady();
+        RunRow parent = new RunRow("run-parent", PROJECT, "SCENARIO", "MANUAL", "local", "RUNNING",
+                SCENARIO, null, OffsetDateTime.now(), null, OffsetDateTime.now(), List.of(), null);
+        when(runs.create(eq(PROJECT), eq("SCENARIO"), any(), any(), any(), eq(SCENARIO), eq((String) null)))
+                .thenReturn(parent);
+        when(runs.start(eq("run-parent"), any())).thenReturn(parent);
+        RunRow completedParent = new RunRow("run-parent", PROJECT, "SCENARIO", "MANUAL", "local", "COMPLETED",
+                SCENARIO, null, OffsetDateTime.now(), null, OffsetDateTime.now(), List.of(), null);
+        when(runs.end(eq("run-parent"), eq("COMPLETED"), any())).thenReturn(completedParent);
+        when(evidence.create(eq(PROJECT), eq("run-parent"), anyString()))
+                .thenReturn(new EvidenceRow("ev-1", PROJECT, "run-parent", "CAPTURING", "{}", null, null, "local"));
+
+        ScenarioRunSummary summary = service.run(PROJECT, SCENARIO, "MANUAL", "local");
+
+        assertThat(summary.status()).isEqualTo("COMPLETED");
+        assertThat(summary.steps()).extracting(StepOutcome::type).containsExactly("MARKER", "WAIT");
+        // Prove append is called with null dataSourceId for both steps — no throw, no guard needed.
+        verify(events, times(2)).append(eq(PROJECT), isNull(), eq("run-parent"), eq("SCENARIO_STEP"), any(), any());
     }
 
     @Test

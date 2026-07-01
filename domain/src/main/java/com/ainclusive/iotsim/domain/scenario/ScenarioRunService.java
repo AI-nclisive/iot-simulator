@@ -80,10 +80,10 @@ public class ScenarioRunService {
         List<String> sourceIds = List.copyOf(new LinkedHashSet<>(scenario.steps().stream()
                 .map(ScenarioStepRow::targetSourceId).filter(s -> s != null && !s.isBlank()).toList()));
 
+        DeterministicSettings settings = parseSettings(scenario.deterministicSettings());
         RunRow run = runs.create(projectId, "SCENARIO", trig, actor, sourceIds, scenarioId, null);
         List<StepOutcome> outcomes = new ArrayList<>();
         try {
-            DeterministicSettings settings = parseSettings(scenario.deterministicSettings());
             runs.start(run.id(), now());
             EvidenceRow ev = evidence.create(projectId, run.id(), actor);
             runs.linkEvidence(run.id(), ev.id());
