@@ -99,8 +99,9 @@ if printf '%s' "$line" | grep -qE '^\s*-\s*\[[xX]\]'; then
 fi
 
 # ── 4. Flip [ ] -> [x] on just that line ─────────────────────────────────────
-# Only the first "[ ]" on the matched line; keep everything else byte-for-byte.
-sed -i "${line_no}s/\[ \]/[x]/" "$CATALOG"
+# Anchor to the leading "- [ ]" checkbox so a literal "[ ]" elsewhere in the
+# line's description (as this very task's line has) is never touched.
+sed -i "${line_no}s/^\([[:space:]]*-[[:space:]]*\)\[ \]/\1[x]/" "$CATALOG"
 echo "auto-tick: flipped ${TASK_ID} in ${CATALOG}:"
 sed -n "${line_no}p" "$CATALOG" | sed 's/^/    /'
 
