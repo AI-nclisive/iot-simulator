@@ -23,14 +23,15 @@ public class JooqDataSourceRepository implements DataSourceRepository {
 
     @Override
     public DataSourceRow insert(String projectId, String name, String protocol, String basis,
-            String endpoint, String runtimeConfigJson, String createdBy) {
+            int simulatorPort, String realDeviceEndpoint, String runtimeConfigJson, String createdBy) {
         DataSourcesRecord record = dsl.insertInto(DATA_SOURCES)
                 .set(DATA_SOURCES.ID, Ids.newId())
                 .set(DATA_SOURCES.PROJECT_ID, projectId)
                 .set(DATA_SOURCES.NAME, name)
                 .set(DATA_SOURCES.PROTOCOL, protocol)
                 .set(DATA_SOURCES.BASIS, basis)
-                .set(DATA_SOURCES.ENDPOINT, endpointToJsonb(endpoint))
+                .set(DATA_SOURCES.SIMULATOR_PORT, simulatorPort)
+                .set(DATA_SOURCES.REAL_DEVICE_ENDPOINT, endpointToJsonb(realDeviceEndpoint))
                 .set(DATA_SOURCES.RUNTIME_CONFIG, json(runtimeConfigJson))
                 .set(DATA_SOURCES.CREATED_BY, createdBy)
                 .returning()
@@ -81,11 +82,12 @@ public class JooqDataSourceRepository implements DataSourceRepository {
     }
 
     @Override
-    public Optional<DataSourceRow> update(String id, String name, String endpoint,
-            String runtimeConfigJson, boolean enabled, long expectedVersion) {
+    public Optional<DataSourceRow> update(String id, String name, int simulatorPort,
+            String realDeviceEndpoint, String runtimeConfigJson, boolean enabled, long expectedVersion) {
         DataSourcesRecord record = dsl.update(DATA_SOURCES)
                 .set(DATA_SOURCES.NAME, name)
-                .set(DATA_SOURCES.ENDPOINT, endpointToJsonb(endpoint))
+                .set(DATA_SOURCES.SIMULATOR_PORT, simulatorPort)
+                .set(DATA_SOURCES.REAL_DEVICE_ENDPOINT, endpointToJsonb(realDeviceEndpoint))
                 .set(DATA_SOURCES.RUNTIME_CONFIG, json(runtimeConfigJson))
                 .set(DATA_SOURCES.ENABLED, enabled)
                 .set(DATA_SOURCES.UPDATED_AT, OffsetDateTime.now(ZoneOffset.UTC))
@@ -110,7 +112,8 @@ public class JooqDataSourceRepository implements DataSourceRepository {
                 .set(DATA_SOURCES.NAME, newName)
                 .set(DATA_SOURCES.PROTOCOL, source.getProtocol())
                 .set(DATA_SOURCES.BASIS, source.getBasis())
-                .set(DATA_SOURCES.ENDPOINT, source.getEndpoint())
+                .set(DATA_SOURCES.SIMULATOR_PORT, source.getSimulatorPort())
+                .set(DATA_SOURCES.REAL_DEVICE_ENDPOINT, source.getRealDeviceEndpoint())
                 .set(DATA_SOURCES.RUNTIME_CONFIG, source.getRuntimeConfig())
                 .set(DATA_SOURCES.ENABLED, false)
                 .set(DATA_SOURCES.CREATED_BY, createdBy)
@@ -133,9 +136,10 @@ public class JooqDataSourceRepository implements DataSourceRepository {
     }
 
     /**
-     * Stores the endpoint — a plain connection URL such as {@code opc.tcp://host:4840} — as a
-     * JSON string scalar so it round-trips through the {@code jsonb} column. A bare URL is not
-     * valid JSON on its own, so it is escaped and quoted; {@code null} becomes the JSON null literal.
+     * Stores the real device endpoint — a plain connection URL such as {@code opc.tcp://host:4840} — as a
+     * JSON string scalar so it round-trips through the {@code real_device_endpoint} jsonb column.
+     * A bare URL is not valid JSON on its own, so it is escaped and quoted;
+     * {@code null} becomes the JSON null literal.
      */
     private static JSONB endpointToJsonb(String endpoint) {
         return endpoint == null ? JSONB.valueOf("null") : JSONB.valueOf(quoteJson(endpoint));
@@ -221,7 +225,8 @@ public class JooqDataSourceRepository implements DataSourceRepository {
                 r.getBasis(),
                 r.getSchemaId(),
                 r.getSchemaVersion(),
-                endpointFromJsonb(r.getEndpoint()),
+                r.getSimulatorPort(),
+                endpointFromJsonb(r.getRealDeviceEndpoint()),
                 jsonString(r.getRuntimeConfig()),
                 Boolean.TRUE.equals(r.getEnabled()),
                 r.getCreatedAt(),
