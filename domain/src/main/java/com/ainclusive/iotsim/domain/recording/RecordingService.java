@@ -76,7 +76,7 @@ public class RecordingService {
     public Recording startCapture(String projectId, String dataSourceId, String actor) {
         DataSourceRow source = requireSource(projectId, dataSourceId);
         if (source.realDeviceEndpoint() == null || source.realDeviceEndpoint().isBlank()) {
-            throw new IllegalArgumentException("data source has no real device endpoint to capture from");
+            throw new IllegalArgumentException("data source has no real-device endpoint to capture from");
         }
         SchemaWithNodes schema = schemas.findCurrent(dataSourceId)
                 .orElseThrow(() -> new IllegalArgumentException(

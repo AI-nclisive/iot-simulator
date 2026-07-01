@@ -137,13 +137,11 @@ public class DataSourceService {
     public DataSource start(String projectId, String id) {
         DataSourceRow row = requireRow(projectId, id);
         int port = row.simulatorPort();
-        if (port != 0) {
-            for (DataSourceRow other : dataSources.findAll()) {
-                if (!other.id().equals(id)
-                        && "RUNNING".equals(runtime.state(other.id()))
-                        && other.simulatorPort() == port) {
-                    throw new PortInUseException(port, other.id());
-                }
+        for (DataSourceRow other : dataSources.findAll()) {
+            if (!other.id().equals(id)
+                    && "RUNNING".equals(runtime.state(other.id()))
+                    && other.simulatorPort() == port) {
+                throw new PortInUseException(port, other.id());
             }
         }
         runtime.start(id, RuntimeStartSpecs.of(schemas, row));

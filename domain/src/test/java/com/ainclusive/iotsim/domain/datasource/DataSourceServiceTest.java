@@ -393,13 +393,21 @@ class DataSourceServiceTest {
     }
 
     @Test
-    void ephemeralPortNeverConflicts() {
-        // Distinct protocols default to distinct ports (OPC UA 4840, Modbus/TCP 502),
-        // so two sources on different protocols never conflict.
+    void twoDefaultPortSourcesConflictOnStart() {
+        // No explicit port → both default to 4840 → second start conflicts.
         DataSource a = service.create(PROJECT, "A", "OPC_UA", "MANUAL", null, null, null, null, null, "it");
-        DataSource b = service.create(PROJECT, "B", "MODBUS_TCP", "MANUAL", null, null, null, null, null, "it");
+        DataSource b = service.create(PROJECT, "B", "OPC_UA", "MANUAL", null, null, null, null, null, "it");
         service.start(PROJECT, a.id());
-        service.start(PROJECT, b.id());   // different ports → no throw
+        assertThatThrownBy(() -> service.start(PROJECT, b.id()))
+                .isInstanceOf(PortInUseException.class);
+    }
+
+    @Test
+    void startAllowsDifferentPorts() {
+        DataSource a = service.create(PROJECT, "A", "OPC_UA", "MANUAL", 4840, null, null, null, null, "it");
+        DataSource b = service.create(PROJECT, "B", "OPC_UA", "MANUAL", 4841, null, null, null, null, "it");
+        service.start(PROJECT, a.id());
+        service.start(PROJECT, b.id());
         assertThat(service.get(PROJECT, b.id()).runtimeState()).isEqualTo(RuntimeState.RUNNING);
     }
 
