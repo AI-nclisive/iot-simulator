@@ -6,6 +6,7 @@ import { useDataSourcesStore } from "../shell/data-sources-store";
 import { useShellStore } from "../shell/shell-store";
 import { useNotificationStore } from "../shell/notification-store";
 import { apiFetch } from "../api";
+import { useLiveValues } from "../shell/use-live-values";
 import { SharedStatePanel } from "../ui/shared-state-panel";
 import { StatusBadge, type StatusTone } from "../ui/status-badge";
 
@@ -105,31 +106,47 @@ export function RecordingFlowPage() {
   const captureActive =
     recordingState === "recording" || recordingState === "no-values-yet";
 
+  // Real elapsed duration clock
   useEffect(() => {
-    if (!captureActive) {
-      return;
-    }
-
-    const intervalId = window.setInterval(() => {
-      setDurationSeconds((currentDuration) => {
-        const nextDuration = currentDuration + 1;
-
-        if (nextDuration < 3) {
-          setLastReceivedHint("Waiting for the first value");
-          setRecordingState("no-values-yet");
-          return nextDuration;
-        }
-
-        setRecordingState("recording");
-        setLastReceivedHint("Just now");
-        setValueCount((currentCount) => currentCount + 6);
-
-        return nextDuration;
-      });
-    }, 1000);
-
-    return () => window.clearInterval(intervalId);
+    if (!captureActive) return;
+    const id = window.setInterval(() => setDurationSeconds((d) => d + 1), 1000);
+    return () => window.clearInterval(id);
   }, [captureActive]);
+
+  // Live values from SSE — rows flow here when backend feeds them during capture
+  const { rows: liveRows, status: liveStatus } = useLiveValues(
+    sourceId ?? "",
+    captureActive,
+  );
+
+  // Keep value count in sync with SSE rows during capture
+  useEffect(() => {
+    if (captureActive) {
+      setValueCount(liveRows.length);
+    }
+  }, [captureActive, liveRows.length]);
+
+  // Transition recording state from SSE connection status
+  useEffect(() => {
+    if (!captureActive) return;
+    if (liveStatus === "open") {
+      setRecordingState("recording");
+      if (liveRows.length > 0) {
+        const latest = liveRows.reduce(
+          (max, r) => (r.updatedAt > max.updatedAt ? r : max),
+          liveRows[0],
+        );
+        setLastReceivedHint(latest.updatedAt);
+      } else {
+        setLastReceivedHint("Waiting for the first value");
+      }
+    } else if (liveStatus === "stale") {
+      setRecordingState("disconnected");
+      setLastReceivedHint("Stream went stale — connection may have dropped");
+    } else if (liveStatus === "reconnecting") {
+      setLastReceivedHint("Reconnecting to live stream");
+    }
+  }, [captureActive, liveStatus, liveRows]);
 
   const saveSummary = useMemo(() => {
     if (!source) {
@@ -238,11 +255,6 @@ export function RecordingFlowPage() {
     }
   }
 
-  function handleDisconnect() {
-    setRecordingState("disconnected");
-    setLastReceivedHint("Connection dropped before capture finished");
-  }
-
   function saveReadyRecording() {
     const artifactId = savedArtifactId ?? activeRecordingId ?? "";
     navigate(`/data-sources/${activeSource.id}/replay?artifactId=${artifactId}`);
@@ -297,9 +309,6 @@ export function RecordingFlowPage() {
             <>
               <button className="shell-action" type="button" onClick={handleStopRecording}>
                 Stop recording
-              </button>
-              <button className="shell-action" type="button" onClick={handleDisconnect}>
-                Simulate disconnect
               </button>
             </>
           )}
