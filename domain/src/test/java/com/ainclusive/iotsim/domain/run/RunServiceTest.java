@@ -12,7 +12,9 @@ import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.domain.replay.ReplayService;
 import com.ainclusive.iotsim.domain.replay.ReplaySummary;
 import com.ainclusive.iotsim.domain.scenario.ScenarioRunService;
+import com.ainclusive.iotsim.domain.scenario.ScenarioRunSummary;
 import com.ainclusive.iotsim.domain.synthetic.SyntheticRunService;
+import com.ainclusive.iotsim.domain.synthetic.SyntheticRunSummary;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRepository;
 import com.ainclusive.iotsim.persistence.run.RunRepository;
 import com.ainclusive.iotsim.persistence.run.RunRow;
@@ -112,6 +114,74 @@ class RunServiceTest {
     @Test
     void startRejectsUnknownKind() {
         assertThatThrownBy(() -> service.start(PROJECT, new StartRunCommand("NOPE", "ci-bot", null, null, null, null, null, null, null)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    // ---- SYNTHETIC routing ----
+
+    @Test
+    void startSyntheticRoutesWithAutomationTriggerAndInitiator() {
+        when(synthetic.run(eq(PROJECT), eq("ds1"), eq(5000L), eq("AUTOMATION"), eq("ci-bot"), eq((String) null)))
+                .thenReturn(new SyntheticRunSummary("ds1", 100L, 42L, "run-s", "ev-s"));
+        when(runs.findById("run-s")).thenReturn(Optional.of(row("run-s", "SYNTHETIC", "COMPLETED", List.of("ds1"))));
+        RunView v = service.start(PROJECT, new StartRunCommand("SYNTHETIC", "ci-bot", "ds1", null, 5000L, null, null, null, null));
+        assertThat(v.id()).isEqualTo("run-s");
+        verify(synthetic).run(eq(PROJECT), eq("ds1"), eq(5000L), eq("AUTOMATION"), eq("ci-bot"), eq((String) null));
+    }
+
+    // ---- SCENARIO routing ----
+
+    @Test
+    void startScenarioRoutesWithAutomationTriggerAndInitiator() {
+        when(scenarioRun.run(eq(PROJECT), eq("sc1"), eq("AUTOMATION"), eq("ci-bot")))
+                .thenReturn(new ScenarioRunSummary("run-sc", "ev-sc", "COMPLETED", List.of()));
+        when(runs.findById("run-sc")).thenReturn(Optional.of(row("run-sc", "SCENARIO", "COMPLETED", List.of())));
+        RunView v = service.start(PROJECT, new StartRunCommand("SCENARIO", "ci-bot", null, null, null, "sc1", null, null, null));
+        assertThat(v.id()).isEqualTo("run-sc");
+        verify(scenarioRun).run(eq(PROJECT), eq("sc1"), eq("AUTOMATION"), eq("ci-bot"));
+    }
+
+    // ---- per-kind field validation ----
+
+    @Test
+    void startReplayMissingDataSourceIdThrows() {
+        assertThatThrownBy(() -> service.start(PROJECT,
+                new StartRunCommand("REPLAY", "ci-bot", null, "rec1", null, null, null, null, false)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void startReplayMissingRecordingIdThrows() {
+        assertThatThrownBy(() -> service.start(PROJECT,
+                new StartRunCommand("REPLAY", "ci-bot", "ds1", null, null, null, null, null, false)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void startSyntheticMissingDataSourceIdThrows() {
+        assertThatThrownBy(() -> service.start(PROJECT,
+                new StartRunCommand("SYNTHETIC", "ci-bot", null, null, 5000L, null, null, null, null)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void startSyntheticNullDurationMsThrows() {
+        assertThatThrownBy(() -> service.start(PROJECT,
+                new StartRunCommand("SYNTHETIC", "ci-bot", "ds1", null, null, null, null, null, null)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void startSyntheticZeroDurationMsThrows() {
+        assertThatThrownBy(() -> service.start(PROJECT,
+                new StartRunCommand("SYNTHETIC", "ci-bot", "ds1", null, 0L, null, null, null, null)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void startScenarioMissingScenarioIdThrows() {
+        assertThatThrownBy(() -> service.start(PROJECT,
+                new StartRunCommand("SCENARIO", "ci-bot", null, null, null, null, null, null, null)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 }
