@@ -21,7 +21,7 @@ dependency-ordered. (Optimized for "make the simulator real end to end, then
 broaden, then harden for teams" — can be re-weighted if the near-term goal
 differs.)
 
-Snapshot: **build green.** 95 done · 25 todo (120 total). Live status is the board; this line is a periodic snapshot.
+Snapshot: **build green.** 96 done · 24 todo (120 total). Live status is the board; this line is a periodic snapshot.
 
 <details>
 <summary>ID crosswalk — legacy <code>BE-*</code> / <code>SDLC-*</code> → <code>IS-XXX</code></summary>
@@ -203,7 +203,7 @@ import/export. Modbus moved to Wave G (deferred) — see the note there.
 - [ ] IS-076 [BE] ⬜ [auth] Flexible permission model + role→permission mapping — 08
 - [ ] IS-077 [BE] ⬜ [auth] API-layer authorization enforcement (admin/user) — 08
 - [x] IS-078 [BE] ✅ [auth] Local vs shared mode enforcement (flag exists, no enforcement) — 08
-- [ ] IS-079 [BE] ⬜ [persist] Auth table repositories (users/roles/permissions/leases) — 04
+- [x] IS-079 [BE] ✅ [persist] Auth table repositories (users/roles/permissions/leases) — 04
 - [ ] IS-080 [BE] ⬜ [auth] Advisory edit leases (read-only while editing; stale recovery) — 08
 - [ ] IS-081 [BE] ⬜ [api] Edit-lease endpoints — 05
 - [ ] IS-082 [BE] ⬜ [auth] Secrets via env/external store; structural export exclusion — 08
