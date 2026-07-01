@@ -108,6 +108,19 @@ describe("ScenarioBuilderPage", () => {
     expect(useScenariosStore.getState().steps["scn-04"]).toHaveLength(1);
   });
 
+  it("a freshly-added wait step is NOT auto-configured (needs its duration)", async () => {
+    const user = userEvent.setup();
+    renderBuilder("scn-04"); // empty
+    await user.click(screen.getByRole("button", { name: "+ Wait" }));
+    const added = useScenariosStore.getState().steps["scn-04"][0];
+    // Regression: addStep must not hard-code wait/marker as configured now that
+    // they have required fields (seconds / note).
+    expect(added.configured).toBe(false);
+    // And the scenario must not claim it is runnable.
+    expect(screen.queryByText("Ready to run")).toBeNull();
+    expect(screen.getByText(/needs configuration/)).toBeTruthy();
+  });
+
   it("admin can remove a step through the confirmation dialog", async () => {
     const user = userEvent.setup();
     renderBuilder("scn-01");

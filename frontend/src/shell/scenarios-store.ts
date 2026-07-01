@@ -11,6 +11,7 @@ import { create } from "zustand";
 import { scenarioRows, stepsByScenario, type ScenarioRow } from "../surfaces/mock-scenarios";
 import {
   STEP_TYPE_LABELS,
+  isStepConfigured,
   type ScenarioStep,
   type ScenarioStepType,
 } from "../surfaces/scenario-steps";
@@ -100,8 +101,10 @@ export const useScenariosStore = create<ScenariosState>((set, get) => ({
 
   addStep: (scenarioId, type) => {
     const stepId = `st-${++stepSeq}`;
-    // wait/marker have no required target config, so they start configured.
-    const configured = type === "wait" || type === "marker";
+    // Derive from the same source of truth the editor and validateScenario use,
+    // so a freshly-added step with empty config is only "configured" if the type
+    // genuinely has no required fields (not a hard-coded per-type assumption).
+    const configured = isStepConfigured(type, {});
     const step: ScenarioStep = {
       id: stepId,
       type,
