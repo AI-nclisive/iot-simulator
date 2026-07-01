@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { resolveAccess } from "../shell/access-policy";
 import { useDataSourcesStore } from "../shell/data-sources-store";
@@ -98,13 +98,51 @@ export function DataSourceDetailPreviewPage() {
   );
   const startDataSource = useDataSourcesStore((state) => state.startDataSource);
   const stopDataSource = useDataSourcesStore((state) => state.stopDataSource);
+  const isLoading = useDataSourcesStore((state) => state.isLoading);
+  const loadDataSources = useDataSourcesStore((state) => state.loadDataSources);
   const access = resolveAccess(accessMode, sharedRole);
+  const fetchedForProjectRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (currentProjectId && !source && !isLoading && fetchedForProjectRef.current !== currentProjectId) {
+      fetchedForProjectRef.current = currentProjectId;
+      loadDataSources(currentProjectId);
+    }
+  }, [currentProjectId, source, isLoading, loadDataSources]);
+
   const activeTab = currentTabId(searchParams.get("tab"));
   const [stopConfirmationOpen, setStopConfirmationOpen] = useState(false);
   const [schemaUnsaved, setSchemaUnsaved] = useState(false);
   const [pendingTab, setPendingTab] = useState<DetailTabId | null>(null);
 
+  // All hooks above — early returns only after this point
+  const sourceStarted = source?.status === "Active";
+  const stopConfirmationModel = useMemo(() => {
+    if (!source || !sourceStarted) return null;
+    const runtimeImpact = "The source stops serving values until someone starts it again.";
+    const copy = stopActionCopy;
+    return {
+      confirmLabel: copy.confirmLabel,
+      impacts: [
+        { label: "Endpoint", value: source.endpoint },
+        { label: "Runtime impact", value: runtimeImpact },
+      ],
+      message: copy.message,
+      objectLabel: `${source.name} (${source.protocol})`,
+      reversibilityLabel: "This action is reversible. The source can be started again later.",
+      title: copy.title,
+      tone: "warning" as const,
+    };
+  }, [source, sourceStarted]);
+
   if (!source) {
+    if (isLoading) {
+      return (
+        <div className="flex h-full items-center justify-center">
+          <SharedStatePanel message="Loading source…" state="loading" title="" />
+        </div>
+      );
+    }
     return (
       <div className="flex h-full flex-col gap-3">
         <section className="shell-panel px-5 py-5">
@@ -126,7 +164,6 @@ export function DataSourceDetailPreviewPage() {
   const activeSource = source;
   const healthDiagnostic = healthDiagnosticCopy(activeSource);
   const activeState = stateMeta(activeSource);
-  const sourceStarted = activeSource.status === "Active";
   const sourceControlAction =
     sourceStarted && access.canStopSource
       ? {
@@ -139,30 +176,6 @@ export function DataSourceDetailPreviewPage() {
             onClick: () => startDataSource(activeSource.id),
           }
         : null;
-
-  const stopConfirmationModel = useMemo(() => {
-    if (!sourceStarted) {
-      return null;
-    }
-
-    const runtimeImpact = "The source stops serving values until someone starts it again.";
-
-    const copy = stopActionCopy;
-
-    return {
-      confirmLabel: copy.confirmLabel,
-      impacts: [
-        { label: "Endpoint", value: activeSource.endpoint },
-        { label: "Runtime impact", value: runtimeImpact },
-      ],
-      message: copy.message,
-      objectLabel: `${activeSource.name} (${activeSource.protocol})`,
-      reversibilityLabel:
-        "This action is reversible. The source can be started again later.",
-      title: copy.title,
-      tone: "warning" as const,
-    };
-  }, [activeSource, sourceStarted]);
 
   function setActiveTab(tabId: DetailTabId) {
     if (activeTab === "schema" && schemaUnsaved && tabId !== "schema") {
