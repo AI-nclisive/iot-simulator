@@ -21,7 +21,7 @@ dependency-ordered. (Optimized for "make the simulator real end to end, then
 broaden, then harden for teams" — can be re-weighted if the near-term goal
 differs.)
 
-Snapshot: **build green.** 94 done · 26 todo (120 total). Live status is the board; this line is a periodic snapshot.
+Snapshot: **build green.** 95 done · 25 todo (120 total). Live status is the board; this line is a periodic snapshot.
 
 <details>
 <summary>ID crosswalk — legacy <code>BE-*</code> / <code>SDLC-*</code> → <code>IS-XXX</code></summary>
@@ -213,7 +213,7 @@ import/export. Modbus moved to Wave G (deferred) — see the note there.
 
 ## Wave F — Advanced workflows & hardening · P2
 
-- [ ] IS-085 [BE] ⬜ [gen] Scenario model + steps (start/stop/replay/synthetic/fault/wait/marker) — SPEC: Build Scenarios
+- [x] IS-085 [BE] ✅ [gen] Scenario model + steps (start/stop/replay/synthetic/fault/wait/marker) — SPEC: Build Scenarios
 - [ ] IS-086 [BE] ⬜ [gen] Scenario validation + run execution — SPEC: Run Scenarios
 - [ ] IS-087 [BE] ⬜ [gen] Fault model + injection (neutral & protocol; never auto-healed) — SPEC: Simulate Faults
 - [ ] IS-088 [BE] ⬜ [ipc] InjectFault RPC — 02

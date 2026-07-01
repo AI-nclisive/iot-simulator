@@ -13,4 +13,6 @@ dependencies {
     implementation(libs.spring.boot.starter.security)
     implementation(libs.spring.boot.starter.oauth2.resource.server)
     implementation(libs.springdoc.openapi.webmvc)
+
+    testImplementation(project(":persistence"))
 }
