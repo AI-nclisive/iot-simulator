@@ -21,7 +21,7 @@ dependency-ordered. (Optimized for "make the simulator real end to end, then
 broaden, then harden for teams" — can be re-weighted if the near-term goal
 differs.)
 
-Snapshot: **build green.** 102 done · 19 todo (121 total). Live status is the board; this line is a periodic snapshot.
+Snapshot: **build green.** 102 done · 20 todo (122 total). Live status is the board; this line is a periodic snapshot.
 
 <details>
 <summary>ID crosswalk — legacy <code>BE-*</code> / <code>SDLC-*</code> → <code>IS-XXX</code></summary>
@@ -84,6 +84,7 @@ Tier 2 — contribution hygiene:
 - [x] IS-115 [SDLC] ✅ Task pre-flight checklist + board-wins tie-break + `catalog-sync` CI guard (a task-linked PR must flip its own catalog checkbox) — `AGENTS.md`/`.github/workflows/ci.yml`
 - [x] IS-117 [SDLC] ✅ Claude Code skills for the contribution workflow under `.claude/skills/` (`/start-task`, `/open-pr`, `/review-loop`, `/new-worker`, `/flyway-migration`, `/board-sync`) + recommended built-in skills documented in `CONTRIBUTING.md` — executable procedures for `CONTRIBUTING.md`/`AGENTS.md`
 - [x] IS-120 [SDLC] ✅ Local e2e run tooling — `/run-local` skill (cross-platform: Postgres + backend + Vite dev proxy, with teardown) + README run/test instructions + `docs/FRONTEND_BACKEND_CONTRACT_MAP.md` refresh for IS-074; wire FE list stores (projects/data-sources/recordings) to the `Page<T>` pagination envelope so they stop failing to load
+- [ ] IS-123 [SDLC] ⬜ `/run-local` supervisor mode — turnkey local OPC UA e2e: opt-in path that builds `worker-opcua` (`installDist`), runs the backend with `IOTSIM_RUNTIME_MODE=supervisor` + `iotsim.runtime.workers.OPC_UA[0]`, and surfaces the bound `opc.tcp://…/iotsim` endpoint for an external client. Backend capability exists (IS-036/038/039); this is tooling only. Surfaced from IS-086.
 
 Tier 3 — quality automation:
 - [x] IS-105 [SDLC] ✅ Spotless (import order + whitespace hygiene) — runs in `check`/CI
