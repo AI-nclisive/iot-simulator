@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { resolveAccess } from "../shell/access-policy";
 import { useDataSourcesStore } from "../shell/data-sources-store";
@@ -101,9 +101,11 @@ export function DataSourceDetailPreviewPage() {
   const isLoading = useDataSourcesStore((state) => state.isLoading);
   const loadDataSources = useDataSourcesStore((state) => state.loadDataSources);
   const access = resolveAccess(accessMode, sharedRole);
+  const fetchedRef = useRef(false);
 
   useEffect(() => {
-    if (currentProjectId && !source && !isLoading) {
+    if (currentProjectId && !source && !isLoading && !fetchedRef.current) {
+      fetchedRef.current = true;
       loadDataSources(currentProjectId);
     }
   }, [currentProjectId, source, isLoading, loadDataSources]);
