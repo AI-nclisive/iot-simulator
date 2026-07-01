@@ -639,7 +639,7 @@ Parallel execution:
   Depends: `UI-061`
   Done when: run is blocked until validation passes, and the reason is obvious.
 
-- [ ] `UI-065` Scenario Run View
+- [x] `UI-065` Scenario Run View
   Surface: `Scenario Run View`
   Depends: `UI-022`, `UI-061`
   Done when: current step, initiator, involved sources, faults, clients, events,
