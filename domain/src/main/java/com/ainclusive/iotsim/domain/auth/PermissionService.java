@@ -38,10 +38,14 @@ import org.springframework.stereotype.Service;
 public class PermissionService {
 
     /**
-     * Role name granted to the implicit {@code local} principal; it receives every permission
+     * Bare role name granted to the implicit {@code local} principal; it receives every permission
      * unconditionally without hitting the DB (local mode is auth-off).
+     *
+     * <p>Named {@code ADMIN_ROLE_NAME} (not {@code ROLE_ADMIN}) to avoid confusion with Spring
+     * Security's {@code ROLE_X} authority-string convention — this value is the bare name
+     * {@code "admin"}, not the prefixed authority {@code "ROLE_admin"}.
      */
-    public static final String ROLE_ADMIN = "admin";
+    public static final String ADMIN_ROLE_NAME = "admin";
 
     private final RoleRepository roleRepository;
     private final UserRepository userRepository;
