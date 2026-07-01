@@ -8,7 +8,7 @@ import java.util.Optional;
 public interface DataSourceRepository {
 
     DataSourceRow insert(String projectId, String name, String protocol, String basis,
-            String endpointJson, String runtimeConfigJson, String createdBy);
+            String endpoint, String runtimeConfigJson, String createdBy);
 
     /**
      * Creates a copy of an existing data-source row under the same project.
@@ -30,7 +30,7 @@ public interface DataSourceRepository {
 
     Optional<DataSourceRow> findById(String id);
 
-    Optional<DataSourceRow> update(String id, String name, String endpointJson,
+    Optional<DataSourceRow> update(String id, String name, String endpoint,
             String runtimeConfigJson, boolean enabled, long expectedVersion);
 
     boolean deleteById(String id);

@@ -63,6 +63,36 @@ class DataSourceRepositoryIT {
     }
 
     @Test
+    void insertPlainUrlEndpointRoundTrips() {
+        // The UI sends the endpoint as a bare URL (not a JSON document). It must persist
+        // into the jsonb column and read back unchanged. Regression for the create-500
+        // (invalid input syntax for type json) reported against opc.tcp:// endpoints.
+        String url = "opc.tcp://simulator.local:4840";
+
+        DataSourceRow created = dataSources.insert(projectId, "OPC Source", "OPC_UA", "MANUAL", url, null, "it");
+
+        assertThat(created.endpoint()).isEqualTo(url);
+        assertThat(dataSources.findById(created.id()))
+                .get()
+                .extracting(DataSourceRow::endpoint)
+                .isEqualTo(url);
+    }
+
+    @Test
+    void endpointWithJsonSpecialCharactersRoundTrips() {
+        // A URL carrying characters that are significant inside a JSON string (quote,
+        // backslash) must still round-trip — proving the value is escaped, not concatenated.
+        String url = "opc.tcp://host/path?q=\"a\\b\"";
+
+        DataSourceRow created = dataSources.insert(projectId, "Weird", "OPC_UA", "MANUAL", url, null, "it");
+
+        assertThat(dataSources.findById(created.id()))
+                .get()
+                .extracting(DataSourceRow::endpoint)
+                .isEqualTo(url);
+    }
+
+    @Test
     void updateWithStaleVersionMatchesNothing() {
         DataSourceRow created = dataSources.insert(projectId, "Stale", "MODBUS_TCP", "SCAN", null, null, "it");
         assertThat(dataSources.update(created.id(), "x", null, null, true, 999)).isEmpty();
