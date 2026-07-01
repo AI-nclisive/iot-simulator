@@ -93,7 +93,8 @@ public class SecurityConfig {
                     + "spring.security.oauth2.resourceserver.jwt.issuer-uri so bearer "
                     + "JWTs validate via JWKS. See backend-specs/08_AUTH_AND_MODES.md.");
         }
-        JwtDecoder validatingDecoder = applyAudienceValidation(jwtDecoder, oidcProperties.audience());
+        JwtDecoder validatingDecoder = applyAudienceValidation(
+                jwtDecoder, oidcProperties.audience(), oidcProperties.issuerUri());
         JwtPrincipalConverter converter = new JwtPrincipalConverter(oidcProperties.rolesClaim());
         http
                 .csrf(csrf -> csrf.disable())
@@ -114,14 +115,22 @@ public class SecurityConfig {
      * non-null and non-blank.  Accepts a {@link NimbusJwtDecoder} (the Spring Boot
      * auto-configured default); falls back to the unmodified decoder for any other
      * implementation (e.g. test mocks).
+     *
+     * <p>{@code setJwtValidator} replaces the entire validation chain, so this method
+     * preserves issuer validation by using
+     * {@link JwtValidators#createDefaultWithIssuer(String)} when {@code issuerUri} is
+     * set, or {@link JwtValidators#createDefault()} otherwise.
      */
-    private static JwtDecoder applyAudienceValidation(JwtDecoder decoder, String audience) {
+    private static JwtDecoder applyAudienceValidation(
+            JwtDecoder decoder, String audience, String issuerUri) {
         if (audience == null || audience.isBlank()
                 || !(decoder instanceof NimbusJwtDecoder nimbus)) {
             return decoder;
         }
         List<OAuth2TokenValidator<Jwt>> validators = new ArrayList<>();
-        validators.add(JwtValidators.createDefault());
+        validators.add(issuerUri != null && !issuerUri.isBlank()
+                ? JwtValidators.createDefaultWithIssuer(issuerUri)
+                : JwtValidators.createDefault());
         validators.add(new JwtClaimValidator<List<String>>(
                 "aud", aud -> aud != null && aud.contains(audience)));
         nimbus.setJwtValidator(new DelegatingOAuth2TokenValidator<>(validators));
