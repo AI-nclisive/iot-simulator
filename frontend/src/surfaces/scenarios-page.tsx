@@ -201,6 +201,8 @@ export function ScenariosPage() {
     actions.push({ label: "Open", onClick: () => handleOpen(row) });
 
     if (row.runState === "Running") {
+      // A running scenario can be observed in the run view (all users).
+      actions.push({ label: "View run", onClick: () => navigate(`/scenarios/${row.id}/run`) });
       if (access.canStopScenario && !lockedByOther) {
         actions.push({ label: "Stop", onClick: () => setConfirmStop(row.id) });
       }
