@@ -8,6 +8,8 @@
  * this file deliberately keeps step config as an open, type-tagged shape.
  */
 
+import { isFaultConfigured } from "./scenario-faults";
+
 export type ScenarioStepType =
   | "start"
   | "stop"
@@ -98,10 +100,11 @@ export const STEP_FIELD_SPECS: Record<ScenarioStepType, StepFieldSpec[]> = {
       required: true,
       options: [
         { value: "drop", label: "Drop values" },
-        { value: "delay", label: "Delay" },
+        { value: "delay", label: "Delay values" },
         { value: "corrupt", label: "Corrupt values" },
+        { value: "quality", label: "Force bad quality" },
       ],
-      hint: "Detailed fault parameters are configured in the fault step (UI-063).",
+      hint: "Timing and kind-specific parameters are set below.",
     },
   ],
   wait: [
@@ -123,6 +126,11 @@ export const STEP_FIELD_SPECS: Record<ScenarioStepType, StepFieldSpec[]> = {
  * (via isStepConfigured) to set step.configured, which feeds validateScenario.
  */
 export function isStepConfigured(type: ScenarioStepType, config: Record<string, unknown>): boolean {
+  // Fault steps have kind-dependent required params (UI-063), so delegate to the
+  // fault model rather than the static field list.
+  if (type === "fault") {
+    return isFaultConfigured(config);
+  }
   return STEP_FIELD_SPECS[type]
     .filter((f) => f.required)
     .every((f) => {

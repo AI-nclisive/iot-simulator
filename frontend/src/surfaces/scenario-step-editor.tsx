@@ -14,6 +14,7 @@
 import { useMemo, useState } from "react";
 import { sourceRows } from "./mock-data-sources";
 import { mockRecordings } from "./mock-recordings";
+import { FaultConfigPanel } from "./fault-config-panel";
 import {
   STEP_FIELD_SPECS,
   STEP_TYPE_LABELS,
@@ -87,10 +88,6 @@ export function ScenarioStepEditor({ step, canEdit, onChange }: StepEditorProps)
     if (field.kind === "recording") return recordingOptions;
     return field.options ?? [];
   }
-
-  const missingRequired = specs.filter(
-    (f) => f.required && !isFieldFilled(config[f.key]),
-  );
 
   return (
     <div className="space-y-4">
@@ -169,13 +166,19 @@ export function ScenarioStepEditor({ step, canEdit, onChange }: StepEditorProps)
         })
       )}
 
-      {missingRequired.length === 0 ? (
+      {/* Fault steps get kind-specific params, timing, and a behavior preview. */}
+      {step.type === "fault" ? (
+        <FaultConfigPanel
+          config={config}
+          canEdit={canEdit}
+          onChange={(key, value) => setField(key, value)}
+        />
+      ) : null}
+
+      {isStepConfigured(step.type, config) ? (
         <p className="text-sm text-shell-accent">Step is fully configured.</p>
       ) : (
-        <p className="text-sm text-shell-warning">
-          {missingRequired.length} required field
-          {missingRequired.length === 1 ? "" : "s"} still needed.
-        </p>
+        <p className="text-sm text-shell-warning">This step still needs required fields.</p>
       )}
     </div>
   );
