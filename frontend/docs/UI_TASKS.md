@@ -622,7 +622,7 @@ Parallel execution:
   Done when: the builder provides step list, details panel, validation, and
   save/run structure inside one coherent editing surface.
 
-- [ ] `UI-062` Scenario step editor
+- [x] `UI-062` Scenario step editor
   Surface: `Scenario Builder`
   Depends: `UI-061`
   Done when: start, stop, replay, synthetic, fault, wait, and marker steps fit
