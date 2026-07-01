@@ -13,7 +13,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi, type MockedFunction } from "vitest";
-import { detectDependencyWarnings, DataSourceSchemaEditor } from "./data-source-schema-editor";
+import { detectDependencyWarnings, DataSourceSchemaEditor, buildTree, type NodeDto } from "./data-source-schema-editor";
 import type { SchemaParameter } from "./mock-schema-parameters";
 import type { DataSourceRow } from "./mock-data-sources";
 import { apiFetch } from "../api";
@@ -541,5 +541,79 @@ describe("DataSourceSchemaEditor — NodeDto round-trip on save", () => {
     };
     const node = body.nodes.find((n) => n.nodeId === "v-dt")!;
     expect(node.dataType).toBe("DATETIME");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Unit tests for buildTree
+// ---------------------------------------------------------------------------
+
+function makeNode(overrides: Partial<NodeDto> & { nodeId: string; name: string }): NodeDto {
+  return {
+    parentId: null,
+    path: `/${overrides.name}`,
+    kind: "VARIABLE",
+    dataType: "FLOAT64",
+    valueRank: null,
+    access: "READ",
+    unit: null,
+    description: null,
+    ...overrides,
+  };
+}
+
+describe("buildTree", () => {
+  it("returns empty array for empty input", () => {
+    expect(buildTree([])).toEqual([]);
+  });
+
+  it("places root-level nodes (parentId null) as top-level roots", () => {
+    const nodes = [
+      makeNode({ nodeId: "a", name: "alpha" }),
+      makeNode({ nodeId: "b", name: "beta" }),
+    ];
+    const tree = buildTree(nodes);
+    expect(tree).toHaveLength(2);
+    expect(tree.map((n) => n.nodeId).sort()).toEqual(["a", "b"]);
+  });
+
+  it("nests children under their parent", () => {
+    const nodes = [
+      makeNode({ nodeId: "parent", name: "parent", kind: "FOLDER" }),
+      makeNode({ nodeId: "child", name: "child", parentId: "parent" }),
+    ];
+    const tree = buildTree(nodes);
+    expect(tree).toHaveLength(1);
+    expect(tree[0].nodeId).toBe("parent");
+    expect(tree[0].children).toHaveLength(1);
+    expect(tree[0].children[0].nodeId).toBe("child");
+  });
+
+  it("sorts folders before variables within roots", () => {
+    const nodes = [
+      makeNode({ nodeId: "v", name: "var", kind: "VARIABLE" }),
+      makeNode({ nodeId: "f", name: "folder", kind: "FOLDER" }),
+    ];
+    const tree = buildTree(nodes);
+    expect(tree[0].kind).toBe("FOLDER");
+    expect(tree[1].kind).toBe("VARIABLE");
+  });
+
+  it("sorts siblings alphabetically within the same kind", () => {
+    const nodes = [
+      makeNode({ nodeId: "zz", name: "zeta" }),
+      makeNode({ nodeId: "aa", name: "alpha" }),
+    ];
+    const tree = buildTree(nodes);
+    expect(tree[0].name).toBe("alpha");
+    expect(tree[1].name).toBe("zeta");
+  });
+
+  it("ignores orphaned nodes whose parentId does not exist", () => {
+    const nodes = [
+      makeNode({ nodeId: "orphan", name: "orphan", parentId: "no-such-parent" }),
+    ];
+    const tree = buildTree(nodes);
+    expect(tree).toHaveLength(0);
   });
 });
