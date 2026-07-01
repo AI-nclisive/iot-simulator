@@ -1,6 +1,7 @@
 package com.ainclusive.iotsim.domain.datasource;
 
 import com.ainclusive.iotsim.domain.common.ConcurrencyConflictException;
+import com.ainclusive.iotsim.domain.common.PortInUseException;
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.domain.support.Page;
 import com.ainclusive.iotsim.domain.support.PageCursor;
@@ -121,6 +122,16 @@ public class DataSourceService {
 
     public DataSource start(String projectId, String id) {
         DataSourceRow row = requireRow(projectId, id);
+        int port = RuntimeStartSpecs.listenPort(row.runtimeConfig(), json);
+        if (port != 0) {
+            for (DataSourceRow other : dataSources.findAll()) {
+                if (!other.id().equals(id)
+                        && "RUNNING".equals(runtime.state(other.id()))
+                        && RuntimeStartSpecs.listenPort(other.runtimeConfig(), json) == port) {
+                    throw new PortInUseException(port, other.id());
+                }
+            }
+        }
         runtime.start(id, RuntimeStartSpecs.of(schemas, row, json));
         return map(row);
     }

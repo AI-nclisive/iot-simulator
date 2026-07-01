@@ -2,6 +2,7 @@ package com.ainclusive.iotsim.api.error;
 
 import com.ainclusive.iotsim.domain.common.ConcurrencyConflictException;
 import com.ainclusive.iotsim.domain.common.FeatureNotAvailableException;
+import com.ainclusive.iotsim.domain.common.PortInUseException;
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.domain.common.ScenarioInvalidException;
 import com.ainclusive.iotsim.domain.common.SchemaVersionMismatchException;
@@ -25,6 +26,11 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(ConcurrencyConflictException.class)
     public ProblemDetail conflict(ConcurrencyConflictException e) {
+        return problem(HttpStatus.CONFLICT, e.getMessage());
+    }
+
+    @ExceptionHandler(PortInUseException.class)
+    public ProblemDetail portInUse(PortInUseException e) {
         return problem(HttpStatus.CONFLICT, e.getMessage());
     }
 
