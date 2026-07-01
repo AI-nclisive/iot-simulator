@@ -161,7 +161,7 @@ ToDo
 ### Capability: Run Deterministic Scenarios
 
 Explanation:
-Users can run synthetic data, recorded data replay, and custom scenarios in a deterministic way so repeated runs produce the same values, event order, and timing behavior.
+Users can run synthetic data, recorded data replay, and custom scenarios in a deterministic way so repeated runs produce the same values, event order, and timing behavior. Synthetic data runs as a continuous, real-time-paced live feed until stopped.
 
 Priority:
 P1
