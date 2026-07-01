@@ -338,6 +338,11 @@ class EvidenceServiceTest {
             throw new UnsupportedOperationException();
         }
 
+        public List<RunRow> findByProjectPaged(String projectId, java.time.OffsetDateTime afterAt,
+                String afterId, int limit) {
+            throw new UnsupportedOperationException();
+        }
+
         public List<RunRow> findActiveByProject(String projectId) {
             throw new UnsupportedOperationException();
         }

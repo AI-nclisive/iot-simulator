@@ -69,11 +69,22 @@ public class SyntheticRunService {
     /**
      * Starts a synthetic run linked to a parent (scenario) run.
      *
-     * <p>Delegates all logic to the main overload; {@code parentRunId} is forwarded to
-     * {@link com.ainclusive.iotsim.persistence.run.RunRepository#create} so the child run is
-     * linked in {@code runs.parent_run_id}.
+     * <p>Delegates to the full overload with default {@code trigger="MANUAL"} and
+     * {@code initiator="local"}.
      */
     public SyntheticRunSummary run(String projectId, String dataSourceId, long durationMs, String parentRunId) {
+        return run(projectId, dataSourceId, durationMs, "MANUAL", "local", parentRunId);
+    }
+
+    /**
+     * Starts a synthetic run with explicit {@code trigger}, {@code initiator}, and
+     * {@code parentRunId}.
+     *
+     * <p>Used by automation (e.g. {@code POST /runs}) to thread {@code trigger="AUTOMATION"} and
+     * a caller-supplied initiator into the created run row.
+     */
+    public SyntheticRunSummary run(String projectId, String dataSourceId, long durationMs,
+            String trigger, String initiator, String parentRunId) {
         if (durationMs <= 0) {
             throw new IllegalArgumentException("durationMs must be > 0: " + durationMs);
         }
@@ -88,7 +99,7 @@ public class SyntheticRunService {
                 ? DeterministicSettings.withRandomSeed(clock.instant())
                 : new DeterministicSettings(config.seed(), clock.instant());
 
-        RunRow run = runs.create(projectId, "SYNTHETIC", "MANUAL", "local", List.of(dataSourceId), null, parentRunId);
+        RunRow run = runs.create(projectId, "SYNTHETIC", trigger, initiator, List.of(dataSourceId), null, parentRunId);
         try {
             runs.start(run.id(), now());
             EvidenceRow evidenceRow = evidence.create(projectId, run.id(), "local");

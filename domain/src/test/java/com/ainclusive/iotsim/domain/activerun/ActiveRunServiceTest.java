@@ -52,6 +52,12 @@ class ActiveRunServiceTest {
         }
 
         @Override
+        public List<RunRow> findByProjectPaged(String projectId, OffsetDateTime afterAt,
+                String afterId, int limit) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public RunRow start(String id, OffsetDateTime at) {
             throw new UnsupportedOperationException();
         }

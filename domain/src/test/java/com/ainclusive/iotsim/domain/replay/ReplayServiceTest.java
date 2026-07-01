@@ -184,6 +184,20 @@ class ReplayServiceTest {
         assertThat(runs.parentOf(summary.runId())).isEqualTo("parent-run-1");
     }
 
+    @Test
+    void replayWithAutomationTriggerAndInitiator() {
+        ReplaySummary s = service.replay(PROJECT, SOURCE, RECORDING, null, true, "AUTOMATION", "ci-bot", null);
+        assertThat(runs.triggerOf(s.runId())).isEqualTo("AUTOMATION");
+        assertThat(runs.initiatorOf(s.runId())).isEqualTo("ci-bot");
+    }
+
+    @Test
+    void replayDefaultOverloadUsesManualTriggerAndLocalInitiator() {
+        ReplaySummary s = service.replay(PROJECT, SOURCE, RECORDING, null, true);
+        assertThat(runs.triggerOf(s.runId())).isEqualTo("MANUAL");
+        assertThat(runs.initiatorOf(s.runId())).isEqualTo("local");
+    }
+
     /** Replay service with recording schemaVersion=0 and source schemaVersion=0 — perfectly aligned. */
     private ReplayService buildWithSchemaVersion(int version) {
         List<NeutralValue> values = List.of(
@@ -243,6 +257,18 @@ class ReplayServiceTest {
             return row == null ? null : row.parentRunId();
         }
 
+        /** Returns the {@code trigger} stored for the given run, or {@code null} if not found. */
+        public String triggerOf(String runId) {
+            RunRow row = byId.get(runId);
+            return row == null ? null : row.trigger();
+        }
+
+        /** Returns the {@code initiator} stored for the given run, or {@code null} if not found. */
+        public String initiatorOf(String runId) {
+            RunRow row = byId.get(runId);
+            return row == null ? null : row.initiator();
+        }
+
         public RunRow start(String id, OffsetDateTime startedAt) {
             RunRow r = byId.get(id);
             RunRow updated = new RunRow(r.id(), r.projectId(), r.kind(), r.trigger(), r.initiator(),
@@ -275,6 +301,11 @@ class ReplayServiceTest {
         }
 
         public List<RunRow> findByProject(String projectId) {
+            throw new UnsupportedOperationException();
+        }
+
+        public List<RunRow> findByProjectPaged(String projectId, java.time.OffsetDateTime afterAt,
+                String afterId, int limit) {
             throw new UnsupportedOperationException();
         }
 

@@ -78,11 +78,24 @@ public class ReplayService {
     /**
      * Starts a replay run linked to a parent (scenario) run.
      *
-     * <p>Delegates all logic to the main overload; {@code parentRunId} is forwarded to
-     * {@link RunRepository#create} so the child run is linked in {@code runs.parent_run_id}.
+     * <p>Delegates all logic to the full overload with default {@code trigger="MANUAL"} and
+     * {@code initiator="local"}.
      */
     public ReplaySummary replay(String projectId, String dataSourceId, String recordingId,
             DeterministicSettings deterministicSettings, boolean compatibilityAck, String parentRunId) {
+        return replay(projectId, dataSourceId, recordingId, deterministicSettings, compatibilityAck,
+                "MANUAL", "local", parentRunId);
+    }
+
+    /**
+     * Starts a replay run with explicit {@code trigger}, {@code initiator}, and {@code parentRunId}.
+     *
+     * <p>Used by automation (e.g. {@code POST /runs}) to thread {@code trigger="AUTOMATION"} and a
+     * caller-supplied initiator into the created run row.
+     */
+    public ReplaySummary replay(String projectId, String dataSourceId, String recordingId,
+            DeterministicSettings deterministicSettings, boolean compatibilityAck,
+            String trigger, String initiator, String parentRunId) {
         DataSourceRow source = requireSource(projectId, dataSourceId);
         RecordingRow recording = requireRecording(projectId, recordingId);
 
@@ -101,7 +114,7 @@ public class ReplayService {
                 ? deterministicSettings
                 : DeterministicSettings.withRandomSeed(Instant.now());
 
-        RunRow run = runs.create(projectId, "REPLAY", "MANUAL", "local", List.of(dataSourceId), null, parentRunId);
+        RunRow run = runs.create(projectId, "REPLAY", trigger, initiator, List.of(dataSourceId), null, parentRunId);
         // Everything after the run exists is guarded: any failure (evidence setup, worker
         // launch, value streaming) must end the run FAILED rather than leave it RUNNING.
         try {
