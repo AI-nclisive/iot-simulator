@@ -174,6 +174,65 @@ export function validateScenario(steps: ScenarioStep[]): ScenarioValidation {
     }
   }
 
+  // ── Semantic lifecycle checks (UI-064) ────────────────────────────────────
+  // Walk the steps in order, tracking which sources are running, so we can flag
+  // steps that act on a source that is not running at that point. Unconfigured
+  // steps are skipped here — they are already reported above, and letting a
+  // partially-filled step drive the state machine would produce false
+  // negatives (an unconfigured start hiding real errors) or false positives
+  // (an unconfigured stop invalidating later valid steps).
+  const running = new Set<string>();
+  for (const step of steps) {
+    if (!step.configured) continue;
+    const sourceId = typeof step.config.sourceId === "string" ? step.config.sourceId : null;
+    const label = step.label || STEP_TYPE_LABELS[step.type];
+
+    switch (step.type) {
+      case "start":
+        if (sourceId) {
+          if (running.has(sourceId)) {
+            issues.push({
+              stepId: step.id,
+              message: `"${label}" starts a source that is already running.`,
+            });
+          }
+          running.add(sourceId);
+        }
+        break;
+      case "stop":
+        if (sourceId) {
+          if (!running.has(sourceId)) {
+            issues.push({
+              stepId: step.id,
+              message: `"${label}" stops a source that is not running.`,
+            });
+          }
+          running.delete(sourceId);
+        }
+        break;
+      case "replay":
+      case "synthetic":
+      case "fault":
+        if (sourceId && !running.has(sourceId)) {
+          issues.push({
+            stepId: step.id,
+            message: `"${label}" acts on a source that has not been started in this scenario.`,
+          });
+        }
+        break;
+      default:
+        break; // wait / marker: no source lifecycle
+    }
+  }
+
+  // Sources started but never stopped — advisory (the run teardown stops them).
+  if (running.size > 0) {
+    warnings.push({
+      stepId: null,
+      message: `${running.size} source${running.size === 1 ? "" : "s"} left running at scenario end; they stop on teardown.`,
+    });
+  }
+
   // A scenario that only waits/marks does nothing observable — warn, don't block.
   const hasActionable = steps.some((s) => s.type !== "wait" && s.type !== "marker");
   if (steps.length > 0 && !hasActionable) {
