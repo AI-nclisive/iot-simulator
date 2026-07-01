@@ -112,6 +112,21 @@ public class JooqScenarioRepository implements ScenarioRepository {
         return dsl.deleteFrom(SCENARIOS).where(SCENARIOS.ID.eq(id)).execute() > 0;
     }
 
+    @Override
+    public Optional<ScenarioRow> updateStatus(String id, String status) {
+        ScenariosRecord rec = dsl.update(SCENARIOS)
+                .set(SCENARIOS.STATUS, status)
+                .set(SCENARIOS.UPDATED_AT, OffsetDateTime.now(ZoneOffset.UTC))
+                .set(SCENARIOS.VERSION, SCENARIOS.VERSION.plus(1))
+                .where(SCENARIOS.ID.eq(id))
+                .returning()
+                .fetchOne();
+        if (rec == null) {
+            return Optional.empty();
+        }
+        return Optional.of(map(rec, fetchSteps(dsl, id)));
+    }
+
     private static void insertSteps(DSLContext tx, String scenarioId, List<ScenarioStepInput> steps) {
         for (int i = 0; i < steps.size(); i++) {
             ScenarioStepInput s = steps.get(i);
