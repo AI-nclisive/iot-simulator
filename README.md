@@ -74,6 +74,14 @@ in `local` mode by default (auth off), no login or token is needed.
 Vite binds to `0.0.0.0`, so the same dev server can be opened from another device
 on the LAN via `http://<your-lan-ip>:4173/`.
 
+> The **`/run-local`** Claude Code skill automates this whole stack and runs it in
+> **supervisor mode** — real out-of-process OPC UA workers — so starting a data
+> source spawns an Eclipse Milo server an edge device can connect to
+> (`opc.tcp://127.0.0.1:<listenPort>/iotsim`). Build the worker once with
+> `./gradlew :workers:worker-opcua:installDist`. The manual steps above run the
+> app's default `memory` mode (no workers) — fine for UI/API clicking, but there is
+> no real protocol endpoint.
+
 ### Database data persistence
 
 Postgres data **survives restarts** — it lives in the named Docker volume
@@ -174,7 +182,7 @@ Postgres:
 | `DB_USER` / `DB_PASSWORD` | `iotsim` / `iotsim` | DB credentials. |
 | `SERVER_PORT` | `8080` | HTTP port. |
 | `IOTSIM_MODE` | `local` | `local` = auth off (implicit `local` principal); `shared` = OAuth2/OIDC resource server (set `spring.security.oauth2.resourceserver.jwt.issuer-uri`). See `backend-specs/08_AUTH_AND_MODES.md`. |
-| `IOTSIM_RUNTIME_MODE` | `memory` | `memory` = no workers (default for dev); `supervisor` = real out-of-process protocol workers. |
+| `IOTSIM_RUNTIME_MODE` | `memory` | `memory` = no workers (app default for dev/tests); `supervisor` = real out-of-process protocol workers (the `/run-local` skill runs this). |
 
 **Frontend** (`.env.example`):
 
