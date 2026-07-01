@@ -42,6 +42,7 @@ function renderRun(scenarioId: string) {
         <Route path="/scenarios/:scenarioId/run" element={<ScenarioRunViewPage />} />
         <Route path="/scenarios/:scenarioId" element={<div>Builder</div>} />
         <Route path="/scenarios" element={<div>Scenarios list</div>} />
+        <Route path="/data-sources/:sourceId" element={<div>Source detail</div>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -90,6 +91,14 @@ describe("ScenarioRunViewPage", () => {
     renderRun("scn-01");
     await user.click(screen.getByRole("button", { name: "Open in builder" }));
     expect(screen.getByText("Builder")).toBeTruthy();
+  });
+
+  it("navigates to the correct data-source route when a source is clicked", async () => {
+    const user = userEvent.setup();
+    renderRun("scn-01");
+    const sources = screen.getByLabelText("Sources involved");
+    await user.click(within(sources).getByRole("button", { name: "Line A telemetry" }));
+    expect(screen.getByText("Source detail")).toBeTruthy();
   });
 
   it("shows a not-found panel for an unknown scenario", () => {

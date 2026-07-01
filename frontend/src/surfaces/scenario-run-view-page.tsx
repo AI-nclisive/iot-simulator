@@ -200,7 +200,7 @@ export function ScenarioRunViewPage() {
                 <button
                   className="shell-text-action text-left text-sm"
                   type="button"
-                  onClick={() => navigate(`/sources/${src.sourceId}`)}
+                  onClick={() => navigate(`/data-sources/${src.sourceId}`)}
                 >
                   {src.name}
                 </button>
