@@ -99,9 +99,10 @@ public class ReplayService {
         DataSourceRow source = requireSource(projectId, dataSourceId);
         RecordingRow recording = requireRecording(projectId, recordingId);
 
-        // Load schema once — used both for the compat check and to build the RuntimeStartSpec.
-        var currentSchema = schemas.findCurrent(dataSourceId);
-        int currentSchemaVersion = currentSchema.map(SchemaWithNodes::version).orElse(0);
+        // Load the current schema version for the compat check; the RuntimeStartSpec is built
+        // from the source (which carries the simulator port) and its current schema.
+        int currentSchemaVersion = schemas.findCurrent(dataSourceId)
+                .map(SchemaWithNodes::version).orElse(0);
 
         // Schema compatibility check (IS-069): guard if the recording was captured against a
         // different schema version than the data source currently has.
@@ -123,12 +124,7 @@ public class ReplayService {
             runs.linkEvidence(run.id(), evidenceRow.id());
             evidence.updateManifest(evidenceRow.id(), seed(recordingId, settings));
 
-            RuntimeStartSpec startSpec = new RuntimeStartSpec(
-                    source.protocol(),
-                    currentSchemaVersion,
-                    currentSchema.map(SchemaWithNodes::nodes).orElse(List.of()),
-                    RuntimeStartSpecs.listenPort(source.runtimeConfig(), json),
-                    settings);
+            RuntimeStartSpec startSpec = RuntimeStartSpecs.of(schemas, source, settings);
             List<NeutralValue> values = timeline.readAll(recordingId);
             runtime.start(dataSourceId, startSpec);
             long applied = runtime.applyValues(dataSourceId, values);
