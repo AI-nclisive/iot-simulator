@@ -3,6 +3,8 @@ package com.ainclusive.iotsim.api.synthetic;
 import com.ainclusive.iotsim.api.security.Permission;
 import com.ainclusive.iotsim.domain.synthetic.SyntheticRunService;
 import com.ainclusive.iotsim.domain.synthetic.SyntheticRunSummary;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -18,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
  * {@link Permission#REPLAY_START} (user + admin).
  */
 @RestController
+@Tag(name = "Synthetic Runs", description = "Start a synthetic (generated) run on a data source.")
 @RequestMapping("/api/v1/projects/{projectId}/data-sources/{dataSourceId}/run-synthetic")
 public class SyntheticRunController {
 
@@ -31,6 +34,9 @@ public class SyntheticRunController {
         this.syntheticRuns = syntheticRuns;
     }
 
+    @Operation(summary = "Start a synthetic run",
+            description = "Runs the data source's generated series as a bounded batch for the given duration and"
+                    + " returns the run summary.")
     @PostMapping
     @PreAuthorize(REPLAY_START)
     public SyntheticRunResponse run(

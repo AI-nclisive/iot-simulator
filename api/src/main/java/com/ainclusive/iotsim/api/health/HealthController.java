@@ -5,6 +5,8 @@ import com.ainclusive.iotsim.platform.runtime.HealthOrigin;
 import com.ainclusive.iotsim.platform.runtime.RuntimeController;
 import com.ainclusive.iotsim.platform.runtime.SourceError;
 import com.ainclusive.iotsim.platform.runtime.SourceHealth;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.Instant;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,6 +26,8 @@ import org.springframework.web.bind.annotation.RestController;
  * <p>Authorization (IS-077): read-only — {@link Permission#OBSERVE} (user + admin).
  */
 @RestController
+@Tag(name = "Source Health", description = "Point-in-time runtime state and most-recent error for a single"
+        + " data source. Live transitions arrive on the runtime SSE stream.")
 public class HealthController {
 
     private static final String OBSERVE =
@@ -36,6 +40,9 @@ public class HealthController {
         this.runtime = runtime;
     }
 
+    @Operation(summary = "Get source health",
+            description = "Returns the current runtime state and most-recent error for a data source."
+                    + " An unknown id returns 200 with STOPPED and no error.")
     @PreAuthorize(OBSERVE)
     @GetMapping("/api/v1/data-sources/{id}/health")
     public SourceHealthResponse health(@PathVariable String id) {

@@ -7,6 +7,8 @@ import com.ainclusive.iotsim.domain.evidence.EvidenceFormat;
 import com.ainclusive.iotsim.domain.evidence.EvidenceService;
 import com.ainclusive.iotsim.domain.evidence.EvidenceView;
 import com.ainclusive.iotsim.domain.support.Page;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.Instant;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.HttpHeaders;
@@ -31,6 +33,11 @@ import tools.jackson.databind.ObjectMapper;
  * export trigger — {@link Permission#IMPORT_EXPORT} (admin).
  */
 @RestController
+@Tag(
+        name = "Run Evidence",
+        description =
+                "List and read run evidence, trigger an evidence export,"
+                + " and download the produced bundle.")
 @RequestMapping("/api/v1/projects/{projectId}/evidence")
 public class EvidenceController {
 
@@ -49,6 +56,11 @@ public class EvidenceController {
         this.json = json;
     }
 
+    @Operation(
+            summary = "List evidence",
+            description =
+                    "Returns run evidence in the project using cursor-based pagination"
+                    + " (cursor and limit query parameters).")
     @GetMapping
     @PreAuthorize(OBSERVE)
     public Page<EvidenceResponse> list(
@@ -58,6 +70,10 @@ public class EvidenceController {
         return evidence.listPaged(projectId, cursor, limit).map(this::toResponse);
     }
 
+    @Operation(
+            summary = "Get evidence",
+            description =
+                    "Returns a single evidence record by id, including its content manifest.")
     @GetMapping("/{id}")
     @PreAuthorize(OBSERVE)
     public EvidenceResponse get(@PathVariable String projectId, @PathVariable String id) {
@@ -65,6 +81,11 @@ public class EvidenceController {
                 .orElseThrow(() -> new ResourceNotFoundException("Evidence", id));
     }
 
+    @Operation(
+            summary = "Export evidence",
+            description =
+                    "Triggers export of the evidence in the given format (defaults to BUNDLE)."
+                    + " Idempotent-ish: re-posting after a failed export retries it.")
     @PostMapping("/{id}/export")
     @PreAuthorize(IMPORT_EXPORT)
     public EvidenceResponse export(@PathVariable String projectId, @PathVariable String id,
@@ -72,6 +93,11 @@ public class EvidenceController {
         return toResponse(evidence.export(projectId, id, format));
     }
 
+    @Operation(
+            summary = "Download evidence bundle",
+            description =
+                    "Streams the produced evidence bundle as an attachment."
+                    + " Returns 404 if no bundle has been exported yet.")
     @GetMapping("/{id}/download")
     @PreAuthorize(OBSERVE)
     public ResponseEntity<InputStreamResource> download(

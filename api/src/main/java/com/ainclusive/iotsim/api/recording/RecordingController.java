@@ -4,6 +4,8 @@ import com.ainclusive.iotsim.api.security.Permission;
 import com.ainclusive.iotsim.domain.recording.Recording;
 import com.ainclusive.iotsim.domain.recording.RecordingService;
 import com.ainclusive.iotsim.domain.support.Page;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.net.URI;
 import java.time.Instant;
 import org.springframework.http.ResponseEntity;
@@ -24,6 +26,11 @@ import org.springframework.web.bind.annotation.RestController;
  * a recording entity is a configuration action distinct from starting live capture).
  */
 @RestController
+@Tag(
+        name = "Recordings",
+        description =
+                "List, read, and create recordings — captured timelines of real source values"
+                + " that can be replayed.")
 @RequestMapping("/api/v1/projects/{projectId}/recordings")
 public class RecordingController {
 
@@ -40,6 +47,11 @@ public class RecordingController {
         this.recordings = recordings;
     }
 
+    @Operation(
+            summary = "List recordings",
+            description =
+                    "Returns recordings in the project using cursor-based pagination"
+                    + " (cursor and limit query parameters).")
     @GetMapping
     @PreAuthorize(OBSERVE)
     public Page<RecordingResponse> list(
@@ -49,6 +61,12 @@ public class RecordingController {
         return recordings.listPaged(projectId, cursor, limit).map(RecordingResponse::from);
     }
 
+    @Operation(
+            summary = "Create a recording shell",
+            description =
+                    "Creates an empty recording entity for the given data source and returns 201"
+                    + " with a Location header. This is a configuration action, distinct from"
+                    + " starting live capture.")
     @PostMapping
     @PreAuthorize(SOURCE_EDIT)
     public ResponseEntity<RecordingResponse> create(
@@ -63,6 +81,10 @@ public class RecordingController {
                 .body(RecordingResponse.from(recording));
     }
 
+    @Operation(
+            summary = "Get a recording",
+            description =
+                    "Returns a single recording by id, with its version as the ETag response header.")
     @GetMapping("/{id}")
     @PreAuthorize(OBSERVE)
     public ResponseEntity<RecordingResponse> get(@PathVariable String projectId, @PathVariable String id) {

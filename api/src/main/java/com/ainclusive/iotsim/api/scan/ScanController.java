@@ -11,6 +11,8 @@ import com.ainclusive.iotsim.domain.scan.TypeResolution;
 import com.ainclusive.iotsim.platform.scan.ConnectionTestResult;
 import com.ainclusive.iotsim.platform.scan.DiscoveredNode;
 import com.ainclusive.iotsim.platform.scan.ScanResult;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.net.URI;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
@@ -32,6 +34,10 @@ import org.springframework.web.bind.annotation.RestController;
  * (admin-level) — {@link Permission#SOURCE_EDIT}. Poll (GET) uses {@link Permission#OBSERVE}.
  */
 @RestController
+@Tag(
+        name = "Source Discovery",
+        description = "Test connectivity to a real endpoint and scan its address space, then turn"
+                + " discovered nodes into a new simulated data source.")
 @RequestMapping("/api/v1/projects/{projectId}/data-sources/scan")
 public class ScanController {
 
@@ -49,6 +55,10 @@ public class ScanController {
     }
 
     /** Reachability/auth probe (synchronous). */
+    @Operation(
+            summary = "Test endpoint connectivity",
+            description = "Synchronously probes reachability and authentication against a real endpoint"
+                    + " without scanning or persisting anything.")
     @PostMapping("/test-connection")
     @PreAuthorize(SOURCE_EDIT)
     public ConnectionTestResponse testConnection(
@@ -63,6 +73,10 @@ public class ScanController {
     }
 
     /** Starts an async scan; returns 202 with the job id to poll. */
+    @Operation(
+            summary = "Start a discovery scan",
+            description = "Starts an asynchronous scan of the endpoint's address space and returns 202 Accepted"
+                    + " with a Location header and the job id to poll.")
     @PostMapping
     @PreAuthorize(SOURCE_EDIT)
     public ResponseEntity<StartScanResponse> startScan(
@@ -81,6 +95,10 @@ public class ScanController {
     }
 
     /** Polls a scan job: progress while running, then results/states. */
+    @Operation(
+            summary = "Poll a scan job",
+            description = "Returns the scan job's status while running, then its discovered nodes and counts"
+                    + " once complete.")
     @GetMapping("/{jobId}")
     @PreAuthorize(OBSERVE)
     public ScanJobResponse get(@PathVariable String projectId, @PathVariable String jobId) {
@@ -92,6 +110,11 @@ public class ScanController {
      * discovered nodes must be addressed via {@code typeResolutions} (assign a type
      * or exclude); an unresolved unknown node rejects the request (400).
      */
+    @Operation(
+            summary = "Create data source from scan",
+            description = "Materializes a data source from a completed scan's discovered nodes,"
+                    + " applying type resolutions for unknown-typed nodes. Returns 201 Created with a"
+                    + " Location header.")
     @PostMapping("/{jobId}/create")
     @PreAuthorize(SOURCE_EDIT)
     public ResponseEntity<DataSourceResponse> create(

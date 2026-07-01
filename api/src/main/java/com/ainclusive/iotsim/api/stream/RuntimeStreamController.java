@@ -1,6 +1,8 @@
 package com.ainclusive.iotsim.api.stream;
 
 import com.ainclusive.iotsim.api.security.Permission;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -18,6 +20,9 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
  * <p>Authorization (IS-077): read-only SSE — {@link Permission#OBSERVE} (user + admin).
  */
 @RestController
+@Tag(name = "Streams (SSE)",
+        description = "Server-Sent Events (SSE) streams for live push updates: client connect/disconnect,"
+                + " runtime state and health transitions, and value changes.")
 public class RuntimeStreamController {
 
     private static final String OBSERVE =
@@ -32,6 +37,9 @@ public class RuntimeStreamController {
         this.runtimeState = runtimeState;
     }
 
+    @Operation(summary = "Stream runtime state and health transitions",
+            description = "Opens a Server-Sent Events (text/event-stream) stream that stays open and pushes live"
+                    + " runtime state and health transitions for the project.")
     @GetMapping(value = "/api/v1/projects/{projectId}/stream/runtime",
             produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @PreAuthorize(OBSERVE)

@@ -5,6 +5,8 @@ import com.ainclusive.iotsim.api.security.Permission;
 import com.ainclusive.iotsim.domain.project.Project;
 import com.ainclusive.iotsim.domain.project.ProjectService;
 import com.ainclusive.iotsim.domain.support.Page;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.net.URI;
 import java.time.Instant;
 import org.springframework.http.ResponseEntity;
@@ -31,6 +33,9 @@ import org.springframework.web.bind.annotation.RestController;
  * </ul>
  */
 @RestController
+@Tag(name = "Projects", description = "Create, read, update, duplicate, archive, and delete simulation projects"
+        + " — the top-level container for data sources, scenarios, recordings, and runs."
+        + " Uses ETag / If-Match optimistic concurrency.")
 @RequestMapping("/api/v1/projects")
 public class ProjectController {
 
@@ -47,6 +52,9 @@ public class ProjectController {
         this.projects = projects;
     }
 
+    @Operation(summary = "List projects",
+            description = "Returns a page of projects, optionally filtered by status."
+                    + " Uses cursor-based pagination via the cursor and limit query parameters.")
     @GetMapping
     @PreAuthorize(OBSERVE)
     public Page<ProjectResponse> list(
@@ -57,6 +65,9 @@ public class ProjectController {
                 .map(ProjectResponse::from);
     }
 
+    @Operation(summary = "Create a project",
+            description = "Creates a new project from the supplied name and optional description."
+                    + " Responds 201 Created with a Location header and an ETag for the new version.")
     @PostMapping
     @PreAuthorize(PROJECT_EDIT)
     public ResponseEntity<ProjectResponse> create(@RequestBody CreateProjectRequest req) {
@@ -69,6 +80,8 @@ public class ProjectController {
                 .body(ProjectResponse.from(p));
     }
 
+    @Operation(summary = "Get a project",
+            description = "Returns a single project by id, with an ETag carrying its current version.")
     @GetMapping("/{id}")
     @PreAuthorize(OBSERVE)
     public ResponseEntity<ProjectResponse> get(@PathVariable String id) {
@@ -76,6 +89,9 @@ public class ProjectController {
         return ResponseEntity.ok().eTag(etag(p.version())).body(ProjectResponse.from(p));
     }
 
+    @Operation(summary = "Update a project",
+            description = "Updates a project's name and description. Requires an If-Match header carrying"
+                    + " the current version for optimistic concurrency; returns 428 when it is missing.")
     @PutMapping("/{id}")
     @PreAuthorize(PROJECT_EDIT)
     public ResponseEntity<ProjectResponse> update(
@@ -89,6 +105,9 @@ public class ProjectController {
         return ResponseEntity.ok().eTag(etag(p.version())).body(ProjectResponse.from(p));
     }
 
+    @Operation(summary = "Duplicate a project",
+            description = "Creates a copy of the project and its contents as a new project."
+                    + " Responds 201 Created with a Location header and an ETag for the new version.")
     @PostMapping("/{id}/duplicate")
     @PreAuthorize(PROJECT_EDIT)
     public ResponseEntity<ProjectResponse> duplicate(@PathVariable String id) {
@@ -98,6 +117,8 @@ public class ProjectController {
                 .body(ProjectResponse.from(p));
     }
 
+    @Operation(summary = "Archive a project",
+            description = "Marks the project as archived and returns it with an ETag for its new version.")
     @PostMapping("/{id}/archive")
     @PreAuthorize(PROJECT_EDIT)
     public ResponseEntity<ProjectResponse> archive(@PathVariable String id) {
@@ -105,6 +126,8 @@ public class ProjectController {
         return ResponseEntity.ok().eTag(etag(p.version())).body(ProjectResponse.from(p));
     }
 
+    @Operation(summary = "Delete a project",
+            description = "Permanently deletes the project and its contents, responding 204 No Content.")
     @DeleteMapping("/{id}")
     @PreAuthorize(PROJECT_EDIT)
     public ResponseEntity<Void> delete(@PathVariable String id) {
