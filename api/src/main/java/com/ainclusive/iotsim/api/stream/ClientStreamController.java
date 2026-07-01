@@ -3,6 +3,8 @@ package com.ainclusive.iotsim.api.stream;
 import com.ainclusive.iotsim.api.clients.ClientConnectionDto;
 import com.ainclusive.iotsim.api.security.Permission;
 import com.ainclusive.iotsim.domain.clientobservation.ClientObservationService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.http.MediaType;
@@ -22,6 +24,9 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
  * <p>Authorization (IS-077): read-only SSE — {@link Permission#OBSERVE} (user + admin).
  */
 @RestController
+@Tag(name = "Streams (SSE)",
+        description = "Server-Sent Events (SSE) streams for live push updates: client connect/disconnect,"
+                + " runtime state and health transitions, and value changes.")
 public class ClientStreamController {
 
     private static final String OBSERVE =
@@ -36,6 +41,9 @@ public class ClientStreamController {
         this.clients = clients;
     }
 
+    @Operation(summary = "Stream client connect/disconnect events",
+            description = "Opens a Server-Sent Events (text/event-stream) stream that stays open and pushes an"
+                    + " initial client snapshot followed by live connect/disconnect deltas for the source.")
     @GetMapping(value = "/api/v1/data-sources/{id}/stream/clients",
             produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @PreAuthorize(OBSERVE)

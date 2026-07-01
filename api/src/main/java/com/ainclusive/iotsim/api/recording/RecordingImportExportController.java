@@ -4,6 +4,8 @@ import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.domain.recording.Recording;
 import com.ainclusive.iotsim.domain.recording.RecordingBundle;
 import com.ainclusive.iotsim.domain.recording.RecordingImportExportService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.io.IOException;
 import java.net.URI;
 import java.time.Instant;
@@ -34,6 +36,11 @@ import org.springframework.web.multipart.MultipartFile;
  * serves the previously-stored blob (404 before first export).
  */
 @RestController
+@Tag(
+        name = "Recording Import/Export",
+        description =
+                "Export a recording as a ZIP, download a previously exported ZIP,"
+                + " and import a recording ZIP.")
 @RequestMapping("/api/v1/projects/{projectId}/recordings")
 public class RecordingImportExportController {
 
@@ -54,6 +61,11 @@ public class RecordingImportExportController {
      * Builds and streams a recording export ZIP (re-builds on every call so the
      * export always reflects the current timeline state).
      */
+    @Operation(
+            summary = "Export a recording",
+            description =
+                    "Rebuilds the export ZIP from the current timeline data, stores it in the object"
+                    + " store, then streams it as an attachment. Re-builds on every call.")
     @PostMapping("/{id}/export")
     @PreAuthorize(IMPORT_EXPORT)
     public ResponseEntity<InputStreamResource> export(
@@ -65,6 +77,11 @@ public class RecordingImportExportController {
     /**
      * Serves a previously-built export ZIP from the object store; 404 if not yet exported.
      */
+    @Operation(
+            summary = "Download exported ZIP",
+            description =
+                    "Streams the previously stored export ZIP from the object store."
+                    + " Returns 404 if the recording has not been exported yet.")
     @GetMapping("/{id}/download")
     @PreAuthorize(OBSERVE)
     public ResponseEntity<InputStreamResource> download(
@@ -78,6 +95,11 @@ public class RecordingImportExportController {
      * Imports a recording from a multipart ZIP upload.
      * Returns 201 with the new recording resource.
      */
+    @Operation(
+            summary = "Import a recording",
+            description =
+                    "Imports a recording from a multipart ZIP upload (the file part) and"
+                    + " returns 201 with the new recording resource.")
     @PostMapping("/import")
     @PreAuthorize(IMPORT_EXPORT)
     public ResponseEntity<RecordingResponse> importRecording(

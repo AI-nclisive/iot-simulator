@@ -1,5 +1,7 @@
 package com.ainclusive.iotsim.api.meta;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.Map;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -11,9 +13,14 @@ import org.springframework.web.bind.annotation.RestController;
  * Path-based major versioning at /api/v1 (decision D7).
  */
 @RestController
+@Tag(name = "Meta", description = "Lightweight metadata endpoint confirming the versioned API surface"
+        + " is reachable.")
 @RequestMapping("/api/v1")
 public class MetaController {
 
+    @Operation(summary = "Get API metadata",
+            description = "Returns the application name and API version, confirming the versioned"
+                    + " API surface is wired and reachable.")
     @GetMapping("/meta")
     public Map<String, String> meta() {
         return Map.of(

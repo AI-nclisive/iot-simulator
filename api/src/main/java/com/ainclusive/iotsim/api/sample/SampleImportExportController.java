@@ -5,6 +5,8 @@ import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.domain.sample.Sample;
 import com.ainclusive.iotsim.domain.sample.SampleBundle;
 import com.ainclusive.iotsim.domain.sample.SampleImportExportService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.io.IOException;
 import java.net.URI;
 import java.time.Instant;
@@ -35,6 +37,8 @@ import org.springframework.web.multipart.MultipartFile;
  * download — {@link Permission#OBSERVE} (user + admin).
  */
 @RestController
+@Tag(name = "Sample Import/Export",
+        description = "Export a sample as a ZIP, download a previously exported ZIP, and import a sample ZIP.")
 @RequestMapping("/api/v1/projects/{projectId}/samples")
 public class SampleImportExportController {
 
@@ -54,6 +58,8 @@ public class SampleImportExportController {
     /**
      * Builds and streams a sample export ZIP.
      */
+    @Operation(summary = "Export a sample as a ZIP",
+            description = "Rebuilds and stores the sample bundle, then streams it back as an attachment ZIP.")
     @PostMapping("/{id}/export")
     @PreAuthorize(IMPORT_EXPORT)
     public ResponseEntity<InputStreamResource> export(
@@ -65,6 +71,8 @@ public class SampleImportExportController {
     /**
      * Serves a previously-built export ZIP from the object store; 404 if not yet exported.
      */
+    @Operation(summary = "Download a previously exported ZIP",
+            description = "Streams the previously stored sample bundle ZIP; returns 404 before the first export.")
     @GetMapping("/{id}/download")
     @PreAuthorize(OBSERVE)
     public ResponseEntity<InputStreamResource> download(
@@ -78,6 +86,8 @@ public class SampleImportExportController {
      * Imports a sample from a multipart ZIP upload.
      * Returns 201 with the new sample resource.
      */
+    @Operation(summary = "Import a sample ZIP",
+            description = "Imports a sample from a multipart ZIP upload and returns 201 Created with the new sample.")
     @PostMapping("/import")
     @PreAuthorize(IMPORT_EXPORT)
     public ResponseEntity<SampleResponse> importSample(

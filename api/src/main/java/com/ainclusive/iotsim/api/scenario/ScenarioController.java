@@ -12,6 +12,8 @@ import com.ainclusive.iotsim.domain.scenario.ScenarioValidationService;
 import com.ainclusive.iotsim.domain.scenario.StepOutcome;
 import com.ainclusive.iotsim.domain.scenario.ValidationIssue;
 import com.ainclusive.iotsim.domain.support.Page;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.net.URI;
 import java.time.Instant;
 import java.util.List;
@@ -35,6 +37,8 @@ import org.springframework.web.bind.annotation.RestController;
  * create/update/delete/duplicate — {@link Permission#SCENARIO_EDIT} (admin).
  */
 @RestController
+@Tag(name = "Scenarios", description = "Create, read, update, duplicate, validate, and run synthetic scenarios"
+        + " that script value changes over time.")
 @RequestMapping("/api/v1/projects/{projectId}/scenarios")
 public class ScenarioController {
 
@@ -59,6 +63,8 @@ public class ScenarioController {
         this.runService = runService;
     }
 
+    @Operation(summary = "List scenarios",
+            description = "Returns scenarios in the project using cursor-based pagination (cursor and limit).")
     @GetMapping
     @PreAuthorize(OBSERVE)
     public Page<ScenarioResponse> list(
@@ -68,6 +74,9 @@ public class ScenarioController {
         return scenarios.listPaged(projectId, cursor, limit).map(ScenarioResponse::from);
     }
 
+    @Operation(summary = "Create a scenario",
+            description = "Creates a scenario (the name field is required). Responds 201 Created with a Location"
+                    + " header and an ETag of the current version.")
     @PostMapping
     @PreAuthorize(SCENARIO_EDIT)
     public ResponseEntity<ScenarioResponse> create(
@@ -83,6 +92,9 @@ public class ScenarioController {
                 .body(ScenarioResponse.from(s));
     }
 
+    @Operation(summary = "Get a scenario",
+            description = "Returns a single scenario by id, with an ETag of its current version for optimistic"
+                    + " concurrency.")
     @GetMapping("/{id}")
     @PreAuthorize(OBSERVE)
     public ResponseEntity<ScenarioResponse> get(@PathVariable String projectId, @PathVariable String id) {
@@ -90,6 +102,9 @@ public class ScenarioController {
         return ResponseEntity.ok().eTag(etag(s.version())).body(ScenarioResponse.from(s));
     }
 
+    @Operation(summary = "Update a scenario",
+            description = "Partially updates a scenario; only provided fields change. Requires an If-Match header"
+                    + " carrying the current version for optimistic concurrency.")
     @PatchMapping("/{id}")
     @PreAuthorize(SCENARIO_EDIT)
     public ResponseEntity<ScenarioResponse> update(
@@ -108,6 +123,8 @@ public class ScenarioController {
         return ResponseEntity.ok().eTag(etag(s.version())).body(ScenarioResponse.from(s));
     }
 
+    @Operation(summary = "Delete a scenario",
+            description = "Deletes the scenario and responds 204 No Content.")
     @DeleteMapping("/{id}")
     @PreAuthorize(SCENARIO_EDIT)
     public ResponseEntity<Void> delete(@PathVariable String projectId, @PathVariable String id) {
@@ -115,6 +132,9 @@ public class ScenarioController {
         return ResponseEntity.noContent().build();
     }
 
+    @Operation(summary = "Duplicate a scenario",
+            description = "Creates a copy of the scenario. Responds 201 Created with a Location header and an ETag"
+                    + " of the new scenario's version.")
     @PostMapping("/{id}/duplicate")
     @PreAuthorize(SCENARIO_EDIT)
     public ResponseEntity<ScenarioResponse> duplicate(
@@ -126,12 +146,16 @@ public class ScenarioController {
                 .body(ScenarioResponse.from(s));
     }
 
+    @Operation(summary = "Validate a scenario",
+            description = "Validates the scenario without running it, returning a status and any validation issues.")
     @GetMapping("/{id}/validate")
     @PreAuthorize(OBSERVE)
     public ScenarioValidationResponse validate(@PathVariable String projectId, @PathVariable String id) {
         return ScenarioValidationResponse.from(validationService.validate(projectId, id));
     }
 
+    @Operation(summary = "Run a scenario",
+            description = "Starts a scenario run and returns its summary, including the per-step outcomes.")
     @PostMapping("/{id}/run")
     @PreAuthorize(REPLAY_START)
     public ScenarioRunResponse run(@PathVariable String projectId, @PathVariable String id,

@@ -2,6 +2,8 @@ package com.ainclusive.iotsim.api.activerun;
 
 import com.ainclusive.iotsim.domain.activerun.ActiveRun;
 import com.ainclusive.iotsim.domain.activerun.ActiveRunService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -15,6 +17,8 @@ import org.springframework.web.bind.annotation.RestController;
  * <p>GET /api/v1/projects/{projectId}/active-runs → {@code ActiveRunsResponse}
  */
 @RestController
+@Tag(name = "Active Runs", description = "Read-only dashboard view of the currently active (RUNNING or QUEUED)"
+        + " runs in a project.")
 @RequestMapping("/api/v1/projects/{projectId}/active-runs")
 public class ActiveRunController {
 
@@ -24,6 +28,8 @@ public class ActiveRunController {
         this.activeRunService = activeRunService;
     }
 
+    @Operation(summary = "List active runs",
+            description = "Returns the currently active (RUNNING or QUEUED) runs for the project as a dashboard view.")
     @GetMapping
     public ActiveRunsResponse list(@PathVariable String projectId) {
         List<ActiveRunResponse> items = activeRunService.getActiveRuns(projectId)

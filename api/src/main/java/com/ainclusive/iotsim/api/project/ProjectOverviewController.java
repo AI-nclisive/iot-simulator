@@ -3,6 +3,8 @@ package com.ainclusive.iotsim.api.project;
 import com.ainclusive.iotsim.api.security.Permission;
 import com.ainclusive.iotsim.domain.project.ProjectOverview;
 import com.ainclusive.iotsim.domain.project.ProjectOverviewService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,6 +21,9 @@ import org.springframework.web.bind.annotation.RestController;
  * <p>Authorization (IS-077): read-only — {@link Permission#OBSERVE} (user + admin).
  */
 @RestController
+@Tag(name = "Project Overview", description = "Read-only aggregated dashboard counts for a project:"
+        + " configured vs running sources, reusable-artifact counts, and how many sources need attention"
+        + " (unhealthy).")
 @RequestMapping("/api/v1/projects")
 public class ProjectOverviewController {
 
@@ -32,6 +37,9 @@ public class ProjectOverviewController {
         this.overview = overview;
     }
 
+    @Operation(summary = "List project overviews",
+            description = "Returns per-project aggregated counts: configured and running sources,"
+                    + " reusable artifacts, and the number of sources needing attention.")
     @GetMapping("/overview")
     @PreAuthorize(OBSERVE)
     public List<ProjectOverviewResponse> overview() {

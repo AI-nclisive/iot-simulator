@@ -4,6 +4,8 @@ import com.ainclusive.iotsim.api.security.Permission;
 import com.ainclusive.iotsim.domain.sample.Sample;
 import com.ainclusive.iotsim.domain.sample.SampleService;
 import com.ainclusive.iotsim.domain.support.Page;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.net.URI;
 import java.time.Instant;
 import java.util.List;
@@ -25,6 +27,8 @@ import org.springframework.web.bind.annotation.RestController;
  * create/delete — {@link Permission#SOURCE_EDIT} (admin: editing recording data).
  */
 @RestController
+@Tag(name = "Samples",
+        description = "List, read, create, and delete reusable value samples used to seed source values and scenarios.")
 @RequestMapping("/api/v1/projects/{projectId}/samples")
 public class SampleController {
 
@@ -41,6 +45,8 @@ public class SampleController {
         this.sampleService = sampleService;
     }
 
+    @Operation(summary = "List samples",
+            description = "Returns a page of samples in the project using cursor-based pagination.")
     @GetMapping
     @PreAuthorize(OBSERVE)
     public Page<SampleResponse> list(
@@ -50,6 +56,8 @@ public class SampleController {
         return sampleService.listPaged(projectId, cursor, limit).map(SampleResponse::from);
     }
 
+    @Operation(summary = "Create a sample",
+            description = "Creates a new sample in the project and returns 201 Created with a Location header and ETag.")
     @PostMapping
     @PreAuthorize(SOURCE_EDIT)
     public ResponseEntity<SampleResponse> create(
@@ -65,6 +73,8 @@ public class SampleController {
                 .body(SampleResponse.from(sample));
     }
 
+    @Operation(summary = "Get a sample",
+            description = "Returns a single sample by id, with its current version as the ETag.")
     @GetMapping("/{id}")
     @PreAuthorize(OBSERVE)
     public ResponseEntity<SampleResponse> get(@PathVariable String projectId, @PathVariable String id) {
@@ -72,6 +82,8 @@ public class SampleController {
         return ResponseEntity.ok().eTag(etag(sample.version())).body(SampleResponse.from(sample));
     }
 
+    @Operation(summary = "Delete a sample",
+            description = "Deletes the sample by id and returns 204 No Content.")
     @DeleteMapping("/{id}")
     @PreAuthorize(SOURCE_EDIT)
     public ResponseEntity<Void> delete(@PathVariable String projectId, @PathVariable String id) {

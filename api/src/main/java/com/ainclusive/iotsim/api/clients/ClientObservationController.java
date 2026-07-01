@@ -2,6 +2,8 @@ package com.ainclusive.iotsim.api.clients;
 
 import com.ainclusive.iotsim.api.security.Permission;
 import com.ainclusive.iotsim.domain.clientobservation.ClientObservationService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,6 +20,9 @@ import org.springframework.web.bind.annotation.RestController;
  * <p>Authorization (IS-077): read-only — {@link Permission#OBSERVE} (user + admin).
  */
 @RestController
+@Tag(name = "Client Observations",
+        description = "Point-in-time view of clients currently connected to a simulated source,"
+                + " plus the full connection history.")
 public class ClientObservationController {
 
     private static final String OBSERVE =
@@ -33,6 +38,9 @@ public class ClientObservationController {
     // An unknown {id} returns 200 with empty lists rather than 404: this mirrors the
     // sibling SSE observability endpoints (/stream/{values,clients,runtime}), spec 05
     // does not require 404 here, and empty lists are an unambiguous "no clients" answer.
+    @Operation(summary = "Get connected clients and history",
+            description = "Returns a point-in-time snapshot of clients connected to the source plus the full"
+                    + " connection history; live connect/disconnect events are on the SSE stream instead.")
     @GetMapping("/api/v1/data-sources/{id}/clients")
     @PreAuthorize(OBSERVE)
     public ClientsResponse clients(@PathVariable String id) {

@@ -1,6 +1,8 @@
 package com.ainclusive.iotsim.api.stream;
 
 import com.ainclusive.iotsim.api.security.Permission;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,6 +23,9 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
  * <p>Authorization (IS-077): read-only SSE — {@link Permission#OBSERVE} (user + admin).
  */
 @RestController
+@Tag(name = "Streams (SSE)",
+        description = "Server-Sent Events (SSE) streams for live push updates: client connect/disconnect,"
+                + " runtime state and health transitions, and value changes.")
 public class ValuesStreamController {
 
     private static final String OBSERVE =
@@ -40,6 +45,9 @@ public class ValuesStreamController {
         this.store = store;
     }
 
+    @Operation(summary = "Stream value changes",
+            description = "Opens a Server-Sent Events (text/event-stream) stream that stays open and pushes an"
+                    + " initial values snapshot followed by live value-change deltas for the source.")
     @GetMapping(value = "/api/v1/data-sources/{id}/stream/values",
             produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @PreAuthorize(OBSERVE)

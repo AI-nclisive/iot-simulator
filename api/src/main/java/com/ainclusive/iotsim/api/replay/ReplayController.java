@@ -4,6 +4,8 @@ import com.ainclusive.iotsim.api.security.Permission;
 import com.ainclusive.iotsim.domain.replay.ReplayService;
 import com.ainclusive.iotsim.domain.replay.ReplaySummary;
 import com.ainclusive.iotsim.protocolmodel.DeterministicSettings;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.Instant;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -19,6 +21,9 @@ import org.springframework.web.bind.annotation.RestController;
  * {@link Permission#REPLAY_START} (user + admin).
  */
 @RestController
+@Tag(
+        name = "Replay",
+        description = "Replay a recorded timeline back through a data source.")
 @RequestMapping("/api/v1/projects/{projectId}/data-sources/{dataSourceId}/replay")
 public class ReplayController {
 
@@ -32,6 +37,12 @@ public class ReplayController {
         this.replays = replays;
     }
 
+    @Operation(
+            summary = "Start a replay",
+            description =
+                    "Replays the given recording through the data source, optionally with a"
+                    + " deterministic seed and start-time (both or neither). Returns a summary"
+                    + " including the run and evidence ids.")
     @PostMapping
     @PreAuthorize(REPLAY_START)
     public ReplayResponse replay(

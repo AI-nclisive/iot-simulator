@@ -6,6 +6,8 @@ import com.ainclusive.iotsim.domain.run.RunView;
 import com.ainclusive.iotsim.domain.run.SourceState;
 import com.ainclusive.iotsim.domain.run.StartRunCommand;
 import com.ainclusive.iotsim.domain.support.Page;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
@@ -21,6 +23,8 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 /** Unified runs resource + test-control for automation (backend-specs/05, IS-089). */
 @RestController
+@Tag(name = "Runs", description = "Unified runs resource and automation test-control: list and inspect runs,"
+        + " read live run/source state, and start or stop a run of any kind.")
 @RequestMapping("/api/v1/projects/{projectId}/runs")
 public class RunController {
 
@@ -40,6 +44,8 @@ public class RunController {
         this.runs = runs;
     }
 
+    @Operation(summary = "List runs",
+            description = "Returns runs in the project using cursor-based pagination (cursor and limit).")
     @GetMapping
     @PreAuthorize(OBSERVE)
     public Page<RunResponse> list(@PathVariable String projectId,
@@ -48,24 +54,33 @@ public class RunController {
         return runs.listPaged(projectId, cursor, limit).map(RunResponse::from);
     }
 
+    @Operation(summary = "Get a run",
+            description = "Returns a single run by id within the project.")
     @GetMapping("/{id}")
     @PreAuthorize(OBSERVE)
     public RunResponse get(@PathVariable String projectId, @PathVariable String id) {
         return RunResponse.from(runs.get(projectId, id));
     }
 
+    @Operation(summary = "Get live run state",
+            description = "Returns the live run state along with the per-source state for each source in the run.")
     @GetMapping("/{id}/state")
     @PreAuthorize(OBSERVE)
     public RunStateResponse state(@PathVariable String projectId, @PathVariable String id) {
         return RunStateResponse.from(runs.stateOf(projectId, id));
     }
 
+    @Operation(summary = "Stop a run",
+            description = "Stops the given run and returns its updated state.")
     @PostMapping("/{id}/stop")
     @PreAuthorize(REPLAY_STOP)
     public RunResponse stop(@PathVariable String projectId, @PathVariable String id) {
         return RunResponse.from(runs.stop(projectId, id));
     }
 
+    @Operation(summary = "Start a run",
+            description = "Starts a run of the given kind (the kind field is required). Responds 201 Created with a"
+                    + " Location header pointing to the new run.")
     @PostMapping
     @PreAuthorize(REPLAY_START)
     public ResponseEntity<RunResponse> start(@PathVariable String projectId, @RequestBody StartRunRequest req) {

@@ -5,6 +5,8 @@ import com.ainclusive.iotsim.api.security.Permission;
 import com.ainclusive.iotsim.domain.datasource.DataSource;
 import com.ainclusive.iotsim.domain.synthetic.SyntheticConfig;
 import com.ainclusive.iotsim.domain.synthetic.SyntheticSourceService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.net.URI;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -21,6 +23,10 @@ import org.springframework.web.bind.annotation.RestController;
  * {@link Permission#SOURCE_EDIT}.
  */
 @RestController
+@Tag(
+        name = "Synthetic Sources",
+        description = "Create a data source backed by a synthetic (generated) value profile rather than a"
+                + " real captured endpoint.")
 @RequestMapping("/api/v1/projects/{projectId}/data-sources/synthetic")
 public class SyntheticSourceController {
 
@@ -34,6 +40,10 @@ public class SyntheticSourceController {
         this.syntheticSources = syntheticSources;
     }
 
+    @Operation(
+            summary = "Create a synthetic data source",
+            description = "Creates a data source backed by a synthetic value profile from the supplied config."
+                    + " Returns 201 Created with a Location header and the current ETag.")
     @PostMapping
     @PreAuthorize(SOURCE_EDIT)
     public ResponseEntity<DataSourceResponse> create(

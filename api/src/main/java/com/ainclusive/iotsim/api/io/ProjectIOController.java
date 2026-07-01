@@ -6,6 +6,8 @@ import com.ainclusive.iotsim.domain.io.ProjectExportService;
 import com.ainclusive.iotsim.domain.io.ProjectImportException;
 import com.ainclusive.iotsim.domain.io.ProjectImportService;
 import com.ainclusive.iotsim.domain.project.Project;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -39,6 +41,9 @@ import org.springframework.web.multipart.MultipartFile;
  * <p>Authorization (IS-077): both endpoints require {@link Permission#IMPORT_EXPORT} (admin).
  */
 @RestController
+@Tag(name = "Project Import/Export",
+        description = "Export a whole project as a versioned, secret-free ZIP and import one back"
+                + " as a new project.")
 @RequestMapping("/api/v1/projects")
 public class ProjectIOController {
 
@@ -61,6 +66,9 @@ public class ProjectIOController {
      * <p>Returns the ZIP with {@code Content-Disposition: attachment} so clients
      * get a direct download. Responds 404 if the project does not exist.
      */
+    @Operation(summary = "Export a project",
+            description = "Streams the project as a versioned, secret-free ZIP bundle with a"
+                    + " Content-Disposition attachment header for direct download.")
     @PostMapping("/{id}/export")
     @PreAuthorize(IMPORT_EXPORT)
     public ResponseEntity<InputStreamResource> export(@PathVariable String id) {
@@ -81,6 +89,9 @@ public class ProjectIOController {
      * the ZIP. Returns 201 Created with the newly created project representation.
      * Responds 422 if the ZIP is malformed or uses an unsupported format version.
      */
+    @Operation(summary = "Import a project",
+            description = "Accepts a multipart ZIP upload and creates a new project from it,"
+                    + " responding 201 Created with a Location header for the new project.")
     @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize(IMPORT_EXPORT)
     public ResponseEntity<ImportedProjectResponse> importProject(

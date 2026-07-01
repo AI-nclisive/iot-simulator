@@ -5,6 +5,8 @@ import com.ainclusive.iotsim.domain.runtimeevent.RuntimeEventHistoryPage;
 import com.ainclusive.iotsim.domain.runtimeevent.RuntimeEventHistoryRequest;
 import com.ainclusive.iotsim.domain.runtimeevent.RuntimeEventHistoryService;
 import com.ainclusive.iotsim.domain.runtimeevent.RuntimeEventView;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -27,6 +29,8 @@ import tools.jackson.databind.ObjectMapper;
  * <p>Authorization (IS-077): read-only — {@link Permission#OBSERVE} (user + admin).
  */
 @RestController
+@Tag(name = "Runtime Events",
+        description = "Read the historical runtime event log (state transitions and errors) for a project.")
 @RequestMapping("/api/v1/projects")
 public class RuntimeEventHistoryController {
 
@@ -42,6 +46,9 @@ public class RuntimeEventHistoryController {
         this.json = json;
     }
 
+    @Operation(summary = "List runtime event history",
+            description = "Returns a page of the project's historical runtime events, filterable by source, run,"
+                    + " type and time window, using cursor-based pagination; live events are on the SSE stream.")
     @GetMapping("/{projectId}/runtime-events")
     @PreAuthorize(OBSERVE)
     public RuntimeEventHistoryResponse runtimeEvents(

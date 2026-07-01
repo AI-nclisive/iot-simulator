@@ -12,6 +12,8 @@ import com.ainclusive.iotsim.protocolmodel.DataType;
 import com.ainclusive.iotsim.protocolmodel.NodeKind;
 import com.ainclusive.iotsim.protocolmodel.SchemaNode;
 import com.ainclusive.iotsim.protocolmodel.ValueRank;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.net.URI;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -43,6 +45,11 @@ import org.springframework.web.bind.annotation.RestController;
  * </ul>
  */
 @RestController
+@Tag(
+        name = "Data Sources",
+        description = "Create, read, update, duplicate, and delete simulated data sources within a project,"
+                + " plus start/stop their runtime and manage credentials."
+                + " Uses ETag / If-Match optimistic concurrency.")
 @RequestMapping("/api/v1/projects/{projectId}/data-sources")
 public class DataSourceController {
 
@@ -65,6 +72,10 @@ public class DataSourceController {
         this.dataSources = dataSources;
     }
 
+    @Operation(
+            summary = "List data sources",
+            description = "Returns data sources in the project, optionally filtered by protocol,"
+                    + " using cursor-based pagination.")
     @GetMapping
     @PreAuthorize(OBSERVE)
     public Page<DataSourceResponse> list(
@@ -76,6 +87,10 @@ public class DataSourceController {
                 .map(DataSourceResponse::from);
     }
 
+    @Operation(
+            summary = "Create a data source",
+            description = "Creates a data source in the project, optionally with an initial schema."
+                    + " Returns 201 Created with a Location header and the current ETag.")
     @PostMapping
     @PreAuthorize(SOURCE_EDIT)
     public ResponseEntity<DataSourceResponse> create(
@@ -96,6 +111,9 @@ public class DataSourceController {
                 .body(DataSourceResponse.from(ds));
     }
 
+    @Operation(
+            summary = "Get a data source",
+            description = "Returns a single data source by id, with its current version as the ETag.")
     @GetMapping("/{id}")
     @PreAuthorize(OBSERVE)
     public ResponseEntity<DataSourceResponse> get(@PathVariable String projectId, @PathVariable String id) {
@@ -103,6 +121,10 @@ public class DataSourceController {
         return ResponseEntity.ok().eTag(etag(ds.version())).body(DataSourceResponse.from(ds));
     }
 
+    @Operation(
+            summary = "Update a data source",
+            description = "Updates a data source's mutable fields. Requires an If-Match header carrying the"
+                    + " current version for optimistic concurrency; returns the new ETag.")
     @PutMapping("/{id}")
     @PreAuthorize(SOURCE_EDIT)
     public ResponseEntity<DataSourceResponse> update(
@@ -118,6 +140,9 @@ public class DataSourceController {
         return ResponseEntity.ok().eTag(etag(ds.version())).body(DataSourceResponse.from(ds));
     }
 
+    @Operation(
+            summary = "Delete a data source",
+            description = "Deletes a data source and returns 204 No Content.")
     @DeleteMapping("/{id}")
     @PreAuthorize(SOURCE_EDIT)
     public ResponseEntity<Void> delete(@PathVariable String projectId, @PathVariable String id) {
@@ -126,6 +151,10 @@ public class DataSourceController {
     }
 
     /** Clears any held connection credentials ("clear value" in the Credential Handling surface). */
+    @Operation(
+            summary = "Clear stored credentials",
+            description = "Clears any stored connection credentials for the data source and returns"
+                    + " its updated state.")
     @DeleteMapping("/{id}/credentials")
     @PreAuthorize(SOURCE_EDIT)
     public ResponseEntity<DataSourceResponse> clearCredentials(
@@ -139,6 +168,10 @@ public class DataSourceController {
      * The copy gets a new ID, name {@code "<original name> (copy)"}, enabled=false, and STOPPED state.
      * Schema nodes are copied when present. Returns 201 with the new resource. See IS-066.
      */
+    @Operation(
+            summary = "Duplicate a data source",
+            description = "Deep-copies the data source within the same project, giving the copy a new id,"
+                    + " a \"(copy)\" name, disabled and STOPPED. Returns 201 Created with a Location header.")
     @PostMapping("/{id}/duplicate")
     @PreAuthorize(SOURCE_EDIT)
     public ResponseEntity<DataSourceResponse> duplicate(@PathVariable String projectId, @PathVariable String id) {
@@ -149,6 +182,9 @@ public class DataSourceController {
                 .body(DataSourceResponse.from(ds));
     }
 
+    @Operation(
+            summary = "Start the data source runtime",
+            description = "Spawns the runtime worker for the data source and returns its updated runtime state.")
     @PostMapping("/{id}/start")
     @PreAuthorize(SOURCE_START)
     public ResponseEntity<DataSourceResponse> start(@PathVariable String projectId, @PathVariable String id) {
@@ -156,6 +192,10 @@ public class DataSourceController {
         return ResponseEntity.ok().eTag(etag(ds.version())).body(DataSourceResponse.from(ds));
     }
 
+    @Operation(
+            summary = "Stop the data source runtime",
+            description = "Stops the running runtime worker for the data source and returns its updated"
+                    + " runtime state.")
     @PostMapping("/{id}/stop")
     @PreAuthorize(SOURCE_STOP)
     public ResponseEntity<DataSourceResponse> stop(@PathVariable String projectId, @PathVariable String id) {

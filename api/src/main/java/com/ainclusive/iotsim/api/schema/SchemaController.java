@@ -8,6 +8,8 @@ import com.ainclusive.iotsim.protocolmodel.DataType;
 import com.ainclusive.iotsim.protocolmodel.NodeKind;
 import com.ainclusive.iotsim.protocolmodel.SchemaNode;
 import com.ainclusive.iotsim.protocolmodel.ValueRank;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
@@ -26,6 +28,9 @@ import org.springframework.web.bind.annotation.RestController;
  * <p>Authorization (IS-077): GET — {@link Permission#OBSERVE}; PUT — {@link Permission#SCHEMA_EDIT}.
  */
 @RestController
+@Tag(
+        name = "Source Schema",
+        description = "Read or replace the value schema (address space / tag layout) of a data source.")
 @RequestMapping("/api/v1/projects/{projectId}/data-sources/{dataSourceId}/schema")
 public class SchemaController {
 
@@ -42,6 +47,9 @@ public class SchemaController {
         this.schemas = schemas;
     }
 
+    @Operation(
+            summary = "Get the source schema",
+            description = "Returns the current value schema of the data source, with its version as the ETag.")
     @GetMapping
     @PreAuthorize(OBSERVE)
     public ResponseEntity<SchemaResponse> get(
@@ -50,6 +58,10 @@ public class SchemaController {
         return ResponseEntity.ok().eTag(etag(schema.version())).body(SchemaResponse.from(schema));
     }
 
+    @Operation(
+            summary = "Replace the source schema",
+            description = "Replaces the data source's schema with the supplied nodes, saving a new version"
+                    + " and returning the updated ETag.")
     @PutMapping
     @PreAuthorize(SCHEMA_EDIT)
     public ResponseEntity<SchemaResponse> save(
