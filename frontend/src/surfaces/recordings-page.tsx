@@ -513,7 +513,7 @@ export function RecordingsPage() {
               onExport={() => setExportDialogOpen(true)}
               onAssignToReplay={() => {
                 navigate(
-                  `data-sources/${selected.sourceId}/replay?artifactId=${selected.id}`,
+                  `/data-sources/${selected.sourceId}/replay?artifactId=${selected.id}`,
                 );
               }}
             />
