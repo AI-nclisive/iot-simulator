@@ -7,7 +7,7 @@ package com.ainclusive.iotsim.domain.run;
  * <ul>
  *   <li>REPLAY: {@code dataSourceId}, {@code recordingId}, {@code seed}, {@code startTime},
  *       {@code compatibilityAck}
- *   <li>SYNTHETIC: {@code dataSourceId}, {@code durationMs}
+ *   <li>SYNTHETIC: {@code dataSourceId}, {@code durationMs (optional cap)}
  *   <li>SCENARIO: {@code scenarioId}
  * </ul>
  */

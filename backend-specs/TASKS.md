@@ -21,7 +21,7 @@ dependency-ordered. (Optimized for "make the simulator real end to end, then
 broaden, then harden for teams" — can be re-weighted if the near-term goal
 differs.)
 
-Snapshot: **build green.** 108 done · 17 todo (125 total). Live status is the board; this line is a periodic snapshot.
+Snapshot: **build green.** 109 done · 16 todo (125 total). Live status is the board; this line is a periodic snapshot.
 
 <details>
 <summary>ID crosswalk — legacy <code>BE-*</code> / <code>SDLC-*</code> → <code>IS-XXX</code></summary>
@@ -196,7 +196,7 @@ import/export. Modbus moved to Wave G (deferred) — see the note there.
 - [x] IS-072 [BE] ✅ [project] Archive project — SPEC: Manage Projects
 - [x] IS-073 [BE] ✅ [io] Project export/import (versioned ZIP+manifest, secret-free) — 06
 - [x] IS-074 [BE] ✅ [api] Cursor pagination + filtering on collections — 05
-- [ ] IS-119 [BE] ⬜ [runtime] Run synthetic source — continuous live feed (Model B / real-time pacing); low priority, pairs with IS-069 — 02
+- [x] IS-119 [BE] ✅ [runtime] Run synthetic source — continuous live feed (Model B / real-time pacing): standalone run-synthetic + /runs kind=SYNTHETIC now start a live paced feed (until stop + optional maxDurationMs cap); bounded one-shot retained as the scenario-step primitive; pairs with IS-069 — 02
 - [x] IS-124 [BE] ✅ [runtime] OPC UA listen port from `runtimeConfig.listenPort` (deterministic endpoint) + host-wide port-uniqueness at start (`PortInUseException`→409) — 02/03. Enabler for IS-123.
 - [x] IS-125 [BE] ✅ [runtime] Supervisor-mode context boots — `@Primary` on the `runtimeController` bean resolves ambiguous `SourceScanner`/`SourceCapturer` candidates (single Supervisor under 3 bean names) + first supervisor-mode context-boot IT — 02. Enabler for IS-123.
 - [x] IS-122 [BE] ✅ [api] GET /projects/{id}/active-runs — list currently running recordings/replays/scenarios for the dashboard overview panel — 05
