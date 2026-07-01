@@ -179,6 +179,9 @@ class SyntheticLiveRunServiceTest {
 
         assertThat(runs.byId.get(s.runId()).state()).isEqualTo("FAILED");
         assertThat(failing.stopIfLive(s.runId())).isFalse(); // already removed
+        // feed.emitted is advanced before applyValues is called, so valueCount reflects
+        // the ticks that were computed (500ms / 100ms=5 + 500ms/250ms=2 = 7), not 0.
+        assertThat(evidence.byId.get(s.evidenceId()).manifestJson()).contains("\"valueCount\":7");
     }
 
     // --- fakes ---
