@@ -628,7 +628,7 @@ Parallel execution:
   Done when: start, stop, replay, synthetic, fault, wait, and marker steps fit
   the same step-editing model.
 
-- [ ] `UI-063` Fault configuration
+- [x] `UI-063` Fault configuration
   Surface: `Scenario Builder`
   Depends: `UI-062`
   Done when: target, timing, parameters, and clear behavior are understandable
