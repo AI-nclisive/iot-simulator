@@ -17,8 +17,6 @@ dependencies {
     // Jackson 3 (BOM-managed) — evidence manifests are JSON; assembly/export lives here
     // (api -> domain -> persistence), so the JSON handling does too.
     implementation("tools.jackson.core:jackson-databind")
-    // SLF4J API (BOM-managed) — structured logging for background-thread tick failures.
-    implementation("org.slf4j:slf4j-api")
 
     testImplementation(libs.mockito.core)
 }

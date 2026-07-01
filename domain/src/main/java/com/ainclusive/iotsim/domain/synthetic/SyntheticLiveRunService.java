@@ -24,8 +24,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import tools.jackson.core.JacksonException;
@@ -49,8 +47,6 @@ public class SyntheticLiveRunService {
     private final EvidenceRepository evidence;
     private final ObjectMapper json;
     private final Clock wallClock;
-
-    private static final Logger log = LoggerFactory.getLogger(SyntheticLiveRunService.class);
 
     private final ConcurrentMap<String, LiveRun> registry = new ConcurrentHashMap<>();
 
@@ -146,7 +142,6 @@ public class SyntheticLiveRunService {
                 finalizeRun(live, "COMPLETED");
             }
         } catch (RuntimeException e) {
-            log.warn("synthetic live tick failed for run {}: {}", live.runId(), e.toString(), e);
             finalizeRun(live, "FAILED");
         }
     }
