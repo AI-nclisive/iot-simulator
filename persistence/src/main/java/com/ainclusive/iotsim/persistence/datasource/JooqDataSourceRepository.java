@@ -198,8 +198,13 @@ public class JooqDataSourceRepository implements DataSourceRepository {
                 case 'b' -> sb.append('\b');
                 case 'f' -> sb.append('\f');
                 case 'u' -> {
-                    sb.append((char) Integer.parseInt(escaped.substring(i + 1, i + 5), 16));
-                    i += 4;
+                    if (i + 5 > escaped.length()) { sb.append('u'); break; }
+                    try {
+                        sb.append((char) Integer.parseInt(escaped.substring(i + 1, i + 5), 16));
+                        i += 4;
+                    } catch (NumberFormatException ignored) {
+                        sb.append('u');
+                    }
                 }
                 default -> sb.append(next);
             }
