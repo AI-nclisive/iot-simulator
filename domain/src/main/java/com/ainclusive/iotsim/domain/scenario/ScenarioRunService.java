@@ -81,9 +81,9 @@ public class ScenarioRunService {
                 .map(ScenarioStepRow::targetSourceId).filter(s -> s != null && !s.isBlank()).toList()));
 
         RunRow run = runs.create(projectId, "SCENARIO", trig, actor, sourceIds, scenarioId, null);
-        DeterministicSettings settings = parseSettings(scenario.deterministicSettings());
         List<StepOutcome> outcomes = new ArrayList<>();
         try {
+            DeterministicSettings settings = parseSettings(scenario.deterministicSettings());
             runs.start(run.id(), now());
             EvidenceRow ev = evidence.create(projectId, run.id(), actor);
             runs.linkEvidence(run.id(), ev.id());

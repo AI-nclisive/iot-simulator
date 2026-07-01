@@ -130,6 +130,26 @@ class ScenarioRunServiceTest {
     }
 
     @Test
+    void malformedStartTimeInDeterministicSettingsEndsParentRunFailed() {
+        // Scenario with a valid seed but unparseable startTime — parseSettings throws DateTimeParseException.
+        // The step list has a MARKER so the run would reach the settings parse inside the try block.
+        ScenarioRow scenarioWithBadSettings = new ScenarioRow(
+                SCENARIO, PROJECT, "Flow", "READY",
+                "{\"seed\":123,\"startTime\":\"nope\"}",
+                List.of(new ScenarioStepRow(0, "MARKER", null, "{}")),
+                OffsetDateTime.now(), OffsetDateTime.now(), "local", 1);
+        when(scenarios.findById(SCENARIO)).thenReturn(Optional.of(scenarioWithBadSettings));
+        stubValidReady();
+        RunRow parent = parentRun();
+        when(runs.create(eq(PROJECT), eq("SCENARIO"), any(), any(), any(), eq(SCENARIO), eq((String) null)))
+                .thenReturn(parent);
+
+        assertThatThrownBy(() -> service.run(PROJECT, SCENARIO, "MANUAL", "local"))
+                .isInstanceOf(RuntimeException.class);
+        verify(runs).end(eq("run-parent"), eq("FAILED"), any());
+    }
+
+    @Test
     void stepFailureEndsParentRunFailedAndSkipsRest() {
         stubScenario(
                 new ScenarioStepRow(0, "START", SOURCE, "{}"),
