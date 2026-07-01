@@ -10,6 +10,7 @@
 import {
   FAULT_PARAM_SPECS,
   describeFault,
+  isFilled,
   type FaultKind,
 } from "./scenario-faults";
 
@@ -66,12 +67,15 @@ export function FaultConfigPanel({ config, canEdit, onChange }: FaultConfigPanel
                 className="shell-field w-full"
                 type="number"
                 min={0}
+                max={param.max}
                 disabled={!canEdit}
                 value={numberValue(param.key)}
                 onChange={(e) =>
                   onChange(
                     param.key,
-                    e.target.value === "" ? undefined : Math.max(0, Number(e.target.value)),
+                    e.target.value === ""
+                      ? undefined
+                      : Math.min(param.max ?? Infinity, Math.max(0, Number(e.target.value))),
                   )
                 }
               />
@@ -157,11 +161,4 @@ export function FaultConfigPanel({ config, canEdit, onChange }: FaultConfigPanel
       </div>
     </div>
   );
-}
-
-function isFilled(v: unknown): boolean {
-  if (v === undefined || v === null) return false;
-  if (typeof v === "string") return v.trim().length > 0;
-  if (typeof v === "number") return !Number.isNaN(v);
-  return true;
 }

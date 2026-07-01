@@ -31,6 +31,8 @@ export interface FaultParamSpec {
   unit?: string;
   options?: { value: string; label: string }[];
   hint?: string;
+  /** Upper bound for number inputs (e.g. 100 for percentages). */
+  max?: number;
 }
 
 /** Per-kind parameter specs (beyond the shared timing fields). */
@@ -42,6 +44,7 @@ export const FAULT_PARAM_SPECS: Record<FaultKind, FaultParamSpec[]> = {
       kind: "number",
       required: true,
       unit: "%",
+      max: 100,
       hint: "Percentage of values silently dropped while active.",
     },
   ],
@@ -62,6 +65,7 @@ export const FAULT_PARAM_SPECS: Record<FaultKind, FaultParamSpec[]> = {
       kind: "number",
       required: true,
       unit: "%",
+      max: 100,
       hint: "Percentage of values replaced with corrupted data.",
     },
   ],
@@ -95,7 +99,7 @@ export function faultRequiredKeys(kind: FaultKind | undefined): string[] {
   return [...base, ...FAULT_PARAM_SPECS[kind].filter((p) => p.required).map((p) => p.key)];
 }
 
-function isFilled(v: unknown): boolean {
+export function isFilled(v: unknown): boolean {
   if (v === undefined || v === null) return false;
   if (typeof v === "string") return v.trim().length > 0;
   if (typeof v === "number") return !Number.isNaN(v);

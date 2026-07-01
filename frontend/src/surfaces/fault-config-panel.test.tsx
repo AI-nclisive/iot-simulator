@@ -37,6 +37,20 @@ describe("FaultConfigPanel", () => {
     expect(last[1]).toBe(0);
   });
 
+  it("clamps a percentage param to its max (100)", async () => {
+    const onChange = vi.fn();
+    const user = userEvent.setup();
+    render(<FaultConfigPanel config={{ kind: "drop" }} canEdit onChange={onChange} />);
+    // Fire a single change with an over-max value (the component is controlled,
+    // so per-keystroke typing would re-read the unchanged prop each time).
+    const input = screen.getByLabelText(/Drop rate/);
+    await user.click(input);
+    await user.paste("250");
+    const last = onChange.mock.calls.at(-1)!;
+    expect(last[0]).toBe("dropRate");
+    expect(last[1]).toBe(100);
+  });
+
   it("renders the plain-language behavior description", () => {
     render(
       <FaultConfigPanel
