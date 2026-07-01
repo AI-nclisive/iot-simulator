@@ -1,7 +1,9 @@
 package com.ainclusive.iotsim.api.error;
 
 import com.ainclusive.iotsim.domain.common.ConcurrencyConflictException;
+import com.ainclusive.iotsim.domain.common.FeatureNotAvailableException;
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
+import com.ainclusive.iotsim.domain.common.ScenarioInvalidException;
 import com.ainclusive.iotsim.domain.common.SchemaVersionMismatchException;
 import com.ainclusive.iotsim.domain.io.ProjectImportException;
 import com.ainclusive.iotsim.platform.capture.CaptureException;
@@ -59,6 +61,18 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ProjectImportException.class)
     public ProblemDetail projectImportFailed(ProjectImportException e) {
         return problem(HttpStatus.UNPROCESSABLE_ENTITY, e.getMessage());
+    }
+
+    @ExceptionHandler(FeatureNotAvailableException.class)
+    public ProblemDetail featureNotAvailable(FeatureNotAvailableException e) {
+        return problem(HttpStatus.NOT_IMPLEMENTED, e.getMessage());
+    }
+
+    @ExceptionHandler(ScenarioInvalidException.class)
+    public ProblemDetail scenarioInvalid(ScenarioInvalidException e) {
+        ProblemDetail pd = problem(HttpStatus.UNPROCESSABLE_ENTITY, e.getMessage());
+        pd.setProperty("issues", e.issues());
+        return pd;
     }
 
     /**

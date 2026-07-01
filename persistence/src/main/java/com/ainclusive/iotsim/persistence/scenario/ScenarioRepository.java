@@ -21,4 +21,7 @@ public interface ScenarioRepository {
             List<ScenarioStepInput> steps, long expectedVersion);
 
     boolean deleteById(String id);
+
+    /** Sets the derived validation status (READY|INVALID) and bumps version. */
+    Optional<ScenarioRow> updateStatus(String id, String status);
 }

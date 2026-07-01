@@ -27,7 +27,7 @@ public class JooqRunRepository implements RunRepository {
 
     @Override
     public RunRow create(String projectId, String kind, String trigger, String initiator,
-            List<String> sourceIds, String scenarioId) {
+            List<String> sourceIds, String scenarioId, String parentRunId) {
         String id = Ids.newId();
         // Dedup while preserving order: a source named twice is one participation,
         // not a run_sources primary-key violation that would roll back the whole run.
@@ -42,7 +42,8 @@ public class JooqRunRepository implements RunRepository {
                     .set(RUNS.ID, id)
                     .set(RUNS.PROJECT_ID, projectId)
                     .set(RUNS.KIND, kind)
-                    .set(RUNS.SCENARIO_ID, scenarioId);
+                    .set(RUNS.SCENARIO_ID, scenarioId)
+                    .set(RUNS.PARENT_RUN_ID, parentRunId);
             // Null trigger/initiator fall through to the column defaults.
             if (trigger != null) {
                 insert = insert.set(RUNS.TRIGGER, trigger);
@@ -139,6 +140,7 @@ public class JooqRunRepository implements RunRepository {
                 r.getStartedAt(),
                 r.getEndedAt(),
                 r.getCreatedAt(),
-                sources);
+                sources,
+                r.getParentRunId());
     }
 }

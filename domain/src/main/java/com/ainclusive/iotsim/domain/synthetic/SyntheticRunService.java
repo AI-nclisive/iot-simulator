@@ -63,6 +63,17 @@ public class SyntheticRunService {
     }
 
     public SyntheticRunSummary run(String projectId, String dataSourceId, long durationMs) {
+        return run(projectId, dataSourceId, durationMs, null);
+    }
+
+    /**
+     * Starts a synthetic run linked to a parent (scenario) run.
+     *
+     * <p>Delegates all logic to the main overload; {@code parentRunId} is forwarded to
+     * {@link com.ainclusive.iotsim.persistence.run.RunRepository#create} so the child run is
+     * linked in {@code runs.parent_run_id}.
+     */
+    public SyntheticRunSummary run(String projectId, String dataSourceId, long durationMs, String parentRunId) {
         if (durationMs <= 0) {
             throw new IllegalArgumentException("durationMs must be > 0: " + durationMs);
         }
@@ -77,7 +88,7 @@ public class SyntheticRunService {
                 ? DeterministicSettings.withRandomSeed(clock.instant())
                 : new DeterministicSettings(config.seed(), clock.instant());
 
-        RunRow run = runs.create(projectId, "SYNTHETIC", "MANUAL", "local", List.of(dataSourceId), null);
+        RunRow run = runs.create(projectId, "SYNTHETIC", "MANUAL", "local", List.of(dataSourceId), null, parentRunId);
         try {
             runs.start(run.id(), now());
             EvidenceRow evidenceRow = evidence.create(projectId, run.id(), "local");

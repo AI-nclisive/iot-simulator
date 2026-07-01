@@ -193,6 +193,11 @@ class ScenarioServiceTest {
             return rows.remove(id) != null;
         }
 
+        @Override
+        public Optional<ScenarioRow> updateStatus(String id, String status) {
+            throw new UnsupportedOperationException();
+        }
+
         private static List<ScenarioStepRow> toRows(List<ScenarioStepInput> steps) {
             List<ScenarioStepRow> out = new ArrayList<>();
             for (int i = 0; i < steps.size(); i++) {

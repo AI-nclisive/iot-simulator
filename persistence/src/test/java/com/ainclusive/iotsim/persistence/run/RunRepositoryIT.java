@@ -124,6 +124,17 @@ class RunRepositoryIT {
     }
 
     @Test
+    void childRunCarriesParentRunId() {
+        RunRow parent = runs.create(projectId, "SCENARIO", "MANUAL", "local", List.of(), null, null);
+        RunRow child = runs.create(projectId, "REPLAY", "MANUAL", "local", List.of(), null, parent.id());
+
+        assertThat(parent.parentRunId()).isNull();
+        assertThat(child.parentRunId()).isEqualTo(parent.id());
+        assertThat(runs.findById(child.id())).get()
+                .extracting(RunRow::parentRunId).isEqualTo(parent.id());
+    }
+
+    @Test
     void findByProjectReturnsNewestFirst() {
         String project = projects.insert("Ordering", null, "it").id();
         RunRow first = runs.create(project, "REPLAY", null, null, List.of(), null);

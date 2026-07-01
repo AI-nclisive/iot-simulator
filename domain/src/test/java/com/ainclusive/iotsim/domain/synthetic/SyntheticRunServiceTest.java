@@ -126,6 +126,13 @@ class SyntheticRunServiceTest {
                 .extracting(RunRow::state).isEqualTo("FAILED");
     }
 
+    @Test
+    void runWithParentRunIdPassesItToRunCreate() {
+        SyntheticRunService service = service("SYNTHETIC", config(5L));
+        SyntheticRunSummary summary = service.run(PROJECT, SOURCE, 1000L, "parent-run-9");
+        assertThat(runs.byId.get(summary.runId()).parentRunId()).isEqualTo("parent-run-9");
+    }
+
     // --- fakes ---
 
     private static final class CapturingRuntime implements RuntimeController {
@@ -229,10 +236,11 @@ class SyntheticRunServiceTest {
         private int seq;
 
         public RunRow create(String projectId, String kind, String trigger, String initiator,
-                List<String> sourceIds, String scenarioId) {
+                List<String> sourceIds, String scenarioId, String parentRunId) {
             String id = "run-" + (++seq);
             RunRow row = new RunRow(id, projectId, kind, trigger, initiator, "QUEUED",
-                    scenarioId, null, null, null, OffsetDateTime.now(ZoneOffset.UTC), new ArrayList<>(sourceIds));
+                    scenarioId, null, null, null, OffsetDateTime.now(ZoneOffset.UTC),
+                    new ArrayList<>(sourceIds), parentRunId);
             byId.put(id, row);
             return row;
         }
@@ -240,7 +248,8 @@ class SyntheticRunServiceTest {
         public RunRow start(String id, OffsetDateTime startedAt) {
             RunRow r = byId.get(id);
             RunRow u = new RunRow(r.id(), r.projectId(), r.kind(), r.trigger(), r.initiator(),
-                    "RUNNING", r.scenarioId(), r.evidenceId(), startedAt, r.endedAt(), r.createdAt(), r.sourceIds());
+                    "RUNNING", r.scenarioId(), r.evidenceId(), startedAt, r.endedAt(), r.createdAt(),
+                    r.sourceIds(), r.parentRunId());
             byId.put(id, u);
             return u;
         }
@@ -248,7 +257,8 @@ class SyntheticRunServiceTest {
         public RunRow end(String id, String terminalState, OffsetDateTime endedAt) {
             RunRow r = byId.get(id);
             RunRow u = new RunRow(r.id(), r.projectId(), r.kind(), r.trigger(), r.initiator(),
-                    terminalState, r.scenarioId(), r.evidenceId(), r.startedAt(), endedAt, r.createdAt(), r.sourceIds());
+                    terminalState, r.scenarioId(), r.evidenceId(), r.startedAt(), endedAt, r.createdAt(),
+                    r.sourceIds(), r.parentRunId());
             byId.put(id, u);
             return u;
         }
@@ -256,7 +266,8 @@ class SyntheticRunServiceTest {
         public RunRow linkEvidence(String runId, String evidenceId) {
             RunRow r = byId.get(runId);
             RunRow u = new RunRow(r.id(), r.projectId(), r.kind(), r.trigger(), r.initiator(),
-                    r.state(), r.scenarioId(), evidenceId, r.startedAt(), r.endedAt(), r.createdAt(), r.sourceIds());
+                    r.state(), r.scenarioId(), evidenceId, r.startedAt(), r.endedAt(), r.createdAt(),
+                    r.sourceIds(), r.parentRunId());
             byId.put(runId, u);
             return u;
         }
