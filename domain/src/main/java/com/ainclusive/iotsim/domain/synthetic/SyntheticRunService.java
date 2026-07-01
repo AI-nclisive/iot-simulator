@@ -97,7 +97,7 @@ public class SyntheticRunService {
             List<NeutralValue> values = generate(variables, settings, durationMs);
             evidence.updateManifest(evidenceRow.id(), manifest(settings.seed(), values.size()));
 
-            runtime.start(dataSourceId, RuntimeStartSpecs.of(schemas, source));
+            runtime.start(dataSourceId, RuntimeStartSpecs.of(schemas, source, json));
             long applied = runtime.applyValues(dataSourceId, values);
             runs.end(run.id(), "COMPLETED", now());
             return new SyntheticRunSummary(dataSourceId, applied, settings.seed(), run.id(), evidenceRow.id());

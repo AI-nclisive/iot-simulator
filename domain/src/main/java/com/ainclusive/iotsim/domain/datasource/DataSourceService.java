@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.ObjectMapper;
 
 /** Data-source lifecycle and runtime control (backend-specs/03 & 05). */
 @Service
@@ -28,14 +29,17 @@ public class DataSourceService {
     private final SchemaRepository schemas;
     private final RuntimeController runtime;
     private final CredentialStore credentials;
+    private final ObjectMapper json;
 
     public DataSourceService(DataSourceRepository dataSources, ProjectRepository projects,
-            SchemaRepository schemas, RuntimeController runtime, CredentialStore credentials) {
+            SchemaRepository schemas, RuntimeController runtime, CredentialStore credentials,
+            ObjectMapper json) {
         this.dataSources = dataSources;
         this.projects = projects;
         this.schemas = schemas;
         this.runtime = runtime;
         this.credentials = credentials;
+        this.json = json;
     }
 
     /**
@@ -117,7 +121,7 @@ public class DataSourceService {
 
     public DataSource start(String projectId, String id) {
         DataSourceRow row = requireRow(projectId, id);
-        runtime.start(id, RuntimeStartSpecs.of(schemas, row));
+        runtime.start(id, RuntimeStartSpecs.of(schemas, row, json));
         return map(row);
     }
 

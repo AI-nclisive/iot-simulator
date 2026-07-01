@@ -24,6 +24,7 @@ import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.ObjectMapper;
 
 class DataSourceServiceTest {
 
@@ -42,7 +43,8 @@ class DataSourceServiceTest {
                 new FakeProjectRepository(Set.of(PROJECT)),
                 new EmptySchemaRepository(),
                 new InMemoryRuntimeController(),
-                credentials);
+                credentials,
+                new ObjectMapper());
     }
 
     @Test
@@ -240,7 +242,8 @@ class DataSourceServiceTest {
                 new FakeProjectRepository(Set.of(PROJECT)),
                 schemaRepo,
                 new InMemoryRuntimeController(),
-                credentials);
+                credentials,
+                new ObjectMapper());
 
         DataSource original = svc.create(PROJECT, "Sensor", "OPC_UA", "SCAN", null, null, null, null, "a");
         SchemaNode node = new SchemaNode("n1", null, "/root/temp", "Temperature",
@@ -267,7 +270,8 @@ class DataSourceServiceTest {
                 new FakeProjectRepository(Set.of(PROJECT)),
                 schemaRepo,
                 new InMemoryRuntimeController(),
-                credentials);
+                credentials,
+                new ObjectMapper());
 
         SchemaNode node = new SchemaNode("n1", null, "/root/temp", "Temperature",
                 com.ainclusive.iotsim.protocolmodel.NodeKind.VARIABLE,

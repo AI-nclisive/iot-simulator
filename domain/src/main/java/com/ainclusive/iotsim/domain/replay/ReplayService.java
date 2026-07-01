@@ -2,6 +2,7 @@ package com.ainclusive.iotsim.domain.replay;
 
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.domain.common.SchemaVersionMismatchException;
+import com.ainclusive.iotsim.domain.datasource.RuntimeStartSpecs;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRepository;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRow;
 import com.ainclusive.iotsim.persistence.evidence.EvidenceRepository;
@@ -113,7 +114,7 @@ public class ReplayService {
                     source.protocol(),
                     currentSchemaVersion,
                     currentSchema.map(SchemaWithNodes::nodes).orElse(List.of()),
-                    0,
+                    RuntimeStartSpecs.listenPort(source.runtimeConfig(), json),
                     settings);
             List<NeutralValue> values = timeline.readAll(recordingId);
             runtime.start(dataSourceId, startSpec);

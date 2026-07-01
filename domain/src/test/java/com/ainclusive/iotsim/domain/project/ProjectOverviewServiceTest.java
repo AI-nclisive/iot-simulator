@@ -14,6 +14,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.ObjectMapper;
 
 class ProjectOverviewServiceTest {
 
@@ -79,7 +80,7 @@ class ProjectOverviewServiceTest {
                 return projects;
             }
         };
-        DataSourceService dataSourceService = new DataSourceService(null, null, null, null, null) {
+        DataSourceService dataSourceService = new DataSourceService(null, null, null, null, null, null) {
             @Override
             public List<DataSource> list(String projectId) {
                 return sourcesByProject.getOrDefault(projectId, List.of());
