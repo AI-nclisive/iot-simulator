@@ -121,28 +121,60 @@ public class SyntheticLiveRunService {
     }
 
     private void tickOne(LiveRun live) {
-        long elapsedMs = live.elapsedMs(wallClock);
-        boolean capped = live.maxDurationMs() != null && elapsedMs >= live.maxDurationMs();
-        long effectiveMs = capped ? live.maxDurationMs() : elapsedMs;
+        try {
+            long elapsedMs = live.elapsedMs(wallClock);
+            boolean capped = live.maxDurationMs() != null && elapsedMs >= live.maxDurationMs();
+            long effectiveMs = capped ? live.maxDurationMs() : elapsedMs;
 
-        List<NeutralValue> due = new ArrayList<>();
-        for (VariableFeed feed : live.feeds()) {
-            long dueTicks = effectiveMs / feed.updateRateMs;
-            for (long i = feed.emitted; i < dueTicks; i++) {
-                due.add(feed.generator.next());
+            List<NeutralValue> due = new ArrayList<>();
+            for (VariableFeed feed : live.feeds()) {
+                long dueTicks = effectiveMs / feed.updateRateMs;
+                for (long i = feed.emitted; i < dueTicks; i++) {
+                    due.add(feed.generator.next());
+                }
+                feed.emitted = dueTicks;
             }
-            feed.emitted = dueTicks;
+            due.sort(ORDER);
+            if (!due.isEmpty()) {
+                runtime.applyValues(live.dataSourceId(), due);
+            }
+            if (capped) {
+                finalizeRun(live, "COMPLETED");
+            }
+        } catch (RuntimeException e) {
+            finalizeRun(live, "FAILED");
         }
-        due.sort(ORDER);
-        if (!due.isEmpty()) {
-            runtime.applyValues(live.dataSourceId(), due);
-        }
-        // Cap handling (COMPLETED) is added in Task 3.
     }
 
-    /** Placeholder — implemented in Task 3. */
+    /**
+     * Cancels a live feed if present, stamping the final value count on its evidence.
+     * Does NOT end the run — the caller ({@code RunService.stop}) owns the STOPPED
+     * transition. Returns whether a live feed was actually cancelled (idempotent).
+     */
     public boolean stopIfLive(String runId) {
-        return false; // Task 3
+        LiveRun live = registry.remove(runId);
+        if (live == null) {
+            return false;
+        }
+        evidence.updateManifest(live.evidenceId(), manifest(live.seed(), totalEmitted(live)));
+        return true;
+    }
+
+    /** Ends the run in a terminal state and stamps the final value count. Atomic via registry.remove. */
+    private void finalizeRun(LiveRun live, String terminalState) {
+        if (registry.remove(live.runId()) == null) {
+            return; // already finalized/stopped
+        }
+        evidence.updateManifest(live.evidenceId(), manifest(live.seed(), totalEmitted(live)));
+        runs.end(live.runId(), terminalState, now());
+    }
+
+    private static long totalEmitted(LiveRun live) {
+        long total = 0;
+        for (VariableFeed feed : live.feeds()) {
+            total += feed.emitted;
+        }
+        return total;
     }
 
     private String manifest(long seed, long valueCount) {

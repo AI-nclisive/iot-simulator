@@ -122,9 +122,68 @@ class SyntheticLiveRunServiceTest {
         assertThat(runtime.applied).isEqualTo(batchRuntime.applied);
     }
 
+    @Test
+    void capReachedFinalizesRunCompletedWithTotalValueCount() {
+        SyntheticLiveRunService service = service("SYNTHETIC", config(5L));
+        SyntheticLiveRunSummary s = service.start(PROJECT, SOURCE, 1000L, "MANUAL", "local");
+
+        wall.advance(Duration.ofMillis(5000)); // well past the 1000ms cap
+        service.tickAll();
+
+        RunRow run = runs.byId.get(s.runId());
+        assertThat(run.state()).isEqualTo("COMPLETED");
+        // capped at 1000ms => 14 values (temp 10 + rnd 4); count reflected in evidence.
+        assertThat(runtime.applied).hasSize(14);
+        assertThat(evidence.byId.get(s.evidenceId()).manifestJson()).contains("\"valueCount\":14");
+        // A subsequent tick is a no-op (removed from registry).
+        service.tickAll();
+        assertThat(runtime.applied).hasSize(14);
+    }
+
+    @Test
+    void stopIfLiveCancelsFeedAndStampsEvidenceButLeavesRunEndingToCaller() {
+        SyntheticLiveRunService service = service("SYNTHETIC", config(5L));
+        SyntheticLiveRunSummary s = service.start(PROJECT, SOURCE, null, "MANUAL", "local");
+        wall.advance(Duration.ofMillis(500));
+        service.tickAll(); // 7 emitted
+
+        boolean wasLive = service.stopIfLive(s.runId());
+
+        assertThat(wasLive).isTrue();
+        assertThat(evidence.byId.get(s.evidenceId()).manifestJson()).contains("\"valueCount\":7");
+        // Run is NOT ended here (RunService owns that on manual stop): still RUNNING.
+        assertThat(runs.byId.get(s.runId()).state()).isEqualTo("RUNNING");
+        // Ticking after stop does nothing.
+        wall.advance(Duration.ofMillis(500));
+        service.tickAll();
+        assertThat(runtime.applied).hasSize(7);
+        // Idempotent second stop.
+        assertThat(service.stopIfLive(s.runId())).isFalse();
+    }
+
+    @Test
+    void tickErrorFinalizesRunFailedAndRemovesIt() {
+        // A runtime whose applyValues throws marks the run FAILED and unregisters it.
+        CapturingRuntime throwing = new CapturingRuntime() {
+            @Override public long applyValues(String id, List<com.ainclusive.iotsim.protocolmodel.NeutralValue> v) {
+                throw new IllegalStateException("apply failed");
+            }
+        };
+        SyntheticLiveRunService failing = new SyntheticLiveRunService(
+                new FakeDataSources("SYNTHETIC", json.writeValueAsString(config(5L))),
+                new EmptySchemas(), throwing, runs, evidence, json, wall);
+        SyntheticLiveRunSummary s = failing.start(PROJECT, SOURCE, null, "MANUAL", "local");
+
+        wall.advance(Duration.ofMillis(500));
+        failing.tickAll(); // applyValues throws -> run FAILED
+
+        assertThat(runs.byId.get(s.runId()).state()).isEqualTo("FAILED");
+        assertThat(failing.stopIfLive(s.runId())).isFalse(); // already removed
+    }
+
     // --- fakes ---
 
-    private static final class CapturingRuntime implements RuntimeController {
+    private static class CapturingRuntime implements RuntimeController {
         final List<NeutralValue> applied = new ArrayList<>();
         private String state = "STOPPED";
 
