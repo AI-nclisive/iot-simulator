@@ -11,13 +11,38 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+  # In shared mode the backend validates bearer JWTs via JWKS (IS-075).
+  # Set the issuer URI so Spring Boot auto-configures JWKS discovery.
+  # Leave unset in local mode — the local security chain does not use it.
+  #
+  # Example (Keycloak):
+  #   security:
+  #     oauth2:
+  #       resourceserver:
+  #         jwt:
+  #           issuer-uri: https://idp.example/realms/iotsim
+  #
+  # If OIDC discovery is unavailable (e.g. Cognito in some regions), set
+  # iotsim.oidc.jwks-uri directly instead of (or in addition to) issuer-uri.
 
 # Deployment mode: local (auth optional) | shared (OAuth2/OIDC). D2/D6.
-# In shared mode the backend is an OAuth2/OIDC resource server: set the issuer so
-# bearer JWTs validate via JWKS (full provider support lands in IS-075):
-#   spring.security.oauth2.resourceserver.jwt.issuer-uri: https://idp.example/realms/iotsim
+# See backend-specs/08_AUTH_AND_MODES.md and IS-075/IS-078.
 iotsim:
   mode: ${IOTSIM_MODE:local}
+
+  # OIDC resource-server settings (shared mode only; IS-075).
+  # All fields are optional — omit in local mode. When mode=shared, at least
+  # one of issuer-uri or jwks-uri (or the spring.security.oauth2.* equivalent)
+  # must be set so bearer JWTs can be validated.
+  #
+  # oidc:
+  #   issuer-uri: ${OIDC_ISSUER_URI:}      # e.g. https://idp.example/realms/iotsim
+  #   jwks-uri:   ${OIDC_JWKS_URI:}        # override auto-discovery; use when
+  #                                         # OIDC discovery is unavailable
+  #   audience:   ${OIDC_AUDIENCE:}        # required aud claim; leave blank to skip
+  #   roles-claim: ${OIDC_ROLES_CLAIM:roles} # JWT claim holding role list
+  #                                           # (use "groups" for some IdPs)
+
   # Runtime controller: memory (default, no workers) | supervisor (real
   # out-of-process protocol workers). In supervisor mode, `workers` maps each
   # protocol to the base launch command (installDist bin script); the supervisor

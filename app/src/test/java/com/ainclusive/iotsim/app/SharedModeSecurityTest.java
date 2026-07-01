@@ -16,12 +16,13 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
- * IS-078: in shared mode workspace endpoints require an authenticated bearer JWT.
- * See backend-specs/08_AUTH_AND_MODES.md.
+ * IS-078 / IS-075: in shared mode workspace endpoints require an authenticated
+ * bearer JWT; the JWT is converted to an {@code IotSimPrincipal} via
+ * {@code JwtPrincipalConverter}. See backend-specs/08_AUTH_AND_MODES.md.
  */
 @WebMvcTest(controllers = MetaController.class)
 @Import(SecurityConfig.class)
-@TestPropertySource(properties = "iotsim.mode=shared")
+@TestPropertySource(properties = {"iotsim.mode=shared"})
 class SharedModeSecurityTest {
 
     @Autowired
