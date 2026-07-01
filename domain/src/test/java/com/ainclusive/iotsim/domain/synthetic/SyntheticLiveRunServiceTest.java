@@ -83,6 +83,45 @@ class SyntheticLiveRunServiceTest {
                         new PatternSpec("RANDOM_UNIFORM", null, 0.0, 1.0, null, null, null, null), 250)));
     }
 
+    @Test
+    void tickEmitsOnlySamplesDueSinceStart() {
+        SyntheticLiveRunService service = service("SYNTHETIC", config(5L));
+        service.start(PROJECT, SOURCE, null, "MANUAL", "local");
+
+        // config: temp @100ms, rnd @250ms. Advance 500ms of wall time.
+        wall.advance(Duration.ofMillis(500));
+        service.tickAll();
+
+        // temp: 500/100 = 5 ; rnd: 500/250 = 2  => 7 values on first tick.
+        assertThat(runtime.applied).hasSize(7);
+
+        // Advance to 1000ms total and tick again.
+        wall.advance(Duration.ofMillis(500));
+        service.tickAll();
+
+        // temp now 10 total (=> +5), rnd now 4 total (=> +2) => +7, cumulative 14.
+        assertThat(runtime.applied).hasSize(14);
+    }
+
+    @Test
+    void livePacedSequenceMatchesBoundedBatchForSameElapsed() {
+        // Model A over 1000ms produces 14 values (see SyntheticRunServiceTest); the paced
+        // feed must produce the identical ordered sequence once 1000ms has elapsed.
+        CapturingRuntime batchRuntime = new CapturingRuntime();
+        SyntheticRunService batch = new SyntheticRunService(
+                new FakeDataSources("SYNTHETIC", json.writeValueAsString(config(5L))),
+                new EmptySchemas(), batchRuntime, new FakeRuns(), new FakeEvidence(),
+                json, java.time.Clock.fixed(T0, ZoneOffset.UTC));
+        batch.run(PROJECT, SOURCE, 1000);
+
+        SyntheticLiveRunService live = service("SYNTHETIC", config(5L));
+        live.start(PROJECT, SOURCE, null, "MANUAL", "local");
+        wall.advance(Duration.ofMillis(1000));
+        live.tickAll();
+
+        assertThat(runtime.applied).isEqualTo(batchRuntime.applied);
+    }
+
     // --- fakes ---
 
     private static final class CapturingRuntime implements RuntimeController {

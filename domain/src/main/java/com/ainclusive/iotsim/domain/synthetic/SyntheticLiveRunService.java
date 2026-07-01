@@ -113,9 +113,31 @@ public class SyntheticLiveRunService {
         }
     }
 
-    /** Placeholder — implemented in Task 2. */
+    /** Advances every registered live run by one pacing step (called by the pacer, ~every 250 ms). */
     public void tickAll() {
-        // Task 2
+        for (LiveRun live : registry.values()) {
+            tickOne(live);
+        }
+    }
+
+    private void tickOne(LiveRun live) {
+        long elapsedMs = live.elapsedMs(wallClock);
+        boolean capped = live.maxDurationMs() != null && elapsedMs >= live.maxDurationMs();
+        long effectiveMs = capped ? live.maxDurationMs() : elapsedMs;
+
+        List<NeutralValue> due = new ArrayList<>();
+        for (VariableFeed feed : live.feeds()) {
+            long dueTicks = effectiveMs / feed.updateRateMs;
+            for (long i = feed.emitted; i < dueTicks; i++) {
+                due.add(feed.generator.next());
+            }
+            feed.emitted = dueTicks;
+        }
+        due.sort(ORDER);
+        if (!due.isEmpty()) {
+            runtime.applyValues(live.dataSourceId(), due);
+        }
+        // Cap handling (COMPLETED) is added in Task 3.
     }
 
     /** Placeholder — implemented in Task 3. */
