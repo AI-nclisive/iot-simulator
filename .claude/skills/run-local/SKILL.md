@@ -1,21 +1,24 @@
 ---
 name: run-local
 description: >-
-  Bring up the full local stack — Postgres + backend (:8080) + frontend
-  dev server (:4173) — wired together for manual end-to-end / e2e testing in a
-  browser. Use when the user wants to click through the real UI against a real
-  backend locally, smoke-test a change end to end, or "run the app".
-  Cross-platform (macOS/Linux/Windows). Invoke as `/run-local` (add `down` to
-  tear it back down).
+  Bring up the full local stack — Postgres + backend (:8080, supervisor mode with
+  real OPC UA workers) + frontend dev server (:4173) — for manual end-to-end
+  testing in a browser: create/start a data source and connect an OPC UA client to
+  the worker it spawns. Cross-platform (macOS/Linux/Windows). Invoke as `/run-local`
+  (add `down` to tear it back down).
 ---
 
 # Run the local e2e stack (backend + frontend)
 
-Brings up the three processes the UI needs to talk to a real backend, the way the
-README's "Run it locally" → "Quick start" section describes. Default modes only:
-`IOTSIM_MODE=local` (auth off) and `IOTSIM_RUNTIME_MODE=memory` (no protocol
-workers) — enough to exercise the UI/API end to end. The Vite dev server proxies
+Brings up the processes the UI needs to talk to a real backend. Runs
+`IOTSIM_MODE=local` (auth off) and `IOTSIM_RUNTIME_MODE=supervisor` — so starting a
+data source spawns a **real out-of-process OPC UA worker** (Eclipse Milo) that an
+edge device can connect to, not the in-memory stub. The Vite dev server proxies
 `/api` → `:8080` (`vite.config.ts`), so the browser hits one origin.
+
+(The app's own default is `IOTSIM_RUNTIME_MODE=memory` — no workers — which tests
+use and which you can still run by hand; this skill deliberately runs supervisor so
+the platform behaves as it does in real use.)
 
 **Argument:** none = bring the stack **up**. `down` = tear it down (see last
 section).
@@ -70,17 +73,39 @@ until docker compose exec -T postgres pg_isready -U iotsim >/dev/null 2>&1; do s
 while ($true) { docker compose exec -T postgres pg_isready -U iotsim 2>$null; if ($LASTEXITCODE -eq 0) { break }; Start-Sleep 1 }
 ```
 
-## 2. Start the backend (background), then poll health
+## 2. Build the OPC UA worker (once per worker-code change)
 
-Launch via the agent's background-run capability and capture logs — never block
-the session. Flyway migrates the DB on startup.
+Supervisor mode launches an out-of-process worker; package it so the supervisor can
+spawn it. Skip if `workers/worker-opcua/build/install/worker-opcua/bin/worker-opcua`
+already exists and the worker code is unchanged.
 
 ```bash
-# bash — Gradle wrapper is ./gradlew ; log to /tmp
+./gradlew :workers:worker-opcua:installDist
+```
+
+The launch script lands at `workers/worker-opcua/build/install/worker-opcua/bin/worker-opcua`
+(`worker-opcua.bat` on Windows). Note its **absolute** path for the next step.
+
+## 3. Start the backend (background, supervisor mode), then poll health
+
+Launch via the agent's background-run capability and capture logs — never block
+the session. Flyway migrates the DB on startup. Set supervisor mode + the OPC UA
+worker command via env (inherited by `bootRun`); substitute `<WORKER>` with the
+absolute path from step 2.
+
+```bash
+# bash — <WORKER> = <repo>/workers/worker-opcua/build/install/worker-opcua/bin/worker-opcua
+export IOTSIM_MODE=local
+export IOTSIM_RUNTIME_MODE=supervisor
+export SPRING_APPLICATION_JSON='{"iotsim":{"runtime":{"workers":{"OPC_UA":["<WORKER>"]}}}}'
 ./gradlew :app:bootRun > /tmp/iotsim-backend.log 2>&1
 ```
 ```powershell
-# PowerShell — wrapper is .\gradlew.bat ; *> redirects all streams ; log to %TEMP%
+# PowerShell — <WORKER> = <repo>/workers/worker-opcua/build/install/worker-opcua/bin/worker-opcua.bat
+#              (use forward slashes inside the JSON so the string stays valid)
+$env:IOTSIM_MODE = 'local'
+$env:IOTSIM_RUNTIME_MODE = 'supervisor'
+$env:SPRING_APPLICATION_JSON = '{"iotsim":{"runtime":{"workers":{"OPC_UA":["<WORKER>"]}}}}'
 .\gradlew.bat :app:bootRun *> $env:TEMP\iotsim-backend.log
 ```
 
@@ -98,7 +123,7 @@ while ($true) { try { if ((Invoke-RestMethod http://localhost:8080/actuator/heal
 If it never comes up, read the backend log and report the cause (common: port 8080
 busy, Postgres not healthy).
 
-## 3. Start the frontend dev server (background)
+## 4. Start the frontend dev server (background)
 
 ```bash
 # bash
@@ -120,7 +145,7 @@ until curl -fsS http://localhost:4173 >/dev/null; do sleep 1; done
 while ($true) { try { Invoke-WebRequest http://localhost:4173 -UseBasicParsing > $null; break } catch { Start-Sleep 1 } }
 ```
 
-## 4. Verify the wiring, then report to the user
+## 5. Verify the wiring, then report to the user
 
 Prove the browser→proxy→backend→DB path works (in `local` mode no token is needed).
 `curl` works on all OSes; PowerShell alt given:
@@ -138,6 +163,11 @@ Then tell the user the stack is up and give the entry points:
 - Swagger UI: http://localhost:8080/swagger-ui.html
 - API base: http://localhost:8080/api/v1 · Health: http://localhost:8080/actuator/health
 - Logs: `/tmp/iotsim-*.log` (bash) or `%TEMP%\iotsim-*.log` (Windows)
+- **Real OPC UA workers:** starting an `OPC_UA` data source in the UI spawns a Milo
+  worker that binds the source's `runtimeConfig.listenPort` and serves
+  `opc.tcp://127.0.0.1:<port>/iotsim` — point an external OPC UA client (the edge
+  device under test) there. No `listenPort` set → the port is ephemeral and not
+  surfaced, so set one when creating the source (IS-124).
 
 ## Tear down (`/run-local down`)
 
@@ -184,6 +214,8 @@ Only wipe the database when the user explicitly wants a clean slate:
 - **Backend health never UP:** read the backend log. Postgres not healthy or a
   Flyway migration failure are the usual causes.
 - **UI loads but data views are empty / network errors:** the backend isn't up or
-  the proxy target changed — confirm step 4's request returns JSON with `items`.
-- **Need real protocol workers** (OPC UA / Modbus), not the memory runtime: run with
-  `IOTSIM_RUNTIME_MODE=supervisor` (see README "Configuration"); not covered here.
+  the proxy target changed — confirm step 5's request returns JSON with `items`.
+- **Source shows RUNNING but no OPC UA endpoint / client can't connect:** the worker
+  didn't spawn — check the worker command path in `SPRING_APPLICATION_JSON` (step 3)
+  and that `:workers:worker-opcua:installDist` ran; confirm a `worker-opcua` process
+  is up (`pgrep -fl worker-opcua`) and the source has a `runtimeConfig.listenPort`.
