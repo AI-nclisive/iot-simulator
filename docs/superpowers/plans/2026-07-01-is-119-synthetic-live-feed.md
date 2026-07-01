@@ -370,16 +370,12 @@ Add to `SyntheticLiveRunServiceTest`:
     void livePacedSequenceMatchesBoundedBatchForSameElapsed() {
         // Model A over 1000ms produces 14 values (see SyntheticRunServiceTest); the paced
         // feed must produce the identical ordered sequence once 1000ms has elapsed.
-        SyntheticRunService batch = new SyntheticRunService(
-                new FakeDataSources("SYNTHETIC", json.writeValueAsString(config(5L))),
-                new EmptySchemas(), new CapturingRuntime(), new FakeRuns(), new FakeEvidence(),
-                json, java.time.Clock.fixed(T0, ZoneOffset.UTC));
         CapturingRuntime batchRuntime = new CapturingRuntime();
-        SyntheticRunService batch2 = new SyntheticRunService(
+        SyntheticRunService batch = new SyntheticRunService(
                 new FakeDataSources("SYNTHETIC", json.writeValueAsString(config(5L))),
                 new EmptySchemas(), batchRuntime, new FakeRuns(), new FakeEvidence(),
                 json, java.time.Clock.fixed(T0, ZoneOffset.UTC));
-        batch2.run(PROJECT, SOURCE, 1000);
+        batch.run(PROJECT, SOURCE, 1000);
 
         SyntheticLiveRunService live = service("SYNTHETIC", config(5L));
         live.start(PROJECT, SOURCE, null, "MANUAL", "local");
@@ -499,15 +495,8 @@ Add to `SyntheticLiveRunServiceTest` (add imports `import com.ainclusive.iotsim.
     }
 
     @Test
-    void tickErrorFinalizesThatRunFailedWithoutAffectingOthers() {
-        // Runtime that throws only for the failing source.
-        CapturingRuntime ok = new CapturingRuntime();
-        SyntheticLiveRunService service = new SyntheticLiveRunService(
-                new FakeDataSources("SYNTHETIC", json.writeValueAsString(config(5L))),
-                new EmptySchemas(), ok, runs, evidence, json, wall) {
-        };
-        // Two runs on the same fake source id is not possible; instead assert a throwing
-        // applyValues marks the run FAILED and is removed.
+    void tickErrorFinalizesRunFailedAndRemovesIt() {
+        // A runtime whose applyValues throws marks the run FAILED and unregisters it.
         CapturingRuntime throwing = new CapturingRuntime() {
             @Override public long applyValues(String id, List<com.ainclusive.iotsim.protocolmodel.NeutralValue> v) {
                 throw new IllegalStateException("apply failed");
@@ -575,15 +564,15 @@ Extend `tickOne` — wrap the body in try/catch and handle the cap:
                 runtime.applyValues(live.dataSourceId(), due);
             }
             if (capped) {
-                finalize(live, "COMPLETED");
+                finalizeRun(live, "COMPLETED");
             }
         } catch (RuntimeException e) {
-            finalize(live, "FAILED");
+            finalizeRun(live, "FAILED");
         }
     }
 
     /** Ends the run in a terminal state and stamps the final value count. Atomic via registry.remove. */
-    private void finalize(LiveRun live, String terminalState) {
+    private void finalizeRun(LiveRun live, String terminalState) {
         if (registry.remove(live.runId()) == null) {
             return; // already finalized/stopped
         }
@@ -634,8 +623,10 @@ Create `SyntheticLivePacerTest.java`:
 ```java
 package com.ainclusive.iotsim.app.synthetic;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.verify;
 
 import com.ainclusive.iotsim.domain.synthetic.SyntheticLiveRunService;
 import java.time.Duration;
@@ -647,38 +638,30 @@ class SyntheticLivePacerTest {
     @Test
     void scheduledPacerInvokesTickAllRepeatedlyThenStops() {
         AtomicInteger ticks = new AtomicInteger();
-        SyntheticLiveRunService service = new CountingService(ticks);
-        SyntheticLivePacer pacer = new SyntheticLivePacer(service, 20L); // 20ms interval
+        SyntheticLiveRunService service = mock(SyntheticLiveRunService.class);
+        org.mockito.Mockito.doAnswer(inv -> {
+            ticks.incrementAndGet();
+            return null;
+        }).when(service).tickAll();
 
+        SyntheticLivePacer pacer = new SyntheticLivePacer(service, 20L); // 20ms interval
         pacer.start();
-        await().atMost(Duration.ofSeconds(2)).until(() -> ticks.get() >= 3);
+        // At least 3 ticks fire within the timeout.
+        verify(service, timeout(2000).atLeast(3)).tickAll();
         pacer.stop();
 
         int afterStop = ticks.get();
-        // No further ticks after stop().
-        await().pollDelay(Duration.ofMillis(100)).atMost(Duration.ofMillis(200))
+        // No further ticks after stop(): count stays put over a short window.
+        await().pollDelay(Duration.ofMillis(150)).atMost(Duration.ofMillis(300))
                 .until(() -> ticks.get() == afterStop);
-        assertThat(ticks.get()).isEqualTo(afterStop);
-    }
-
-    /** Minimal stand-in that counts tickAll() calls (no repositories needed). */
-    private static final class CountingService extends SyntheticLiveRunService {
-        private final AtomicInteger ticks;
-
-        CountingService(AtomicInteger ticks) {
-            super(null, null, null, null, null, null, java.time.Clock.systemUTC());
-            this.ticks = ticks;
-        }
-
-        @Override
-        public void tickAll() {
-            ticks.incrementAndGet();
-        }
     }
 }
 ```
 
-If `awaitility` is not already a test dependency in the `app` module, use a `CountDownLatch` in `CountingService.tickAll()` instead and `latch.await(2, SECONDS)` — check `app/build.gradle` first; the repo already uses Awaitility in supervisor tests, but verify per-module.
+`mock(...)` on the concrete `SyntheticLiveRunService` avoids the cross-package
+constructor (the test-seam constructor is package-private to `domain.synthetic`).
+Confirm `org.mockito.*` and `org.awaitility.*` are on the `app` test classpath
+(`./gradlew :app:dependencies --configuration testRuntimeClasspath | grep -iE 'mockito|awaitility'`); both are used elsewhere in `app` tests.
 
 - [ ] **Step 2: Run test to verify it fails**
 
