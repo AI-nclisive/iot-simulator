@@ -37,6 +37,9 @@ public class JooqEditLeaseRepository implements EditLeaseRepository {
                 .set(EDIT_LEASES.HOLDER, org.jooq.impl.DSL.when(
                         EDIT_LEASES.HOLDER.eq(holder).or(EDIT_LEASES.EXPIRES_AT.lt(now)),
                         holder).otherwise(EDIT_LEASES.HOLDER))
+                .set(EDIT_LEASES.ACQUIRED_AT, org.jooq.impl.DSL.when(
+                        EDIT_LEASES.HOLDER.eq(holder).or(EDIT_LEASES.EXPIRES_AT.lt(now)),
+                        now).otherwise(EDIT_LEASES.ACQUIRED_AT))
                 .set(EDIT_LEASES.EXPIRES_AT, org.jooq.impl.DSL.when(
                         EDIT_LEASES.HOLDER.eq(holder).or(EDIT_LEASES.EXPIRES_AT.lt(now)),
                         expiresAt).otherwise(EDIT_LEASES.EXPIRES_AT))
