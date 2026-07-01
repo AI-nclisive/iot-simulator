@@ -6,7 +6,6 @@ import com.ainclusive.iotsim.domain.run.RunView;
 import com.ainclusive.iotsim.domain.run.SourceState;
 import com.ainclusive.iotsim.domain.run.StartRunCommand;
 import com.ainclusive.iotsim.domain.support.Page;
-import java.net.URI;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
@@ -18,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.util.UriComponentsBuilder;
 
 /** Unified runs resource + test-control for automation (backend-specs/05, IS-089). */
 @RestController
@@ -76,7 +76,8 @@ public class RunController {
                 req.dataSourceId(), req.recordingId(), req.durationMs(), req.scenarioId(),
                 req.seed(), req.startTime(), req.compatibilityAck()));
         return ResponseEntity.created(
-                        URI.create("/api/v1/projects/" + projectId + "/runs/" + v.id()))
+                        UriComponentsBuilder.fromPath("/api/v1/projects/{projectId}/runs/{id}")
+                                .buildAndExpand(projectId, v.id()).toUri())
                 .body(RunResponse.from(v));
     }
 
