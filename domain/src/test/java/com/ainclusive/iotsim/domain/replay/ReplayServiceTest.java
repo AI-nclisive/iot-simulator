@@ -277,6 +277,10 @@ class ReplayServiceTest {
         public List<RunRow> findByProject(String projectId) {
             throw new UnsupportedOperationException();
         }
+
+        public List<RunRow> findActiveByProject(String projectId) {
+            throw new UnsupportedOperationException();
+        }
     }
 
     private static final class FakeEvidence implements EvidenceRepository {

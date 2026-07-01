@@ -338,6 +338,10 @@ class EvidenceServiceTest {
             throw new UnsupportedOperationException();
         }
 
+        public List<RunRow> findActiveByProject(String projectId) {
+            throw new UnsupportedOperationException();
+        }
+
         public RunRow start(String id, OffsetDateTime at) {
             throw new UnsupportedOperationException();
         }

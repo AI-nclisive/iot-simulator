@@ -33,6 +33,12 @@ public interface RunRepository {
     /** All runs for a project, newest first (index-backed: project_id, created_at). */
     List<RunRow> findByProject(String projectId);
 
+    /**
+     * Active runs for a project: {@code state IN (RUNNING, QUEUED)}, newest first.
+     * Used by the dashboard overview panel (IS-122).
+     */
+    List<RunRow> findActiveByProject(String projectId);
+
     /** Moves a run to {@code RUNNING} and stamps {@code startedAt}. */
     RunRow start(String id, OffsetDateTime startedAt);
 
