@@ -76,9 +76,10 @@ export function AppShell() {
                   <select
                     aria-label="Current project"
                     className="rounded-md border border-shell-line bg-white px-3 py-2 text-shell-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-shell-accent/40"
-                    value={currentProject?.id ?? ""}
+                    value={currentProjectId}
                     onChange={(event) => setCurrentProjectId(event.target.value)}
                   >
+                    <option value="" disabled>— Select a project —</option>
                     {projects.map((project) => (
                       <option key={project.id} value={project.id}>
                         {project.name}

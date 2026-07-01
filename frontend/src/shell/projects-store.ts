@@ -32,6 +32,7 @@ function mapProject(
   return {
     id: p.id,
     name: p.name,
+    version: p.version,
     configuredSources: overview?.configuredSources ?? 0,
     runningSources: overview?.runningSources ?? 0,
     reusableArtifacts: overview?.reusableArtifacts ?? 0,
@@ -138,6 +139,7 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
     await apiFetch<ProjectResponse>(`/api/v1/projects/${id}`, {
       method: "PUT",
       body: JSON.stringify({ status: "ARCHIVED" }),
+      headers: { "If-Match": `"${target.version}"` },
     });
     set((state) => ({
       projects: state.projects.filter((p) => p.id !== id),

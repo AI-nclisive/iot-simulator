@@ -4,7 +4,7 @@
  * landing surface runs on this mock, mirroring the data-sources mock approach.
  */
 
-export type ScenarioRunState = "Idle" | "Running" | "Stopped" | "Failed";
+export type ScenarioRunState = "Not running" | "Running" | "Stopped" | "Failed";
 
 export interface ScenarioLastRun {
   /** ISO timestamp of the last run, or null if never run. */
@@ -33,7 +33,7 @@ export const scenarioRows: ScenarioRow[] = [
     name: "Morning ramp-up",
     description: "Starts Line A, replays the calibration recording, then holds.",
     stepCount: 6,
-    runState: "Idle",
+    runState: "Not running",
     lastRun: { at: "2026-06-29T07:14:00Z", outcome: "Completed" },
     owner: "Olena Ohii",
     lockedBy: null,
@@ -66,7 +66,7 @@ export const scenarioRows: ScenarioRow[] = [
     name: "Empty template",
     description: "Starting point for a new packaging-line scenario.",
     stepCount: 0,
-    runState: "Idle",
+    runState: "Not running",
     lastRun: { at: null, outcome: null },
     owner: "Nikolai Pak",
     lockedBy: null,

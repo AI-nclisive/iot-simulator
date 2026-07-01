@@ -7,7 +7,7 @@ import type { DataSourceRow } from "./mock-data-sources";
 import type { ParameterType, SchemaParameter } from "./mock-schema-parameters";
 
 // Backend schema shapes from GET/PUT /api/v1/projects/{pid}/data-sources/{id}/schema
-type NodeDto = {
+export type NodeDto = {
   nodeId: string;
   parentId: string | null;
   path: string;
@@ -26,6 +26,35 @@ type SchemaResponse = {
   version: number;
   nodes: NodeDto[];
 };
+
+type TreeNode = NodeDto & { children: TreeNode[] };
+
+export function buildTree(nodes: NodeDto[]): TreeNode[] {
+  const byId = new Map<string, TreeNode>();
+  for (const n of nodes) byId.set(n.nodeId, { ...n, children: [] });
+  const roots: TreeNode[] = [];
+  for (const n of byId.values()) {
+    if (n.parentId === null) {
+      roots.push(n);
+    } else {
+      byId.get(n.parentId)?.children.push(n);
+    }
+  }
+  // Sort: folders first, then by name within each group
+  function sortChildren(node: TreeNode) {
+    node.children.sort((a, b) => {
+      if (a.kind !== b.kind) return a.kind === "FOLDER" ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+    node.children.forEach(sortChildren);
+  }
+  roots.sort((a, b) => {
+    if (a.kind !== b.kind) return a.kind === "FOLDER" ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
+  roots.forEach(sortChildren);
+  return roots;
+}
 
 function mapNode(node: NodeDto): SchemaParameter {
   const rawType = node.dataType
@@ -61,7 +90,6 @@ export function detectDependencyWarnings(
 ): string[] {
   const warnings: string[] = [];
 
-  // Identifier rename — proxy: description changed
   if (buffer.description !== original.description) {
     warnings.push(
       "Renaming this parameter may break existing recordings, replay configurations, or scenarios that reference it by its current identifier.",
@@ -69,6 +97,86 @@ export function detectDependencyWarnings(
   }
 
   return warnings;
+}
+
+function TreeNodeRow({
+  node,
+  depth,
+  selectedId,
+  expandedIds,
+  onToggle,
+  onSelect,
+}: {
+  node: TreeNode;
+  depth: number;
+  selectedId: string | null;
+  expandedIds: Set<string>;
+  onToggle: (id: string) => void;
+  onSelect: (node: NodeDto) => void;
+}) {
+  const isExpanded = expandedIds.has(node.nodeId);
+  const isSelected = selectedId === node.nodeId;
+  const indent = depth * 16;
+
+  if (node.kind === "FOLDER") {
+    return (
+      <>
+        <li>
+          <button
+            className="flex w-full items-center gap-1.5 px-3 py-2 text-left text-sm hover:bg-shell-base/50 transition"
+            style={{ paddingLeft: `${12 + indent}px` }}
+            type="button"
+            onClick={() => onToggle(node.nodeId)}
+          >
+            <span className="shrink-0 text-xs text-shell-muted w-3 text-center">
+              {isExpanded ? "▾" : "▸"}
+            </span>
+            <span className="text-shell-muted font-medium truncate">{node.name}</span>
+            {node.children.length > 0 && (
+              <span className="ml-auto shrink-0 text-xs text-shell-muted">
+                {node.children.filter((c) => c.kind === "VARIABLE").length || ""}
+              </span>
+            )}
+          </button>
+        </li>
+        {isExpanded &&
+          node.children.map((child) => (
+            <TreeNodeRow
+              key={child.nodeId}
+              node={child}
+              depth={depth + 1}
+              selectedId={selectedId}
+              expandedIds={expandedIds}
+              onToggle={onToggle}
+              onSelect={onSelect}
+            />
+          ))}
+      </>
+    );
+  }
+
+  return (
+    <li>
+      <button
+        className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition ${
+          isSelected ? "bg-shell-accent/5" : "hover:bg-shell-base/50"
+        }`}
+        style={{ paddingLeft: `${12 + indent}px` }}
+        type="button"
+        onClick={() => onSelect(node)}
+      >
+        <span className="shrink-0 w-3" />
+        <span className="min-w-0 flex-1 truncate font-mono text-shell-ink">
+          {node.name}
+        </span>
+        {node.dataType && (
+          <span className="shrink-0 text-xs text-shell-muted">
+            {node.dataType.charAt(0).toUpperCase() + node.dataType.slice(1).toLowerCase()}
+          </span>
+        )}
+      </button>
+    </li>
+  );
 }
 
 export function DataSourceSchemaEditor({
@@ -94,15 +202,17 @@ export function DataSourceSchemaEditor({
   const [saving, setSaving] = useState(false);
   const [confirmSaveOpen, setConfirmSaveOpen] = useState(false);
   const [allParams, setAllParams] = useState<SchemaParameter[]>([]);
+  const [treeRoots, setTreeRoots] = useState<TreeNode[]>([]);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [schemaLoading, setSchemaLoading] = useState(false);
   const [schemaError, setSchemaError] = useState<string | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [addName, setAddName] = useState("");
+  const [addType, setAddType] = useState("FLOAT64");
+  const [addUnit, setAddUnit] = useState("");
 
-  // Preserve the full NodeDto[] from GET so PUT can round-trip all fields.
-  // This ensures parentId, kind, dataType, valueRank, and access are never
-  // dropped or corrupted during a save — FOLDER nodes are included here too.
   const rawNodesRef = useRef<NodeDto[]>([]);
 
-  // Load schema from API when source / projectId is available
   useEffect(() => {
     if (!projectId || !source.id) return;
     setSchemaLoading(true);
@@ -113,8 +223,19 @@ export function DataSourceSchemaEditor({
       .then((resp) => {
         rawNodesRef.current = resp.nodes;
         setAllParams(resp.nodes.filter((n) => n.kind === "VARIABLE").map(mapNode));
+        const roots = buildTree(resp.nodes);
+        setTreeRoots(roots);
+        // Auto-expand top-level folders
+        setExpandedIds(
+          new Set(roots.filter((n) => n.kind === "FOLDER").map((n) => n.nodeId)),
+        );
       })
       .catch((err) => {
+        if (err instanceof ApiError && err.status === 404) {
+          // No schema yet — normal for a freshly created manual source
+          setSchemaLoading(false);
+          return;
+        }
         const msg = err instanceof ApiError ? err.title : "Failed to load schema";
         setSchemaError(msg);
       })
@@ -141,6 +262,25 @@ export function DataSourceSchemaEditor({
       ? detectDependencyWarnings(selectedParam, editBuffer, originalBuffer)
       : [];
 
+  function handleToggle(id: string) {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function handleSelectNode(node: NodeDto) {
+    const param = allParams.find((p) => p.id === node.nodeId);
+    if (!param) return;
+    setSelectedParam(param);
+    const buf = bufferFromParam(param);
+    setEditBuffer(buf);
+    setOriginalBuffer(buf);
+    setHasUnsavedChanges(false);
+  }
+
   function handleSelectParam(param: SchemaParameter) {
     setSelectedParam(param);
     const buf = bufferFromParam(param);
@@ -157,7 +297,6 @@ export function DataSourceSchemaEditor({
     if (!projectId || !source.id || !selectedParam) return;
     setSaving(true);
     try {
-      // Merge rawNodes with EditBuffer so PUT preserves all NodeDto fields.
       const updatedNodes: NodeDto[] = rawNodesRef.current.map((raw) => {
         if (raw.nodeId === selectedParam.id) {
           return {
@@ -166,13 +305,10 @@ export function DataSourceSchemaEditor({
             description: editBuffer.description,
           };
         }
-        // For non-selected VARIABLE nodes, reflect any unit/description that was
-        // updated in a previous save during this session.
         const param = allParams.find((p) => p.id === raw.nodeId);
         if (param) {
           return { ...raw, unit: param.unit, description: param.description };
         }
-        // FOLDER nodes and any other nodes not in allParams pass through as-is.
         return raw;
       });
       await apiFetch<SchemaResponse>(
@@ -182,7 +318,6 @@ export function DataSourceSchemaEditor({
           body: JSON.stringify({ nodes: updatedNodes }),
         },
       );
-      // Update local display state
       setAllParams((prev) =>
         prev.map((p) =>
           p.id === selectedParam.id
@@ -190,7 +325,6 @@ export function DataSourceSchemaEditor({
             : p,
         ),
       );
-      // Keep rawNodesRef in sync so subsequent saves within this session remain correct
       rawNodesRef.current = rawNodesRef.current.map((raw) =>
         raw.nodeId === selectedParam.id
           ? { ...raw, unit: editBuffer.unit, description: editBuffer.description }
@@ -224,6 +358,41 @@ export function DataSourceSchemaEditor({
       setEditBuffer(originalBuffer);
     }
     setHasUnsavedChanges(false);
+  }
+
+  async function handleAddParameter() {
+    const name = addName.trim();
+    if (!name || !projectId) return;
+    const nodeId = `manual-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const newNode: NodeDto = {
+      nodeId,
+      parentId: null,
+      path: `/${name}`,
+      name,
+      kind: "VARIABLE",
+      dataType: addType,
+      valueRank: "SCALAR",
+      access: "READ_WRITE",
+      unit: addUnit.trim() || null,
+      description: null,
+    };
+    const nextNodes = [...rawNodesRef.current, newNode];
+    try {
+      const resp = await apiFetch<SchemaResponse>(
+        `/api/v1/projects/${projectId}/data-sources/${source.id}/schema`,
+        { method: "PUT", body: JSON.stringify({ nodes: nextNodes }) },
+      );
+      rawNodesRef.current = resp.nodes;
+      const variables = resp.nodes.filter((n) => n.kind === "VARIABLE");
+      setAllParams(variables.map(mapNode));
+      setTreeRoots(buildTree(resp.nodes));
+      setAddName("");
+      setAddUnit("");
+      setAddOpen(false);
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.title : "Failed to add parameter";
+      setSchemaError(msg);
+    }
   }
 
   if (schemaLoading) {
@@ -274,8 +443,82 @@ export function DataSourceSchemaEditor({
         >
           Discard changes
         </button>
+        {!isLockedByOther ? (
+          <button
+            className="shell-action"
+            type="button"
+            onClick={() => setAddOpen((v) => !v)}
+          >
+            + Add parameter
+          </button>
+        ) : null}
         {saving ? <StatusBadge label="Saving…" tone="accent" /> : null}
       </div>
+
+      {addOpen ? (
+        <div className="rounded-md border border-shell-line bg-white px-4 py-4 space-y-3">
+          <p className="text-sm font-medium text-shell-ink">New parameter</p>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <label className="flex flex-col gap-1.5 text-sm text-shell-muted">
+              Name
+              <input
+                autoFocus
+                className="shell-field"
+                placeholder="Temperature"
+                type="text"
+                value={addName}
+                onChange={(e) => setAddName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") handleAddParameter(); }}
+              />
+            </label>
+            <label className="flex flex-col gap-1.5 text-sm text-shell-muted">
+              Type
+              <select
+                className="shell-field"
+                value={addType}
+                onChange={(e) => setAddType(e.target.value)}
+              >
+                <option value="FLOAT64">Float64 (decimal)</option>
+                <option value="FLOAT32">Float32</option>
+                <option value="INT32">Int32</option>
+                <option value="INT64">Int64</option>
+                <option value="UINT32">UInt32</option>
+                <option value="INT16">Int16</option>
+                <option value="BOOL">Boolean</option>
+                <option value="STRING">String</option>
+                <option value="DATETIME">DateTime</option>
+              </select>
+            </label>
+            <label className="flex flex-col gap-1.5 text-sm text-shell-muted">
+              Unit
+              <input
+                className="shell-field"
+                placeholder="°C, bar, rpm…"
+                type="text"
+                value={addUnit}
+                onChange={(e) => setAddUnit(e.target.value)}
+              />
+            </label>
+          </div>
+          <div className="flex gap-2">
+            <button
+              className="shell-action"
+              disabled={!addName.trim()}
+              type="button"
+              onClick={handleAddParameter}
+            >
+              Add
+            </button>
+            <button
+              className="shell-action"
+              type="button"
+              onClick={() => { setAddOpen(false); setAddName(""); setAddUnit(""); }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(18rem,1fr)]">
         <div className="space-y-3">
@@ -288,37 +531,60 @@ export function DataSourceSchemaEditor({
               onChange={(e) => setSearchQuery(e.target.value)}
             />
             <span className="whitespace-nowrap text-sm text-shell-muted">
-              {filteredParams.length} of {allParams.length}
+              {allParams.length} parameters
             </span>
           </div>
+
           <div className="overflow-hidden rounded-md border border-shell-line bg-white max-h-[32rem] overflow-y-auto">
-            {filteredParams.length === 0 ? (
+            {searchQuery ? (
+              // Flat filtered list when searching
+              filteredParams.length === 0 ? (
+                <p className="px-4 py-6 text-center text-sm text-shell-muted">
+                  No parameters match the search.
+                </p>
+              ) : (
+                <ul className="divide-y divide-shell-line">
+                  {filteredParams.map((param) => (
+                    <li key={param.id}>
+                      <button
+                        className={`w-full px-4 py-3 text-left transition ${
+                          selectedParam?.id === param.id
+                            ? "bg-shell-accent/5"
+                            : "hover:bg-shell-base/50"
+                        }`}
+                        type="button"
+                        onClick={() => handleSelectParam(param)}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="min-w-0 flex-1 truncate font-mono text-sm text-shell-ink">
+                            {param.path}
+                          </span>
+                          <span className="shrink-0 text-xs text-shell-muted">
+                            {param.type.charAt(0).toUpperCase() + param.type.slice(1)}
+                          </span>
+                        </div>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )
+            ) : treeRoots.length === 0 ? (
               <p className="px-4 py-6 text-center text-sm text-shell-muted">
-                No parameters match the search.
+                No schema nodes found.
               </p>
             ) : (
-              <ul className="divide-y divide-shell-line">
-                {filteredParams.map((param) => (
-                  <li key={param.id}>
-                    <button
-                      className={`w-full px-4 py-3 text-left transition ${
-                        selectedParam?.id === param.id
-                          ? "bg-shell-accent/5"
-                          : "hover:bg-shell-base/50"
-                      }`}
-                      type="button"
-                      onClick={() => handleSelectParam(param)}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="min-w-0 flex-1 truncate font-mono text-sm text-shell-ink">
-                          {param.path}
-                        </span>
-                        <span className="shrink-0 text-xs text-shell-muted">
-                          {param.type.charAt(0).toUpperCase() + param.type.slice(1)}
-                        </span>
-                      </div>
-                    </button>
-                  </li>
+              // Tree view
+              <ul className="py-1">
+                {treeRoots.map((node) => (
+                  <TreeNodeRow
+                    key={node.nodeId}
+                    node={node}
+                    depth={0}
+                    selectedId={selectedParam?.id ?? null}
+                    expandedIds={expandedIds}
+                    onToggle={handleToggle}
+                    onSelect={handleSelectNode}
+                  />
                 ))}
               </ul>
             )}
@@ -391,7 +657,7 @@ export function DataSourceSchemaEditor({
         ) : (
           <section className="rounded-md border border-shell-line bg-white px-4 py-6">
             <p className="text-center text-sm text-shell-muted">
-              Select a parameter from the list to inspect or edit its details.
+              Select a parameter from the tree to inspect or edit its details.
             </p>
           </section>
         )}

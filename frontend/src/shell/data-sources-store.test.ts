@@ -11,7 +11,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi, type MockedFunction } from "vitest";
-import { useDataSourcesStore } from "./data-sources-store";
+import { useDataSourcesStore, parseEndpointUrl } from "./data-sources-store";
 import { apiFetch, mapProtocol, mapRuntimeStateToStatus, mapRuntimeStateToHealth } from "../api";
 
 vi.mock("../api", () => ({
@@ -155,5 +155,31 @@ describe("duplicateDataSource", () => {
     );
     expect(useDataSourcesStore.getState().dataSources).toHaveLength(2);
     expect(useDataSourcesStore.getState().dataSources[1].id).toBe("src-02");
+  });
+});
+
+describe("parseEndpointUrl", () => {
+  it("returns empty string for null", () => {
+    expect(parseEndpointUrl(null)).toBe("");
+  });
+
+  it("extracts url from valid jsonb object", () => {
+    expect(parseEndpointUrl('{"url":"opc.tcp://host:4840"}')).toBe("opc.tcp://host:4840");
+  });
+
+  it("returns raw string when JSON has no .url field", () => {
+    expect(parseEndpointUrl('{"host":"localhost"}')).toBe('{"host":"localhost"}');
+  });
+
+  it("returns raw string when input is not valid JSON", () => {
+    expect(parseEndpointUrl("opc.tcp://plain:4840")).toBe("opc.tcp://plain:4840");
+  });
+
+  it('returns raw string when JSON.parse returns "null"', () => {
+    expect(parseEndpointUrl("null")).toBe("null");
+  });
+
+  it("returns empty string for empty string input", () => {
+    expect(parseEndpointUrl("")).toBe("");
   });
 });

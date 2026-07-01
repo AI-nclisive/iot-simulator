@@ -70,6 +70,7 @@ export function simulateImportValidation(file: File): Promise<ValidationResult> 
         id: `imported-${Date.now()}`,
         origin: "imported",
         sourceId: "src-01",
+        sourceName: "",
         valueCount: estimatedValueCount,
         capturedAt: new Date().toISOString().slice(0, 16).replace("T", " "),
         capturedBy: "Import",

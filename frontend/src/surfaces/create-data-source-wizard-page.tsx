@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { resolveAccess } from "../shell/access-policy";
+import { useArtifactsStore } from "../shell/artifacts-store";
 import { useDataSourcesStore } from "../shell/data-sources-store";
 import { useShellStore } from "../shell/shell-store";
 import { useNotificationStore } from "../shell/notification-store";
@@ -36,7 +37,7 @@ type ProtocolOption = {
   portHint: string;
 };
 
-type SourceBasis = "scan" | "manual" | "import" | "synthetic";
+type SourceBasis = "scan" | "manual" | "import";
 
 type BasisOption = {
   id: SourceBasis;
@@ -47,10 +48,7 @@ type BasisOption = {
 
 type WizardFormState = {
   basis: SourceBasis | null;
-  importArtifactName: string;
-  importArtifactType: "recording" | "sample" | "schema-package";
-  importCompatStatus: "idle" | "compatible" | "incompatible" | "needs-review";
-  manualTemplate: "empty" | "analog" | "discrete";
+  importSelectedSampleId: string | null;
   modbusAddressBase: "0" | "1";
   modbusUnitId: string;
   name: string;
@@ -68,12 +66,6 @@ type WizardFormState = {
   scanUsername: string;
   scanJobId: string | null;
   schemaReviewNote: string;
-  syntheticProfile: "steady" | "spike" | "cycle";
-  syntheticParameterCount: string;
-  syntheticValueMin: string;
-  syntheticValueMax: string;
-  syntheticUpdateInterval: string;
-  syntheticSeed: string;
 };
 
 const protocolOptions: ProtocolOption[] = [
@@ -106,21 +98,50 @@ const basisOptions: BasisOption[] = [
     label: "Prepared data",
     note: "Bring in an existing recording, sample, or schema package.",
   },
-  {
-    id: "synthetic",
-    label: "Synthetic setup",
-    note: "Start from a generated pattern set for deliberate test coverage.",
-  },
 ];
 
-const wizardSteps = [
+type WizardStepId = "protocol" | "basis" | "setup" | "import" | "schema" | "runtime" | "review";
+type WizardStep = { id: WizardStepId; label: string };
+
+const SCAN_STEPS: WizardStep[] = [
   { id: "protocol", label: "Protocol" },
   { id: "basis", label: "Source basis" },
   { id: "setup", label: "Setup" },
   { id: "schema", label: "Schema" },
   { id: "runtime", label: "Runtime" },
   { id: "review", label: "Review" },
-] as const;
+];
+
+const MANUAL_STEPS: WizardStep[] = [
+  { id: "protocol", label: "Protocol" },
+  { id: "basis", label: "Source basis" },
+  { id: "setup", label: "Manual schema" },
+  { id: "review", label: "Review" },
+];
+
+const IMPORT_STEPS: WizardStep[] = [
+  { id: "protocol", label: "Protocol" },
+  { id: "basis", label: "Source basis" },
+  { id: "import", label: "Import data" },
+  { id: "runtime", label: "Runtime" },
+  { id: "review", label: "Review" },
+];
+
+const DEFAULT_STEPS: WizardStep[] = [
+  { id: "protocol", label: "Protocol" },
+  { id: "basis", label: "Source basis" },
+  { id: "setup", label: "Setup" },
+  { id: "schema", label: "Schema" },
+  { id: "runtime", label: "Runtime" },
+  { id: "review", label: "Review" },
+];
+
+function getActiveSteps(basis: SourceBasis | null): WizardStep[] {
+  if (basis === "scan") return SCAN_STEPS;
+  if (basis === "manual") return MANUAL_STEPS;
+  if (basis === "import") return IMPORT_STEPS;
+  return DEFAULT_STEPS;
+}
 
 function optionButtonClass(selected: boolean) {
   return `w-full rounded-md border px-4 py-4 text-left transition ${
@@ -160,70 +181,37 @@ function suggestedEndpoint(protocol: ProtocolOption["id"] | null, basis: SourceB
   return "127.0.0.1:502";
 }
 
-function resolveImportCompat(name: string): WizardFormState["importCompatStatus"] {
-  const n = name.toLowerCase();
-  if (n.includes("incompatible")) return "incompatible";
-  if (n.includes("needs-review")) return "needs-review";
-  if (n.trim().length > 0) return "compatible";
-  return "idle";
-}
-
-function validationMessage(stepIndex: number, form: WizardFormState) {
-  if (stepIndex === 0 && !form.protocol) {
+function validationMessage(stepId: WizardStepId, form: WizardFormState) {
+  if (stepId === "protocol" && !form.protocol) {
     return "Choose a protocol to continue.";
   }
 
-  if (stepIndex === 1 && !form.basis) {
+  if (stepId === "basis" && !form.basis) {
     return "Choose how this source will be created.";
   }
 
-  if (stepIndex === 2) {
+  if (stepId === "setup" || stepId === "import") {
     if (!form.name.trim()) {
       return "Enter a source name to continue.";
     }
 
-    if (form.basis === "scan" && !form.scanEndpoint.trim()) {
+    if (stepId === "setup" && form.basis === "scan" && !form.scanEndpoint.trim()) {
       return "Enter the real endpoint before continuing.";
     }
 
-    if (form.basis === "scan") {
+    if (stepId === "setup" && form.basis === "scan") {
       const credentialMessage = credentialValidationMessage(form);
-
-      if (credentialMessage) {
-        return credentialMessage;
-      }
+      if (credentialMessage) return credentialMessage;
     }
 
-    if (form.basis === "import") {
-      if (!form.importArtifactName.trim()) {
-        return "Enter the prepared artifact name before continuing.";
-      }
-      if (form.importCompatStatus === "incompatible") {
-        return "This artifact is not compatible. Choose a different artifact.";
-      }
-    }
-
-    if (form.basis === "synthetic") {
-      const min = Number(form.syntheticValueMin);
-      const max = Number(form.syntheticValueMax);
-      const count = Number(form.syntheticParameterCount);
-      const interval = Number(form.syntheticUpdateInterval);
-      if (!form.syntheticParameterCount.trim() || isNaN(count) || count < 1 || !Number.isInteger(count)) {
-        return "Parameter count must be a positive whole number.";
-      }
-      if (isNaN(min) || isNaN(max)) {
-        return "Value range min and max must be numbers.";
-      }
-      if (min > max) {
-        return "Value range min must not be greater than max.";
-      }
-      if (!form.syntheticUpdateInterval.trim() || isNaN(interval) || interval < 1 || !Number.isInteger(interval)) {
-        return "Update interval must be a positive whole number (milliseconds).";
+    if (stepId === "import") {
+      if (!form.importSelectedSampleId) {
+        return "Select a sample to continue.";
       }
     }
   }
 
-  if (stepIndex === 3 && form.basis === "scan") {
+  if (stepId === "schema" && form.basis === "scan") {
     if (form.scanState === "idle" || form.scanState === "scanning") {
       return "Run the scan and review the discovery result before continuing.";
     }
@@ -356,7 +344,7 @@ function resolveScanOutcome(form: WizardFormState): WizardFormState["scanState"]
   return "complete";
 }
 
-function reviewLines(form: WizardFormState) {
+function reviewLines(form: WizardFormState, selectedSampleName?: string) {
   const basisLabel = basisOptions.find((option) => option.id === form.basis)?.label ?? "-";
   const runtimeLabel =
     form.runtimeBehavior === "start-now" ? "Start immediately" : "Save without starting";
@@ -371,43 +359,21 @@ function reviewLines(form: WizardFormState) {
         form.basis === "scan"
           ? form.scanEndpoint || "-"
           : form.basis === "import"
-            ? form.importArtifactName || "-"
+            ? selectedSampleName ?? "-"
             : suggestedEndpoint(form.protocol, form.basis),
     },
     ...(form.basis === "scan"
-      ? [
-          {
-            label: "Credentials",
-            value: credentialReviewValue(form),
-          },
-        ]
+      ? [{ label: "Credentials", value: credentialReviewValue(form) }]
       : []),
     ...(form.basis === "import"
-      ? [
-          { label: "Artifact type", value: form.importArtifactType.replaceAll("-", " ") },
-          {
-            label: "Compatibility",
-            value:
-              form.importCompatStatus === "compatible"
-                ? "Compatible"
-                : form.importCompatStatus === "needs-review"
-                  ? "Needs review"
-                  : "Not checked",
-          },
-        ]
+      ? [{ label: "Sample", value: selectedSampleName ?? "-" }]
       : []),
-    ...(form.basis === "synthetic" ? [
-      { label: "Synthetic profile", value: form.syntheticProfile },
-      { label: "Parameters", value: form.syntheticParameterCount || "100" },
-      { label: "Value range", value: `${form.syntheticValueMin} – ${form.syntheticValueMax}` },
-      { label: "Update interval", value: `${form.syntheticUpdateInterval || "1000"} ms` },
-      { label: "Repeatability", value: form.syntheticSeed ? `Seed: ${form.syntheticSeed}` : "Non-deterministic" },
-    ] : []),
-    { label: "Runtime behavior", value: runtimeLabel },
     ...(form.basis === "manual"
-      ? [{ label: "Schema handoff", value: "Schema Editor (opens after create)" }]
+      ? [{ label: "Next step", value: "Schema editor opens after creation" }]
+      : [{ label: "Runtime behavior", value: runtimeLabel }]),
+    ...(form.basis === "scan"
+      ? [{ label: "Schema note", value: form.schemaReviewNote.trim() || "No note" }]
       : []),
-    { label: "Schema note", value: form.schemaReviewNote.trim() || "No note" },
   ];
 }
 
@@ -421,14 +387,17 @@ export function CreateDataSourceWizardPage() {
   const access = resolveAccess(accessMode, sharedRole);
   const scanPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const samples = useArtifactsStore((state) => state.samples);
+  const isSamplesLoading = useArtifactsStore((state) => state.isSamplesLoading);
+  const samplesError = useArtifactsStore((state) => state.samplesError);
+  const loadSamples = useArtifactsStore((state) => state.loadSamples);
+
   const [currentStep, setCurrentStep] = useState(0);
   const [showValidation, setShowValidation] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [form, setForm] = useState<WizardFormState>({
     basis: null,
-    importArtifactName: "",
-    importArtifactType: "recording",
-    importCompatStatus: "idle",
-    manualTemplate: "empty",
+    importSelectedSampleId: null,
     modbusAddressBase: "0",
     modbusUnitId: "1",
     name: "",
@@ -446,19 +415,27 @@ export function CreateDataSourceWizardPage() {
     scanUsername: "",
     scanJobId: null,
     schemaReviewNote: "",
-    syntheticProfile: "steady",
-    syntheticParameterCount: "100",
-    syntheticValueMin: "0",
-    syntheticValueMax: "100",
-    syntheticUpdateInterval: "1000",
-    syntheticSeed: "",
   });
 
-  const currentValidationMessage = validationMessage(currentStep, form);
+  const activeSteps = getActiveSteps(form.basis);
+  const safeStep = Math.min(currentStep, activeSteps.length - 1);
+  const activeStepId = activeSteps[safeStep].id;
+  const currentValidationMessage = validationMessage(activeStepId, form);
   const currentProtocol = protocolOptions.find((option) => option.id === form.protocol) ?? null;
   const currentBasis = basisOptions.find((option) => option.id === form.basis) ?? null;
 
-  const reviewItems = useMemo(() => reviewLines(form), [form]);
+  const selectedSample = useMemo(
+    () => samples.find((s) => s.id === form.importSelectedSampleId) ?? null,
+    [samples, form.importSelectedSampleId],
+  );
+  const reviewItems = useMemo(() => reviewLines(form, selectedSample?.name), [form, selectedSample]);
+
+  // Load samples when import basis is active
+  useEffect(() => {
+    if (form.basis === "import" && currentProjectId) {
+      loadSamples(currentProjectId);
+    }
+  }, [form.basis, currentProjectId, loadSamples]);
 
   // Clean up polling on unmount
   useEffect(() => {
@@ -500,10 +477,7 @@ export function CreateDataSourceWizardPage() {
   function handleBasisSelect(basis: SourceBasis) {
     updateForm({
       basis,
-      importArtifactName:
-        basis === "import" && form.importArtifactName.length === 0
-          ? "line-temperature.recording"
-          : form.importArtifactName,
+      importSelectedSampleId: null,
       scanEndpoint:
       basis === "scan" && form.scanEndpoint.trim().length === 0
           ? suggestedEndpoint(form.protocol, basis)
@@ -623,7 +597,7 @@ export function CreateDataSourceWizardPage() {
     }
 
     setShowValidation(false);
-    setCurrentStep((step) => Math.min(step + 1, wizardSteps.length - 1));
+    setCurrentStep((step) => Math.min(step + 1, activeSteps.length - 1));
   }
 
   function goBack() {
@@ -636,8 +610,13 @@ export function CreateDataSourceWizardPage() {
   }
 
   async function createSource() {
-    if (!form.protocol || !form.basis || !currentProjectId) {
+    if (!form.protocol || !form.basis) {
       setShowValidation(true);
+      return;
+    }
+
+    if (!currentProjectId) {
+      push({ tone: "error", title: "No project selected. Choose a project from the sidebar first." });
       return;
     }
 
@@ -658,8 +637,7 @@ export function CreateDataSourceWizardPage() {
         );
         createdId = data.id;
       } else {
-        // Manual / import / synthetic: POST to data-sources directly
-        const endpoint =
+        const endpointUrl =
           form.basis === "scan"
             ? form.scanEndpoint
             : suggestedEndpoint(form.protocol, form.basis);
@@ -669,7 +647,8 @@ export function CreateDataSourceWizardPage() {
             method: "POST",
             body: JSON.stringify({
               name: form.name.trim(),
-              endpoint,
+              endpoint: JSON.stringify({ url: endpointUrl }),
+              runtimeConfig: JSON.stringify({}),
               protocol: backendProtocolForForm(form.protocol),
               basis: form.basis.toUpperCase(),
             }),
@@ -692,6 +671,7 @@ export function CreateDataSourceWizardPage() {
         navigate(`/data-sources/${createdId}`);
       }
     } catch (err) {
+      console.error("[createSource]", err);
       const title = err instanceof Error ? err.message : "Failed to create source";
       push({ tone: "error", title });
     }
@@ -857,40 +837,64 @@ export function CreateDataSourceWizardPage() {
             ) : null}
 
           {form.protocol === "OPC UA" ? (
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="flex flex-col gap-2 text-sm text-shell-muted">
-                Security policy
-                <select
-                  className="shell-field"
-                  value={form.opcUaSecurity}
-                  onChange={(event) =>
-                    updateForm({
-                      opcUaSecurity: event.target.value as WizardFormState["opcUaSecurity"],
-                    })
-                  }
-                >
-                  <option value="None">None</option>
-                  <option value="Basic256Sha256">Basic256Sha256</option>
-                </select>
-              </label>
+            <>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="flex flex-col gap-2 text-sm text-shell-muted">
+                  Security policy
+                  <select
+                    className="shell-field"
+                    value={form.opcUaSecurity}
+                    onChange={(event) =>
+                      updateForm({
+                        opcUaSecurity: event.target.value as WizardFormState["opcUaSecurity"],
+                      })
+                    }
+                  >
+                    <option value="None">None</option>
+                    <option value="Basic256Sha256">Basic256Sha256</option>
+                  </select>
+                </label>
+              </div>
 
-              <label className="flex flex-col gap-2 text-sm text-shell-muted">
-                Namespace handling
-                <select
-                  className="shell-field"
-                  value={form.opcUaNamespaceStrategy}
-                  onChange={(event) =>
-                    updateForm({
-                      opcUaNamespaceStrategy:
-                        event.target.value as WizardFormState["opcUaNamespaceStrategy"],
-                    })
-                  }
-                >
-                  <option value="normalize">Normalize to simulator</option>
-                  <option value="preserve">Preserve discovered namespaces</option>
-                </select>
-              </label>
-            </div>
+              {form.basis === "scan" ? (
+                <div className="border-t border-shell-line pt-3">
+                  <button
+                    className="flex items-center gap-1.5 text-sm text-shell-muted hover:text-shell-ink transition"
+                    type="button"
+                    onClick={() => setShowAdvanced((v) => !v)}
+                  >
+                    <span>{showAdvanced ? "▾" : "▸"}</span>
+                    Advanced options
+                  </button>
+
+                  {showAdvanced ? (
+                    <div className="mt-3 space-y-3">
+                      <label className="flex flex-col gap-2 text-sm text-shell-muted">
+                        Node ID format
+                        <select
+                          className="shell-field"
+                          value={form.opcUaNamespaceStrategy}
+                          onChange={(event) =>
+                            updateForm({
+                              opcUaNamespaceStrategy:
+                                event.target.value as WizardFormState["opcUaNamespaceStrategy"],
+                            })
+                          }
+                        >
+                          <option value="normalize">Normalize (recommended)</option>
+                          <option value="preserve">Preserve original</option>
+                        </select>
+                        <p className="text-xs text-shell-muted leading-5">
+                          <strong className="text-shell-ink">Normalize</strong> — the simulator assigns its own node IDs after discovery. The schema works across different servers and is easier to read.
+                          <br />
+                          <strong className="text-shell-ink">Preserve original</strong> — keeps the exact node IDs from the real device (e.g. <span className="font-mono">ns=3;s=Boiler.Temp</span>). Use this only if another system expects those exact IDs.
+                        </p>
+                      </label>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+            </>
           ) : null}
 
           {form.protocol === "Modbus TCP" ? (
@@ -926,208 +930,71 @@ export function CreateDataSourceWizardPage() {
           ) : null}
 
           {form.basis === "manual" ? (
-            <label className="flex flex-col gap-2 text-sm text-shell-muted">
-              Starting template
-              <select
-                className="shell-field"
-                value={form.manualTemplate}
-                onChange={(event) =>
-                  updateForm({
-                    manualTemplate: event.target.value as WizardFormState["manualTemplate"],
-                  })
-                }
-              >
-                <option value="empty">Empty structure</option>
-                <option value="analog">Analog parameter set</option>
-                <option value="discrete">Discrete state set</option>
-              </select>
-            </label>
+            <section className="rounded-md border border-shell-accent/30 bg-shell-accent/5 px-4 py-3 text-sm text-shell-ink">
+              After creation, the Schema editor opens automatically — add parameters, folders, and data types there.
+            </section>
           ) : null}
 
           {form.basis === "import" ? (
-            <div className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className="flex flex-col gap-2 text-sm text-shell-muted">
-                  Artifact type
-                  <select
-                    className="shell-field"
-                    value={form.importArtifactType}
-                    onChange={(e) =>
-                      updateForm({
-                        importArtifactType: e.target.value as WizardFormState["importArtifactType"],
-                        importCompatStatus: "idle",
-                      })
-                    }
-                  >
-                    <option value="recording">Recording</option>
-                    <option value="sample">Sample</option>
-                    <option value="schema-package">Schema package</option>
-                  </select>
-                </label>
-                <label className="flex flex-col gap-2 text-sm text-shell-muted">
-                  Artifact name
-                  <input
-                    className="shell-field"
-                    placeholder="packaging-pressure.sample"
-                    type="text"
-                    value={form.importArtifactName}
-                    onChange={(e) =>
-                      updateForm({ importArtifactName: e.target.value, importCompatStatus: "idle" })
-                    }
-                  />
-                </label>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3">
-                <button
-                  className="shell-action"
-                  type="button"
-                  onClick={() =>
-                    updateForm({
-                      importCompatStatus: resolveImportCompat(form.importArtifactName),
-                    })
-                  }
-                >
-                  Check compatibility
-                </button>
-                {form.importCompatStatus === "compatible" ? (
-                  <StatusBadge label="Compatible" tone="accent" />
-                ) : null}
-                {form.importCompatStatus === "incompatible" ? (
-                  <StatusBadge label="Incompatible" tone="danger" />
-                ) : null}
-                {form.importCompatStatus === "needs-review" ? (
-                  <StatusBadge label="Needs review" tone="warning" />
-                ) : null}
-              </div>
-
-              {form.importCompatStatus === "incompatible" ? (
-                <section className="rounded-md border border-shell-danger/30 bg-red-50 px-4 py-3">
-                  <p className="text-sm font-medium text-shell-danger">
-                    This artifact is not compatible with the current simulator version.
-                  </p>
-                  <p className="mt-1 text-sm leading-6 text-shell-muted">
-                    Choose a different artifact or contact the owner to update the file format.
-                  </p>
-                </section>
-              ) : null}
-
-              {form.importCompatStatus === "needs-review" ? (
-                <section className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3">
-                  <p className="text-sm font-medium text-amber-700">
-                    Some structure in this artifact may need manual review after import.
-                  </p>
-                  <p className="mt-1 text-sm leading-6 text-shell-muted">
-                    You can continue, but check the Schema tab after creation.
-                  </p>
-                </section>
-              ) : null}
-
-              {form.importCompatStatus === "compatible" ? (
-                <section className="rounded-md border border-shell-line bg-white px-4 py-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
-                    What will be available after import
-                  </p>
-                  <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-3">
-                    <div>
-                      <dt className="text-shell-muted">Artifact type</dt>
-                      <dd className="mt-1 capitalize text-shell-ink">
-                        {form.importArtifactType.replaceAll("-", " ")}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-shell-muted">Parameters</dt>
-                      <dd className="mt-1 text-shell-ink">–</dd>
-                    </div>
-                    <div>
-                      <dt className="text-shell-muted">Excluded</dt>
-                      <dd className="mt-1 text-shell-ink">Credentials and secrets stripped</dd>
-                    </div>
-                  </dl>
-                </section>
-              ) : null}
-            </div>
-          ) : null}
-
-          {form.basis === "synthetic" ? (
-            <div className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className="flex flex-col gap-2 text-sm text-shell-muted">
-                  Profile
-                  <select
-                    className="shell-field"
-                    value={form.syntheticProfile}
-                    onChange={(event) =>
-                      updateForm({
-                        syntheticProfile: event.target.value as WizardFormState["syntheticProfile"],
-                      })
-                    }
-                  >
-                    <option value="steady">Steady trend</option>
-                    <option value="spike">Spike and recovery</option>
-                    <option value="cycle">Cyclic pattern</option>
-                  </select>
-                </label>
-                <label className="flex flex-col gap-2 text-sm text-shell-muted">
-                  Parameter count
-                  <input
-                    className="shell-field"
-                    inputMode="numeric"
-                    type="text"
-                    value={form.syntheticParameterCount}
-                    onChange={(e) => updateForm({ syntheticParameterCount: e.target.value })}
-                  />
-                </label>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className="flex flex-col gap-2 text-sm text-shell-muted">
-                  Value range — min
-                  <input
-                    className="shell-field"
-                    inputMode="numeric"
-                    type="text"
-                    value={form.syntheticValueMin}
-                    onChange={(e) => updateForm({ syntheticValueMin: e.target.value })}
-                  />
-                </label>
-                <label className="flex flex-col gap-2 text-sm text-shell-muted">
-                  Value range — max
-                  <input
-                    className="shell-field"
-                    inputMode="numeric"
-                    type="text"
-                    value={form.syntheticValueMax}
-                    onChange={(e) => updateForm({ syntheticValueMax: e.target.value })}
-                  />
-                </label>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className="flex flex-col gap-2 text-sm text-shell-muted">
-                  Update interval (ms)
-                  <input
-                    className="shell-field"
-                    inputMode="numeric"
-                    type="text"
-                    value={form.syntheticUpdateInterval}
-                    onChange={(e) => updateForm({ syntheticUpdateInterval: e.target.value })}
-                  />
-                </label>
-                <label className="flex flex-col gap-2 text-sm text-shell-muted">
-                  Repeatability seed
-                  <input
-                    className="shell-field"
-                    placeholder="Leave empty for non-deterministic"
-                    type="text"
-                    value={form.syntheticSeed}
-                    onChange={(e) => updateForm({ syntheticSeed: e.target.value })}
-                  />
-                </label>
-              </div>
-              <p className="text-xs text-shell-muted">
-                A seed makes runs repeatable with the same value sequence. Leave empty for non-deterministic output.
+            <div className="space-y-3">
+              <p className="text-sm text-shell-muted">
+                Select a sample to use as the data source for this source.
               </p>
+              {isSamplesLoading ? (
+                <p className="text-sm text-shell-muted">Loading samples…</p>
+              ) : samplesError ? (
+                <p className="text-sm text-shell-danger">{samplesError}</p>
+              ) : samples.length === 0 ? (
+                <section className="rounded-md border border-shell-line bg-shell-base/40 px-4 py-6 text-center">
+                  <p className="text-sm font-medium text-shell-ink">No samples available.</p>
+                  <p className="mt-1 text-sm text-shell-muted">
+                    Create a sample from an existing recording first.
+                  </p>
+                </section>
+              ) : (
+                <ul className="space-y-2">
+                  {samples.map((sample) => {
+                    const isSelected = form.importSelectedSampleId === sample.id;
+                    return (
+                      <li key={sample.id}>
+                        <button
+                          className={`w-full rounded-md border px-4 py-3 text-left transition ${
+                            isSelected
+                              ? "border-shell-accent bg-white shadow-sm"
+                              : "border-shell-line bg-shell-base/55 hover:border-shell-accent/45 hover:bg-white"
+                          }`}
+                          type="button"
+                          onClick={() => updateForm({ importSelectedSampleId: sample.id })}
+                        >
+                          <p className="text-sm font-medium text-shell-ink">{sample.name}</p>
+                          <div className="mt-1 flex flex-wrap items-center gap-2">
+                            {sample.tags.length > 0
+                              ? sample.tags.map((tag) => (
+                                  <span
+                                    key={tag}
+                                    className="rounded bg-shell-base px-1.5 py-0.5 text-xs text-shell-muted"
+                                  >
+                                    {tag}
+                                  </span>
+                                ))
+                              : null}
+                            <span className="text-xs text-shell-muted">
+                              {new Date(sample.createdAt).toLocaleDateString("en-GB", {
+                                day: "2-digit",
+                                month: "short",
+                                year: "numeric",
+                              })}
+                            </span>
+                          </div>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
             </div>
           ) : null}
+
         </div>
 
         <section className="rounded-md border border-shell-line bg-white px-4 py-4">
@@ -1151,7 +1018,9 @@ export function CreateDataSourceWizardPage() {
               ) : null}
               <div>
                 <dt className="text-shell-muted">Next</dt>
-                <dd className="mt-1 text-shell-ink">Schema review</dd>
+                <dd className="mt-1 text-shell-ink">
+                  {form.basis === "scan" ? "Schema review" : "Runtime"}
+                </dd>
               </div>
           </dl>
         </section>
@@ -1353,7 +1222,7 @@ export function CreateDataSourceWizardPage() {
   }
 
   function renderCurrentStep() {
-    if (currentStep === 0) {
+    if (activeStepId === "protocol") {
       return (
         <div className="grid gap-3 lg:grid-cols-2">
           {protocolOptions.map((option) => (
@@ -1372,7 +1241,7 @@ export function CreateDataSourceWizardPage() {
       );
     }
 
-    if (currentStep === 1) {
+    if (activeStepId === "basis") {
       return (
         <div className="grid gap-3 lg:grid-cols-2">
           {basisOptions.map((option) => (
@@ -1395,15 +1264,15 @@ export function CreateDataSourceWizardPage() {
       );
     }
 
-    if (currentStep === 2) {
+    if (activeStepId === "setup" || activeStepId === "import") {
       return renderSetupStep();
     }
 
-    if (currentStep === 3) {
+    if (activeStepId === "schema") {
       return renderSchemaStep();
     }
 
-    if (currentStep === 4) {
+    if (activeStepId === "runtime") {
       return renderRuntimeStep();
     }
 
@@ -1425,15 +1294,15 @@ export function CreateDataSourceWizardPage() {
 
           <nav aria-label="Wizard steps">
             <ol className="flex flex-wrap items-center gap-2">
-              {wizardSteps.map((step, index) => (
+              {activeSteps.map((step, index) => (
                 <li key={step.id}>
                   <button
-                    aria-current={currentStep === index ? "step" : undefined}
+                    aria-current={safeStep === index ? "step" : undefined}
                     className={`rounded-md border px-3 py-2 text-sm ${stepChipClass(
-                      currentStep === index,
-                      index < currentStep,
+                      safeStep === index,
+                      index < safeStep,
                     )}`}
-                    disabled={index > currentStep}
+                    disabled={index > safeStep}
                     type="button"
                     onClick={() => setCurrentStep(index)}
                   >
@@ -1451,10 +1320,10 @@ export function CreateDataSourceWizardPage() {
           <div className="flex items-center justify-between gap-3">
             <div>
               <h3 className="text-lg font-semibold text-shell-ink">
-                {wizardSteps[currentStep].label}
+                {activeSteps[safeStep].label}
               </h3>
               <p className="mt-1 text-sm text-shell-muted">
-                Step {currentStep + 1} of {wizardSteps.length}
+                Step {safeStep + 1} of {activeSteps.length}
               </p>
             </div>
 
@@ -1482,14 +1351,14 @@ export function CreateDataSourceWizardPage() {
           <div className="flex flex-wrap items-center justify-end gap-2">
             <button
               className="shell-action"
-              disabled={currentStep === 0}
+              disabled={safeStep === 0}
               type="button"
               onClick={goBack}
             >
               Back
             </button>
 
-            {currentStep === wizardSteps.length - 1 ? (
+            {safeStep === activeSteps.length - 1 ? (
               <button className="shell-action" type="button" onClick={createSource}>
                 Create source
               </button>

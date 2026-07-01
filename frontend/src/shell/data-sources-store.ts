@@ -23,12 +23,22 @@ type DataSourceResponse = {
   version: number;
 };
 
+export function parseEndpointUrl(raw: string | null): string {
+  if (!raw) return "";
+  try {
+    const parsed = JSON.parse(raw);
+    return typeof parsed?.url === "string" ? parsed.url : raw;
+  } catch {
+    return raw;
+  }
+}
+
 function mapDataSource(d: DataSourceResponse): DataSourceRow {
   return {
     id: d.id,
     name: d.name,
     protocol: mapProtocol(d.protocol),
-    endpoint: d.endpoint ?? "",
+    endpoint: parseEndpointUrl(d.endpoint),
     parameterCount: 0, // TODO(UI-097): no backend field — will come from schema node count
     status: mapRuntimeStateToStatus(d.runtimeState),
     health: mapRuntimeStateToHealth(d.runtimeState) ?? "Healthy",
