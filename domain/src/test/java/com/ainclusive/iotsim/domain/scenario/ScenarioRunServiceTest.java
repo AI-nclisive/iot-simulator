@@ -109,6 +109,9 @@ class ScenarioRunServiceTest {
                 .thenReturn(parent);
         when(runs.start(eq("run-parent"), any())).thenReturn(parent);
         when(runs.end(eq("run-parent"), anyString(), any())).thenReturn(parent);
+        RunRow completedParent = new RunRow("run-parent", PROJECT, "SCENARIO", "MANUAL", "local", "COMPLETED",
+                SCENARIO, null, OffsetDateTime.now(), null, OffsetDateTime.now(), List.of(SOURCE), null);
+        when(runs.end(eq("run-parent"), eq("COMPLETED"), any())).thenReturn(completedParent);
         // EvidenceRow has 8 fields: (id, projectId, runId, status, manifestJson, objectRef, createdAt, createdBy)
         when(evidence.create(eq(PROJECT), eq("run-parent"), anyString()))
                 .thenReturn(new EvidenceRow("ev-1", PROJECT, "run-parent", "CAPTURING", "{}", null, null, "local"));
@@ -118,7 +121,7 @@ class ScenarioRunServiceTest {
         ScenarioRunSummary summary = service.run(PROJECT, SCENARIO, "MANUAL", "local");
 
         assertThat(summary.runId()).isEqualTo("run-parent");
-        assertThat(summary.status()).isEqualTo("RUNNING"); // ended.state() from stubbed RunRow
+        assertThat(summary.status()).isEqualTo("COMPLETED"); // ended.state() from COMPLETED-state RunRow stub
         assertThat(summary.steps()).extracting(StepOutcome::type).containsExactly("START", "REPLAY", "STOP");
         verify(dataSources).start(PROJECT, SOURCE);
         verify(dataSources).stop(PROJECT, SOURCE);
