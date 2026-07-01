@@ -23,7 +23,7 @@ type DataSourceResponse = {
   version: number;
 };
 
-function parseEndpointUrl(raw: string | null): string {
+export function parseEndpointUrl(raw: string | null): string {
   if (!raw) return "";
   try {
     const parsed = JSON.parse(raw);

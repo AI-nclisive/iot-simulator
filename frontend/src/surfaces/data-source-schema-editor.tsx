@@ -7,7 +7,7 @@ import type { DataSourceRow } from "./mock-data-sources";
 import type { ParameterType, SchemaParameter } from "./mock-schema-parameters";
 
 // Backend schema shapes from GET/PUT /api/v1/projects/{pid}/data-sources/{id}/schema
-type NodeDto = {
+export type NodeDto = {
   nodeId: string;
   parentId: string | null;
   path: string;
@@ -29,7 +29,7 @@ type SchemaResponse = {
 
 type TreeNode = NodeDto & { children: TreeNode[] };
 
-function buildTree(nodes: NodeDto[]): TreeNode[] {
+export function buildTree(nodes: NodeDto[]): TreeNode[] {
   const byId = new Map<string, TreeNode>();
   for (const n of nodes) byId.set(n.nodeId, { ...n, children: [] });
   const roots: TreeNode[] = [];
