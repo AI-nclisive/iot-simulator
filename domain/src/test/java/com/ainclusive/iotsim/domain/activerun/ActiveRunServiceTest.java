@@ -81,7 +81,7 @@ class ActiveRunServiceTest {
         }
 
         @Override
-        public DataSourceRow insert(String p, String n, String prot, String b, String ep,
+        public DataSourceRow insert(String p, String n, String prot, String b, int sp, String rde,
                 String rc, String cb) {
             throw new UnsupportedOperationException();
         }
@@ -108,7 +108,7 @@ class ActiveRunServiceTest {
         }
 
         @Override
-        public Optional<DataSourceRow> update(String id, String name, String ep, String rc,
+        public Optional<DataSourceRow> update(String id, String name, int sp, String rde, String rc,
                 boolean enabled, long ev) {
             return Optional.empty();
         }
@@ -176,7 +176,7 @@ class ActiveRunServiceTest {
 
     private static DataSourceRow dsRow(String id, String name) {
         OffsetDateTime at = OffsetDateTime.of(2026, 7, 1, 0, 0, 0, 0, ZoneOffset.UTC);
-        return new DataSourceRow(id, "p1", name, "OPC_UA", "REAL", null, 0, "{}", "{}", true,
+        return new DataSourceRow(id, "p1", name, "OPC_UA", "REAL", null, 0, 0, null, "{}", true,
                 at, at, "local", 0L);
     }
 

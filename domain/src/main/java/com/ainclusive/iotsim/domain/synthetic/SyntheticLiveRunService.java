@@ -97,7 +97,7 @@ public class SyntheticLiveRunService {
             runs.linkEvidence(run.id(), evidenceRow.id());
             evidence.updateManifest(evidenceRow.id(), manifest(settings.seed(), 0));
 
-            runtime.start(dataSourceId, RuntimeStartSpecs.of(schemas, source, json));
+            runtime.start(dataSourceId, RuntimeStartSpecs.of(schemas, source));
 
             List<VariableFeed> feeds = new ArrayList<>();
             for (SyntheticVariable variable : variables) {

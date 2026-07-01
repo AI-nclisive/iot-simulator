@@ -79,7 +79,7 @@ class ProjectOverviewServiceTest {
                 return projects;
             }
         };
-        DataSourceService dataSourceService = new DataSourceService(null, null, null, null, null, null) {
+        DataSourceService dataSourceService = new DataSourceService(null, null, null, null, null, null, "localhost") {
             @Override
             public List<DataSource> list(String projectId) {
                 return sourcesByProject.getOrDefault(projectId, List.of());
@@ -102,7 +102,8 @@ class ProjectOverviewServiceTest {
     private static DataSource source(String id, RuntimeState state) {
         Instant now = Instant.now();
         return new DataSource(id, "p1", "src-" + id, Protocol.OPC_UA, SourceBasis.MANUAL,
-                null, null, "{}", "{}", false, state, CredentialState.MISSING, now, now, "local", 0);
+                null, null, 0, null, "{}", false, state, CredentialState.MISSING,
+                "opc.tcp://localhost:0/iotsim", now, now, "local", 0);
     }
 
     private static Recording recording(String id) {
