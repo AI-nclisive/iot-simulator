@@ -790,6 +790,13 @@ Parallel execution:
   Depends: IS-122.
   Done when: overview shows real active runs from backend; no mock data imported in the component; empty state renders correctly; no TypeScript errors.
 
+- [x] `UI-112` Recording flow — real SSE value stream
+  Goal: Replace the fake `setInterval` value counter in `RecordingFlowPage` with a real SSE subscription via `useLiveValues`.
+  Surface: `Recording flow page` — capture metrics (value count, last received, state transitions).
+  Work includes: remove fake timer; wire `useLiveValues(sourceId, captureActive)`; sync `valueCount` from SSE rows; transition `recordingState` from SSE `liveStatus`; remove "Simulate disconnect" debug button.
+  Depends: IS-051 (values SSE stream).
+  Done when: no fake timer in `RecordingFlowPage`; value count and state reflect real SSE; TypeScript errors pass.
+
 ## Recommended Sequence
 
 1. Complete the P0 shell and shared-pattern tasks first.
