@@ -21,7 +21,7 @@ dependency-ordered. (Optimized for "make the simulator real end to end, then
 broaden, then harden for teams" — can be re-weighted if the near-term goal
 differs.)
 
-Snapshot: **build green.** 95 done · 25 todo (120 total). Live status is the board; this line is a periodic snapshot.
+Snapshot: **build green.** 94 done · 25 todo (119 total). Live status is the board; this line is a periodic snapshot.
 
 <details>
 <summary>ID crosswalk — legacy <code>BE-*</code> / <code>SDLC-*</code> → <code>IS-XXX</code></summary>
@@ -83,7 +83,6 @@ Tier 2 — contribution hygiene:
 - [x] IS-113 [SDLC] ✅ Board status flow + review-completion rule documented (In Progress at start, In review at PR open; task done only when all review comments resolved) — `AGENTS.md`/`CONTRIBUTING.md`
 - [x] IS-115 [SDLC] ✅ Task pre-flight checklist + board-wins tie-break + `catalog-sync` CI guard (a task-linked PR must flip its own catalog checkbox) — `AGENTS.md`/`.github/workflows/ci.yml`
 - [x] IS-117 [SDLC] ✅ Claude Code skills for the contribution workflow under `.claude/skills/` (`/start-task`, `/open-pr`, `/review-loop`, `/new-worker`, `/flyway-migration`, `/board-sync`) + recommended built-in skills documented in `CONTRIBUTING.md` — executable procedures for `CONTRIBUTING.md`/`AGENTS.md`
-- [x] IS-120 [SDLC] ✅ Local e2e run tooling — `/run-local` skill (cross-platform: Postgres + backend + Vite dev proxy, with teardown) + README run/test instructions + `docs/FRONTEND_BACKEND_CONTRACT_MAP.md` refresh for IS-074; wire FE list stores (projects/data-sources/recordings) to the `Page<T>` pagination envelope so they stop failing to load
 
 Tier 3 — quality automation:
 - [x] IS-105 [SDLC] ✅ Spotless (import order + whitespace hygiene) — runs in `check`/CI
@@ -91,7 +90,6 @@ Tier 3 — quality automation:
 - [x] IS-107 [SDLC] ✅ JaCoCo coverage (XML+HTML) finalizing `test`
 - [x] IS-108 [SDLC] ✅ Dependabot (gradle + github-actions)
 - [x] IS-112 [SDLC] ✅ Claude PR code review (`anthropics/claude-code-action` on `pull_request`): reviews every PR diff against repo conventions, posts inline + verdict comments, and submits a formal review (APPROVE / REQUEST_CHANGES) that gates merge — the Claude GitHub App's APPROVE supplies branch protection's 1 required review; required check stays `build`. Auth = `CLAUDE_CODE_OAUTH_TOKEN` + Claude GitHub App — see `.github/OWNER_SETUP.md`
-- [ ] IS-121 [SDLC] ⬜ Web-layer (MockMvc) controller test harness — add `spring-boot-starter-test` to the `api` module + `@WebMvcTest` slice pattern (HTTP status via `GlobalExceptionHandler`, JSON, headers); backfill `ScenarioController` then other CRUD controllers. Split out of IS-085.
 
 Tier 4 — parallel-conflict mitigations:
 - [x] IS-109 [SDLC] ✅ Flyway migration version-collision convention (documented)
@@ -190,7 +188,7 @@ import/export. Modbus moved to Wave G (deferred) — see the note there.
 - [x] IS-067 [BE] ✅ [source] Create from import / prepared data — SPEC: Manually Create
 - [x] IS-068 [BE] ✅ [recording] Samples (named subset/snapshot) — SPEC: Store Multiple/Samples
 - [x] IS-069 [BE] ✅ [replay] Replay configuration (timing/ordering/compat checks) — SPEC: Replay
-- [x] IS-070 [BE] ✅ [recording] Recording/sample import & export (legacy alias BE-IO2) — SPEC: Import/Export · 06
+- [ ] IS-070 [BE] ⬜ [recording] Recording/sample import & export (legacy alias BE-IO2) — SPEC: Import/Export · 06
 - [x] IS-071 [BE] ⬜ [project] Duplicate project — SPEC: Manage Projects
 - [x] IS-072 [BE] ✅ [project] Archive project — SPEC: Manage Projects
 - [x] IS-073 [BE] ✅ [io] Project export/import (versioned ZIP+manifest, secret-free) — 06
@@ -203,7 +201,7 @@ import/export. Modbus moved to Wave G (deferred) — see the note there.
 - [ ] IS-076 [BE] ⬜ [auth] Flexible permission model + role→permission mapping — 08
 - [ ] IS-077 [BE] ⬜ [auth] API-layer authorization enforcement (admin/user) — 08
 - [x] IS-078 [BE] ✅ [auth] Local vs shared mode enforcement (flag exists, no enforcement) — 08
-- [ ] IS-079 [BE] ⬜ [persist] Auth table repositories (users/roles/permissions/leases) — 04
+- [x] IS-079 [BE] ✅ [persist] Auth table repositories (users/roles/permissions/leases) — 04
 - [ ] IS-080 [BE] ⬜ [auth] Advisory edit leases (read-only while editing; stale recovery) — 08
 - [ ] IS-081 [BE] ⬜ [api] Edit-lease endpoints — 05
 - [ ] IS-082 [BE] ⬜ [auth] Secrets via env/external store; structural export exclusion — 08
@@ -213,7 +211,7 @@ import/export. Modbus moved to Wave G (deferred) — see the note there.
 
 ## Wave F — Advanced workflows & hardening · P2
 
-- [x] IS-085 [BE] ✅ [gen] Scenario model + steps (start/stop/replay/synthetic/fault/wait/marker) — SPEC: Build Scenarios
+- [ ] IS-085 [BE] ⬜ [gen] Scenario model + steps (start/stop/replay/synthetic/fault/wait/marker) — SPEC: Build Scenarios
 - [ ] IS-086 [BE] ⬜ [gen] Scenario validation + run execution — SPEC: Run Scenarios
 - [ ] IS-087 [BE] ⬜ [gen] Fault model + injection (neutral & protocol; never auto-healed) — SPEC: Simulate Faults
 - [ ] IS-088 [BE] ⬜ [ipc] InjectFault RPC — 02
