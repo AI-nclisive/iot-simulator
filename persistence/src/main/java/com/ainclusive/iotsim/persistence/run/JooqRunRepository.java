@@ -106,6 +106,29 @@ public class JooqRunRepository implements RunRepository {
     }
 
     @Override
+    public List<RunRow> findByProjectPaged(
+            String projectId, OffsetDateTime afterAt, String afterId, int limit) {
+        var q = dsl.selectFrom(RUNS).where(RUNS.PROJECT_ID.eq(projectId));
+        if (afterAt != null) {
+            q = q.and(RUNS.CREATED_AT.lt(afterAt)
+                    .or(RUNS.CREATED_AT.eq(afterAt).and(RUNS.ID.lt(afterId))));
+        }
+        Result<RunsRecord> records = q.orderBy(RUNS.CREATED_AT.desc(), RUNS.ID.desc())
+                .limit(limit)
+                .fetch();
+        if (records.isEmpty()) {
+            return List.of();
+        }
+        Map<String, List<String>> sourcesByRun = dsl.select(
+                        RUN_SOURCES.RUN_ID, RUN_SOURCES.DATA_SOURCE_ID)
+                .from(RUN_SOURCES)
+                .where(RUN_SOURCES.RUN_ID.in(records.map(RunsRecord::getId)))
+                .orderBy(RUN_SOURCES.DATA_SOURCE_ID.asc())
+                .fetchGroups(RUN_SOURCES.RUN_ID, RUN_SOURCES.DATA_SOURCE_ID);
+        return records.map(r -> map(r, sourcesByRun.getOrDefault(r.getId(), List.of())));
+    }
+
+    @Override
     public RunRow start(String id, OffsetDateTime startedAt) {
         return map(dsl.update(RUNS)
                 .set(RUNS.STATE, "RUNNING")

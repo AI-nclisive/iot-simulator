@@ -135,6 +135,22 @@ class RunRepositoryIT {
     }
 
     @Test
+    void findByProjectPagedReturnsNewestFirstWithCursor() {
+        RunRow a = runs.create(projectId, "REPLAY", "MANUAL", "local", List.of(), null, null);
+        RunRow b = runs.create(projectId, "SYNTHETIC", "MANUAL", "local", List.of(), null, null);
+        RunRow c = runs.create(projectId, "SCENARIO", "MANUAL", "local", List.of(), null, null);
+
+        List<RunRow> page1 = runs.findByProjectPaged(projectId, null, null, 2);
+        assertThat(page1).hasSize(2);
+        assertThat(page1.get(0).id()).isEqualTo(c.id());
+        assertThat(page1.get(1).id()).isEqualTo(b.id());
+
+        RunRow last = page1.get(1);
+        List<RunRow> page2 = runs.findByProjectPaged(projectId, last.createdAt(), last.id(), 2);
+        assertThat(page2).extracting(RunRow::id).contains(a.id());
+    }
+
+    @Test
     void findByProjectReturnsNewestFirst() {
         String project = projects.insert("Ordering", null, "it").id();
         RunRow first = runs.create(project, "REPLAY", null, null, List.of(), null);

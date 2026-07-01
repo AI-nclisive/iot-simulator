@@ -133,6 +133,22 @@ class SyntheticRunServiceTest {
         assertThat(runs.byId.get(summary.runId()).parentRunId()).isEqualTo("parent-run-9");
     }
 
+    @Test
+    void runWithAutomationTriggerAndInitiator() {
+        SyntheticRunService service = service("SYNTHETIC", config(5L));
+        SyntheticRunSummary summary = service.run(PROJECT, SOURCE, 1000L, "AUTOMATION", "ci-bot", null);
+        assertThat(runs.triggerOf(summary.runId())).isEqualTo("AUTOMATION");
+        assertThat(runs.initiatorOf(summary.runId())).isEqualTo("ci-bot");
+    }
+
+    @Test
+    void runDefaultOverloadUsesManualTriggerAndLocalInitiator() {
+        SyntheticRunService service = service("SYNTHETIC", config(5L));
+        SyntheticRunSummary summary = service.run(PROJECT, SOURCE, 1000L);
+        assertThat(runs.triggerOf(summary.runId())).isEqualTo("MANUAL");
+        assertThat(runs.initiatorOf(summary.runId())).isEqualTo("local");
+    }
+
     // --- fakes ---
 
     private static final class CapturingRuntime implements RuntimeController {
@@ -245,6 +261,18 @@ class SyntheticRunServiceTest {
             return row;
         }
 
+        /** Returns the {@code trigger} stored for the given run, or {@code null} if not found. */
+        public String triggerOf(String runId) {
+            RunRow row = byId.get(runId);
+            return row == null ? null : row.trigger();
+        }
+
+        /** Returns the {@code initiator} stored for the given run, or {@code null} if not found. */
+        public String initiatorOf(String runId) {
+            RunRow row = byId.get(runId);
+            return row == null ? null : row.initiator();
+        }
+
         public RunRow start(String id, OffsetDateTime startedAt) {
             RunRow r = byId.get(id);
             RunRow u = new RunRow(r.id(), r.projectId(), r.kind(), r.trigger(), r.initiator(),
@@ -277,6 +305,11 @@ class SyntheticRunServiceTest {
         }
 
         public List<RunRow> findByProject(String projectId) {
+            throw new UnsupportedOperationException();
+        }
+
+        public List<RunRow> findByProjectPaged(String projectId, OffsetDateTime afterAt,
+                String afterId, int limit) {
             throw new UnsupportedOperationException();
         }
 

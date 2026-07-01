@@ -50,4 +50,7 @@ public interface RunRepository {
 
     /** Links the run to its evidence record (the {@code runs.evidence_id} side). */
     RunRow linkEvidence(String runId, String evidenceId);
+
+    /** Cursor-paged list (IS-074). Sort: {@code created_at DESC, id DESC}. */
+    List<RunRow> findByProjectPaged(String projectId, OffsetDateTime afterAt, String afterId, int limit);
 }
