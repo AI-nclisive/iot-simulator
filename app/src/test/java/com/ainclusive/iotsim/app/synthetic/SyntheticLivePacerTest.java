@@ -1,6 +1,7 @@
 package com.ainclusive.iotsim.app.synthetic;
 
 import static org.awaitility.Awaitility.await;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
@@ -16,7 +17,7 @@ class SyntheticLivePacerTest {
     void scheduledPacerInvokesTickAllRepeatedlyThenStops() {
         AtomicInteger ticks = new AtomicInteger();
         SyntheticLiveRunService service = mock(SyntheticLiveRunService.class);
-        org.mockito.Mockito.doAnswer(inv -> {
+        doAnswer(inv -> {
             ticks.incrementAndGet();
             return null;
         }).when(service).tickAll();
@@ -29,7 +30,7 @@ class SyntheticLivePacerTest {
 
         int afterStop = ticks.get();
         // No further ticks after stop(): count stays put over a short window.
-        await().pollDelay(Duration.ofMillis(150)).atMost(Duration.ofMillis(300))
+        await().pollDelay(Duration.ofMillis(150)).atMost(Duration.ofMillis(500))
                 .until(() -> ticks.get() == afterStop);
     }
 }

@@ -8,6 +8,8 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -19,6 +21,8 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class SyntheticLivePacer {
+
+    private static final Logger log = LoggerFactory.getLogger(SyntheticLivePacer.class);
 
     private final SyntheticLiveRunService service;
     private final long tickIntervalMs;
@@ -52,6 +56,7 @@ public class SyntheticLivePacer {
             service.tickAll();
         } catch (RuntimeException e) {
             // tickAll already isolates per-run failures; never let the scheduler thread die.
+            log.warn("synthetic-live pacer tick failed; skipping this tick", e);
         }
     }
 
