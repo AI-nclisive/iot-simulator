@@ -84,7 +84,7 @@ Tier 2 — contribution hygiene:
 - [x] IS-113 [SDLC] ✅ Board status flow + review-completion rule documented (In Progress at start, In review at PR open; task done only when all review comments resolved) — `AGENTS.md`/`CONTRIBUTING.md`
 - [x] IS-115 [SDLC] ✅ Task pre-flight checklist + board-wins tie-break + `catalog-sync` CI guard (a task-linked PR must flip its own catalog checkbox) — `AGENTS.md`/`.github/workflows/ci.yml`
 - [x] IS-117 [SDLC] ✅ Claude Code skills for the contribution workflow under `.claude/skills/` (`/start-task`, `/open-pr`, `/review-loop`, `/new-worker`, `/flyway-migration`, `/board-sync`) + recommended built-in skills documented in `CONTRIBUTING.md` — executable procedures for `CONTRIBUTING.md`/`AGENTS.md`
-- [x] IS-122 [SDLC] ✅ Auto-tick the catalog checkbox on open PRs (bot flips `[ ]`→`[x]` on the PR branch; task id from the native closing-issue link with branch-name fallback) — replaces the unenforced `catalog-sync` guard (IS-115) — `.github/workflows/auto-tick-catalog.yml`/`.github/scripts/auto-tick-catalog.sh`
+- [ ] IS-122 [SDLC] ✅ Auto-tick the catalog checkbox on open PRs (bot flips `[ ]`→`[x]` on the PR branch; task id from the native closing-issue link with branch-name fallback) — replaces the unenforced `catalog-sync` guard (IS-115) — `.github/workflows/auto-tick-catalog.yml`/`.github/scripts/auto-tick-catalog.sh`
 
 Tier 3 — quality automation:
 - [x] IS-105 [SDLC] ✅ Spotless (import order + whitespace hygiene) — runs in `check`/CI
