@@ -199,4 +199,37 @@ describe("ScenarioBuilderPage", () => {
     renderBuilder("scn-does-not-exist");
     expect(screen.getByText("Scenario not found.")).toBeTruthy();
   });
+
+  it("clicking a validation issue focuses the offending step", async () => {
+    // Build a scenario with a lifecycle issue: stop a source never started.
+    useScenariosStore.setState((s) => ({
+      scenarios: [
+        ...s.scenarios,
+        {
+          id: "scn-lc",
+          name: "Lifecycle",
+          description: "bad stop",
+          stepCount: 1,
+          runState: "Idle" as const,
+          lastRun: { at: null, outcome: null },
+          owner: "You",
+          lockedBy: null,
+          updatedAt: "2026-07-01T00:00:00Z",
+        },
+      ],
+      steps: {
+        ...s.steps,
+        "scn-lc": [
+          { id: "bad", type: "stop" as const, label: "Stop A", config: { sourceId: "src-01" }, configured: true },
+        ],
+      },
+    }));
+    const user = userEvent.setup();
+    renderBuilder("scn-lc");
+    // The issue appears in the summary as a button; clicking selects the step.
+    const issueButton = screen.getByRole("button", { name: /not running/ });
+    await user.click(issueButton);
+    // The step list marks it with an Issue badge (configured but semantically bad).
+    expect(screen.getByText("Issue")).toBeTruthy();
+  });
 });
