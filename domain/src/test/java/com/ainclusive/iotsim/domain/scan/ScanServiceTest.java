@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.ObjectMapper;
 
 /** Job lifecycle, create-from-scan, and the secrets-never-persisted guarantee (IS-043). */
 class ScanServiceTest {
@@ -55,7 +56,8 @@ class ScanServiceTest {
         schemaRepo = new InMemorySchemaRepository(dataSourceRepo);
         ProjectRepository projects = new FakeProjectRepository();
         DataSourceService dataSources = new DataSourceService(
-                dataSourceRepo, projects, schemaRepo, new InMemoryRuntimeController(), credentials);
+                dataSourceRepo, projects, schemaRepo, new InMemoryRuntimeController(), credentials,
+                new ObjectMapper());
         SchemaService schemas = new SchemaService(schemaRepo, dataSourceRepo);
         // Synchronous executor so the async scan completes inline for deterministic asserts.
         service = new ScanService(scanner, projects, dataSources, schemas, Runnable::run);
@@ -197,7 +199,8 @@ class ScanServiceTest {
                 scanner,
                 new FakeProjectRepository(),
                 new DataSourceService(dataSourceRepo, new FakeProjectRepository(),
-                        new InMemorySchemaRepository(dataSourceRepo), new InMemoryRuntimeController(), credentials),
+                        new InMemorySchemaRepository(dataSourceRepo), new InMemoryRuntimeController(), credentials,
+                        new ObjectMapper()),
                 new SchemaService(new InMemorySchemaRepository(dataSourceRepo), dataSourceRepo),
                 task -> { /* never executes */ });
         ScanJob job = pending.startScan(PROJECT, "OPC_UA", "opc.tcp://h", ConnectionCredentials.anonymous(), 0);

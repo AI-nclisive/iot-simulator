@@ -95,6 +95,19 @@ class DataSourceRepositoryIT {
     }
 
     @Test
+    void findAllReturnsSourcesAcrossProjects() {
+        DataSourceRow a = dataSources.insert(projectId, "A", "OPC_UA", "MANUAL", null, null, "it");
+        DataSourceRow b = dataSources.insert(projectId, "B", "OPC_UA", "MANUAL", null, null, "it");
+
+        List<DataSourceRow> all = dataSources.findAll();
+
+        assertThat(all).extracting(DataSourceRow::id).contains(a.id(), b.id());
+
+        dataSources.deleteById(a.id());
+        dataSources.deleteById(b.id());
+    }
+
+    @Test
     void findByProjectPagedReturnsBatchNewestFirst() {
         DataSourceRow a = dataSources.insert(projectId, "Paged-A", "OPC_UA", "SCAN", null, null, "it");
         DataSourceRow b = dataSources.insert(projectId, "Paged-B", "OPC_UA", "SCAN", null, null, "it");

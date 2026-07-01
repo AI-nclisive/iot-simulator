@@ -79,7 +79,7 @@ class ProjectOverviewServiceTest {
                 return projects;
             }
         };
-        DataSourceService dataSourceService = new DataSourceService(null, null, null, null, null) {
+        DataSourceService dataSourceService = new DataSourceService(null, null, null, null, null, null) {
             @Override
             public List<DataSource> list(String projectId) {
                 return sourcesByProject.getOrDefault(projectId, List.of());

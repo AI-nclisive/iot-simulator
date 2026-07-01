@@ -17,6 +17,11 @@ public interface DataSourceRepository {
      */
     Optional<DataSourceRow> duplicate(String sourceId, String newName, String createdBy);
 
+    /** All data sources across all projects, newest first. Host-wide (used for port-uniqueness). */
+    default List<DataSourceRow> findAll() {
+        return List.of();
+    }
+
     List<DataSourceRow> findByProject(String projectId);
 
     /** Cursor-paged list with optional protocol filter (IS-074). Sort: {@code created_at DESC, id DESC}. */

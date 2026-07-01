@@ -1,6 +1,7 @@
 package com.ainclusive.iotsim.domain.datasource;
 
 import com.ainclusive.iotsim.domain.common.ConcurrencyConflictException;
+import com.ainclusive.iotsim.domain.common.PortInUseException;
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.domain.support.Page;
 import com.ainclusive.iotsim.domain.support.PageCursor;
@@ -18,6 +19,7 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.ObjectMapper;
 
 /** Data-source lifecycle and runtime control (backend-specs/03 & 05). */
 @Service
@@ -28,14 +30,17 @@ public class DataSourceService {
     private final SchemaRepository schemas;
     private final RuntimeController runtime;
     private final CredentialStore credentials;
+    private final ObjectMapper json;
 
     public DataSourceService(DataSourceRepository dataSources, ProjectRepository projects,
-            SchemaRepository schemas, RuntimeController runtime, CredentialStore credentials) {
+            SchemaRepository schemas, RuntimeController runtime, CredentialStore credentials,
+            ObjectMapper json) {
         this.dataSources = dataSources;
         this.projects = projects;
         this.schemas = schemas;
         this.runtime = runtime;
         this.credentials = credentials;
+        this.json = json;
     }
 
     /**
@@ -117,7 +122,17 @@ public class DataSourceService {
 
     public DataSource start(String projectId, String id) {
         DataSourceRow row = requireRow(projectId, id);
-        runtime.start(id, RuntimeStartSpecs.of(schemas, row));
+        int port = RuntimeStartSpecs.listenPort(row.runtimeConfig(), json);
+        if (port != 0) {
+            for (DataSourceRow other : dataSources.findAll()) {
+                if (!other.id().equals(id)
+                        && "RUNNING".equals(runtime.state(other.id()))
+                        && RuntimeStartSpecs.listenPort(other.runtimeConfig(), json) == port) {
+                    throw new PortInUseException(port, other.id());
+                }
+            }
+        }
+        runtime.start(id, RuntimeStartSpecs.of(schemas, row, json));
         return map(row);
     }
 

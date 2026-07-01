@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.ainclusive.iotsim.domain.common.ConcurrencyConflictException;
+import com.ainclusive.iotsim.domain.common.PortInUseException;
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.domain.support.Page;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRepository;
@@ -24,6 +25,7 @@ import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.ObjectMapper;
 
 class DataSourceServiceTest {
 
@@ -42,7 +44,8 @@ class DataSourceServiceTest {
                 new FakeProjectRepository(Set.of(PROJECT)),
                 new EmptySchemaRepository(),
                 new InMemoryRuntimeController(),
-                credentials);
+                credentials,
+                new ObjectMapper());
     }
 
     @Test
@@ -240,7 +243,8 @@ class DataSourceServiceTest {
                 new FakeProjectRepository(Set.of(PROJECT)),
                 schemaRepo,
                 new InMemoryRuntimeController(),
-                credentials);
+                credentials,
+                new ObjectMapper());
 
         DataSource original = svc.create(PROJECT, "Sensor", "OPC_UA", "SCAN", null, null, null, null, "a");
         SchemaNode node = new SchemaNode("n1", null, "/root/temp", "Temperature",
@@ -267,7 +271,8 @@ class DataSourceServiceTest {
                 new FakeProjectRepository(Set.of(PROJECT)),
                 schemaRepo,
                 new InMemoryRuntimeController(),
-                credentials);
+                credentials,
+                new ObjectMapper());
 
         SchemaNode node = new SchemaNode("n1", null, "/root/temp", "Temperature",
                 com.ainclusive.iotsim.protocolmodel.NodeKind.VARIABLE,
@@ -310,6 +315,49 @@ class DataSourceServiceTest {
         assertThat(modbusOnly.items().get(0).name()).isEqualTo("DS-C");
     }
 
+    @Test
+    void startRejectsPortHeldByAnotherRunningSource() {
+        DataSource a = service.create(PROJECT, "A", "OPC_UA", "MANUAL", null,
+                "{\"listenPort\":4840}", null, null, "it");
+        DataSource b = service.create(PROJECT, "B", "OPC_UA", "MANUAL", null,
+                "{\"listenPort\":4840}", null, null, "it");
+        service.start(PROJECT, a.id());   // A now RUNNING on 4840
+
+        assertThatThrownBy(() -> service.start(PROJECT, b.id()))
+                .isInstanceOf(PortInUseException.class);
+    }
+
+    @Test
+    void startAllowsSamePortWhenOtherSourceIsStopped() {
+        DataSource a = service.create(PROJECT, "A", "OPC_UA", "MANUAL", null,
+                "{\"listenPort\":4840}", null, null, "it");
+        DataSource b = service.create(PROJECT, "B", "OPC_UA", "MANUAL", null,
+                "{\"listenPort\":4840}", null, null, "it");
+        service.start(PROJECT, a.id());
+        service.stop(PROJECT, a.id());    // A STOPPED → 4840 free
+
+        service.start(PROJECT, b.id());   // no throw
+        assertThat(service.get(PROJECT, b.id()).runtimeState()).isEqualTo(RuntimeState.RUNNING);
+    }
+
+    @Test
+    void ephemeralPortNeverConflicts() {
+        DataSource a = service.create(PROJECT, "A", "OPC_UA", "MANUAL", null, null, null, null, "it");
+        DataSource b = service.create(PROJECT, "B", "OPC_UA", "MANUAL", null, null, null, null, "it");
+        service.start(PROJECT, a.id());
+        service.start(PROJECT, b.id());   // both ephemeral (0) → no throw
+        assertThat(service.get(PROJECT, b.id()).runtimeState()).isEqualTo(RuntimeState.RUNNING);
+    }
+
+    @Test
+    void restartingSameSourceIsNotSelfConflict() {
+        DataSource a = service.create(PROJECT, "A", "OPC_UA", "MANUAL", null,
+                "{\"listenPort\":4840}", null, null, "it");
+        service.start(PROJECT, a.id());
+        service.start(PROJECT, a.id());   // same id re-start → no throw
+        assertThat(service.get(PROJECT, a.id()).runtimeState()).isEqualTo(RuntimeState.RUNNING);
+    }
+
     private static final class InMemoryDataSourceRepository implements DataSourceRepository {
         private final List<DataSourceRow> rows = new ArrayList<>();
         private int seq;
@@ -325,6 +373,11 @@ class DataSourceServiceTest {
                     false, now, now, createdBy, 0);
             rows.add(row);
             return row;
+        }
+
+        @Override
+        public List<DataSourceRow> findAll() {
+            return List.copyOf(rows);
         }
 
         @Override
