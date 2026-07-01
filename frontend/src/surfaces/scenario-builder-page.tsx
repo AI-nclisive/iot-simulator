@@ -77,6 +77,10 @@ export function ScenarioBuilderPage() {
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
 
   const validation = useMemo(() => validateScenario(steps), [steps]);
+  const stepIssueIds = useMemo(
+    () => new Set(validation.issues.map((i) => i.stepId).filter((id): id is string => id !== null)),
+    [validation],
+  );
 
   // A scenario locked by another editor is read-only here (mock phase: any lock
   // is treated as someone else's — see scenarios-page rationale). An admin with
@@ -185,9 +189,22 @@ export function ScenarioBuilderPage() {
             Not runnable yet — {validation.issues.length} issue
             {validation.issues.length === 1 ? "" : "s"}:
           </p>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-shell-muted">
+          <ul className="mt-2 space-y-1 pl-0 text-sm">
             {validation.issues.map((issue, i) => (
-              <li key={`${issue.stepId ?? "scenario"}-${i}`}>{issue.message}</li>
+              <li key={`${issue.stepId ?? "scenario"}-${i}`} className="flex gap-2">
+                <span aria-hidden className="text-shell-warning">•</span>
+                {issue.stepId ? (
+                  <button
+                    type="button"
+                    className="shell-text-action text-left text-shell-muted underline-offset-2 hover:underline"
+                    onClick={() => setSelectedStepId(issue.stepId)}
+                  >
+                    {issue.message}
+                  </button>
+                ) : (
+                  <span className="text-shell-muted">{issue.message}</span>
+                )}
+              </li>
             ))}
           </ul>
         </section>
@@ -247,6 +264,8 @@ export function ScenarioBuilderPage() {
                           </span>
                           {!step.configured ? (
                             <StatusBadge label="Needs config" tone="warning" />
+                          ) : stepIssueIds.has(step.id) ? (
+                            <StatusBadge label="Issue" tone="danger" />
                           ) : null}
                         </div>
                         <span className="ml-5 text-xs text-shell-muted">

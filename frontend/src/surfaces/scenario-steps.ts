@@ -8,6 +8,8 @@
  * this file deliberately keeps step config as an open, type-tagged shape.
  */
 
+import { isFaultConfigured } from "./scenario-faults";
+
 export type ScenarioStepType =
   | "start"
   | "stop"
@@ -98,10 +100,11 @@ export const STEP_FIELD_SPECS: Record<ScenarioStepType, StepFieldSpec[]> = {
       required: true,
       options: [
         { value: "drop", label: "Drop values" },
-        { value: "delay", label: "Delay" },
+        { value: "delay", label: "Delay values" },
         { value: "corrupt", label: "Corrupt values" },
+        { value: "quality", label: "Force bad quality" },
       ],
-      hint: "Detailed fault parameters are configured in the fault step (UI-063).",
+      hint: "Timing and kind-specific parameters are set below.",
     },
   ],
   wait: [
@@ -123,6 +126,11 @@ export const STEP_FIELD_SPECS: Record<ScenarioStepType, StepFieldSpec[]> = {
  * (via isStepConfigured) to set step.configured, which feeds validateScenario.
  */
 export function isStepConfigured(type: ScenarioStepType, config: Record<string, unknown>): boolean {
+  // Fault steps have kind-dependent required params (UI-063), so delegate to the
+  // fault model rather than the static field list.
+  if (type === "fault") {
+    return isFaultConfigured(config);
+  }
   return STEP_FIELD_SPECS[type]
     .filter((f) => f.required)
     .every((f) => {
@@ -164,6 +172,65 @@ export function validateScenario(steps: ScenarioStep[]): ScenarioValidation {
         message: `"${step.label || STEP_TYPE_LABELS[step.type]}" needs configuration.`,
       });
     }
+  }
+
+  // ── Semantic lifecycle checks (UI-064) ────────────────────────────────────
+  // Walk the steps in order, tracking which sources are running, so we can flag
+  // steps that act on a source that is not running at that point. Unconfigured
+  // steps are skipped here — they are already reported above, and letting a
+  // partially-filled step drive the state machine would produce false
+  // negatives (an unconfigured start hiding real errors) or false positives
+  // (an unconfigured stop invalidating later valid steps).
+  const running = new Set<string>();
+  for (const step of steps) {
+    if (!step.configured) continue;
+    const sourceId = typeof step.config.sourceId === "string" ? step.config.sourceId : null;
+    const label = step.label || STEP_TYPE_LABELS[step.type];
+
+    switch (step.type) {
+      case "start":
+        if (sourceId) {
+          if (running.has(sourceId)) {
+            issues.push({
+              stepId: step.id,
+              message: `"${label}" starts a source that is already running.`,
+            });
+          }
+          running.add(sourceId);
+        }
+        break;
+      case "stop":
+        if (sourceId) {
+          if (!running.has(sourceId)) {
+            issues.push({
+              stepId: step.id,
+              message: `"${label}" stops a source that is not running.`,
+            });
+          }
+          running.delete(sourceId);
+        }
+        break;
+      case "replay":
+      case "synthetic":
+      case "fault":
+        if (sourceId && !running.has(sourceId)) {
+          issues.push({
+            stepId: step.id,
+            message: `"${label}" acts on a source that has not been started in this scenario.`,
+          });
+        }
+        break;
+      default:
+        break; // wait / marker: no source lifecycle
+    }
+  }
+
+  // Sources started but never stopped — advisory (the run teardown stops them).
+  if (running.size > 0) {
+    warnings.push({
+      stepId: null,
+      message: `${running.size} source${running.size === 1 ? "" : "s"} left running at scenario end; they stop on teardown.`,
+    });
   }
 
   // A scenario that only waits/marks does nothing observable — warn, don't block.

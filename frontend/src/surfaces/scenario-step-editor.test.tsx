@@ -88,11 +88,12 @@ describe("ScenarioStepEditor", () => {
     expect(last.label).toBe("Checkpoint");
   });
 
-  it("fault step exposes target + kind (details deferred to UI-063)", () => {
+  it("fault step exposes target + kind and prompts to choose a kind", () => {
     render(<ScenarioStepEditor step={makeStep("fault")} canEdit onChange={() => {}} />);
     expect(screen.getByLabelText(/Target source/)).toBeTruthy();
     expect(screen.getByLabelText(/Fault kind/)).toBeTruthy();
-    expect(screen.getByText(/configured in the fault step/)).toBeTruthy();
+    // With no kind chosen yet, the fault panel prompts for one.
+    expect(screen.getByText(/Choose a fault kind/)).toBeTruthy();
   });
 
   it("is read-only when canEdit is false", () => {

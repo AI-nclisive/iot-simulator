@@ -50,4 +50,75 @@ describe("validateScenario", () => {
     expect(v.ready).toBe(false);
     expect(v.issues.some((i) => /needs configuration/.test(i.message))).toBe(true);
   });
+
+  // ── lifecycle checks (UI-064) ──────────────────────────────────────────────
+
+  it("blocks replay on a source that was never started", () => {
+    const v = validateScenario([
+      step({ id: "s1", type: "replay", configured: true, config: { sourceId: "src-01", recordingId: "r1" } }),
+    ]);
+    expect(v.ready).toBe(false);
+    expect(v.issues.some((i) => /has not been started/.test(i.message))).toBe(true);
+  });
+
+  it("allows replay after the source is started", () => {
+    const v = validateScenario([
+      step({ id: "s1", type: "start", configured: true, config: { sourceId: "src-01" } }),
+      step({ id: "s2", type: "replay", configured: true, config: { sourceId: "src-01", recordingId: "r1" } }),
+    ]);
+    expect(v.issues.filter((i) => /has not been started/.test(i.message))).toHaveLength(0);
+  });
+
+  it("blocks stopping a source that is not running", () => {
+    const v = validateScenario([
+      step({ id: "s1", type: "stop", configured: true, config: { sourceId: "src-01" } }),
+    ]);
+    expect(v.ready).toBe(false);
+    expect(v.issues.some((i) => /not running/.test(i.message))).toBe(true);
+  });
+
+  it("blocks starting the same source twice", () => {
+    const v = validateScenario([
+      step({ id: "s1", type: "start", configured: true, config: { sourceId: "src-01" } }),
+      step({ id: "s2", type: "start", configured: true, config: { sourceId: "src-01" } }),
+    ]);
+    expect(v.ready).toBe(false);
+    expect(v.issues.some((i) => /already running/.test(i.message))).toBe(true);
+  });
+
+  it("warns (not blocks) when a source is left running at the end", () => {
+    const v = validateScenario([
+      step({ id: "s1", type: "start", configured: true, config: { sourceId: "src-01" } }),
+    ]);
+    expect(v.ready).toBe(true);
+    expect(v.warnings.some((w) => /left running/.test(w.message))).toBe(true);
+  });
+
+  it("ties lifecycle issues to the offending step id", () => {
+    const v = validateScenario([
+      step({ id: "bad-stop", type: "stop", configured: true, config: { sourceId: "src-01" } }),
+    ]);
+    expect(v.issues.some((i) => i.stepId === "bad-stop")).toBe(true);
+  });
+
+  it("does not let an unconfigured start suppress a downstream lifecycle error", () => {
+    // Unconfigured start must NOT add src-01 to running, so the replay is still
+    // flagged as acting on a not-started source (no false negative).
+    const v = validateScenario([
+      step({ id: "s1", type: "start", configured: false, config: { sourceId: "src-01" } }),
+      step({ id: "s2", type: "replay", configured: true, config: { sourceId: "src-01", recordingId: "r1" } }),
+    ]);
+    expect(v.issues.some((i) => i.stepId === "s2" && /has not been started/.test(i.message))).toBe(true);
+  });
+
+  it("does not let an unconfigured stop invalidate a later valid step", () => {
+    // Unconfigured stop must NOT remove src-01 from running, so the fault after
+    // a valid start is not spuriously flagged (no false positive).
+    const v = validateScenario([
+      step({ id: "s1", type: "start", configured: true, config: { sourceId: "src-01" } }),
+      step({ id: "s2", type: "stop", configured: false, config: { sourceId: "src-01" } }),
+      step({ id: "s3", type: "fault", configured: true, config: { sourceId: "src-01", kind: "drop", dropRate: 10 } }),
+    ]);
+    expect(v.issues.some((i) => i.stepId === "s3")).toBe(false);
+  });
 });
