@@ -156,7 +156,7 @@ public class SyntheticLiveRunService {
         if (live == null) {
             return false;
         }
-        evidence.updateManifest(live.evidenceId(), manifest(live.seed(), totalEmitted(live)));
+        stampEvidence(live);
         return true;
     }
 
@@ -165,8 +165,24 @@ public class SyntheticLiveRunService {
         if (registry.remove(live.runId()) == null) {
             return; // already finalized/stopped
         }
-        evidence.updateManifest(live.evidenceId(), manifest(live.seed(), totalEmitted(live)));
+        stampEvidence(live);
         runs.end(live.runId(), terminalState, now());
+    }
+
+    /**
+     * Best-effort stamp of the final value count onto evidence. Failures are swallowed on
+     * purpose: the manifest count is advisory, and a transient stamp error must not block
+     * the terminal-state write in {@link #finalizeRun} nor surface out of {@link #stopIfLive}
+     * into {@code RunService.stop} (which would strand the runtime source and leave the run
+     * RUNNING). The run's terminal state stays the source of truth. (The domain module keeps
+     * no logging facade by design — same swallow-and-continue stance as the {@code tickOne} catch.)
+     */
+    private void stampEvidence(LiveRun live) {
+        try {
+            evidence.updateManifest(live.evidenceId(), manifest(live.seed(), totalEmitted(live)));
+        } catch (RuntimeException ignored) {
+            // advisory count only; the terminal-state transition must still proceed
+        }
     }
 
     private static long totalEmitted(LiveRun live) {

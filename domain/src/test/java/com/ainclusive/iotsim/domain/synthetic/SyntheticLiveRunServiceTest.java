@@ -184,6 +184,48 @@ class SyntheticLiveRunServiceTest {
         assertThat(evidence.byId.get(s.evidenceId()).manifestJson()).contains("\"valueCount\":7");
     }
 
+    @Test
+    void capFinalizeCompletesEvenIfEvidenceStampThrows() {
+        // A transient DB error stamping evidence must not block the terminal COMPLETED write.
+        SyntheticLiveRunService svc = new SyntheticLiveRunService(
+                new FakeDataSources("SYNTHETIC", json.writeValueAsString(config(5L))),
+                new EmptySchemas(), runtime, runs, throwingEvidenceAfterStart(), json, wall);
+        SyntheticLiveRunSummary s = svc.start(PROJECT, SOURCE, 1000L, "MANUAL", "local");
+
+        wall.advance(Duration.ofMillis(5000)); // past the cap
+        svc.tickAll();
+
+        assertThat(runs.byId.get(s.runId()).state()).isEqualTo("COMPLETED");
+    }
+
+    @Test
+    void stopIfLiveSwallowsEvidenceStampFailure() {
+        // stopIfLive must not propagate an evidence-stamp failure into RunService.stop.
+        SyntheticLiveRunService svc = new SyntheticLiveRunService(
+                new FakeDataSources("SYNTHETIC", json.writeValueAsString(config(5L))),
+                new EmptySchemas(), runtime, runs, throwingEvidenceAfterStart(), json, wall);
+        SyntheticLiveRunSummary s = svc.start(PROJECT, SOURCE, null, "MANUAL", "local");
+        wall.advance(Duration.ofMillis(500));
+        svc.tickAll();
+
+        assertThat(svc.stopIfLive(s.runId())).isTrue(); // returns; does not throw
+    }
+
+    /** Evidence fake that stamps the start manifest fine but throws on the finalize/stop stamp. */
+    private FakeEvidence throwingEvidenceAfterStart() {
+        return new FakeEvidence() {
+            private int calls;
+
+            @Override
+            public EvidenceRow updateManifest(String id, String manifestJson) {
+                if (++calls > 1) {
+                    throw new IllegalStateException("evidence store unavailable");
+                }
+                return super.updateManifest(id, manifestJson);
+            }
+        };
+    }
+
     // --- fakes ---
 
     private static class CapturingRuntime implements RuntimeController {
@@ -331,7 +373,7 @@ class SyntheticLiveRunServiceTest {
         }
     }
 
-    private static final class FakeEvidence implements EvidenceRepository {
+    private static class FakeEvidence implements EvidenceRepository {
         final java.util.Map<String, EvidenceRow> byId = new java.util.LinkedHashMap<>();
         private int seq;
 
