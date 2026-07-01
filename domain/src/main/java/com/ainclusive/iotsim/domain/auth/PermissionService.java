@@ -8,32 +8,28 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.stereotype.Service;
 
 /**
- * Domain service for the flexible permission model (IS-076 / D2).
+ * Domain helper for the flexible permission model (IS-076 / D2).
  *
- * <p>This service answers the central authorization question:
+ * <p>This class answers the central authorization question:
  * <em>"does the authenticated principal hold a given permission?"</em>
  *
  * <p>How it works:
  * <ol>
- *   <li>In <b>local trusted mode</b> the implicit {@code local} principal is granted the full
- *       {@code admin} permission set at the filter level (see {@code LocalPrincipalFilter}).
- *       {@link #hasPermission(Permission)} therefore returns {@code true} for every permission.
  *   <li>In <b>shared mode</b> a bearer JWT carries role claims; Spring Security translates them to
- *       {@code ROLE_<roleName>} {@link GrantedAuthority} entries. This service resolves the
+ *       {@code ROLE_<roleName>} {@link GrantedAuthority} entries. This class resolves the
  *       matching DB permissions and checks membership.
  * </ol>
  *
- * <p>Enforcement is in the API layer — this service is the single evaluation point so that
- * enforcement code never has to enumerate roles directly (D2 contract: "same permission checks
- * stay" when the role set expands).
+ * <p>Not a Spring bean — wired by the API layer's deployment-mode-specific service
+ * (see {@code SharedPermissionService} in IS-077) to avoid conflicting bean definitions.
+ * The enforcement entry point remains in the API layer so that permission checks stay
+ * uniform when the role set expands (D2 contract).
  *
  * @see PermissionSeeder
  * @see Permission
  */
-@Service
 public class PermissionService {
 
     /**
