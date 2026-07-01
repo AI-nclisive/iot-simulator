@@ -1,11 +1,13 @@
 package com.ainclusive.iotsim.api.runtimeevent;
 
+import com.ainclusive.iotsim.api.security.Permission;
 import com.ainclusive.iotsim.domain.runtimeevent.RuntimeEventHistoryPage;
 import com.ainclusive.iotsim.domain.runtimeevent.RuntimeEventHistoryRequest;
 import com.ainclusive.iotsim.domain.runtimeevent.RuntimeEventHistoryService;
 import com.ainclusive.iotsim.domain.runtimeevent.RuntimeEventView;
 import java.time.Instant;
 import java.util.List;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -21,10 +23,16 @@ import tools.jackson.databind.ObjectMapper;
  * this is the history. Filters are project-scoped with optional source/run/type and
  * a {@code [from, to)} time window; paging is keyset via the opaque {@code cursor}.
  * Distinct from the user-activity audit stream. See backend-specs/05_API_CONTRACT.md.
+ *
+ * <p>Authorization (IS-077): read-only — {@link Permission#OBSERVE} (user + admin).
  */
 @RestController
 @RequestMapping("/api/v1/projects")
 public class RuntimeEventHistoryController {
+
+    private static final String OBSERVE =
+            "@permissionService.hasPermission(authentication,"
+            + " T(com.ainclusive.iotsim.api.security.Permission).OBSERVE)";
 
     private final RuntimeEventHistoryService history;
     private final ObjectMapper json;
@@ -35,6 +43,7 @@ public class RuntimeEventHistoryController {
     }
 
     @GetMapping("/{projectId}/runtime-events")
+    @PreAuthorize(OBSERVE)
     public RuntimeEventHistoryResponse runtimeEvents(
             @PathVariable String projectId,
             @RequestParam(required = false) String source,

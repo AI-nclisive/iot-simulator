@@ -1,5 +1,6 @@
 package com.ainclusive.iotsim.api.sample;
 
+import com.ainclusive.iotsim.api.security.Permission;
 import com.ainclusive.iotsim.domain.sample.Sample;
 import com.ainclusive.iotsim.domain.sample.SampleService;
 import com.ainclusive.iotsim.domain.support.Page;
@@ -7,6 +8,7 @@ import java.net.URI;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -16,10 +18,22 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Named sample subsets/snapshots within a project (backend-specs/05_API_CONTRACT.md). */
+/**
+ * Named sample subsets/snapshots within a project (backend-specs/05_API_CONTRACT.md).
+ *
+ * <p>Authorization (IS-077): list/get — {@link Permission#OBSERVE};
+ * create/delete — {@link Permission#SOURCE_EDIT} (admin: editing recording data).
+ */
 @RestController
 @RequestMapping("/api/v1/projects/{projectId}/samples")
 public class SampleController {
+
+    private static final String OBSERVE =
+            "@permissionService.hasPermission(authentication,"
+            + " T(com.ainclusive.iotsim.api.security.Permission).OBSERVE)";
+    private static final String SOURCE_EDIT =
+            "@permissionService.hasPermission(authentication,"
+            + " T(com.ainclusive.iotsim.api.security.Permission).SOURCE_EDIT)";
 
     private final SampleService sampleService;
 
@@ -28,6 +42,7 @@ public class SampleController {
     }
 
     @GetMapping
+    @PreAuthorize(OBSERVE)
     public Page<SampleResponse> list(
             @PathVariable String projectId,
             @RequestParam(required = false) String cursor,
@@ -36,6 +51,7 @@ public class SampleController {
     }
 
     @PostMapping
+    @PreAuthorize(SOURCE_EDIT)
     public ResponseEntity<SampleResponse> create(
             @PathVariable String projectId, @RequestBody CreateSampleRequest req) {
         if (req == null || req.name() == null || req.name().isBlank()) {
@@ -50,12 +66,14 @@ public class SampleController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize(OBSERVE)
     public ResponseEntity<SampleResponse> get(@PathVariable String projectId, @PathVariable String id) {
         Sample sample = sampleService.get(projectId, id);
         return ResponseEntity.ok().eTag(etag(sample.version())).body(SampleResponse.from(sample));
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize(SOURCE_EDIT)
     public ResponseEntity<Void> delete(@PathVariable String projectId, @PathVariable String id) {
         sampleService.delete(projectId, id);
         return ResponseEntity.noContent().build();

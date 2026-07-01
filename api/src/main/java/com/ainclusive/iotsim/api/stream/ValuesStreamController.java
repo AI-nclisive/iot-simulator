@@ -1,9 +1,11 @@
 package com.ainclusive.iotsim.api.stream;
 
+import com.ainclusive.iotsim.api.security.Permission;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -15,9 +17,15 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
  * client gets a {@code values-snapshot} (current latest-per-node) and then {@code values}
  * deltas. {@code Last-Event-ID} is intentionally ignored — the snapshot is the resync.
  * See backend-specs/05_API_CONTRACT.md.
+ *
+ * <p>Authorization (IS-077): read-only SSE — {@link Permission#OBSERVE} (user + admin).
  */
 @RestController
 public class ValuesStreamController {
+
+    private static final String OBSERVE =
+            "@permissionService.hasPermission(authentication,"
+            + " T(com.ainclusive.iotsim.api.security.Permission).OBSERVE)";
 
     private final LiveStreamSubscriptions subscriptions;
     private final LiveValueStore store;
@@ -34,6 +42,7 @@ public class ValuesStreamController {
 
     @GetMapping(value = "/api/v1/data-sources/{id}/stream/values",
             produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @PreAuthorize(OBSERVE)
     public SseEmitter streamValues(@PathVariable String id,
             @RequestHeader(value = "Last-Event-ID", required = false) String lastEventId) {
         List<StreamValue> snapshot = store.snapshot(id).stream().map(StreamValue::from).toList();

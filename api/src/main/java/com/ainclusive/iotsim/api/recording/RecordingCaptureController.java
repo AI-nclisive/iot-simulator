@@ -1,10 +1,12 @@
 package com.ainclusive.iotsim.api.recording;
 
 import com.ainclusive.iotsim.api.recording.RecordingController.RecordingResponse;
+import com.ainclusive.iotsim.api.security.Permission;
 import com.ainclusive.iotsim.domain.recording.Recording;
 import com.ainclusive.iotsim.domain.recording.RecordingService;
 import java.net.URI;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -16,10 +18,20 @@ import org.springframework.web.bind.annotation.RestController;
  * ({@code POST .../data-sources/{id}/recording/start|stop}). Start connects to the
  * source's real endpoint in client mode and streams observed value changes into a
  * new recording; stop ends the capture and finalizes the recording.
+ *
+ * <p>Authorization (IS-077): start/stop capture are runtime-operate actions —
+ * {@link Permission#SOURCE_START} / {@link Permission#SOURCE_STOP} (user + admin).
  */
 @RestController
 @RequestMapping("/api/v1/projects/{projectId}/data-sources/{dataSourceId}/recording")
 public class RecordingCaptureController {
+
+    private static final String SOURCE_START =
+            "@permissionService.hasPermission(authentication,"
+            + " T(com.ainclusive.iotsim.api.security.Permission).SOURCE_START)";
+    private static final String SOURCE_STOP =
+            "@permissionService.hasPermission(authentication,"
+            + " T(com.ainclusive.iotsim.api.security.Permission).SOURCE_STOP)";
 
     private final RecordingService recordings;
 
@@ -29,6 +41,7 @@ public class RecordingCaptureController {
 
     /** Starts capturing the real source into a new recording; 201 with the recording. */
     @PostMapping("/start")
+    @PreAuthorize(SOURCE_START)
     public ResponseEntity<RecordingResponse> start(
             @PathVariable String projectId, @PathVariable String dataSourceId) {
         Recording recording = recordings.startCapture(projectId, dataSourceId, "local");
@@ -40,6 +53,7 @@ public class RecordingCaptureController {
 
     /** Stops the active capture and finalizes its recording; 200 with the recording. */
     @PostMapping("/stop")
+    @PreAuthorize(SOURCE_STOP)
     public ResponseEntity<RecordingResponse> stop(
             @PathVariable String projectId, @PathVariable String dataSourceId) {
         Recording recording = recordings.stopCapture(projectId, dataSourceId);

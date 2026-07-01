@@ -21,7 +21,7 @@ dependency-ordered. (Optimized for "make the simulator real end to end, then
 broaden, then harden for teams" — can be re-weighted if the near-term goal
 differs.)
 
-Snapshot: **build green.** 100 done · 21 todo (121 total). Live status is the board; this line is a periodic snapshot.
+Snapshot: **build green.** 102 done · 19 todo (121 total). Live status is the board; this line is a periodic snapshot.
 
 <details>
 <summary>ID crosswalk — legacy <code>BE-*</code> / <code>SDLC-*</code> → <code>IS-XXX</code></summary>
@@ -199,9 +199,9 @@ import/export. Modbus moved to Wave G (deferred) — see the note there.
 
 ## Wave E — Shared-team & security · P1→P2
 
-- [ ] IS-075 [BE] ⬜ [auth] OIDC resource server (validate JWT via JWKS) — 08
+- [x] IS-075 [BE] ✅ [auth] OIDC resource server (validate JWT via JWKS) — 08
 - [ ] IS-076 [BE] ⬜ [auth] Flexible permission model + role→permission mapping — 08
-- [ ] IS-077 [BE] ⬜ [auth] API-layer authorization enforcement (admin/user) — 08
+- [x] IS-077 [BE] ✅ [auth] API-layer authorization enforcement (admin/user) — 08
 - [x] IS-078 [BE] ✅ [auth] Local vs shared mode enforcement (flag exists, no enforcement) — 08
 - [x] IS-079 [BE] ✅ [persist] Auth table repositories (users/roles/permissions/leases) — 04
 - [ ] IS-080 [BE] ⬜ [auth] Advisory edit leases (read-only while editing; stale recovery) — 08

@@ -1,10 +1,12 @@
 package com.ainclusive.iotsim.api.health;
 
+import com.ainclusive.iotsim.api.security.Permission;
 import com.ainclusive.iotsim.platform.runtime.HealthOrigin;
 import com.ainclusive.iotsim.platform.runtime.RuntimeController;
 import com.ainclusive.iotsim.platform.runtime.SourceError;
 import com.ainclusive.iotsim.platform.runtime.SourceHealth;
 import java.time.Instant;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
@@ -18,9 +20,15 @@ import org.springframework.web.bind.annotation.RestController;
  * mirroring the sibling observability endpoints. See
  * backend-specs/05_API_CONTRACT.md and SPEC.md → Observe Data Source Health And
  * Errors.
+ *
+ * <p>Authorization (IS-077): read-only — {@link Permission#OBSERVE} (user + admin).
  */
 @RestController
 public class HealthController {
+
+    private static final String OBSERVE =
+            "@permissionService.hasPermission(authentication,"
+            + " T(com.ainclusive.iotsim.api.security.Permission).OBSERVE)";
 
     private final RuntimeController runtime;
 
@@ -28,6 +36,7 @@ public class HealthController {
         this.runtime = runtime;
     }
 
+    @PreAuthorize(OBSERVE)
     @GetMapping("/api/v1/data-sources/{id}/health")
     public SourceHealthResponse health(@PathVariable String id) {
         return SourceHealthResponse.from(runtime.health(id));

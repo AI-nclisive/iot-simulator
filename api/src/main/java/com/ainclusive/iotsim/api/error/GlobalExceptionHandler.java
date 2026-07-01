@@ -10,6 +10,7 @@ import com.ainclusive.iotsim.platform.capture.CaptureException;
 import com.ainclusive.iotsim.platform.runtime.RuntimeCapacityException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -72,6 +73,15 @@ public class GlobalExceptionHandler {
         ProblemDetail pd = problem(HttpStatus.UNPROCESSABLE_ENTITY, e.getMessage());
         pd.setProperty("issues", e.issues());
         return pd;
+    }
+
+    /**
+     * Maps {@link AccessDeniedException} thrown by {@code @PreAuthorize} to RFC 9457 403
+     * (backend-specs/05).
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ProblemDetail forbidden(AccessDeniedException e) {
+        return problem(HttpStatus.FORBIDDEN, "Access denied: insufficient permissions");
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
