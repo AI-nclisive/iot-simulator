@@ -105,9 +105,7 @@ export function RuntimeDashboardPanel() {
         <div className="mb-4 rounded-md border border-shell-danger/30 bg-shell-danger/10 px-3 py-2 text-sm text-shell-danger">
           {error}
         </div>
-      ) : null}
-
-      {isLoading ? (
+      ) : isLoading ? (
         <RunSkeleton />
       ) : runs.length === 0 ? (
         <SharedStatePanel
@@ -128,7 +126,7 @@ export function RuntimeDashboardPanel() {
                     <p className="text-sm font-medium text-shell-ink">{run.label}</p>
                   </div>
                   <p className="mt-1 text-sm text-shell-muted">
-                    {run.initiator} · {run.startedAt}
+                    {run.initiator} · {new Date(run.startedAt).toLocaleString()}
                   </p>
                   {run.relatedLabel ? (
                     <p className="mt-0.5 text-xs text-shell-muted">{run.relatedLabel}</p>

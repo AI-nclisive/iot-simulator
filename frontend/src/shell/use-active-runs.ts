@@ -33,28 +33,28 @@ const POLL_INTERVAL_MS = 5_000;
 
 export function useActiveRuns(projectId: string | null): ActiveRunsResult {
   const [runs, setRuns] = useState<ActiveRunResponse[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(!!projectId);
   const [error, setError] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const activeRef = useRef(true);
 
-  const fetchRuns = useCallback(async () => {
+  const fetchRuns = useCallback(async (signal?: AbortSignal) => {
     if (!projectId) return;
 
     try {
       const envelope = await apiFetch<ActiveRunsEnvelope>(
         `/api/v1/projects/${projectId}/active-runs`,
+        { signal },
       );
-      if (activeRef.current) {
+      if (!signal?.aborted) {
         setRuns(envelope.items ?? []);
         setError(null);
       }
     } catch (err) {
-      if (activeRef.current) {
+      if (!signal?.aborted) {
         setError(err instanceof Error ? err.message : "Failed to load active runs");
       }
     } finally {
-      if (activeRef.current) {
+      if (!signal?.aborted) {
         setIsLoading(false);
       }
     }
@@ -68,15 +68,16 @@ export function useActiveRuns(projectId: string | null): ActiveRunsResult {
       return;
     }
 
-    activeRef.current = true;
     setIsLoading(true);
 
-    void fetchRuns();
+    const controller = new AbortController();
+
+    void fetchRuns(controller.signal);
 
     const schedule = () => {
       timerRef.current = setTimeout(() => {
-        void fetchRuns().then(() => {
-          if (activeRef.current) schedule();
+        void fetchRuns(controller.signal).then(() => {
+          if (!controller.signal.aborted) schedule();
         });
       }, POLL_INTERVAL_MS);
     };
@@ -84,7 +85,7 @@ export function useActiveRuns(projectId: string | null): ActiveRunsResult {
     schedule();
 
     return () => {
-      activeRef.current = false;
+      controller.abort();
       if (timerRef.current !== null) {
         clearTimeout(timerRef.current);
         timerRef.current = null;
