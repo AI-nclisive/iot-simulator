@@ -1,5 +1,7 @@
 package com.ainclusive.iotsim.api.security;
 
+import java.util.ArrayList;
+import java.util.List;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -8,7 +10,13 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtClaimValidator;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtValidators;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
 
@@ -67,6 +75,11 @@ public class SecurityConfig {
      * when {@code spring.security.oauth2.resourceserver.jwt.issuer-uri} is set.
      * An absent decoder causes a fail-fast error at startup with an actionable
      * message.
+     *
+     * <p>When {@link OidcProperties#audience()} is set the auto-configured
+     * {@link NimbusJwtDecoder} is wrapped with an audience validator so that tokens
+     * missing the expected {@code aud} value are rejected at the decoding stage,
+     * honouring the contract stated in the Javadoc of {@link OidcProperties}.
      */
     @Bean
     @ConditionalOnProperty(name = "iotsim.mode", havingValue = "shared")
@@ -80,6 +93,7 @@ public class SecurityConfig {
                     + "spring.security.oauth2.resourceserver.jwt.issuer-uri so bearer "
                     + "JWTs validate via JWKS. See backend-specs/08_AUTH_AND_MODES.md.");
         }
+        JwtDecoder validatingDecoder = applyAudienceValidation(jwtDecoder, oidcProperties.audience());
         JwtPrincipalConverter converter = new JwtPrincipalConverter(oidcProperties.rolesClaim());
         http
                 .csrf(csrf -> csrf.disable())
@@ -90,8 +104,27 @@ public class SecurityConfig {
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(jwt -> jwt
-                                .decoder(jwtDecoder)
+                                .decoder(validatingDecoder)
                                 .jwtAuthenticationConverter(converter)));
         return http.build();
+    }
+
+    /**
+     * Adds an {@code aud} claim validator to {@code decoder} when {@code audience} is
+     * non-null and non-blank.  Accepts a {@link NimbusJwtDecoder} (the Spring Boot
+     * auto-configured default); falls back to the unmodified decoder for any other
+     * implementation (e.g. test mocks).
+     */
+    private static JwtDecoder applyAudienceValidation(JwtDecoder decoder, String audience) {
+        if (audience == null || audience.isBlank()
+                || !(decoder instanceof NimbusJwtDecoder nimbus)) {
+            return decoder;
+        }
+        List<OAuth2TokenValidator<Jwt>> validators = new ArrayList<>();
+        validators.add(JwtValidators.createDefault());
+        validators.add(new JwtClaimValidator<List<String>>(
+                "aud", aud -> aud != null && aud.contains(audience)));
+        nimbus.setJwtValidator(new DelegatingOAuth2TokenValidator<>(validators));
+        return nimbus;
     }
 }

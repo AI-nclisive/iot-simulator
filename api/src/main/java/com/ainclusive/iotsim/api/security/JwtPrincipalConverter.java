@@ -8,7 +8,6 @@ import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
 /**
  * Converts a validated Spring Security {@link Jwt} into an
@@ -51,7 +50,7 @@ public class JwtPrincipalConverter implements Converter<Jwt, AbstractAuthenticat
         Collection<GrantedAuthority> authorities = extractAuthorities(jwt);
         IotSimPrincipal principal = new IotSimPrincipal(jwt.getSubject(),
                 Map.copyOf(jwt.getClaims()), authorities);
-        return new JwtAuthenticationToken(jwt, authorities, principal.subject());
+        return new IotSimAuthentication(jwt, principal, authorities);
     }
 
     private Collection<GrantedAuthority> extractAuthorities(Jwt jwt) {

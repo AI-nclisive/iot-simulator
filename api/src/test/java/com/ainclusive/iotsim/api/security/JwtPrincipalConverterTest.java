@@ -43,6 +43,19 @@ class JwtPrincipalConverterTest {
     }
 
     @Test
+    void principalIsIotSimPrincipal() {
+        JwtPrincipalConverter converter = new JwtPrincipalConverter();
+        Jwt jwt = buildJwt("user-42", Map.of("roles", List.of("admin")));
+
+        AbstractAuthenticationToken token = converter.convert(jwt);
+
+        assertThat(token.getPrincipal()).isInstanceOf(IotSimPrincipal.class);
+        IotSimPrincipal principal = (IotSimPrincipal) token.getPrincipal();
+        assertThat(principal.subject()).isEqualTo("user-42");
+        assertThat(principal.claims()).containsKey("roles");
+    }
+
+    @Test
     void extractsRolesFromDefaultRolesClaim() {
         JwtPrincipalConverter converter = new JwtPrincipalConverter();
         Jwt jwt = buildJwt("user-42", Map.of("roles", List.of("admin", "user")));
