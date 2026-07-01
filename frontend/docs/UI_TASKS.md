@@ -797,6 +797,12 @@ Parallel execution:
   Depends: IS-051 (values SSE stream).
   Done when: no fake timer in `RecordingFlowPage`; value count and state reflect real SSE; TypeScript errors pass.
 
+- [x] `UI-113` Fix source detail crash on direct navigation — hooks ordering + load-on-mount
+  Goal: `DataSourceDetailPreviewPage` crashed with a Rules of Hooks violation when navigated to directly (e.g. bookmark or refresh) because `useMemo` was called after an early `if (!source) return`. Also, the page showed a permanent "source not found" error on direct URL because the store was empty and nothing triggered a fetch.
+  Surface: `Data Source Detail` — all tabs.
+  Work includes: move `useMemo(stopConfirmationModel)` before the early return; add `useEffect` to call `loadDataSources` when store is empty on mount; use `fetchedForProjectRef` (tracks project id, not a bare boolean) to prevent infinite re-fetch; show loading spinner while fetch is in flight; 8 tests covering all states.
+  Done when: direct navigation to `/data-sources/<id>` loads correctly; invalid id shows error panel (no infinite spinner); all 8 tests pass.
+
 ## Recommended Sequence
 
 1. Complete the P0 shell and shared-pattern tasks first.
