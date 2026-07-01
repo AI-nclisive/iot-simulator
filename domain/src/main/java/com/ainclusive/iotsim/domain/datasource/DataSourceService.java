@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
 /** Data-source lifecycle and runtime control (backend-specs/03 & 05). */
@@ -56,6 +57,7 @@ public class DataSourceService {
         // Validate enum inputs early (invalid -> IllegalArgumentException -> 400).
         Protocol.valueOf(protocol);
         SourceBasis.valueOf(basis);
+        requireValidJson(runtimeConfig, "runtimeConfig");
         DataSourceRow row = dataSources.insert(projectId, name, protocol, basis, endpoint, runtimeConfig, actor);
         applyCredentials(row.id(), connectionCredentials);
         if (initialNodes != null && !initialNodes.isEmpty()) {
@@ -95,6 +97,7 @@ public class DataSourceService {
             String runtimeConfig, Boolean enabled, ConnectionCredentials connectionCredentials,
             long expectedVersion) {
         DataSourceRow existing = requireRow(projectId, id);
+        requireValidJson(runtimeConfig, "runtimeConfig");
         String newName = name != null ? name : existing.name();
         String newEndpoint = endpoint != null ? endpoint : existing.endpoint();
         String newRuntimeConfig = runtimeConfig != null ? runtimeConfig : existing.runtimeConfig();
@@ -187,6 +190,18 @@ public class DataSourceService {
     private void requireProject(String projectId) {
         if (projects.findById(projectId).isEmpty()) {
             throw new ResourceNotFoundException("Project", projectId);
+        }
+    }
+
+    /** Rejects a malformed jsonb field up front so it surfaces as 400, not a 500 from the DB driver. */
+    private void requireValidJson(String value, String field) {
+        if (value == null || value.isBlank()) {
+            return;
+        }
+        try {
+            json.readTree(value);
+        } catch (JacksonException e) {
+            throw new IllegalArgumentException(field + " must be valid JSON");
         }
     }
 

@@ -72,6 +72,22 @@ class DataSourceServiceTest {
     }
 
     @Test
+    void createWithMalformedRuntimeConfigThrowsBadInput() {
+        // Malformed JSON in a jsonb field must surface as 400, not a 500 from the DB driver.
+        assertThatThrownBy(() -> service.create(
+                        PROJECT, "Pump", "OPC_UA", "MANUAL", "opc.tcp://plc:4840", "{not json", null, null, "a"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void updateWithMalformedRuntimeConfigThrowsBadInput() {
+        DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null, null, "a");
+        assertThatThrownBy(() -> service.update(
+                        PROJECT, ds.id(), null, null, "{not json", null, null, ds.version()))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void getFromWrongProjectThrowsNotFound() {
         DataSource ds = service.create(PROJECT, "Pump", "MODBUS_TCP", "SCAN", null, null, null, null, "a");
         assertThatThrownBy(() -> service.get("other-project", ds.id()))

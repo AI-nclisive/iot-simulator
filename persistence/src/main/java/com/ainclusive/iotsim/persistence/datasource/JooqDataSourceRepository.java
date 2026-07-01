@@ -23,14 +23,14 @@ public class JooqDataSourceRepository implements DataSourceRepository {
 
     @Override
     public DataSourceRow insert(String projectId, String name, String protocol, String basis,
-            String endpointJson, String runtimeConfigJson, String createdBy) {
+            String endpoint, String runtimeConfigJson, String createdBy) {
         DataSourcesRecord record = dsl.insertInto(DATA_SOURCES)
                 .set(DATA_SOURCES.ID, Ids.newId())
                 .set(DATA_SOURCES.PROJECT_ID, projectId)
                 .set(DATA_SOURCES.NAME, name)
                 .set(DATA_SOURCES.PROTOCOL, protocol)
                 .set(DATA_SOURCES.BASIS, basis)
-                .set(DATA_SOURCES.ENDPOINT, json(endpointJson))
+                .set(DATA_SOURCES.ENDPOINT, endpointToJsonb(endpoint))
                 .set(DATA_SOURCES.RUNTIME_CONFIG, json(runtimeConfigJson))
                 .set(DATA_SOURCES.CREATED_BY, createdBy)
                 .returning()
@@ -81,11 +81,11 @@ public class JooqDataSourceRepository implements DataSourceRepository {
     }
 
     @Override
-    public Optional<DataSourceRow> update(String id, String name, String endpointJson,
+    public Optional<DataSourceRow> update(String id, String name, String endpoint,
             String runtimeConfigJson, boolean enabled, long expectedVersion) {
         DataSourcesRecord record = dsl.update(DATA_SOURCES)
                 .set(DATA_SOURCES.NAME, name)
-                .set(DATA_SOURCES.ENDPOINT, json(endpointJson))
+                .set(DATA_SOURCES.ENDPOINT, endpointToJsonb(endpoint))
                 .set(DATA_SOURCES.RUNTIME_CONFIG, json(runtimeConfigJson))
                 .set(DATA_SOURCES.ENABLED, enabled)
                 .set(DATA_SOURCES.UPDATED_AT, OffsetDateTime.now(ZoneOffset.UTC))
@@ -132,6 +132,86 @@ public class JooqDataSourceRepository implements DataSourceRepository {
         return value == null ? null : value.data();
     }
 
+    /**
+     * Stores the endpoint — a plain connection URL such as {@code opc.tcp://host:4840} — as a
+     * JSON string scalar so it round-trips through the {@code jsonb} column. A bare URL is not
+     * valid JSON on its own, so it is escaped and quoted; {@code null} becomes the JSON null literal.
+     */
+    private static JSONB endpointToJsonb(String endpoint) {
+        return endpoint == null ? JSONB.valueOf("null") : JSONB.valueOf(quoteJson(endpoint));
+    }
+
+    /** Inverse of {@link #endpointToJsonb}: decodes the stored JSON string scalar back to a plain URL. */
+    private static String endpointFromJsonb(JSONB value) {
+        String data = value == null ? null : value.data();
+        if (data == null || "null".equals(data)) {
+            return null;
+        }
+        String trimmed = data.trim();
+        if (trimmed.length() < 2 || trimmed.charAt(0) != '"' || trimmed.charAt(trimmed.length() - 1) != '"') {
+            // Legacy non-string jsonb (e.g. the historical "{}" default) carries no usable URL.
+            return null;
+        }
+        return unquoteJson(trimmed.substring(1, trimmed.length() - 1));
+    }
+
+    private static String quoteJson(String raw) {
+        StringBuilder sb = new StringBuilder(raw.length() + 2).append('"');
+        for (int i = 0; i < raw.length(); i++) {
+            char c = raw.charAt(i);
+            switch (c) {
+                case '"' -> sb.append("\\\"");
+                case '\\' -> sb.append("\\\\");
+                case '\n' -> sb.append("\\n");
+                case '\r' -> sb.append("\\r");
+                case '\t' -> sb.append("\\t");
+                case '\b' -> sb.append("\\b");
+                case '\f' -> sb.append("\\f");
+                default -> {
+                    if (c < 0x20) {
+                        sb.append(String.format("\\u%04x", (int) c));
+                    } else {
+                        sb.append(c);
+                    }
+                }
+            }
+        }
+        return sb.append('"').toString();
+    }
+
+    private static String unquoteJson(String escaped) {
+        StringBuilder sb = new StringBuilder(escaped.length());
+        for (int i = 0; i < escaped.length(); i++) {
+            char c = escaped.charAt(i);
+            if (c != '\\' || i + 1 >= escaped.length()) {
+                sb.append(c);
+                continue;
+            }
+            char next = escaped.charAt(++i);
+            switch (next) {
+                case '"' -> sb.append('"');
+                case '\\' -> sb.append('\\');
+                case '/' -> sb.append('/');
+                case 'n' -> sb.append('\n');
+                case 'r' -> sb.append('\r');
+                case 't' -> sb.append('\t');
+                case 'b' -> sb.append('\b');
+                case 'f' -> sb.append('\f');
+                case 'u' -> {
+                    if (i + 5 > escaped.length()) { sb.append('u'); break; }
+                    try {
+                        sb.append((char) Integer.parseInt(escaped.substring(i + 1, i + 5), 16));
+                        i += 4;
+                    } catch (NumberFormatException ignored) {
+                        sb.append('u');
+                    }
+                }
+                default -> sb.append(next);
+            }
+        }
+        return sb.toString();
+    }
+
     private DataSourceRow map(DataSourcesRecord r) {
         return new DataSourceRow(
                 r.getId(),
@@ -141,7 +221,7 @@ public class JooqDataSourceRepository implements DataSourceRepository {
                 r.getBasis(),
                 r.getSchemaId(),
                 r.getSchemaVersion(),
-                jsonString(r.getEndpoint()),
+                endpointFromJsonb(r.getEndpoint()),
                 jsonString(r.getRuntimeConfig()),
                 Boolean.TRUE.equals(r.getEnabled()),
                 r.getCreatedAt(),
