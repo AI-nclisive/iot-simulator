@@ -1,10 +1,12 @@
 import { Link } from "react-router-dom";
-import { activeRuns, type RunState } from "../shell/mock-workspace";
 import { useShellStore } from "../shell/shell-store";
+import { useActiveRuns, type ActiveRunResponse } from "../shell/use-active-runs";
 import { useLiveRuntime } from "../shell/use-live-runtime";
 import { SharedStatePanel } from "../ui/shared-state-panel";
 import { StaleBanner } from "../ui/stale-banner";
 import { StatusBadge, type StatusTone } from "../ui/status-badge";
+
+type RunState = ActiveRunResponse["runState"];
 
 function processTone(processType: "Recording" | "Replay" | "Scenario"): StatusTone {
   if (processType === "Recording") {
@@ -13,18 +15,6 @@ function processTone(processType: "Recording" | "Replay" | "Scenario"): StatusTo
 
   if (processType === "Scenario") {
     return "neutral";
-  }
-
-  return "accent";
-}
-
-function evidenceTone(status: "Ready" | "Assembling" | "Retry needed"): StatusTone {
-  if (status === "Retry needed") {
-    return "danger";
-  }
-
-  if (status === "Assembling") {
-    return "warning";
   }
 
   return "accent";
@@ -51,12 +41,36 @@ function runProcessLabel(
   return `${proc} stopped`;
 }
 
+function RunSkeleton() {
+  return (
+    <div className="space-y-3" aria-busy="true" aria-label="Loading active runs">
+      {[0, 1, 2].map((i) => (
+        <div
+          key={i}
+          className="animate-pulse rounded-md border border-shell-line bg-white px-4 py-4"
+        >
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0 flex-1 space-y-2">
+              <div className="h-4 w-40 rounded bg-shell-line" />
+              <div className="h-3 w-28 rounded bg-shell-line/60" />
+            </div>
+            <div className="flex gap-2">
+              <div className="h-6 w-24 rounded-full bg-shell-line" />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function RuntimeDashboardPanel() {
   const projectId = useShellStore((state) => state.currentProjectId);
   // Live runtime stream drives the connection/stale indicator and per-source
   // health summary. The active-run process list (recordings/replays/scenarios)
-  // is wired separately under UI-097; here we reflect real-time connection state.
+  // is polled separately via useActiveRuns (UI-111).
   const { sources, status: liveStatus } = useLiveRuntime(projectId, !!projectId);
+  const { runs, isLoading, error } = useActiveRuns(projectId);
 
   const isStale = liveStatus === "stale" || liveStatus === "reconnecting";
   const unhealthy = sources.filter((s) => s.health === "Error" || s.health === "Warning");
@@ -87,7 +101,15 @@ export function RuntimeDashboardPanel() {
         </div>
       ) : null}
 
-      {activeRuns.length === 0 ? (
+      {error ? (
+        <div className="mb-4 rounded-md border border-shell-danger/30 bg-shell-danger/10 px-3 py-2 text-sm text-shell-danger">
+          {error}
+        </div>
+      ) : null}
+
+      {isLoading ? (
+        <RunSkeleton />
+      ) : runs.length === 0 ? (
         <SharedStatePanel
           message="Start a source, recording, replay, or scenario to bring active runtime back into view here."
           state="empty"
@@ -95,31 +117,22 @@ export function RuntimeDashboardPanel() {
         />
       ) : (
         <div className="space-y-3">
-          {activeRuns.map((run) => (
+          {runs.map((run) => (
             <article
               key={run.id}
-              className={`rounded-md border bg-white px-4 py-4 ${
-                run.runSource === "automation"
-                  ? "border-shell-accent/25 bg-shell-accent/[0.02]"
-                  : "border-shell-line"
-              }`}
+              className="rounded-md border border-shell-line bg-white px-4 py-4"
             >
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="text-sm font-medium text-shell-ink">{run.label}</p>
-                    {run.runSource === "automation" ? (
-                      <span
-                        className="inline-flex items-center rounded-full border border-shell-accent/30 bg-shell-accent/10 px-2 py-0.5 text-xs font-medium text-shell-accent"
-                        title="Triggered by an external automation process, not a manual user action"
-                      >
-                        Automated
-                      </span>
-                    ) : null}
                   </div>
                   <p className="mt-1 text-sm text-shell-muted">
                     {run.initiator} · {run.startedAt}
                   </p>
+                  {run.relatedLabel ? (
+                    <p className="mt-0.5 text-xs text-shell-muted">{run.relatedLabel}</p>
+                  ) : null}
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
@@ -127,46 +140,29 @@ export function RuntimeDashboardPanel() {
                     label={runProcessLabel(run.runState, run.processType)}
                     tone={runStateTone(run.runState)}
                   />
-                  {run.runState !== "queued" ? (
-                    <StatusBadge
-                      label={`Evidence: ${run.evidence}`}
-                      tone={evidenceTone(run.evidence)}
-                    />
-                  ) : null}
+                  <StatusBadge
+                    label={run.processType}
+                    tone={processTone(run.processType)}
+                  />
                 </div>
               </div>
-
-              {run.runState !== "queued" ? (
-                <div className="mt-4 flex flex-wrap items-center gap-3">
-                  <p className="text-sm text-shell-muted">
-                    {run.parameterCount.toLocaleString()} parameters in this run
-                  </p>
-                </div>
-              ) : null}
-
-              {run.runState === "queued" ? (
-                <p className="mt-3 text-sm text-shell-muted">
-                  Waiting to start — {run.parameterCount.toLocaleString()} parameters scheduled.
-                </p>
-              ) : null}
-
 
               {run.runState === "failed" ? (
                 <div className="mt-3 rounded-md border border-shell-danger/30 bg-shell-danger/10 px-3 py-2 text-sm text-shell-danger">
-                  This run failed. Open the related source or evidence for details.
+                  This run failed. Open the related source for details.
                 </div>
               ) : null}
 
-              <div className="mt-4 flex flex-wrap items-center gap-3">
-                <Link className="shell-text-action" to={run.relatedPath}>
-                  Open source
-                </Link>
-                {run.evidencePath && run.runState !== "queued" ? (
-                  <Link className="shell-text-action" to={run.evidencePath}>
-                    Open evidence
+              {run.relatedSourceId ? (
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <Link
+                    className="shell-text-action"
+                    to={`/data-sources/${run.relatedSourceId}`}
+                  >
+                    Open source
                   </Link>
-                ) : null}
-              </div>
+                </div>
+              ) : null}
             </article>
           ))}
         </div>
