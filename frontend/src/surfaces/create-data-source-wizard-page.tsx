@@ -181,7 +181,7 @@ function suggestedEndpoint(protocol: ProtocolOption["id"] | null, basis: SourceB
   return "127.0.0.1:502";
 }
 
-function validationMessage(stepId: WizardStepId, form: WizardFormState) {
+function validationMessage(stepId: WizardStepId, form: WizardFormState, accessMode: "local" | "shared" = "local") {
   if (stepId === "protocol" && !form.protocol) {
     return "Choose a protocol to continue.";
   }
@@ -199,7 +199,7 @@ function validationMessage(stepId: WizardStepId, form: WizardFormState) {
       return "Enter the real endpoint before continuing.";
     }
 
-    if (stepId === "setup" && form.basis === "scan") {
+    if (stepId === "setup" && form.basis === "scan" && accessMode !== "local") {
       const credentialMessage = credentialValidationMessage(form);
       if (credentialMessage) return credentialMessage;
     }
@@ -420,7 +420,7 @@ export function CreateDataSourceWizardPage() {
   const activeSteps = getActiveSteps(form.basis);
   const safeStep = Math.min(currentStep, activeSteps.length - 1);
   const activeStepId = activeSteps[safeStep].id;
-  const currentValidationMessage = validationMessage(activeStepId, form);
+  const currentValidationMessage = validationMessage(activeStepId, form, accessMode);
   const currentProtocol = protocolOptions.find((option) => option.id === form.protocol) ?? null;
   const currentBasis = basisOptions.find((option) => option.id === form.basis) ?? null;
 
@@ -711,6 +711,7 @@ export function CreateDataSourceWizardPage() {
                   />
                 </label>
 
+                {accessMode !== "local" ? (
                 <div className="space-y-3 border-t border-shell-line pt-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-sm font-medium text-shell-ink">Credential handling</p>
@@ -833,6 +834,7 @@ export function CreateDataSourceWizardPage() {
                     ) : null}
                   </div>
                 </div>
+                ) : null}
               </div>
             ) : null}
 
