@@ -36,8 +36,6 @@ final class OpcUaServerRuntime {
     private final String endpointUrl;
     private final Consumer<RuntimeEvent> runtimeEventSink;
     private final int port;
-    private final String bindAddress;
-    private final String advertisedHost;
 
     OpcUaServerRuntime(int port, List<VarDef> variables) {
         this(port, variables, event -> {}, event -> {});
@@ -56,8 +54,6 @@ final class OpcUaServerRuntime {
             Consumer<ClientEvent> clientEventSink, Consumer<RuntimeEvent> runtimeEventSink) {
         this.runtimeEventSink = runtimeEventSink;
         this.port = port;
-        this.bindAddress = bindAddress;
-        this.advertisedHost = advertisedHost;
         try {
             File pki = Files.createTempDirectory("iotsim-pki").toFile();
             DefaultTrustListManager trustList = new DefaultTrustListManager(pki);

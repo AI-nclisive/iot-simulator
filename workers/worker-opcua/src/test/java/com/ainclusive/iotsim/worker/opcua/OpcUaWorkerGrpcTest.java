@@ -98,7 +98,7 @@ class OpcUaWorkerGrpcTest {
     }
 
     @Test
-    void configureWithNetworkOptionsStartsAndAcceptsClient() {
+    void configureWithNetworkOptionsStarts() {
         stub.configure(ConfigureRequest.newBuilder()
                 .setListenPort(0)
                 .putOptions("bindAddress", "127.0.0.1")
