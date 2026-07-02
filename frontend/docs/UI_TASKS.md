@@ -797,6 +797,7 @@ Parallel execution:
   Depends: IS-051 (values SSE stream).
   Done when: no fake timer in `RecordingFlowPage`; value count and state reflect real SSE; TypeScript errors pass.
 
+- [x] `UI-115` Sample import flow + local-mode auth skip in wizard
 - [x] `UI-114` UX polish — wizard rework, recordings, scenarios, schema editor fixes
 
 - [x] `UI-113` Fix source detail crash on direct navigation — hooks ordering + load-on-mount
