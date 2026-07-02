@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link, NavLink, Outlet } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { ToastRegion } from "../ui/notification-pattern";
 import { useNotificationStore } from "./notification-store";
 import { useProjectsStore } from "./projects-store";
@@ -18,6 +18,7 @@ const topLevelNav = [
 ] as const;
 
 export function AppShell() {
+  const navigate = useNavigate();
   const accessMode = useShellStore((state) => state.accessMode);
   const currentProjectId = useShellStore((state) => state.currentProjectId);
   const setCurrentProjectId = useShellStore((state) => state.setCurrentProjectId);
@@ -26,9 +27,20 @@ export function AppShell() {
   const toasts = useNotificationStore((state) => state.toasts);
   const dismissNotification = useNotificationStore((state) => state.dismiss);
   const projects = useProjectsStore((state) => state.projects);
+  const loadProjects = useProjectsStore((state) => state.loadProjects);
 
   // Mobile nav: collapsed by default on narrow screens, always visible on lg+
   const [navOpen, setNavOpen] = useState(false);
+
+  useEffect(() => {
+    void loadProjects();
+  }, [loadProjects]);
+
+  useEffect(() => {
+    if (!currentProjectId) {
+      navigate("/projects", { replace: true });
+    }
+  }, [currentProjectId, navigate]);
 
   const currentProject = projects.find((p) => p.id === currentProjectId) ?? null;
   const access = resolveAccess(accessMode, sharedRole);

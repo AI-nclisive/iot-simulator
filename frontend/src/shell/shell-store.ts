@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 import type { AccessMode, SharedRole } from "./access-policy";
 
 type ShellState = {
@@ -10,11 +11,23 @@ type ShellState = {
   sharedRole: SharedRole;
 };
 
-export const useShellStore = create<ShellState>((set) => ({
-  accessMode: "local",
-  currentProjectId: "",
-  setAccessMode: (accessMode) => set({ accessMode }),
-  setCurrentProjectId: (currentProjectId) => set({ currentProjectId }),
-  setSharedRole: (sharedRole) => set({ sharedRole }),
-  sharedRole: "admin",
-}));
+export const useShellStore = create<ShellState>()(
+  persist(
+    (set) => ({
+      accessMode: "local",
+      currentProjectId: "",
+      setAccessMode: (accessMode) => set({ accessMode }),
+      setCurrentProjectId: (currentProjectId) => set({ currentProjectId }),
+      setSharedRole: (sharedRole) => set({ sharedRole }),
+      sharedRole: "admin",
+    }),
+    {
+      name: "iot-shell",
+      partialize: (state) => ({
+        accessMode: state.accessMode,
+        currentProjectId: state.currentProjectId,
+        sharedRole: state.sharedRole,
+      }),
+    },
+  ),
+);

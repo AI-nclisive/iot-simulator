@@ -797,6 +797,7 @@ Parallel execution:
   Depends: IS-051 (values SSE stream).
   Done when: no fake timer in `RecordingFlowPage`; value count and state reflect real SSE; TypeScript errors pass.
 
+- [x] `UI-117` Fix project selection persistence — lost on refresh, not shown on direct URL
 - [x] `UI-116` Sample import flow + local-mode auth skip in wizard
 - [x] `UI-115` Data-source wizard + recordings rework
   Goal: (1) rework the Create Data Source wizard — rename "Scan real source" → "Real source", remove pre-start schema-scan step, add schedule (start/end datetime) step, replace simulatored endpoint with simulatorPort input, change "Prepared data" import step from samples to recordings; (2) replace the Recordings & Samples page — remove Samples block, add Create Recording wizard (new connection → scan type → schedule → review) with file import support, add Recording detail page (Schema + Values tabs); (3) in the "Prepared data" wizard branch show recordings list instead of samples.

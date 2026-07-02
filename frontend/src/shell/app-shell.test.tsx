@@ -52,6 +52,7 @@ function setupStores() {
   mockProjectsStore.mockImplementation((selector: (s: Record<string, unknown>) => unknown) =>
     selector({
       projects: PROJECTS,
+      loadProjects: vi.fn().mockResolvedValue(undefined),
     }),
   );
 }
