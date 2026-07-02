@@ -90,6 +90,20 @@ class ProjectZipExporterTest {
     }
 
     @Test
+    void dataSourceJsonIncludesHashedSecurityConfig() {
+        // Build content with a hashed securityConfig and verify it round-trips through export.
+        String storedHash = "{\"userTokens\":{\"anonymous\":false,\"username\":{\"enabled\":true,"
+                + "\"users\":[{\"username\":\"op\",\"passwordHash\":\"pbkdf2-sha256$1$aa$bb\"}]}}}";
+        ProjectExportContent content = contentWithSecurityConfig(storedHash);
+
+        String dsJson = unzip(exporter.toBytes(content)).get("data-sources.json");
+
+        assertThat(dsJson)
+                .contains("securityConfig")
+                .contains("pbkdf2-sha256$1$aa$bb");
+    }
+
+    @Test
     void schemasJsonContainsNodes() {
         String schemasJson = unzip(exporter.toBytes(fullContent())).get("schemas.json");
 
@@ -165,6 +179,18 @@ class ProjectZipExporterTest {
                 "{}", List.of("tag1"), now, "local", 1L);
 
         return new ProjectExportContent(project, List.of(ds), schemas, List.of(rec), List.of(sample));
+    }
+
+    private static ProjectExportContent contentWithSecurityConfig(String securityConfig) {
+        Instant now = Instant.parse("2026-06-01T00:00:00Z");
+        Project project = new Project("proj-sc", "Security Config Project", "desc",
+                Project.ProjectStatus.ACTIVE, now, now, "local", 1L);
+        DataSource ds = new DataSource("ds-sc", "proj-sc", "Secure Source",
+                Protocol.OPC_UA, SourceBasis.SCAN, null, null,
+                4840, "device://plc", "{}", securityConfig, false,
+                RuntimeState.STOPPED, CredentialState.MISSING,
+                "opc.tcp://localhost:4840/iotsim", now, now, "local", 1L);
+        return new ProjectExportContent(project, List.of(ds), Map.of(), List.of(), List.of());
     }
 
     private static Map<String, String> unzip(byte[] bytes) {

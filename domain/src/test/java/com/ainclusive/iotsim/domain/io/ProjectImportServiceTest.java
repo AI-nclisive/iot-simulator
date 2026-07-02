@@ -169,6 +169,25 @@ class ProjectImportServiceTest {
         assertThat(fixture.updateCalledCount).isGreaterThan(0);
     }
 
+    @Test
+    void importPreservesSecurityConfigHashes() {
+        // Build a content whose data source carries a hashed securityConfig,
+        // export it, then import it — the hash must survive the round-trip.
+        String storedHash = "{\"userTokens\":{\"anonymous\":false,\"username\":{\"enabled\":true,"
+                + "\"users\":[{\"username\":\"op\",\"passwordHash\":\"pbkdf2-sha256$1$aa$bb\"}]}}}";
+        ProjectExportContent content = contentWithSecurityConfig(storedHash);
+
+        Fixture fixture = new Fixture();
+        fixture.service().importProject(exportStream(content), "local");
+
+        assertThat(fixture.insertedDataSources).hasSize(1);
+        DataSourceRow imported = fixture.insertedDataSources.get(0);
+        assertThat(imported.securityConfig())
+                .isNotNull()
+                .contains("passwordHash")
+                .isEqualTo(storedHash);
+    }
+
     // -------------------------------------------------------------------------
 
     private InputStream exportStream(ProjectExportContent content) {
@@ -206,6 +225,20 @@ class ProjectImportServiceTest {
 
         return new ProjectExportContent(project, List.of(ds), Map.of("ds-1", schema),
                 List.of(rec), List.of(sample));
+    }
+
+    private static ProjectExportContent contentWithSecurityConfig(String securityConfig) {
+        Instant now = Instant.parse("2026-06-01T00:00:00Z");
+        Project project = new Project("proj-sc", "Security Config Project", "desc",
+                Project.ProjectStatus.ACTIVE, now, now, "local", 1L);
+
+        DataSource ds = new DataSource("ds-sc", "proj-sc", "Secure Source",
+                Protocol.OPC_UA, SourceBasis.SCAN, null, null,
+                4840, "device://plc", "{}", securityConfig, false,
+                RuntimeState.STOPPED, CredentialState.MISSING,
+                "opc.tcp://localhost:4840/iotsim", now, now, "local", 1L);
+
+        return new ProjectExportContent(project, List.of(ds), Map.of(), List.of(), List.of());
     }
 
     /** Builds a ZIP with a manifest.json that has the given formatVersion. */
