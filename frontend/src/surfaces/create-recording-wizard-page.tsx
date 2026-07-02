@@ -148,6 +148,13 @@ export function CreateRecordingWizardPage() {
             protocol: backendProtocol(form.protocol),
             endpoint: form.endpoint,
             scanType: form.scanType === "schema-only" ? "SCHEMA_ONLY" : "SCHEMA_AND_DATA",
+            credentialMode: form.credentialMode,
+            ...(form.credentialMode === "password"
+              ? { username: form.username, password: form.password }
+              : {}),
+            ...(form.credentialMode === "external-ref"
+              ? { secretRef: form.secretRef }
+              : {}),
             ...(form.scheduleStartEnabled && form.scheduleStart
               ? { scheduleStart: form.scheduleStart }
               : {}),

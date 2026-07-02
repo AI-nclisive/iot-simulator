@@ -192,8 +192,10 @@ export function validationMessage(stepId: WizardStepId, form: WizardFormState, a
       if (credentialMessage) return credentialMessage;
     }
 
-    if (!form.simulatorPort.trim() || isNaN(Number(form.simulatorPort)) || Number(form.simulatorPort) < 1 || Number(form.simulatorPort) > 65535) {
-      return "Enter a valid simulator port (1–65535).";
+    if (stepId === "setup") {
+      if (!form.simulatorPort.trim() || isNaN(Number(form.simulatorPort)) || Number(form.simulatorPort) < 1 || Number(form.simulatorPort) > 65535) {
+        return "Enter a valid simulator port (1–65535).";
+      }
     }
 
     if (stepId === "import") {
