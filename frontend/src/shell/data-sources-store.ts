@@ -27,7 +27,8 @@ export function parseEndpointUrl(raw: string | null): string {
   if (!raw) return "";
   try {
     const parsed = JSON.parse(raw);
-    return typeof parsed?.url === "string" ? parsed.url : raw;
+    const url = parsed?.url;
+    return typeof url === "string" && url.trim() ? url : "";
   } catch {
     return raw;
   }

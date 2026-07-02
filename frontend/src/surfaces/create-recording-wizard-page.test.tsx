@@ -1,12 +1,11 @@
 /**
- * Tests for CreateRecordingWizardPage (UI-115)
+ * Tests for CreateRecordingWizardPage (UI-115, UI-118)
  *
  * Covers:
- * - Step 1 (Connection): renders protocol options, Next disabled without protocol
- * - Step 1 → Step 2 navigation when protocol + endpoint filled
- * - Step 2 (Scan type): Next disabled until scan type selected
- * - Step 3 (Schedule): renders immediate-start notice by default
- * - Step 4 (Review): shows Create recording button
+ * - Step 1 (Data source): shows empty state when no sources available
+ * - Step 1: shows data sources; Next disabled until one selected
+ * - Step 1: Next enabled after selecting a source
+ * - Step 2 (Review): shows Create recording button
  */
 
 import { cleanup, render, screen } from "@testing-library/react";
@@ -32,12 +31,30 @@ vi.mock("../shell/notification-store", () => ({
     selector({ push: vi.fn() }),
 }));
 
+const { mockDataSourcesStore } = vi.hoisted(() => ({ mockDataSourcesStore: vi.fn() }));
+
+vi.mock("../shell/data-sources-store", () => ({
+  useDataSourcesStore: mockDataSourcesStore,
+}));
+
+const defaultSources = [
+  { id: "src-1", name: "Plant OPC UA", protocol: "OPC UA", status: "Active", endpoint: "opc.tcp://plant:4840" },
+  { id: "src-2", name: "Modbus Line B", protocol: "Modbus TCP", status: "Stopped", endpoint: "" },
+];
+
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
 });
 
+function setupSources(sources: typeof defaultSources) {
+  mockDataSourcesStore.mockImplementation((selector: (s: Record<string, unknown>) => unknown) =>
+    selector({ dataSources: sources }),
+  );
+}
+
 function renderPage() {
+  setupSources(defaultSources);
   render(
     <MemoryRouter>
       <CreateRecordingWizardPage />
@@ -45,92 +62,51 @@ function renderPage() {
   );
 }
 
-describe("CreateRecordingWizardPage — step 1 (Connection)", () => {
-  it("renders protocol option buttons", () => {
+describe("CreateRecordingWizardPage — step 1 (Data source)", () => {
+  it("renders data source list", () => {
     renderPage();
-    expect(screen.getByText("OPC UA")).toBeTruthy();
-    expect(screen.getByText("Modbus TCP")).toBeTruthy();
+    expect(screen.getByText("Plant OPC UA")).toBeTruthy();
+    expect(screen.getByText("Modbus Line B")).toBeTruthy();
   });
 
-  it("Next is disabled when no protocol selected", () => {
+  it("Next is disabled when no source selected", () => {
     renderPage();
     const btn = screen.getByRole("button", { name: "Next" }) as HTMLButtonElement;
     expect(btn.disabled).toBe(true);
   });
 
-  it("Next remains disabled when protocol selected but endpoint empty", async () => {
+  it("Next enabled after selecting a source", async () => {
     renderPage();
-    await userEvent.click(screen.getByText("OPC UA"));
-    const btn = screen.getByRole("button", { name: "Next" }) as HTMLButtonElement;
-    expect(btn.disabled).toBe(true);
-  });
-
-  it("Next enabled when protocol and endpoint filled", async () => {
-    renderPage();
-    await userEvent.click(screen.getByText("OPC UA"));
-    await userEvent.type(screen.getByPlaceholderText(/opc.tcp/i), "opc.tcp://host:4840");
+    await userEvent.click(screen.getByText("Plant OPC UA"));
     const btn = screen.getByRole("button", { name: "Next" }) as HTMLButtonElement;
     expect(btn.disabled).toBe(false);
   });
 });
 
-describe("CreateRecordingWizardPage — step 2 (Scan type)", () => {
-  async function navigateToScanType() {
+describe("CreateRecordingWizardPage — step 2 (Review)", () => {
+  it("renders Create recording button on review step", async () => {
     renderPage();
-    await userEvent.click(screen.getByText("OPC UA"));
-    await userEvent.type(screen.getByPlaceholderText(/opc.tcp/i), "opc.tcp://host:4840");
+    await userEvent.click(screen.getByText("Plant OPC UA"));
     await userEvent.click(screen.getByRole("button", { name: "Next" }));
-  }
-
-  it("renders scan type options after advancing from connection step", async () => {
-    await navigateToScanType();
-    expect(screen.getByText("Scan schema only")).toBeTruthy();
-    expect(screen.getByText("Scan schema + data")).toBeTruthy();
-  });
-
-  it("Next is disabled until scan type is chosen", async () => {
-    await navigateToScanType();
-    const btn = screen.getByRole("button", { name: "Next" }) as HTMLButtonElement;
-    expect(btn.disabled).toBe(true);
-  });
-
-  it("Next enabled after scan type selected", async () => {
-    await navigateToScanType();
-    await userEvent.click(screen.getByText("Scan schema only"));
-    const btn = screen.getByRole("button", { name: "Next" }) as HTMLButtonElement;
-    expect(btn.disabled).toBe(false);
-  });
-});
-
-describe("CreateRecordingWizardPage — step 3 (Schedule)", () => {
-  async function navigateToSchedule() {
-    renderPage();
-    await userEvent.click(screen.getByText("OPC UA"));
-    await userEvent.type(screen.getByPlaceholderText(/opc.tcp/i), "opc.tcp://host:4840");
-    await userEvent.click(screen.getByRole("button", { name: "Next" }));
-    await userEvent.click(screen.getByText("Scan schema only"));
-    await userEvent.click(screen.getByRole("button", { name: "Next" }));
-  }
-
-  it("shows immediate-start notice by default", async () => {
-    await navigateToSchedule();
-    expect(screen.getByText(/start immediately and run without a time limit/i)).toBeTruthy();
-  });
-});
-
-describe("CreateRecordingWizardPage — step 4 (Review)", () => {
-  async function navigateToReview() {
-    renderPage();
-    await userEvent.click(screen.getByText("OPC UA"));
-    await userEvent.type(screen.getByPlaceholderText(/opc.tcp/i), "opc.tcp://host:4840");
-    await userEvent.click(screen.getByRole("button", { name: "Next" }));
-    await userEvent.click(screen.getByText("Scan schema only"));
-    await userEvent.click(screen.getByRole("button", { name: "Next" }));
-    await userEvent.click(screen.getByRole("button", { name: "Next" }));
-  }
-
-  it("renders Create recording submit button on review step", async () => {
-    await navigateToReview();
     expect(screen.getByRole("button", { name: "Create recording" })).toBeTruthy();
+  });
+
+  it("shows selected source name in review", async () => {
+    renderPage();
+    await userEvent.click(screen.getByText("Plant OPC UA"));
+    await userEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getAllByText("Plant OPC UA").length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("CreateRecordingWizardPage — empty sources", () => {
+  it("shows empty state when no data sources exist", () => {
+    setupSources([]);
+    render(
+      <MemoryRouter>
+        <CreateRecordingWizardPage />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText("No data sources available.")).toBeTruthy();
   });
 });

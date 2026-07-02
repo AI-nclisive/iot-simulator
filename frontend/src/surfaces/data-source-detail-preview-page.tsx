@@ -226,7 +226,9 @@ export function DataSourceDetailPreviewPage() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 max-w-3xl">
             <h2 className="text-2xl font-semibold text-shell-ink">{activeSource.name}</h2>
-            <p className="mt-2 text-sm leading-6 text-shell-muted">{activeSource.endpoint}</p>
+            {activeSource.endpoint ? (
+              <p className="mt-2 text-sm leading-6 text-shell-muted">{activeSource.endpoint}</p>
+            ) : null}
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
