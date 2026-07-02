@@ -797,6 +797,7 @@ Parallel execution:
   Depends: IS-051 (values SSE stream).
   Done when: no fake timer in `RecordingFlowPage`; value count and state reflect real SSE; TypeScript errors pass.
 
+- [ ] `UI-119` Recording value browser — paginated table (Timestamp, Parameter path, Value) in Recording detail Values tab; wired to IS-134 `GET .../values` endpoint; cursor pagination "Load more"; replaces "will be available in a future release" placeholder.
 - [x] `UI-118` Fix data source detail, schema editor, and create recording wizard bugs
 - [x] `UI-117` Fix project selection persistence — lost on refresh, not shown on direct URL
 - [x] `UI-116` Sample import flow + local-mode auth skip in wizard

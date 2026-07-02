@@ -17,6 +17,7 @@ import com.ainclusive.iotsim.persistence.runtimeevent.RuntimeEventQuery;
 import com.ainclusive.iotsim.persistence.runtimeevent.RuntimeEventRepository;
 import com.ainclusive.iotsim.persistence.runtimeevent.RuntimeEventRow;
 import com.ainclusive.iotsim.persistence.timeline.ValueTimelineRepository;
+import com.ainclusive.iotsim.persistence.timeline.ValueTimelineRepository.ValueTimelineEntry;
 import com.ainclusive.iotsim.platform.storage.ObjectStore;
 import com.ainclusive.iotsim.protocolmodel.NeutralValue;
 import com.ainclusive.iotsim.protocolmodel.Quality;
@@ -376,6 +377,10 @@ class EvidenceServiceTest {
         }
 
         public long count(String recordingId) {
+            throw new UnsupportedOperationException();
+        }
+
+        public List<ValueTimelineEntry> readPage(String recordingId, long afterSeq, int limit) {
             throw new UnsupportedOperationException();
         }
     }

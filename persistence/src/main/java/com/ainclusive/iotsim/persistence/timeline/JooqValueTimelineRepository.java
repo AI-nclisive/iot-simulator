@@ -80,6 +80,17 @@ public class JooqValueTimelineRepository implements ValueTimelineRepository {
         return total == null ? 0 : total;
     }
 
+    @Override
+    public List<ValueTimelineEntry> readPage(String recordingId, long afterSeq, int limit) {
+        return dsl.selectFrom(VALUE_TIMELINE)
+                .where(VALUE_TIMELINE.RECORDING_ID.eq(recordingId))
+                .and(VALUE_TIMELINE.SEQ.greaterThan(afterSeq))
+                .orderBy(VALUE_TIMELINE.SEQ)
+                .limit(limit)
+                .fetch()
+                .map(r -> new ValueTimelineEntry(r.getSeq(), toValue(r)));
+    }
+
     private NeutralValue toValue(ValueTimelineRecord r) {
         ValueCodec.Kind kind = ValueCodec.Kind.valueOf(r.getValueKind());
         Object value = ValueCodec.decode(kind, r.getValueEnc());
