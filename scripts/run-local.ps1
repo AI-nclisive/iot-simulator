@@ -25,9 +25,10 @@ param(
 $ErrorActionPreference = 'Stop'
 # Native (external) commands returning non-zero must NOT throw - we check
 # $LASTEXITCODE by hand in the wait loops (pg_isready fails while starting).
-# The preference variable below only exists in PowerShell 7.4+; on Windows
-# PowerShell 5.1 native commands never throw on non-zero anyway, so the guard
-# keeps 5.1 from creating a stray no-op variable.
+# The preference variable below is meaningful only on PowerShell 7.4+, but
+# setting it on any 7.x is a harmless no-op; on Windows PowerShell 5.1 native
+# commands never throw on non-zero anyway, so gating on major -ge 7 keeps 5.1
+# from creating a stray no-op variable.
 if ($PSVersionTable.PSVersion.Major -ge 7) {
   $PSNativeCommandUseErrorActionPreference = $false
 }
