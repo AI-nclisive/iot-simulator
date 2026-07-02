@@ -98,6 +98,17 @@ class OpcUaWorkerGrpcTest {
     }
 
     @Test
+    void configureWithNetworkOptionsStartsAndAcceptsClient() {
+        stub.configure(ConfigureRequest.newBuilder()
+                .setListenPort(0)
+                .putOptions("bindAddress", "127.0.0.1")
+                .putOptions("advertisedHost", "127.0.0.1")
+                .build());
+        Ack started = stub.start(StartRequest.newBuilder().build());
+        assertThat(started.getOk()).isTrue();
+    }
+
+    @Test
     void applyValuesIsReceivedAndCounted() throws Exception {
         ProtocolDataSourceGrpc.ProtocolDataSourceStub async = ProtocolDataSourceGrpc.newStub(channel);
         CountDownLatch done = new CountDownLatch(1);

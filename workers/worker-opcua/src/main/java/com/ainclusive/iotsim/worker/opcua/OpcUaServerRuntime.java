@@ -36,6 +36,8 @@ final class OpcUaServerRuntime {
     private final String endpointUrl;
     private final Consumer<RuntimeEvent> runtimeEventSink;
     private final int port;
+    private final String bindAddress;
+    private final String advertisedHost;
 
     OpcUaServerRuntime(int port, List<VarDef> variables) {
         this(port, variables, event -> {}, event -> {});
@@ -47,16 +49,23 @@ final class OpcUaServerRuntime {
 
     OpcUaServerRuntime(int port, List<VarDef> variables, Consumer<ClientEvent> clientEventSink,
             Consumer<RuntimeEvent> runtimeEventSink) {
+        this(port, "127.0.0.1", "127.0.0.1", variables, clientEventSink, runtimeEventSink);
+    }
+
+    OpcUaServerRuntime(int port, String bindAddress, String advertisedHost, List<VarDef> variables,
+            Consumer<ClientEvent> clientEventSink, Consumer<RuntimeEvent> runtimeEventSink) {
         this.runtimeEventSink = runtimeEventSink;
         this.port = port;
+        this.bindAddress = bindAddress;
+        this.advertisedHost = advertisedHost;
         try {
             File pki = Files.createTempDirectory("iotsim-pki").toFile();
             DefaultTrustListManager trustList = new DefaultTrustListManager(pki);
 
             EndpointConfiguration endpoint = EndpointConfiguration.newBuilder()
                     .setTransportProfile(TransportProfile.TCP_UASC_UABINARY)
-                    .setBindAddress("127.0.0.1")
-                    .setHostname("127.0.0.1")
+                    .setBindAddress(bindAddress)
+                    .setHostname(advertisedHost)
                     .setBindPort(port)
                     .setPath("/iotsim")
                     .setSecurityPolicy(SecurityPolicy.None)
@@ -90,7 +99,7 @@ final class OpcUaServerRuntime {
                 }
             });
             this.namespace = new SchemaNamespace(server, variables);
-            this.endpointUrl = "opc.tcp://127.0.0.1:" + port + "/iotsim";
+            this.endpointUrl = "opc.tcp://" + advertisedHost + ":" + port + "/iotsim";
         } catch (IOException e) {
             throw new UncheckedIOException("failed to prepare OPC UA server", e);
         }

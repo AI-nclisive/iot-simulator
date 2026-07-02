@@ -90,8 +90,11 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
                 nodeDataTypes.put(node.getNodeId(), node.getDataType());
             }
         }
+        String bindAddress = request.getOptions().getOrDefault("bindAddress", "127.0.0.1");
+        String advertisedHost = request.getOptions().getOrDefault("advertisedHost", "127.0.0.1");
         serverRuntime.set(new OpcUaServerRuntime(
-                request.getListenPort(), variables, clientEventHub::emit, runtimeEventHub::emit));
+                request.getListenPort(), bindAddress, advertisedHost, variables,
+                clientEventHub::emit, runtimeEventHub::emit));
         configuredNodes.set(request.getSchema().getNodesCount());
         state.set("CONFIGURED");
         ackOk(obs, "configured " + variables.size() + " variables");
