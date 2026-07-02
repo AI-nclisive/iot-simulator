@@ -32,7 +32,6 @@ export function SampleImportDialog({
   const [nameError, setNameError] = useState<string | null>(null);
   const [dropError, setDropError] = useState<string | null>(null);
   const [confirmError, setConfirmError] = useState<string | null>(null);
-  const [estimatedValues, setEstimatedValues] = useState(0);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
@@ -46,7 +45,6 @@ export function SampleImportDialog({
       setNameError(null);
       setDropError(null);
       setConfirmError(null);
-      setEstimatedValues(0);
     }
   }, [open]);
 
@@ -97,7 +95,6 @@ export function SampleImportDialog({
         const text = await selectedFile.text();
         JSON.parse(text);
       }
-      setEstimatedValues(Math.max(0, Math.round(selectedFile.size / 1024)) * 20);
       setStep("confirm");
     } catch {
       setStep("select");
@@ -274,14 +271,6 @@ export function SampleImportDialog({
             <div>
               <p className="text-shell-muted">File</p>
               <p className="mt-1 text-shell-ink truncate">{selectedFile?.name}</p>
-            </div>
-            <div>
-              <p className="text-shell-muted">Estimated values</p>
-              <p className="mt-1 text-shell-ink">{estimatedValues.toLocaleString()}</p>
-            </div>
-            <div>
-              <p className="text-shell-muted">Imported by</p>
-              <p className="mt-1 text-shell-ink">Import</p>
             </div>
             <div>
               <p className="text-shell-muted">Size</p>
