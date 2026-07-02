@@ -214,7 +214,14 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
     public void start(StartRequest request, StreamObserver<Ack> obs) {
         OpcUaServerRuntime runtime = serverRuntime.get();
         if (runtime != null) {
-            runtime.start();
+            try {
+                runtime.start();
+            } catch (BindFailedException e) {
+                state.set("ERROR");
+                obs.onNext(Ack.newBuilder().setOk(false).setMessage(e.getMessage()).build());
+                obs.onCompleted();
+                return;
+            }
         }
         state.set("RUNNING");
         ackOk(obs, "started");

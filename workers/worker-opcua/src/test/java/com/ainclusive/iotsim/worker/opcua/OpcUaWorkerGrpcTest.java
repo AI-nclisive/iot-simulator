@@ -80,6 +80,24 @@ class OpcUaWorkerGrpcTest {
     }
 
     @Test
+    void startReturnsNotOkWhenPortIsAlreadyBound() throws Exception {
+        // On macOS ServerSocket defaults to SO_REUSEADDR=true, which lets Netty bind
+        // the same port again. Disable REUSEADDR so the hold is exclusive.
+        java.net.ServerSocket held = new java.net.ServerSocket();
+        held.setReuseAddress(false);
+        held.bind(new java.net.InetSocketAddress("127.0.0.1", 0));
+        try {
+            int taken = held.getLocalPort();
+            stub.configure(ConfigureRequest.newBuilder().setListenPort(taken).build());
+            Ack ack = stub.start(StartRequest.newBuilder().build());
+            assertThat(ack.getOk()).isFalse();
+            assertThat(ack.getMessage()).contains(String.valueOf(taken));
+        } finally {
+            held.close();
+        }
+    }
+
+    @Test
     void applyValuesIsReceivedAndCounted() throws Exception {
         ProtocolDataSourceGrpc.ProtocolDataSourceStub async = ProtocolDataSourceGrpc.newStub(channel);
         CountDownLatch done = new CountDownLatch(1);
