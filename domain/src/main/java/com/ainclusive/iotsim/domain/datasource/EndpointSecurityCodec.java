@@ -45,7 +45,7 @@ final class EndpointSecurityCodec {
                 if (name.isBlank()) {
                     throw new IllegalArgumentException("securityConfig: user username must not be blank");
                 }
-                if (password.isEmpty()) {
+                if (password.isBlank()) {
                     throw new IllegalArgumentException("securityConfig: user password must not be blank");
                 }
                 ObjectNode outUser = JSON.createObjectNode();
@@ -116,7 +116,7 @@ final class EndpointSecurityCodec {
         try {
             return JSON.readTree(json);
         } catch (RuntimeException e) {
-            throw new IllegalArgumentException("securityConfig must be valid JSON");
+            throw new IllegalArgumentException("securityConfig must be valid JSON", e);
         }
     }
 

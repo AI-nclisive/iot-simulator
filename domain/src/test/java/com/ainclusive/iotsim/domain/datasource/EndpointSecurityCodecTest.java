@@ -61,4 +61,18 @@ class EndpointSecurityCodecTest {
                 + "\"users\":[{\"username\":\"\",\"password\":\"x\"}]}}}"))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void rejectsWhitespacePassword() {
+        assertThatThrownBy(() -> EndpointSecurityCodec.normalizeForStorage(
+                "{\"userTokens\":{\"anonymous\":true,\"username\":{\"enabled\":true,"
+                + "\"users\":[{\"username\":\"op\",\"password\":\"   \"}]}}}"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void rejectsMalformedJson() {
+        assertThatThrownBy(() -> EndpointSecurityCodec.normalizeForStorage("not-json"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
 }
