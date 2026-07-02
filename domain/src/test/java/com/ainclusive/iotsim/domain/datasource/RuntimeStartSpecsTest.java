@@ -29,10 +29,28 @@ class RuntimeStartSpecsTest {
         assertThat(spec.listenPort()).isEqualTo(0);
     }
 
+    @Test
+    void buildsEndpointSecurityFromRow() {
+        String stored = "{\"userTokens\":{\"anonymous\":false,"
+                + "\"username\":{\"enabled\":true,\"users\":[{\"username\":\"op\",\"passwordHash\":\"h\"}]}}}";
+        DataSourceRow row = rowWithSecurityConfig(stored);
+        RuntimeStartSpec spec = RuntimeStartSpecs.of(emptySchemas(), row);
+        assertThat(spec.endpointSecurity().usernameEnabled()).isTrue();
+        assertThat(spec.endpointSecurity().anonymousAllowed()).isFalse();
+        assertThat(spec.endpointSecurity().users()).singleElement()
+                .satisfies(u -> assertThat(u.username()).isEqualTo("op"));
+    }
+
     private static DataSourceRow row(int simulatorPort) {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         return new DataSourceRow("ds-1", "proj-1", "Test", "OPC_UA", "MANUAL",
                 null, null, simulatorPort, null, "{}", null, false, now, now, "local", 0);
+    }
+
+    private static DataSourceRow rowWithSecurityConfig(String securityConfig) {
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        return new DataSourceRow("ds-1", "proj-1", "Test", "OPC_UA", "MANUAL",
+                null, null, 4840, null, "{}", securityConfig, false, now, now, "local", 0);
     }
 
     private static SchemaRepository emptySchemas() {

@@ -24,6 +24,7 @@ public final class RuntimeStartSpecs {
                 current.map(SchemaWithNodes::version).orElse(0),
                 current.map(SchemaWithNodes::nodes).orElse(List.of()),
                 source.simulatorPort(),
-                deterministicSettings);
+                deterministicSettings,
+                EndpointSecurityCodec.toModel(source.securityConfig()));
     }
 }
