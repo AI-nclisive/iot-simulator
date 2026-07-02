@@ -1,15 +1,19 @@
 #!/usr/bin/env pwsh
 #
-# run-local.ps1 — bring up / tear down the full local e2e stack (Windows).
+# run-local.ps1 - bring up / tear down the full local e2e stack (Windows).
 #
 # Mirrors the `run-local` skill (.claude/skills/run-local/SKILL.md):
 #   Postgres (:5432) + backend (:8080, IOTSIM_MODE=local, IOTSIM_RUNTIME_MODE=supervisor
 #   with a real out-of-process OPC UA worker) + frontend Vite dev server (:4173).
 #
 # Usage:
-#   .\scripts\run-local.ps1            # or `up` — bring the stack up
+#   .\scripts\run-local.ps1            # or `up` - bring the stack up
 #   .\scripts\run-local.ps1 down       # stop backend/frontend/postgres (KEEPS db data)
 #   .\scripts\run-local.ps1 down -Wipe # also drop the pgdata volume (clean slate)
+#
+# Runs on Windows PowerShell 5.1 and PowerShell 7+. This file is intentionally
+# ASCII-only: 5.1 reads a BOM-less .ps1 as ANSI, so any non-ASCII character
+# (e.g. an em-dash) would be mis-decoded and break parsing. Keep it ASCII.
 #
 [CmdletBinding()]
 param(
@@ -19,9 +23,15 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-# Native (external) commands returning non-zero must NOT throw — we check
+# Native (external) commands returning non-zero must NOT throw - we check
 # $LASTEXITCODE by hand in the wait loops (pg_isready fails while starting).
-$PSNativeCommandUseErrorActionPreference = $false
+# The preference variable below is meaningful only on PowerShell 7.4+, but
+# setting it on any 7.x is a harmless no-op; on Windows PowerShell 5.1 native
+# commands never throw on non-zero anyway, so gating on major -ge 7 keeps 5.1
+# from creating a stray no-op variable.
+if ($PSVersionTable.PSVersion.Major -ge 7) {
+  $PSNativeCommandUseErrorActionPreference = $false
+}
 
 # --- locate repo root (this script lives in <repo>\scripts) -------------------
 $RepoRoot = Split-Path -Parent $PSScriptRoot
@@ -52,7 +62,7 @@ function Invoke-Compose {
 }
 
 function Write-Report {
-  Write-Log "stack is up — entry points:"
+  Write-Log "stack is up - entry points:"
   Write-Host "  UI (use this):  http://localhost:$FrontendPort"
   Write-Host "  Swagger UI:     http://localhost:$BackendPort/swagger-ui.html"
   Write-Host "  API base:       http://localhost:$BackendPort/api/v1"
@@ -61,7 +71,7 @@ function Write-Report {
   Write-Host ""
   Write-Host "  Real OPC UA workers: starting an OPC_UA data source in the UI spawns a Milo"
   Write-Host "  worker that binds the source's runtimeConfig.listenPort and serves"
-  Write-Host "  opc.tcp://127.0.0.1:<port>/iotsim — point your external OPC UA client there."
+  Write-Host "  opc.tcp://127.0.0.1:<port>/iotsim - point your external OPC UA client there."
   Write-Host "  (Set a listenPort when creating the source, else the port is ephemeral.)"
   Write-Host ""
   Write-Host "  Tear down with: .\scripts\run-local.ps1 down"
@@ -71,12 +81,12 @@ function Invoke-Up {
   # 0. Preflight -------------------------------------------------------------
   docker info *> $null
   if ($LASTEXITCODE -ne 0) {
-    throw "Docker is not running — start Docker Desktop first."
+    throw "Docker is not running - start Docker Desktop first."
   }
   Initialize-Compose
 
   if (-not (Test-Path node_modules)) {
-    Write-Log "node_modules missing — running 'npm ci'..."
+    Write-Log "node_modules missing - running 'npm ci'..."
     & npm ci
   }
 
@@ -89,7 +99,7 @@ function Invoke-Up {
     }
   } catch { }
   if ($alreadyUp) {
-    Write-Log "stack already running — reusing it."
+    Write-Log "stack already running - reusing it."
     Write-Report
     return
   }
@@ -113,7 +123,7 @@ function Invoke-Up {
   }
 
   # 3. Backend (background, supervisor mode) ---------------------------------
-  Write-Log "starting backend (:$BackendPort, supervisor mode) — log: $BackendLog"
+  Write-Log "starting backend (:$BackendPort, supervisor mode) - log: $BackendLog"
   $env:IOTSIM_MODE         = 'local'
   $env:IOTSIM_RUNTIME_MODE = 'supervisor'
   # Forward slashes inside the JSON so the path string stays valid.
@@ -126,7 +136,7 @@ function Invoke-Up {
         -RedirectStandardOutput $BackendLog -RedirectStandardError $BackendErr -NoNewWindow -PassThru
   $be.Id | Out-File (Join-Path $env:TEMP 'iotsim-backend.pid')
 
-  Write-Log "polling health (first run compiles — allow ~2 min)..."
+  Write-Log "polling health (first run compiles - allow ~2 min)..."
   $deadline = (Get-Date).AddSeconds(240)
   while ($true) {
     try {
@@ -142,7 +152,7 @@ function Invoke-Up {
   Write-Log "backend is UP."
 
   # 4. Frontend dev server (background) --------------------------------------
-  Write-Log "starting frontend dev server (:$FrontendPort) — log: $FrontendLog"
+  Write-Log "starting frontend dev server (:$FrontendPort) - log: $FrontendLog"
   $fe = Start-Process -FilePath $env:ComSpec -ArgumentList '/c', 'npm run dev' `
         -RedirectStandardOutput $FrontendLog -RedirectStandardError $FrontendErr -NoNewWindow -PassThru
   $fe.Id | Out-File (Join-Path $env:TEMP 'iotsim-frontend.pid')
@@ -164,7 +174,7 @@ function Invoke-Up {
     Invoke-RestMethod "http://localhost:$FrontendPort/api/v1/projects" -TimeoutSec 5 *> $null
     Write-Log "wiring verified: :$FrontendPort/api proxied to backend."
   } catch {
-    Write-Err "warning: proxied /api/v1/projects did not answer — check $BackendLog."
+    Write-Err "warning: proxied /api/v1/projects did not answer - check $BackendLog."
   }
 
   Write-Report
@@ -183,7 +193,7 @@ function Invoke-Down {
     }
 
   # STOPGAP (IS-123): supervisor-spawned workers don't shut down gracefully
-  # yet — graceful Shutdown RPC is IS-090. Kill lingering workers explicitly.
+  # yet - graceful Shutdown RPC is IS-090. Kill lingering workers explicitly.
   Get-Process worker-opcua -ErrorAction SilentlyContinue | Stop-Process -Force
 
   if ($Wipe) {
