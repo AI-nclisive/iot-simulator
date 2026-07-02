@@ -10,6 +10,7 @@ import com.ainclusive.iotsim.platform.runtime.HealthOrigin;
 import com.ainclusive.iotsim.platform.runtime.LiveValueListener;
 import com.ainclusive.iotsim.platform.runtime.RuntimeActivityEvent;
 import com.ainclusive.iotsim.platform.runtime.RuntimeActivityListener;
+import com.ainclusive.iotsim.platform.runtime.EndpointSecurity;
 import com.ainclusive.iotsim.platform.runtime.RuntimeCapacityException;
 import com.ainclusive.iotsim.platform.runtime.RuntimeController;
 import com.ainclusive.iotsim.platform.runtime.RuntimeStartSpec;
@@ -27,6 +28,8 @@ import com.ainclusive.iotsim.protocolmodel.NodeKind;
 import com.ainclusive.iotsim.protocolmodel.SchemaNode;
 import com.ainclusive.iotsim.protocolmodel.ValueCodec;
 import com.ainclusive.iotsim.workercontract.v1.CaptureRequest;
+import com.ainclusive.iotsim.workercontract.v1.SecurityConfig;
+import com.ainclusive.iotsim.workercontract.v1.UserCredential;
 import com.ainclusive.iotsim.workercontract.v1.ClientEvent;
 import com.ainclusive.iotsim.workercontract.v1.ConnectionConfigMsg;
 import com.ainclusive.iotsim.workercontract.v1.Quality;
@@ -647,6 +650,21 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
         return schema.build();
     }
 
+    private static SecurityConfig toProtoSecurityConfig(EndpointSecurity sec) {
+        if (sec == null) {
+            return SecurityConfig.getDefaultInstance();
+        }
+        SecurityConfig.Builder b = SecurityConfig.newBuilder()
+                .setAnonymousAllowed(sec.anonymousAllowed())
+                .setUsernameEnabled(sec.usernameEnabled());
+        for (EndpointSecurity.UserCredential u : sec.users()) {
+            b.addUsers(UserCredential.newBuilder()
+                    .setUsername(u.username())
+                    .setPasswordHash(u.passwordHash()));
+        }
+        return b.build();
+    }
+
     private static String orEmpty(String value) {
         return value == null ? "" : value;
     }
@@ -762,7 +780,8 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
                 awaitReady(newClient);
                 newClient.configure(
                         toProtoSchema(spec.schemaVersion(), spec.schemaNodes()), spec.listenPort(),
-                        network.bindAddress(), network.advertisedHost());
+                        network.bindAddress(), network.advertisedHost(),
+                        toProtoSecurityConfig(spec.endpointSecurity()));
                 // Subscribe to runtime events BEFORE start so SOURCE_START — emitted the
                 // instant the worker's server begins listening — is not missed; the hub
                 // does not buffer. UNIMPLEMENTED on an older worker is non-fatal.

@@ -14,6 +14,7 @@ import com.ainclusive.iotsim.workercontract.v1.RuntimeEvent;
 import com.ainclusive.iotsim.workercontract.v1.ScanRequest;
 import com.ainclusive.iotsim.workercontract.v1.ScanResponse;
 import com.ainclusive.iotsim.workercontract.v1.Schema;
+import com.ainclusive.iotsim.workercontract.v1.SecurityConfig;
 import com.ainclusive.iotsim.workercontract.v1.StartRequest;
 import com.ainclusive.iotsim.workercontract.v1.StopRequest;
 import com.ainclusive.iotsim.workercontract.v1.StreamRequest;
@@ -62,17 +63,19 @@ public final class WorkerClient implements AutoCloseable {
         return response;
     }
 
-    public Ack configure(Schema schema, int listenPort, String bindAddress, String advertisedHost) {
-        return stub.configure(buildConfigureRequest(schema, listenPort, bindAddress, advertisedHost));
+    public Ack configure(Schema schema, int listenPort, String bindAddress, String advertisedHost,
+            SecurityConfig securityConfig) {
+        return stub.configure(buildConfigureRequest(schema, listenPort, bindAddress, advertisedHost, securityConfig));
     }
 
     static ConfigureRequest buildConfigureRequest(Schema schema, int listenPort,
-            String bindAddress, String advertisedHost) {
+            String bindAddress, String advertisedHost, SecurityConfig securityConfig) {
         return ConfigureRequest.newBuilder()
                 .setSchema(schema)
                 .setListenPort(listenPort)
                 .putOptions("bindAddress", bindAddress)
                 .putOptions("advertisedHost", advertisedHost)
+                .setSecurityConfig(securityConfig)
                 .build();
     }
 
