@@ -60,6 +60,7 @@ type ArtifactsState = {
   error: string | null;
   samplesError: string | null;
   loadRecordings: (projectId: string) => Promise<void>;
+  loadRecordingById: (projectId: string, recordingId: string) => Promise<void>;
   loadSamples: (projectId: string) => Promise<void>;
   createSample: (projectId: string, req: CreateSampleRequest) => Promise<SampleResponse>;
   deleteSample: (projectId: string, sampleId: string) => Promise<void>;
@@ -71,7 +72,7 @@ type ArtifactsState = {
   appendRecording: (artifact: ReusableArtifact) => void;
 };
 
-export const useArtifactsStore = create<ArtifactsState>((set) => ({
+export const useArtifactsStore = create<ArtifactsState>((set, get) => ({
   artifacts: [],
   samples: [],
   isLoading: false,
@@ -88,6 +89,23 @@ export const useArtifactsStore = create<ArtifactsState>((set) => ({
       set({ artifacts: items.map(mapRecording), isLoading: false });
     } catch (err) {
       const message = err instanceof ApiError ? err.title : "Failed to load recordings";
+      set({ error: message, isLoading: false });
+    }
+  },
+
+  loadRecordingById: async (projectId: string, recordingId: string) => {
+    if (get().artifacts.find((a) => a.id === recordingId)) return;
+    set({ isLoading: true, error: null });
+    try {
+      const r = await apiFetch<RecordingResponse>(
+        `/api/v1/projects/${projectId}/recordings/${recordingId}`,
+      );
+      set((state) => ({
+        artifacts: [mapRecording(r), ...state.artifacts.filter((a) => a.id !== r.id)],
+        isLoading: false,
+      }));
+    } catch (err) {
+      const message = err instanceof ApiError ? err.title : "Failed to load recording";
       set({ error: message, isLoading: false });
     }
   },

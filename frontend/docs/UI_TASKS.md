@@ -798,12 +798,12 @@ Parallel execution:
   Done when: no fake timer in `RecordingFlowPage`; value count and state reflect real SSE; TypeScript errors pass.
 
 - [x] `UI-116` Sample import flow + local-mode auth skip in wizard
-- [ ] `UI-115` Data-source form/detail rework for the payload redesign (simulatorPort + serveUrl)
-  Goal: replace the free-text endpoint field with a `simulatorPort` number input and surface a derived `serveUrl`; expose `realDeviceEndpoint` only for scan/real sources.
-  Surface: `Create Data Source Wizard`, `Data Source Detail` (Overview + Settings), `Data Sources List`.
-  Work includes: wizard `simulatorPort` input pre-filled with the per-protocol default (4840/502); settings edits `simulatorPort` (1..65535); overview shows `serveUrl` prominently + `realDeviceEndpoint` when present; list search + `data-sources-store` request/response types on the new fields; drop the raw `endpoint` field.
-  Depends: IS-127 (backend payload + `serveUrl`).
-  Done when: wizard sends `simulatorPort`; overview renders the derived `serveUrl`; no raw endpoint field; typecheck + vitest pass.
+- [x] `UI-115` Data-source wizard + recordings rework
+  Goal: (1) rework the Create Data Source wizard — rename "Scan real source" → "Real source", remove pre-start schema-scan step, add schedule (start/end datetime) step, replace simulatored endpoint with simulatorPort input, change "Prepared data" import step from samples to recordings; (2) replace the Recordings & Samples page — remove Samples block, add Create Recording wizard (new connection → scan type → schedule → review) with file import support, add Recording detail page (Schema + Values tabs); (3) in the "Prepared data" wizard branch show recordings list instead of samples.
+  Surface: `Create Data Source Wizard`, `Recordings & Samples` (now Recordings), new `Create Recording Wizard`, new `Recording Detail`.
+  Work includes: wizard step sequence update (schema step removed, schedule step added); simulatorPort number input pre-filled per protocol (4840/502); realDeviceEndpoint only for scan basis; import step shows recordings; SamplesSection removed from recordings page; CreateRecordingWizardPage with steps: connection, scan type (schema-only vs schema+data), schedule; RecordingDetailPage with Schema and Values tabs; import recording file dialog kept; routes /recordings/new and /recordings/:id added.
+  Depends: IS-127 (backend payload).
+  Done when: wizard sends simulatorPort + realDeviceEndpoint; schedule step present; import shows recordings; recordings page has no samples block; create recording flow works; detail page shows schema/values; typecheck + vitest pass.
 
 - [x] `UI-114` UX polish — wizard rework, recordings, scenarios, schema editor fixes
 
