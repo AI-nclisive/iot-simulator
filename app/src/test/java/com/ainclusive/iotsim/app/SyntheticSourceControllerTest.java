@@ -47,7 +47,8 @@ class SyntheticSourceControllerTest {
     private static DataSource sample() {
         Instant now = Instant.now();
         return new DataSource("ds1", PROJECT, "Gen", Protocol.OPC_UA, SourceBasis.SYNTHETIC,
-                "sc1", 1, "{}", "{}", false, RuntimeState.STOPPED, CredentialState.MISSING, now, now, "local", 0);
+                "sc1", 1, 4840, null, "{}", false, RuntimeState.STOPPED, CredentialState.MISSING,
+                "opc.tcp://localhost:4840/iotsim", now, now, "local", 0);
     }
 
     @Test
@@ -55,7 +56,7 @@ class SyntheticSourceControllerTest {
         given(service.create(eq(PROJECT), eq("Gen"), eq("OPC_UA"), any(), any(), eq("local")))
                 .willReturn(sample());
         ResponseEntity<DataSourceResponse> resp = controller.create(
-                PROJECT, new CreateSyntheticSourceRequest("Gen", "OPC_UA", "{}", config()));
+                PROJECT, new CreateSyntheticSourceRequest("Gen", "OPC_UA", null, config()));
         assertThat(resp.getStatusCode().value()).isEqualTo(201);
         assertThat(resp.getHeaders().getETag()).isEqualTo("\"0\"");
         assertThat(resp.getBody()).isNotNull();
@@ -65,14 +66,14 @@ class SyntheticSourceControllerTest {
     @Test
     void blankNameRejected() {
         assertThatThrownBy(() -> controller.create(
-                PROJECT, new CreateSyntheticSourceRequest(" ", "OPC_UA", "{}", config())))
+                PROJECT, new CreateSyntheticSourceRequest(" ", "OPC_UA", null, config())))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void missingConfigRejected() {
         assertThatThrownBy(() -> controller.create(
-                PROJECT, new CreateSyntheticSourceRequest("Gen", "OPC_UA", "{}", null)))
+                PROJECT, new CreateSyntheticSourceRequest("Gen", "OPC_UA", null, null)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("config is required");
     }

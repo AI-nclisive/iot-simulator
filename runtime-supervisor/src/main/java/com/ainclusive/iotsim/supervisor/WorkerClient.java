@@ -69,8 +69,18 @@ public final class WorkerClient implements AutoCloseable {
                 .build());
     }
 
+    /**
+     * Starts the worker's protocol server. A worker that cannot bind its listen port
+     * returns {@code Ack(ok=false)} with the reason (rather than a raw gRPC error);
+     * this surfaces that as a {@link WorkerBindException} so the supervisor can record
+     * the source as ERROR. See backend-specs/02_WORKER_CONTRACT_AND_IPC.md.
+     */
     public Ack start() {
-        return stub.start(StartRequest.getDefaultInstance());
+        Ack ack = stub.start(StartRequest.getDefaultInstance());
+        if (!ack.getOk()) {
+            throw new WorkerBindException(ack.getMessage());
+        }
+        return ack;
     }
 
     public Ack stop() {

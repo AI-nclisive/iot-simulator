@@ -114,12 +114,12 @@ class SchemaServiceTest {
             }
             OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
             return Optional.of(new DataSourceRow(id, projectId, "src", "OPC_UA", "MANUAL",
-                    null, null, "{}", "{}", false, now, now, "local", 0));
+                    null, null, 0, null, "{}", false, now, now, "local", 0));
         }
 
         @Override
         public DataSourceRow insert(String projectId, String name, String protocol, String basis,
-                String endpointJson, String runtimeConfigJson, String createdBy) {
+                int simulatorPort, String realDeviceEndpoint, String runtimeConfigJson, String createdBy) {
             throw new UnsupportedOperationException();
         }
 
@@ -135,8 +135,8 @@ class SchemaServiceTest {
         }
 
         @Override
-        public Optional<DataSourceRow> update(String id, String name, String endpointJson,
-                String runtimeConfigJson, boolean enabled, long expectedVersion) {
+        public Optional<DataSourceRow> update(String id, String name, int simulatorPort,
+                String realDeviceEndpoint, String runtimeConfigJson, boolean enabled, long expectedVersion) {
             throw new UnsupportedOperationException();
         }
 

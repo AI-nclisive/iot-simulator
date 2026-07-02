@@ -58,7 +58,7 @@ public class SyntheticSourceController {
             throw new IllegalArgumentException("config is required");
         }
         DataSource ds = syntheticSources.create(
-                projectId, req.name(), req.protocol(), req.endpoint(), req.config(), "local");
+                projectId, req.name(), req.protocol(), req.simulatorPort(), req.config(), "local");
         return ResponseEntity.created(
                         URI.create("/api/v1/projects/" + projectId + "/data-sources/" + ds.id()))
                 .eTag("\"" + ds.version() + "\"")
@@ -66,5 +66,5 @@ public class SyntheticSourceController {
     }
 
     public record CreateSyntheticSourceRequest(
-            String name, String protocol, String endpoint, SyntheticConfig config) {}
+            String name, String protocol, Integer simulatorPort, SyntheticConfig config) {}
 }

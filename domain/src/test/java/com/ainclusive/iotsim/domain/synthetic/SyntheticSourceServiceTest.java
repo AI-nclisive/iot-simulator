@@ -51,23 +51,23 @@ class SyntheticSourceServiceTest {
     private static DataSource sample(String id) {
         Instant now = Instant.now();
         return new DataSource(id, PROJECT, "Gen", Protocol.OPC_UA, SourceBasis.SYNTHETIC,
-                null, null, "{}", "{}", false, RuntimeState.STOPPED, CredentialState.MISSING,
-                now, now, "local", 0);
+                null, null, 0, null, "{}", false, RuntimeState.STOPPED, CredentialState.MISSING,
+                "opc.tcp://localhost:0/iotsim", now, now, "local", 0);
     }
 
     @Test
     void createStoresSyntheticBasisAndSerializedConfigAndBuildsSchema() {
         given(dataSources.create(eq(PROJECT), eq("Gen"), eq("OPC_UA"), eq("SYNTHETIC"),
-                any(), any(), any(), any(), eq("local"))).willReturn(sample("ds1"));
+                any(), any(), any(), any(), any(), eq("local"))).willReturn(sample("ds1"));
         given(dataSources.get(PROJECT, "ds1")).willReturn(sample("ds1"));
 
-        DataSource result = service.create(PROJECT, "Gen", "OPC_UA", "{}", config(), "local");
+        DataSource result = service.create(PROJECT, "Gen", "OPC_UA", null, config(), "local");
 
         assertThat(result.id()).isEqualTo("ds1");
 
         ArgumentCaptor<String> runtimeConfig = ArgumentCaptor.forClass(String.class);
         verify(dataSources).create(eq(PROJECT), eq("Gen"), eq("OPC_UA"), eq("SYNTHETIC"),
-                eq("{}"), runtimeConfig.capture(), any(), any(), eq("local"));
+                any(), eq((String) null), runtimeConfig.capture(), any(), any(), eq("local"));
         assertThat(runtimeConfig.getValue()).contains("\"seed\":9").contains("temp").contains("level");
 
         @SuppressWarnings("unchecked")
@@ -82,7 +82,7 @@ class SyntheticSourceServiceTest {
 
     @Test
     void createWithNullConfigRejected() {
-        assertThatThrownBy(() -> service.create(PROJECT, "Gen", "OPC_UA", "{}", null, "local"))
+        assertThatThrownBy(() -> service.create(PROJECT, "Gen", "OPC_UA", null, null, "local"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("config is required");
     }
@@ -92,7 +92,7 @@ class SyntheticSourceServiceTest {
         var bad = new SyntheticConfig(1L, List.of(
                 new SyntheticVariableConfig("x", DataType.FLOAT64,
                         new PatternSpec("RAMP", null, 0.0, 10.0, null, null, null, null), 100)));
-        assertThatThrownBy(() -> service.create(PROJECT, "Gen", "OPC_UA", "{}", bad, "local"))
+        assertThatThrownBy(() -> service.create(PROJECT, "Gen", "OPC_UA", null, bad, "local"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("periodMs");
     }

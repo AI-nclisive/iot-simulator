@@ -140,7 +140,7 @@ class RecordingServiceTest {
 
     @Test
     void startCaptureWithoutEndpointIsRejected() {
-        sources.endpoint = null;
+        sources.realDeviceEndpoint = null;
         schemas.set(1, List.of(variable("temp", DataType.FLOAT64)));
         assertThatThrownBy(() -> service.startCapture(PROJECT, SOURCE, "a"))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -338,12 +338,12 @@ class RecordingServiceTest {
     private static final class FakeDataSourceRepository implements DataSourceRepository {
         private final String id;
         private final String projectId;
-        private String endpoint;
+        private String realDeviceEndpoint;
 
-        FakeDataSourceRepository(String id, String projectId, String endpoint) {
+        FakeDataSourceRepository(String id, String projectId, String realDeviceEndpoint) {
             this.id = id;
             this.projectId = projectId;
-            this.endpoint = endpoint;
+            this.realDeviceEndpoint = realDeviceEndpoint;
         }
 
         @Override
@@ -353,12 +353,12 @@ class RecordingServiceTest {
             }
             OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
             return Optional.of(new DataSourceRow(id, projectId, "src", "OPC_UA", "SCAN",
-                    "sch-1", 2, endpoint, "{}", false, now, now, "local", 0));
+                    "sch-1", 2, 0, realDeviceEndpoint, "{}", false, now, now, "local", 0));
         }
 
         @Override
         public DataSourceRow insert(String projectId, String name, String protocol, String basis,
-                String endpointJson, String runtimeConfigJson, String createdBy) {
+                int simulatorPort, String realDeviceEndpoint, String runtimeConfigJson, String createdBy) {
             throw new UnsupportedOperationException();
         }
 
@@ -374,8 +374,8 @@ class RecordingServiceTest {
         }
 
         @Override
-        public Optional<DataSourceRow> update(String id, String name, String endpointJson,
-                String runtimeConfigJson, boolean enabled, long expectedVersion) {
+        public Optional<DataSourceRow> update(String id, String name, int simulatorPort,
+                String realDeviceEndpoint, String runtimeConfigJson, boolean enabled, long expectedVersion) {
             throw new UnsupportedOperationException();
         }
 

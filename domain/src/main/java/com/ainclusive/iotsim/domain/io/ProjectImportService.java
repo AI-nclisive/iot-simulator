@@ -1,5 +1,7 @@
 package com.ainclusive.iotsim.domain.io;
 
+import com.ainclusive.iotsim.domain.datasource.Protocol;
+import com.ainclusive.iotsim.domain.datasource.SimulatorUrl;
 import com.ainclusive.iotsim.domain.project.Project;
 import com.ainclusive.iotsim.domain.project.ProjectService;
 import com.ainclusive.iotsim.domain.sample.SampleService;
@@ -128,18 +130,25 @@ public class ProjectImportService {
                     String dsName = ds.path("name").asString("Imported Source");
                     String protocol = ds.path("protocol").asString("OPC_UA");
                     String basis = ds.path("basis").asString("IMPORT");
-                    String endpoint = ds.path("endpoint").asString(null);
+                    // Fall back to the legacy "endpoint" key for pre-IS-127 export bundles.
+                    String realDeviceEndpoint = ds.path("realDeviceEndpoint")
+                            .asString(ds.path("endpoint").asString(null));
+                    int simulatorPort = ds.path("simulatorPort").asInt(0);
+                    if (simulatorPort <= 0) {
+                        simulatorPort = SimulatorUrl.defaultPort(Protocol.valueOf(protocol));
+                    }
                     String runtimeConfig = ds.path("runtimeConfig").asString(null);
                     boolean enabled = ds.path("enabled").asBoolean(false);
 
                     DataSourceRow row = dataSources.insert(
-                            newProject.id(), dsName, protocol, basis, endpoint, runtimeConfig, actor);
+                            newProject.id(), dsName, protocol, basis, simulatorPort, realDeviceEndpoint,
+                            runtimeConfig, actor);
 
                     // Preserve the exported enabled state: insert() defaults to false;
                     // apply an update only when the exported value is true.
                     if (enabled) {
-                        dataSources.update(row.id(), row.name(), row.endpoint(),
-                                row.runtimeConfig(), true, row.version());
+                        dataSources.update(row.id(), row.name(), row.simulatorPort(),
+                                row.realDeviceEndpoint(), row.runtimeConfig(), true, row.version());
                     }
 
                     if (oldId != null) {

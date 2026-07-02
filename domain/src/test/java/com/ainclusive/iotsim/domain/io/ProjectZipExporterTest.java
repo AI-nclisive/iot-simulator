@@ -83,6 +83,8 @@ class ProjectZipExporterTest {
         assertThat(dsJson)
                 .contains("\"id\":\"ds-1\"")
                 .contains("\"protocol\":\"OPC_UA\"")
+                .contains("\"simulatorPort\":4840")
+                .contains("\"realDeviceEndpoint\":\"device://plc\"")
                 .doesNotContain("credentialState")
                 .doesNotContain("runtimeState");
     }
@@ -144,8 +146,9 @@ class ProjectZipExporterTest {
 
         DataSource ds = new DataSource("ds-1", "proj-1", "OPC UA Source",
                 Protocol.OPC_UA, SourceBasis.SCAN, "schema-1", 1,
-                "{\"host\":\"opc.local\"}", "{}", true,
+                4840, "device://plc", "{}", true,
                 RuntimeState.STOPPED, CredentialState.MISSING,
+                "opc.tcp://localhost:4840/iotsim",
                 now, now, "local", 1L);
 
         SchemaNode node = new SchemaNode("ns=2;s=Temp", null, "/Temperature",

@@ -27,7 +27,7 @@ class PersistingRuntimeActivityListenerTest {
             sources, events, new ObjectMapper(), Runnable::run);
 
     private static DataSourceRow row(String id, String projectId) {
-        return new DataSourceRow(id, projectId, "name", "OPC_UA", "SCAN", null, null, null, null,
+        return new DataSourceRow(id, projectId, "name", "OPC_UA", "SCAN", null, null, 4840, null, null,
                 true, OffsetDateTime.now(), OffsetDateTime.now(), null, 1L);
     }
 

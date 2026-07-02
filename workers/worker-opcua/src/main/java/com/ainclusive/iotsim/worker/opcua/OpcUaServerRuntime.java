@@ -35,6 +35,7 @@ final class OpcUaServerRuntime {
     private final SchemaNamespace namespace;
     private final String endpointUrl;
     private final Consumer<RuntimeEvent> runtimeEventSink;
+    private final int port;
 
     OpcUaServerRuntime(int port, List<VarDef> variables) {
         this(port, variables, event -> {}, event -> {});
@@ -47,6 +48,7 @@ final class OpcUaServerRuntime {
     OpcUaServerRuntime(int port, List<VarDef> variables, Consumer<ClientEvent> clientEventSink,
             Consumer<RuntimeEvent> runtimeEventSink) {
         this.runtimeEventSink = runtimeEventSink;
+        this.port = port;
         try {
             File pki = Files.createTempDirectory("iotsim-pki").toFile();
             DefaultTrustListManager trustList = new DefaultTrustListManager(pki);
@@ -97,6 +99,12 @@ final class OpcUaServerRuntime {
     void start() {
         namespace.startup();
         await(server.startup());
+        // Milo swallows bind failures silently (exceptionally → Unit.VALUE); detect them
+        // by checking that the endpoint was actually registered after startup.
+        if (server.getStackServer().getBoundEndpoints().isEmpty()) {
+            runtimeEventSink.accept(runtimeEvent("ERROR", "port " + port + " bind failed"));
+            throw new BindFailedException("port " + port + " bind failed", null);
+        }
         // Server is now listening: surface SOURCE_START on the runtime stream (IS-048).
         runtimeEventSink.accept(runtimeEvent("SOURCE_START", ""));
     }

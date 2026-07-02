@@ -251,6 +251,13 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
             ManagedWorker worker = new ManagedWorker(id, spec);
             try {
                 worker.launchAndStart();
+            } catch (WorkerBindException e) {
+                // The worker could not bind its listen port. connect() already recorded
+                // the worker as EXITED (ERROR) with the reason; keep it in the map so
+                // state()/health() report ERROR + reason instead of throwing. Its slot is
+                // freed — a failed source holds no admission permit.
+                worker.releaseSlot();
+                return worker;
             } catch (RuntimeException e) {
                 worker.releaseSlot(); // a failed launch must not hold a slot
                 throw e;
@@ -268,7 +275,11 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
             mine.stop();
             throw new IllegalStateException("supervisor is closed");
         }
-        return RUNNING;
+        // The RUNNING launch reports RUNNING; a worker kept in the map after a bind
+        // failure reports its stored ERROR state. Read from the map so the outcome
+        // reflects whatever compute() left behind.
+        ManagedWorker current = running.get(dataSourceId);
+        return current == null ? STOPPED : current.stateName();
     }
 
     @Override
@@ -763,6 +774,13 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
                 }
                 newClient.close();
                 newLaunched.close();
+                // A bind failure is a terminal, worker-reported fault: record it as an
+                // EXITED (ERROR) worker with the reason so start() can keep it in the map
+                // and state()/health() report ERROR + reason instead of the raw throw.
+                if (e instanceof WorkerBindException) {
+                    this.state = WorkerState.EXITED;
+                    this.lastError = new SourceError(HealthOrigin.PROTOCOL, e.getMessage(), Instant.now());
+                }
                 throw e;
             }
             return new Connection(newLaunched, newClient, runtimeStream);
