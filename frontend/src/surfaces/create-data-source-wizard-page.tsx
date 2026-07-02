@@ -46,7 +46,7 @@ type BasisOption = {
   recommended?: boolean;
 };
 
-type WizardFormState = {
+export type WizardFormState = {
   basis: SourceBasis | null;
   importSelectedSampleId: string | null;
   modbusAddressBase: "0" | "1";
@@ -100,7 +100,7 @@ const basisOptions: BasisOption[] = [
   },
 ];
 
-type WizardStepId = "protocol" | "basis" | "setup" | "import" | "schema" | "runtime" | "review";
+export type WizardStepId = "protocol" | "basis" | "setup" | "import" | "schema" | "runtime" | "review";
 type WizardStep = { id: WizardStepId; label: string };
 
 const SCAN_STEPS: WizardStep[] = [
@@ -181,7 +181,7 @@ function suggestedEndpoint(protocol: ProtocolOption["id"] | null, basis: SourceB
   return "127.0.0.1:502";
 }
 
-function validationMessage(stepId: WizardStepId, form: WizardFormState, accessMode: "local" | "shared" = "local") {
+export function validationMessage(stepId: WizardStepId, form: WizardFormState, accessMode: "local" | "shared" = "local") {
   if (stepId === "protocol" && !form.protocol) {
     return "Choose a protocol to continue.";
   }

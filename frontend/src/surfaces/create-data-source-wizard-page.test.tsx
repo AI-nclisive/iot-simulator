@@ -1,19 +1,23 @@
 /**
- * Tests for CreateDataSourceWizardPage (UI-037)
+ * Tests for CreateDataSourceWizardPage (UI-037, UI-116)
  *
  * Covers:
- * - Synthetic setup fields are shown in setup step when basis is synthetic
- * - Default parameter count is a positive integer (100)
- * - Default update interval is a positive integer (1000)
+ * - Source name field is shown on the manual schema setup step
  * - Next is disabled when source name is empty (validation system active)
- * - Next is enabled when source name is filled with valid synthetic defaults
+ * - Next is enabled when source name is filled on manual schema path
+ * - validationMessage skips credential validation in local mode (UI-116)
+ * - validationMessage enforces credentials in shared mode
  */
 
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { CreateDataSourceWizardPage } from "./create-data-source-wizard-page";
+import {
+  CreateDataSourceWizardPage,
+  validationMessage,
+  type WizardFormState,
+} from "./create-data-source-wizard-page";
 
 const { mockNavigate } = vi.hoisted(() => ({ mockNavigate: vi.fn() }));
 
@@ -40,7 +44,7 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-async function navigateToSyntheticSetup() {
+async function navigateToManualSetup() {
   render(
     <MemoryRouter>
       <CreateDataSourceWizardPage />
@@ -51,50 +55,72 @@ async function navigateToSyntheticSetup() {
   await userEvent.click(screen.getByText("OPC UA"));
   await userEvent.click(screen.getByRole("button", { name: "Next" }));
 
-  // Step 1: choose synthetic basis
-  await userEvent.click(screen.getByText("Synthetic setup"));
+  // Step 1: choose manual basis
+  await userEvent.click(screen.getByText("Manual schema"));
   await userEvent.click(screen.getByRole("button", { name: "Next" }));
 }
 
-describe("CreateDataSourceWizardPage — synthetic setup fields", () => {
-  it("shows synthetic controls in setup step for synthetic basis", async () => {
-    await navigateToSyntheticSetup();
-
-    expect(screen.getByText("Parameter count")).toBeTruthy();
-    expect(screen.getByText("Update interval (ms)")).toBeTruthy();
-    expect(screen.getByText("Value range — min")).toBeTruthy();
-    expect(screen.getByText("Repeatability seed")).toBeTruthy();
+describe("CreateDataSourceWizardPage — setup step", () => {
+  it("shows Source name field on the manual schema setup step", async () => {
+    await navigateToManualSetup();
+    expect(screen.getByLabelText("Source name")).toBeTruthy();
   });
 
-  it("renders parameter count input with positive integer default (100)", async () => {
-    await navigateToSyntheticSetup();
-
-    const inputs = screen.getAllByRole("textbox");
-    const countInput = inputs.find(
-      (el) => (el as HTMLInputElement).value === "100",
-    ) as HTMLInputElement;
-    expect(countInput).toBeTruthy();
-    expect(Number.isInteger(Number(countInput.value))).toBe(true);
-  });
-
-  it("renders update interval input with positive integer default (1000)", async () => {
-    await navigateToSyntheticSetup();
-
-    const inputs = screen.getAllByRole("textbox");
-    const intervalInput = inputs.find(
-      (el) => (el as HTMLInputElement).value === "1000",
-    ) as HTMLInputElement;
-    expect(intervalInput).toBeTruthy();
-    expect(Number.isInteger(Number(intervalInput.value))).toBe(true);
+  it("Next is disabled when source name is empty", async () => {
+    await navigateToManualSetup();
+    const btn = screen.getByRole("button", { name: "Next" }) as HTMLButtonElement;
+    expect(btn.disabled).toBe(true);
   });
 });
 
-describe("CreateDataSourceWizardPage — synthetic validation", () => {
-  it("enables Next when source name is filled and defaults are valid", async () => {
-    await navigateToSyntheticSetup();
+describe("CreateDataSourceWizardPage — manual schema validation", () => {
+  it("enables Next when source name is filled", async () => {
+    await navigateToManualSetup();
     await userEvent.type(screen.getByLabelText("Source name"), "Test source");
 
     const btn = screen.getByRole("button", { name: "Next" }) as HTMLButtonElement;
     expect(btn.disabled).toBe(false);
+  });
+});
+
+// ─── validationMessage — local-mode credential skip (UI-116) ─────────────────
+
+const baseScanForm: WizardFormState = {
+  basis: "scan",
+  importSelectedSampleId: null,
+  modbusAddressBase: "0",
+  modbusUnitId: "1",
+  name: "My Source",
+  opcUaNamespaceStrategy: "normalize",
+  opcUaSecurity: "None",
+  protocol: "OPC UA",
+  runtimeBehavior: "stopped",
+  scanCredentialConfirmed: false,
+  scanCredentialMode: "password",
+  scanPassword: "",
+  scanEndpoint: "opc.tcp://host:4840",
+  scanSecretRef: "",
+  scanState: "idle",
+  scanTestResult: "idle",
+  scanUsername: "",
+  scanJobId: null,
+  schemaReviewNote: "",
+};
+
+describe("validationMessage — local-mode credential skip", () => {
+  it("returns null (no error) on setup step in local mode despite missing credentials", () => {
+    const msg = validationMessage("setup", baseScanForm, "local");
+    expect(msg).toBeNull();
+  });
+
+  it("returns credential error on setup step in shared mode", () => {
+    const msg = validationMessage("setup", baseScanForm, "shared");
+    expect(msg).toBeTruthy();
+  });
+
+  it("returns name error when name is empty regardless of mode", () => {
+    const form = { ...baseScanForm, name: "" };
+    expect(validationMessage("setup", form, "local")).toBeTruthy();
+    expect(validationMessage("setup", form, "shared")).toBeTruthy();
   });
 });

@@ -162,7 +162,6 @@ function SamplesSection({
   const samplesError = useArtifactsStore((s) => s.samplesError);
   const loadSamples = useArtifactsStore((s) => s.loadSamples);
   const deleteSample = useArtifactsStore((s) => s.deleteSample);
-  const appendSample = useArtifactsStore((s) => s.appendSample);
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -296,8 +295,7 @@ function SamplesSection({
       existingNames={samples.map((s) => s.name)}
       projectId={projectId}
       onClose={() => setImportOpen(false)}
-      onImported={(sample) => {
-        appendSample(sample);
+      onImported={() => {
         setImportOpen(false);
       }}
     />

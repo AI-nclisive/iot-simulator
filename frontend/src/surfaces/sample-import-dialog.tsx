@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import type { SampleResponse } from "../shell/artifacts-store";
+import { useArtifactsStore, type SampleResponse } from "../shell/artifacts-store";
 
 type Step = "select" | "validating" | "confirm";
 
@@ -13,7 +13,7 @@ type SampleImportDialogProps = {
   onImported: (sample: SampleResponse) => void;
 };
 
-function stripExtension(filename: string): string {
+export function stripExtension(filename: string): string {
   return filename.replace(/\.[^.]+$/, "");
 }
 
@@ -30,6 +30,8 @@ export function SampleImportDialog({
   const [dragOver, setDragOver] = useState(false);
   const [sampleName, setSampleName] = useState("");
   const [nameError, setNameError] = useState<string | null>(null);
+  const [dropError, setDropError] = useState<string | null>(null);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
   const [estimatedValues, setEstimatedValues] = useState(0);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -42,6 +44,8 @@ export function SampleImportDialog({
       setDragOver(false);
       setSampleName("");
       setNameError(null);
+      setDropError(null);
+      setConfirmError(null);
       setEstimatedValues(0);
     }
   }, [open]);
@@ -63,7 +67,11 @@ export function SampleImportDialog({
 
   function acceptFile(file: File) {
     const ext = file.name.split(".").pop()?.toLowerCase();
-    if (ext !== "json" && ext !== "iotsim") return;
+    if (ext !== "json" && ext !== "iotsim") {
+      setDropError("Unsupported file type — use .json or .iotsim.");
+      return;
+    }
+    setDropError(null);
     setSelectedFile(file);
     const derived = stripExtension(file.name);
     setSampleName(derived);
@@ -84,25 +92,35 @@ export function SampleImportDialog({
     const err = validateName(sampleName);
     if (err) { setNameError(err); return; }
     setStep("validating");
-    await new Promise((r) => setTimeout(r, 600));
-    setEstimatedValues(Math.round((selectedFile.size / 1024) || 512) * 20);
-    setStep("confirm");
+    try {
+      if (selectedFile.name.toLowerCase().endsWith(".json")) {
+        const text = await selectedFile.text();
+        JSON.parse(text);
+      }
+      setEstimatedValues(Math.max(0, Math.round(selectedFile.size / 1024)) * 20);
+      setStep("confirm");
+    } catch {
+      setStep("select");
+      setNameError("File does not contain valid JSON.");
+    }
   }
 
-  function handleConfirm() {
+  async function handleConfirm() {
     const trimmed = sampleName.trim();
-    const sample: SampleResponse = {
-      id: `imported-sample-${Date.now()}`,
-      projectId,
-      derivedFromRecordingId: "",
-      name: trimmed,
-      selection: "full",
-      tags: [],
-      createdAt: new Date().toISOString(),
-      createdBy: "Import",
-      version: 0,
-    };
-    onImported(sample);
+    setConfirmError(null);
+    setStep("validating");
+    try {
+      const sample = await useArtifactsStore.getState().createSample(projectId, {
+        name: trimmed,
+        derivedFromRecordingId: "",
+        selection: "full",
+        tags: [],
+      });
+      onImported(sample);
+    } catch {
+      setConfirmError("Failed to save sample. Please try again.");
+      setStep("confirm");
+    }
   }
 
   function renderReadOnly() {
@@ -175,11 +193,15 @@ export function SampleImportDialog({
           />
         </div>
 
+        {dropError ? (
+          <p className="mt-2 text-xs text-red-600" role="alert">{dropError}</p>
+        ) : null}
+
         {selectedFile ? (
           <button
             className="mt-2 text-xs text-shell-muted underline underline-offset-2"
             type="button"
-            onClick={() => { setSelectedFile(null); setSampleName(""); setNameError(null); }}
+            onClick={() => { setSelectedFile(null); setSampleName(""); setNameError(null); setDropError(null); }}
           >
             Remove file
           </button>
@@ -269,6 +291,9 @@ export function SampleImportDialog({
             </div>
           </div>
         </div>
+        {confirmError ? (
+          <p className="mt-2 text-xs text-red-600" role="alert">{confirmError}</p>
+        ) : null}
         <div className="mt-5 flex justify-end gap-2">
           <button
             className="shell-action"
@@ -280,7 +305,7 @@ export function SampleImportDialog({
           <button
             className="shell-action"
             type="button"
-            onClick={handleConfirm}
+            onClick={() => void handleConfirm()}
           >
             Add sample
           </button>
