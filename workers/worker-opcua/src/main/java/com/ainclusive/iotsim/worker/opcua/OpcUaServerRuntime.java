@@ -31,7 +31,10 @@ import org.eclipse.milo.opcua.stack.server.security.DefaultServerCertificateVali
 
 /**
  * A real OPC UA server (Eclipse Milo) with an address space built from the
- * neutral schema, bound to loopback. None security / anonymous for now.
+ * neutral schema. Message security is {@code None}; the accepted user tokens
+ * (Anonymous and/or UserName/password) come from the {@link AuthConfig} — an
+ * empty config keeps the historical None/Anonymous behaviour (IS-131). Transport
+ * message security (Sign/Encrypt) is a later phase (IS-132).
  * See backend-specs/02_WORKER_CONTRACT_AND_IPC.md.
  */
 final class OpcUaServerRuntime {
