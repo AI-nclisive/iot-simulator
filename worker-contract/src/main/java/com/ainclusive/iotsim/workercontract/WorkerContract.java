@@ -7,10 +7,10 @@ package com.ainclusive.iotsim.workercontract;
  */
 public final class WorkerContract {
 
-    // 1.2.0 adds the additive Capture RPC (live capture from a real source,
-    // IS-045); 1.1.0 added TestConnection/Scan (real-source discovery, IS-043).
-    // The major is unchanged so existing workers stay compatible.
-    public static final String VERSION = "1.2.0";
+    // 1.3.0 adds the additive SecurityConfig on ConfigureRequest (simulated OPC UA
+    // endpoint auth, IS-131); 1.2.0 added Capture (IS-045); 1.1.0 added
+    // TestConnection/Scan (IS-043). The major is unchanged so existing workers stay compatible.
+    public static final String VERSION = "1.3.0";
 
     private WorkerContract() {}
 
