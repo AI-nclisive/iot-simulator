@@ -62,11 +62,18 @@ public final class WorkerClient implements AutoCloseable {
         return response;
     }
 
-    public Ack configure(Schema schema, int listenPort) {
-        return stub.configure(ConfigureRequest.newBuilder()
+    public Ack configure(Schema schema, int listenPort, String bindAddress, String advertisedHost) {
+        return stub.configure(buildConfigureRequest(schema, listenPort, bindAddress, advertisedHost));
+    }
+
+    static ConfigureRequest buildConfigureRequest(Schema schema, int listenPort,
+            String bindAddress, String advertisedHost) {
+        return ConfigureRequest.newBuilder()
                 .setSchema(schema)
                 .setListenPort(listenPort)
-                .build());
+                .putOptions("bindAddress", bindAddress)
+                .putOptions("advertisedHost", advertisedHost)
+                .build();
     }
 
     /**

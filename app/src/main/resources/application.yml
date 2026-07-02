@@ -34,6 +34,10 @@ iotsim:
   # (serveUrl). Fixed per network/deploy. The worker's bind address is separate
   # (loopback today; external bind is a follow-up). See IS-127.
   simulator:
+    # Interface the worker's protocol server binds. Default 0.0.0.0 makes the
+    # simulator reachable off-host (intentional; the OPC UA endpoint is anonymous
+    # / SecurityPolicy.None). Set to 127.0.0.1 to restrict to loopback. See IS-128.
+    bind-address: ${IOTSIM_SIMULATOR_BIND_ADDRESS:0.0.0.0}
     advertised-host: ${IOTSIM_SIMULATOR_HOST:localhost}
 
   # OIDC resource-server settings (shared mode only; IS-075).
