@@ -38,7 +38,7 @@ public final class PasswordHash {
         if (plaintext == null || encoded == null) {
             return false;
         }
-        String[] parts = encoded.split("\\$");
+        String[] parts = encoded.split("\\$", -1);
         if (parts.length != 4 || !PREFIX.equals(parts[0])) {
             return false;
         }

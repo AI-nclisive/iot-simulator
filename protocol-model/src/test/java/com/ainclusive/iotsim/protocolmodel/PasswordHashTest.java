@@ -26,4 +26,9 @@ class PasswordHashTest {
         assertThat(PasswordHash.matches(null, "pbkdf2-sha256$1$aa$bb")).isFalse();
         assertThat(PasswordHash.matches("pw", "not-a-hash")).isFalse();
     }
+
+    @Test
+    void rejectsInvalidBase64Segments() {
+        assertThat(PasswordHash.matches("pw", "pbkdf2-sha256$210000$not-b64!!$also!!!")).isFalse();
+    }
 }
