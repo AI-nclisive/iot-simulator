@@ -360,6 +360,28 @@ export function DataSourceSchemaEditor({
     setHasUnsavedChanges(false);
   }
 
+  async function handleDeleteParameter(paramId: string) {
+    if (!projectId) return;
+    const nextNodes = rawNodesRef.current.filter((n) => n.nodeId !== paramId);
+    try {
+      const resp = await apiFetch<SchemaResponse>(
+        `/api/v1/projects/${projectId}/data-sources/${source.id}/schema`,
+        { method: "PUT", body: JSON.stringify({ nodes: nextNodes }) },
+      );
+      rawNodesRef.current = resp.nodes;
+      const variables = resp.nodes.filter((n) => n.kind === "VARIABLE");
+      setAllParams(variables.map(mapNode));
+      setTreeRoots(buildTree(resp.nodes));
+      if (selectedParam?.id === paramId) {
+        setSelectedParam(null);
+        setHasUnsavedChanges(false);
+      }
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.title : "Failed to delete parameter";
+      setSchemaError(msg);
+    }
+  }
+
   async function handleAddParameter() {
     const name = addName.trim();
     if (!name || !projectId) return;
@@ -443,7 +465,7 @@ export function DataSourceSchemaEditor({
         >
           Discard changes
         </button>
-        {!isLockedByOther ? (
+        {!isLockedByOther && source.status !== "Active" ? (
           <button
             className="shell-action"
             type="button"
@@ -594,12 +616,25 @@ export function DataSourceSchemaEditor({
         {selectedParam ? (
           <div className="space-y-4">
             <section className="rounded-md border border-shell-line bg-white px-4 py-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
-                Parameter details
-              </p>
-              <p className="mt-2 font-mono text-sm text-shell-ink">
-                {selectedParam.path}
-              </p>
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
+                    Parameter details
+                  </p>
+                  <p className="mt-2 font-mono text-sm text-shell-ink">
+                    {selectedParam.path}
+                  </p>
+                </div>
+                {!isLockedByOther && source.status !== "Active" ? (
+                  <button
+                    className="shrink-0 text-xs text-shell-danger hover:underline"
+                    type="button"
+                    onClick={() => { void handleDeleteParameter(selectedParam.id); }}
+                  >
+                    Delete
+                  </button>
+                ) : null}
+              </div>
               <div className="mt-4 space-y-3">
                 <label className="flex flex-col gap-2 text-sm text-shell-muted">
                   Description
