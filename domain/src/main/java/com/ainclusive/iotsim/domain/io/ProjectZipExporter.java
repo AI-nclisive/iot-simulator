@@ -31,14 +31,19 @@ import tools.jackson.databind.ObjectMapper;
  * <ul>
  *   <li>{@code manifest.json} — ProjectManifest with per-entry SHA-256 checksums</li>
  *   <li>{@code project.json} — project metadata (no secrets)</li>
- *   <li>{@code data-sources.json} — all data-source configs (endpoint only, no credentials)</li>
+ *   <li>{@code data-sources.json} — all data-source configs, including {@code securityConfig}
+ *       (simulated-server endpoint auth with PBKDF2 password hashes); raw/plaintext connection
+ *       secrets are excluded</li>
  *   <li>{@code schemas.json} — schema versions + nodes per data source</li>
  *   <li>{@code recordings.json} — recording metadata rows</li>
  *   <li>{@code samples.json} — sample metadata rows</li>
  * </ul>
  *
- * <p>Secrets exclusion is structural: {@code DataSource} has no credential fields;
- * credential state is derived from the credential store at runtime and never stored.
+ * <p>Secrets exclusion contract: real-source connection secrets (tokens, plaintext passwords)
+ * are session-only and never stored on {@code DataSource} — they remain excluded structurally.
+ * The simulated-server accepted credentials in {@code securityConfig} are intentionally
+ * exported as non-recoverable PBKDF2 hashes; they are part of the simulation configuration
+ * (see backend-specs/08_AUTH_AND_MODES.md, IS-131) and contain no plaintext secrets.
  */
 @Component
 public class ProjectZipExporter {
@@ -118,9 +123,11 @@ public class ProjectZipExporter {
     /**
      * Projects a data source to its exportable form.
      *
-     * <p>Explicitly excluded: credentials, tokens, passwords. The {@code credentialState}
-     * field is a runtime enum that does not carry the secret value — still excluded
-     * by name to make the contract obvious.
+     * <p>Excluded: real-source connection secrets, tokens, and PLAINTEXT passwords.
+     * The {@code credentialState} runtime enum is also excluded by name to make the contract
+     * obvious. Included: {@code securityConfig} with PBKDF2 password hashes (non-recoverable,
+     * never plaintext) — these are the simulated-server accepted credentials, part of the
+     * simulation config (IS-131).
      */
     private static Map<String, Object> dataSourceDto(DataSource ds) {
         Map<String, Object> m = new HashMap<>();
@@ -136,7 +143,8 @@ public class ProjectZipExporter {
         m.put("schemaVersion", ds.schemaVersion());
         m.put("createdAt", ds.createdAt().toString());
         m.put("createdBy", ds.createdBy());
-        // NOT included: credentialState, runtimeState (runtime only), raw credentials
+        // Included: securityConfig (PBKDF2 hashes, non-recoverable, part of simulation).
+        // NOT included: credentialState, runtimeState (runtime only), raw/plaintext connection credentials.
         return m;
     }
 

@@ -92,6 +92,8 @@ class ProjectZipExporterTest {
     @Test
     void dataSourceJsonIncludesHashedSecurityConfig() {
         // Build content with a hashed securityConfig and verify it round-trips through export.
+        // The securityConfig JSON must surface the PBKDF2 hash but never expose a plaintext
+        // "password" key (IS-131 contract: hashes exported, plaintext credentials excluded).
         String storedHash = "{\"userTokens\":{\"anonymous\":false,\"username\":{\"enabled\":true,"
                 + "\"users\":[{\"username\":\"op\",\"passwordHash\":\"pbkdf2-sha256$1$aa$bb\"}]}}}";
         ProjectExportContent content = contentWithSecurityConfig(storedHash);
@@ -100,7 +102,9 @@ class ProjectZipExporterTest {
 
         assertThat(dsJson)
                 .contains("securityConfig")
-                .contains("pbkdf2-sha256$1$aa$bb");
+                .contains("pbkdf2-sha256$1$aa$bb")
+                // plaintext "password" JSON key must never appear — only passwordHash is allowed
+                .doesNotContain("\"password\"");
     }
 
     @Test
@@ -134,8 +138,12 @@ class ProjectZipExporterTest {
     void neverSerializesSecretLikeFields() {
         String all = String.join("\n", unzip(exporter.toBytes(fullContent())).values());
 
+        // "password" (quoted JSON key) must never appear as a plaintext field.
+        // The intentional "passwordHash" key is allowed; when lowercased, "passwordhash"
+        // does NOT contain the quoted substring "\"password\"", so this assertion still
+        // catches any accidental plaintext password field while permitting the hash.
         assertThat(all.toLowerCase())
-                .doesNotContain("password")
+                .doesNotContain("\"password\"")
                 .doesNotContain("credential")
                 .doesNotContain("privatekey")
                 .doesNotContain("secret");
