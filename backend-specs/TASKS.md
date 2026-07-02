@@ -95,6 +95,7 @@ Tier 3 — quality automation:
 - [x] IS-108 [SDLC] ✅ Dependabot (gradle + github-actions)
 - [x] IS-112 [SDLC] ✅ Claude PR code review (`anthropics/claude-code-action` on `pull_request`): reviews every PR diff against repo conventions, posts inline + verdict comments, and submits a formal review (APPROVE / REQUEST_CHANGES) that gates merge — the Claude GitHub App's APPROVE supplies branch protection's 1 required review; required check stays `build`. Auth = `CLAUDE_CODE_OAUTH_TOKEN` + Claude GitHub App — see `.github/OWNER_SETUP.md`
 - [ ] IS-121 [SDLC] ⬜ Web-layer (MockMvc) controller test harness — add `spring-boot-starter-test` to the `api` module + `@WebMvcTest` slice pattern (HTTP status via `GlobalExceptionHandler`, JSON, headers); backfill `ScenarioController` then other CRUD controllers. Split out of IS-085.
+- [x] IS-128 [SDLC] ✅ `scripts/run-local.ps1` portable to Windows PowerShell 5.1: the BOM-less UTF-8 file contained an em-dash (U+2014) in comments/strings, which 5.1 mis-decodes as ANSI and fails to parse (cascading `Missing argument`/`Missing closing }`/`Unexpected token` errors); replaced all non-ASCII with ASCII so the file decodes identically under UTF-8 and CP1252, and guarded the PS7-only `$PSNativeCommandUseErrorActionPreference`. Runs under 5.1 and 7+ alike. Surfaced from IS-126.
 
 Tier 4 — parallel-conflict mitigations:
 - [x] IS-109 [SDLC] ✅ Flyway migration version-collision convention (documented)
