@@ -41,7 +41,7 @@ class ClientConnectionRepositoryIT {
 
     /** Fresh source per test so connection sets/ordering don't bleed across tests. */
     private static String newSource(String name) {
-        return dataSources.insert(projectId, name, "OPC_UA", "MANUAL", null, null, "it").id();
+        return dataSources.insert(projectId, name, "OPC_UA", "MANUAL", 4840, null, null, "it").id();
     }
 
     @Test

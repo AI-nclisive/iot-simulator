@@ -75,8 +75,8 @@ public class RecordingService {
      */
     public Recording startCapture(String projectId, String dataSourceId, String actor) {
         DataSourceRow source = requireSource(projectId, dataSourceId);
-        if (source.endpoint() == null || source.endpoint().isBlank()) {
-            throw new IllegalArgumentException("data source has no endpoint to capture from");
+        if (source.realDeviceEndpoint() == null || source.realDeviceEndpoint().isBlank()) {
+            throw new IllegalArgumentException("data source has no real-device endpoint to capture from");
         }
         SchemaWithNodes schema = schemas.findCurrent(dataSourceId)
                 .orElseThrow(() -> new IllegalArgumentException(
@@ -95,7 +95,7 @@ public class RecordingService {
             started[0] = true;
             Recording recording = map(recordings.create(
                     projectId, dsId, schema.version(), "SCAN_RECORD", actor));
-            CaptureSpec spec = new CaptureSpec(source.protocol(), source.endpoint(),
+            CaptureSpec spec = new CaptureSpec(source.protocol(), source.realDeviceEndpoint(),
                     credentials.find(dsId).orElse(null), schema.version(), schema.nodes());
             CaptureSession session = capturer.startCapture(
                     spec, values -> timeline.append(recording.id(), values));

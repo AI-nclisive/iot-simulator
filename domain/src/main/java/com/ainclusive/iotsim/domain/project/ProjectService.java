@@ -110,7 +110,7 @@ public class ProjectService {
         for (DataSourceRow ds : dataSources.findByProject(sourceId)) {
             DataSourceRow newDs = dataSources.insert(
                     copy.id(), ds.name(), ds.protocol(), ds.basis(),
-                    ds.endpoint(), ds.runtimeConfig(), ds.createdBy());
+                    ds.simulatorPort(), ds.realDeviceEndpoint(), ds.runtimeConfig(), ds.createdBy());
             dsIdMap.put(ds.id(), newDs.id());
 
             // Copy schema if present and non-empty (mirrors DataSourceService.duplicate() guard).

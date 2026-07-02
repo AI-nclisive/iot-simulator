@@ -189,8 +189,9 @@ class ProjectImportServiceTest {
 
         DataSource ds = new DataSource("ds-1", "proj-1", "OPC UA Source",
                 Protocol.OPC_UA, SourceBasis.SCAN, "schema-1", 1,
-                "{\"host\":\"opc.local\"}", "{}", true,
-                RuntimeState.STOPPED, CredentialState.MISSING, now, now, "local", 1L);
+                4840, "device://plc", "{}", true,
+                RuntimeState.STOPPED, CredentialState.MISSING,
+                "opc.tcp://localhost:4840/iotsim", now, now, "local", 1L);
 
         SchemaNode node = new SchemaNode("ns=2;s=Temp", null, "/Temp", "Temp",
                 NodeKind.VARIABLE, DataType.FLOAT32, ValueRank.SCALAR, Access.READ, null, null);
@@ -246,11 +247,12 @@ class ProjectImportServiceTest {
             return new DataSourceRepository() {
                 @Override
                 public DataSourceRow insert(String projectId, String name, String protocol,
-                        String basis, String endpointJson, String runtimeConfigJson, String createdBy) {
+                        String basis, int simulatorPort, String realDeviceEndpoint,
+                        String runtimeConfigJson, String createdBy) {
                     Instant now = Instant.now();
                     OffsetDateTime odt = OffsetDateTime.ofInstant(now, ZoneOffset.UTC);
                     DataSourceRow row = new DataSourceRow("new-ds-" + counter.incrementAndGet(),
-                            projectId, name, protocol, basis, null, null, endpointJson,
+                            projectId, name, protocol, basis, null, null, simulatorPort, realDeviceEndpoint,
                             runtimeConfigJson, false, odt, odt, createdBy, 0L);
                     insertedDataSources.add(row);
                     return row;
@@ -272,8 +274,9 @@ class ProjectImportServiceTest {
                 public Optional<DataSourceRow> findById(String id) { return Optional.empty(); }
 
                 @Override
-                public Optional<DataSourceRow> update(String id, String name, String endpointJson,
-                        String runtimeConfigJson, boolean enabled, long expectedVersion) {
+                public Optional<DataSourceRow> update(String id, String name, int simulatorPort,
+                        String realDeviceEndpoint, String runtimeConfigJson, boolean enabled,
+                        long expectedVersion) {
                     updateCalledCount++;
                     // Return the last inserted row with the updated enabled state.
                     if (insertedDataSources.isEmpty()) {
@@ -282,8 +285,9 @@ class ProjectImportServiceTest {
                     DataSourceRow last = insertedDataSources.get(insertedDataSources.size() - 1);
                     OffsetDateTime odt = OffsetDateTime.now(ZoneOffset.UTC);
                     return Optional.of(new DataSourceRow(last.id(), last.projectId(), name,
-                            last.protocol(), last.basis(), null, null, endpointJson,
-                            runtimeConfigJson, enabled, last.createdAt(), odt, last.createdBy(), expectedVersion + 1));
+                            last.protocol(), last.basis(), null, null, simulatorPort, realDeviceEndpoint,
+                            runtimeConfigJson, enabled, last.createdAt(), odt, last.createdBy(),
+                            expectedVersion + 1));
                 }
 
                 @Override

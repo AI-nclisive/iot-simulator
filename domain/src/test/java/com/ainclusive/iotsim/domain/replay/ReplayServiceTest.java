@@ -369,11 +369,12 @@ class ReplayServiceTest {
             }
             OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
             return Optional.of(new DataSourceRow(id, projectId, "src", "OPC_UA", "MANUAL",
-                    null, null, "{}", "{}", false, now, now, "local", 0));
+                    null, null, 0, null, "{}", false, now, now, "local", 0));
         }
 
         @Override
-        public DataSourceRow insert(String p, String n, String pr, String b, String e, String rc, String c) {
+        public DataSourceRow insert(String p, String n, String pr, String b, int sp, String rde,
+                String rc, String c) {
             throw new UnsupportedOperationException();
         }
 
@@ -389,7 +390,8 @@ class ReplayServiceTest {
         }
 
         @Override
-        public Optional<DataSourceRow> update(String i, String n, String e, String rc, boolean en, long v) {
+        public Optional<DataSourceRow> update(String i, String n, int sp, String rde, String rc,
+                boolean en, long v) {
             throw new UnsupportedOperationException();
         }
 

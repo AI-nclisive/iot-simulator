@@ -121,7 +121,7 @@ public class ScanController {
             @PathVariable String projectId, @PathVariable String jobId,
             @RequestBody CreateFromScanRequest req) {
         require(req != null && notBlank(req.name()), "name is required");
-        DataSource ds = scans.createFromScan(projectId, jobId, req.name(), req.endpoint(),
+        DataSource ds = scans.createFromScan(projectId, jobId, req.name(), req.realDeviceEndpoint(),
                 toResolutions(req.typeResolutions()), "local");
         return ResponseEntity.created(
                         URI.create("/api/v1/projects/" + projectId + "/data-sources/" + ds.id()))
@@ -154,7 +154,7 @@ public class ScanController {
             ConnectionConfigRequest connectionConfig) {}
 
     public record CreateFromScanRequest(
-            String name, String endpoint, List<TypeResolutionRequest> typeResolutions) {}
+            String name, String realDeviceEndpoint, List<TypeResolutionRequest> typeResolutions) {}
 
     /**
      * A user's decision for one unknown-typed discovered node: assign {@code dataType}

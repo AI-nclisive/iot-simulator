@@ -13,8 +13,9 @@ import com.ainclusive.iotsim.domain.replay.ReplayService;
 import com.ainclusive.iotsim.domain.replay.ReplaySummary;
 import com.ainclusive.iotsim.domain.scenario.ScenarioRunService;
 import com.ainclusive.iotsim.domain.scenario.ScenarioRunSummary;
+import com.ainclusive.iotsim.domain.synthetic.SyntheticLiveRunService;
+import com.ainclusive.iotsim.domain.synthetic.SyntheticLiveRunSummary;
 import com.ainclusive.iotsim.domain.synthetic.SyntheticRunService;
-import com.ainclusive.iotsim.domain.synthetic.SyntheticRunSummary;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRepository;
 import com.ainclusive.iotsim.persistence.run.RunRepository;
 import com.ainclusive.iotsim.persistence.run.RunRow;
@@ -37,6 +38,7 @@ class RunServiceTest {
     private RuntimeController runtime;
     private ReplayService replay;
     private SyntheticRunService synthetic;
+    private SyntheticLiveRunService syntheticLive;
     private ScenarioRunService scenarioRun;
     private RunService service;
 
@@ -48,9 +50,10 @@ class RunServiceTest {
         runtime = mock(RuntimeController.class);
         replay = mock(ReplayService.class);
         synthetic = mock(SyntheticRunService.class);
+        syntheticLive = mock(SyntheticLiveRunService.class);
         scenarioRun = mock(ScenarioRunService.class);
         when(dataSources.findByProject(PROJECT)).thenReturn(List.of());
-        service = new RunService(runs, dataSources, scenarios, runtime, replay, synthetic, scenarioRun);
+        service = new RunService(runs, dataSources, scenarios, runtime, replay, synthetic, syntheticLive, scenarioRun);
     }
 
     private RunRow row(String id, String kind, String state, List<String> sources) {
@@ -121,12 +124,34 @@ class RunServiceTest {
 
     @Test
     void startSyntheticRoutesWithAutomationTriggerAndInitiator() {
-        when(synthetic.run(eq(PROJECT), eq("ds1"), eq(5000L), eq("AUTOMATION"), eq("ci-bot"), eq((String) null)))
-                .thenReturn(new SyntheticRunSummary("ds1", 100L, 42L, "run-s", "ev-s"));
-        when(runs.findById("run-s")).thenReturn(Optional.of(row("run-s", "SYNTHETIC", "COMPLETED", List.of("ds1"))));
+        when(syntheticLive.start(eq(PROJECT), eq("ds1"), eq((Long) null), eq("AUTOMATION"), eq("ci-bot")))
+                .thenReturn(new SyntheticLiveRunSummary("ds1", 7L, "run-9", "ev-9", "RUNNING"));
+        when(runs.findById("run-9")).thenReturn(Optional.of(row("run-9", "SYNTHETIC", "RUNNING", List.of("ds1"))));
+        RunView v = service.start(PROJECT, new StartRunCommand("SYNTHETIC", "ci-bot", "ds1",
+                null, null, null, null, null, null));
+        assertThat(v.id()).isEqualTo("run-9");
+        assertThat(v.state()).isEqualTo("RUNNING");
+        verify(syntheticLive).start(eq(PROJECT), eq("ds1"), eq((Long) null), eq("AUTOMATION"), eq("ci-bot"));
+    }
+
+    @Test
+    void startSyntheticWithCapRoutesWithDurationMs() {
+        when(syntheticLive.start(eq(PROJECT), eq("ds1"), eq(5000L), eq("AUTOMATION"), eq("ci-bot")))
+                .thenReturn(new SyntheticLiveRunSummary("ds1", 7L, "run-9", "ev-9", "RUNNING"));
+        when(runs.findById("run-9")).thenReturn(Optional.of(row("run-9", "SYNTHETIC", "RUNNING", List.of("ds1"))));
         RunView v = service.start(PROJECT, new StartRunCommand("SYNTHETIC", "ci-bot", "ds1", null, 5000L, null, null, null, null));
-        assertThat(v.id()).isEqualTo("run-s");
-        verify(synthetic).run(eq(PROJECT), eq("ds1"), eq(5000L), eq("AUTOMATION"), eq("ci-bot"), eq((String) null));
+        assertThat(v.id()).isEqualTo("run-9");
+        assertThat(v.state()).isEqualTo("RUNNING");
+        verify(syntheticLive).start(eq(PROJECT), eq("ds1"), eq(5000L), eq("AUTOMATION"), eq("ci-bot"));
+    }
+
+    @Test
+    void stopSyntheticCancelsLiveFeedAndEndsRunStopped() {
+        when(runs.findById("run-9")).thenReturn(Optional.of(row("run-9", "SYNTHETIC", "RUNNING", List.of("ds1"))));
+        when(runs.end(eq("run-9"), eq("STOPPED"), any())).thenReturn(row("run-9", "SYNTHETIC", "STOPPED", List.of("ds1")));
+        service.stop(PROJECT, "run-9");
+        verify(syntheticLive).stopIfLive("run-9");
+        verify(runs).end(eq("run-9"), eq("STOPPED"), any());
     }
 
     // ---- SCENARIO routing ----
@@ -165,10 +190,14 @@ class RunServiceTest {
     }
 
     @Test
-    void startSyntheticNullDurationMsThrows() {
-        assertThatThrownBy(() -> service.start(PROJECT,
-                new StartRunCommand("SYNTHETIC", "ci-bot", "ds1", null, null, null, null, null, null)))
-                .isInstanceOf(IllegalArgumentException.class);
+    void startSyntheticNullDurationMsIsUnboundedAndDoesNotThrow() {
+        when(syntheticLive.start(eq(PROJECT), eq("ds1"), eq((Long) null), eq("AUTOMATION"), eq("ci-bot")))
+                .thenReturn(new SyntheticLiveRunSummary("ds1", 7L, "run-u", "ev-u", "RUNNING"));
+        when(runs.findById("run-u")).thenReturn(Optional.of(row("run-u", "SYNTHETIC", "RUNNING", List.of("ds1"))));
+        // null durationMs is now valid (unbounded run) — must NOT throw
+        RunView v = service.start(PROJECT,
+                new StartRunCommand("SYNTHETIC", "ci-bot", "ds1", null, null, null, null, null, null));
+        assertThat(v.state()).isEqualTo("RUNNING");
     }
 
     @Test

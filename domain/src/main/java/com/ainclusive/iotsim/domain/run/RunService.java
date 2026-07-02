@@ -5,6 +5,7 @@ import com.ainclusive.iotsim.domain.replay.ReplayService;
 import com.ainclusive.iotsim.domain.scenario.ScenarioRunService;
 import com.ainclusive.iotsim.domain.support.Page;
 import com.ainclusive.iotsim.domain.support.PageCursor;
+import com.ainclusive.iotsim.domain.synthetic.SyntheticLiveRunService;
 import com.ainclusive.iotsim.domain.synthetic.SyntheticRunService;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRepository;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRow;
@@ -37,18 +38,20 @@ public class RunService {
     private final ScenarioRepository scenarios;
     private final RuntimeController runtime;
     private final ReplayService replay;
-    private final SyntheticRunService synthetic;
+    private final SyntheticRunService synthetic;          // batch primitive (scenarios)
+    private final SyntheticLiveRunService syntheticLive;  // live standalone feed (IS-119)
     private final ScenarioRunService scenarioRun;
 
     public RunService(RunRepository runs, DataSourceRepository dataSources, ScenarioRepository scenarios,
             RuntimeController runtime, ReplayService replay, SyntheticRunService synthetic,
-            ScenarioRunService scenarioRun) {
+            SyntheticLiveRunService syntheticLive, ScenarioRunService scenarioRun) {
         this.runs = runs;
         this.dataSources = dataSources;
         this.scenarios = scenarios;
         this.runtime = runtime;
         this.replay = replay;
         this.synthetic = synthetic;
+        this.syntheticLive = syntheticLive;
         this.scenarioRun = scenarioRun;
     }
 
@@ -84,6 +87,7 @@ public class RunService {
 
     public RunView stop(String projectId, String id) {
         RunRow run = require(projectId, id);
+        syntheticLive.stopIfLive(id);                 // no-op unless it is a live synthetic run
         run.sourceIds().forEach(runtime::stop);
         RunRow after = TERMINAL.contains(run.state())
                 ? run
@@ -109,10 +113,11 @@ public class RunService {
             }
             case "SYNTHETIC" -> {
                 requireField(cmd.dataSourceId(), "dataSourceId");
-                if (cmd.durationMs() == null || cmd.durationMs() <= 0) {
-                    throw new IllegalArgumentException("durationMs must be > 0 for a SYNTHETIC run");
+                if (cmd.durationMs() != null && cmd.durationMs() <= 0) {
+                    throw new IllegalArgumentException("durationMs (cap) must be > 0 when set");
                 }
-                yield synthetic.run(projectId, cmd.dataSourceId(), cmd.durationMs(), "AUTOMATION", initiator, null).runId();
+                yield syntheticLive.start(projectId, cmd.dataSourceId(), cmd.durationMs(),
+                        "AUTOMATION", initiator).runId();
             }
             case "SCENARIO" -> {
                 requireField(cmd.scenarioId(), "scenarioId");

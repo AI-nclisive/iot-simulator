@@ -797,7 +797,14 @@ Parallel execution:
   Depends: IS-051 (values SSE stream).
   Done when: no fake timer in `RecordingFlowPage`; value count and state reflect real SSE; TypeScript errors pass.
 
-- [x] `UI-115` Sample import flow + local-mode auth skip in wizard
+- [x] `UI-116` Sample import flow + local-mode auth skip in wizard
+- [ ] `UI-115` Data-source form/detail rework for the payload redesign (simulatorPort + serveUrl)
+  Goal: replace the free-text endpoint field with a `simulatorPort` number input and surface a derived `serveUrl`; expose `realDeviceEndpoint` only for scan/real sources.
+  Surface: `Create Data Source Wizard`, `Data Source Detail` (Overview + Settings), `Data Sources List`.
+  Work includes: wizard `simulatorPort` input pre-filled with the per-protocol default (4840/502); settings edits `simulatorPort` (1..65535); overview shows `serveUrl` prominently + `realDeviceEndpoint` when present; list search + `data-sources-store` request/response types on the new fields; drop the raw `endpoint` field.
+  Depends: IS-127 (backend payload + `serveUrl`).
+  Done when: wizard sends `simulatorPort`; overview renders the derived `serveUrl`; no raw endpoint field; typecheck + vitest pass.
+
 - [x] `UI-114` UX polish — wizard rework, recordings, scenarios, schema editor fixes
 
 - [x] `UI-113` Fix source detail crash on direct navigation — hooks ordering + load-on-mount

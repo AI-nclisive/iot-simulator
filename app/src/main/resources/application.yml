@@ -30,6 +30,12 @@ spring:
 iotsim:
   mode: ${IOTSIM_MODE:local}
 
+  # Advertised host used to build a simulated source's client connect URL
+  # (serveUrl). Fixed per network/deploy. The worker's bind address is separate
+  # (loopback today; external bind is a follow-up). See IS-127.
+  simulator:
+    advertised-host: ${IOTSIM_SIMULATOR_HOST:localhost}
+
   # OIDC resource-server settings (shared mode only; IS-075).
   # All fields are optional — omit in local mode. When mode=shared, at least
   # one of issuer-uri or jwks-uri (or the spring.security.oauth2.* equivalent)

@@ -14,8 +14,8 @@ class RepositoryDataSourceProjectResolverTest {
     private static DataSourceRepository repoReturning(DataSourceRow row) {
         return new DataSourceRepository() {
             @Override
-            public DataSourceRow insert(String p, String n, String pr, String b, String e,
-                    String r, String c) {
+            public DataSourceRow insert(String p, String n, String pr, String b, int sp,
+                    String e, String r, String c) {
                 throw new UnsupportedOperationException();
             }
             @Override
@@ -32,8 +32,8 @@ class RepositoryDataSourceProjectResolverTest {
                 return Optional.ofNullable(row);
             }
             @Override
-            public Optional<DataSourceRow> update(String id, String n, String e, String r,
-                    boolean en, long v) {
+            public Optional<DataSourceRow> update(String id, String n, int sp, String e,
+                    String r, boolean en, long v) {
                 throw new UnsupportedOperationException();
             }
             @Override
@@ -61,12 +61,12 @@ class RepositoryDataSourceProjectResolverTest {
     }
 
     // DataSourceRow components (verified):
-    // (id, projectId, name, protocol, basis, schemaId, schemaVersion, endpoint,
-    //  runtimeConfig, enabled, createdAt, updatedAt, createdBy, version).
+    // (id, projectId, name, protocol, basis, schemaId, schemaVersion, simulatorPort,
+    //  realDeviceEndpoint, runtimeConfig, enabled, createdAt, updatedAt, createdBy, version).
     // Only id + projectId are asserted; the rest are placeholders.
     private static DataSourceRow sampleRow(String id, String projectId) {
         java.time.OffsetDateTime t = java.time.OffsetDateTime.parse("2026-01-01T00:00:00Z");
         return new DataSourceRow(id, projectId, "name", "opcua", "PROVIDED",
-                null, null, "{}", "{}", true, t, t, "tester", 1L);
+                null, null, 4840, null, "{}", true, t, t, "tester", 1L);
     }
 }

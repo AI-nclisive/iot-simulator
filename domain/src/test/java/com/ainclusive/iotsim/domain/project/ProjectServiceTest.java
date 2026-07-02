@@ -105,8 +105,8 @@ class ProjectServiceTest {
     @Test
     void duplicateCopiesDataSources() {
         Project src = service.create("Factory", null, "alice");
-        dsRepo.insert(src.id(), "Sensor A", "OPC_UA", "SCAN", null, null, "alice");
-        dsRepo.insert(src.id(), "Sensor B", "MODBUS_TCP", "MANUAL", null, null, "alice");
+        dsRepo.insert(src.id(), "Sensor A", "OPC_UA", "SCAN", 0, null, null, "alice");
+        dsRepo.insert(src.id(), "Sensor B", "MODBUS_TCP", "MANUAL", 0, null, null, "alice");
 
         Project copy = service.duplicate(src.id());
 
@@ -123,7 +123,7 @@ class ProjectServiceTest {
     @Test
     void duplicateCopiesRecordingsWithUpdatedDataSourceIds() {
         Project src = service.create("Factory", null, "alice");
-        DataSourceRow ds = dsRepo.insert(src.id(), "Sensor A", "OPC_UA", "SCAN", null, null, "alice");
+        DataSourceRow ds = dsRepo.insert(src.id(), "Sensor A", "OPC_UA", "SCAN", 0, null, null, "alice");
         recordingRepo.create(src.id(), ds.id(), 1, "SCAN_RECORD", "alice");
 
         Project copy = service.duplicate(src.id());
@@ -139,7 +139,7 @@ class ProjectServiceTest {
     @Test
     void duplicateCopiesSchemaToNewDataSource() {
         Project src = service.create("Factory", null, "alice");
-        DataSourceRow ds = dsRepo.insert(src.id(), "Sensor A", "OPC_UA", "SCAN", null, null, "alice");
+        DataSourceRow ds = dsRepo.insert(src.id(), "Sensor A", "OPC_UA", "SCAN", 0, null, null, "alice");
         SchemaNode node = new SchemaNode("n1", null, "/root", "root", NodeKind.FOLDER,
                 null, null, null, null, null);
         schemaRepo.saveNewVersion(ds.id(), List.of(node));
@@ -273,11 +273,11 @@ class ProjectServiceTest {
 
         @Override
         public DataSourceRow insert(String projectId, String name, String protocol, String basis,
-                String endpointJson, String runtimeConfigJson, String createdBy) {
+                int simulatorPort, String realDeviceEndpoint, String runtimeConfigJson, String createdBy) {
             OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
             DataSourceRow row = new DataSourceRow(
                     "ds-" + (++seq), projectId, name, protocol, basis,
-                    null, null, endpointJson, runtimeConfigJson, false,
+                    null, null, simulatorPort, realDeviceEndpoint, runtimeConfigJson, false,
                     now, now, createdBy, 0);
             rows.add(row);
             return row;
@@ -309,7 +309,7 @@ class ProjectServiceTest {
                         DataSourceRow copy = new DataSourceRow(
                                 "ds-" + (++seq), source.projectId(), newName,
                                 source.protocol(), source.basis(), null, null,
-                                source.endpoint(), source.runtimeConfig(),
+                                source.simulatorPort(), source.realDeviceEndpoint(), source.runtimeConfig(),
                                 false, now, now, createdBy, 0);
                         rows.add(copy);
                         return copy;
@@ -317,8 +317,8 @@ class ProjectServiceTest {
         }
 
         @Override
-        public Optional<DataSourceRow> update(String id, String name, String endpointJson,
-                String runtimeConfigJson, boolean enabled, long expectedVersion) {
+        public Optional<DataSourceRow> update(String id, String name, int simulatorPort,
+                String realDeviceEndpoint, String runtimeConfigJson, boolean enabled, long expectedVersion) {
             return Optional.empty();
         }
 

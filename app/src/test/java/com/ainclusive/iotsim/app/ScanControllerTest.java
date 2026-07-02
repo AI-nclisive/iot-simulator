@@ -123,7 +123,7 @@ class ScanControllerTest {
                 .willReturn(scanned());
 
         ResponseEntity<DataSourceResponse> resp = controller.create(PROJECT, "job-1",
-                new CreateFromScanRequest("Scanned", "{}", null));
+                new CreateFromScanRequest("Scanned", "opc.tcp://host:4840", null));
 
         assertThat(resp.getStatusCode().value()).isEqualTo(201);
         assertThat(resp.getHeaders().getETag()).isEqualTo("\"0\"");
@@ -136,7 +136,7 @@ class ScanControllerTest {
         given(service.createFromScan(eq(PROJECT), eq("job-1"), eq("Scanned"), any(), any(), any()))
                 .willReturn(scanned());
 
-        controller.create(PROJECT, "job-1", new CreateFromScanRequest("Scanned", "{}",
+        controller.create(PROJECT, "job-1", new CreateFromScanRequest("Scanned", "opc.tcp://host:4840",
                 List.of(new ScanController.TypeResolutionRequest("ns=2;s=x", "INT32", null, null, false),
                         new ScanController.TypeResolutionRequest("ns=2;s=y", null, null, null, true))));
 
@@ -165,7 +165,7 @@ class ScanControllerTest {
     private static DataSource scanned() {
         Instant now = Instant.now();
         return new DataSource("ds1", PROJECT, "Scanned", Protocol.OPC_UA, SourceBasis.SCAN,
-                "schema-1", 1, "{}", "{}", false, RuntimeState.STOPPED, CredentialState.MISSING,
-                now, now, "local", 0);
+                "schema-1", 1, 4840, null, "{}", false, RuntimeState.STOPPED, CredentialState.MISSING,
+                "opc.tcp://localhost:4840/iotsim", now, now, "local", 0);
     }
 }

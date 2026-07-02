@@ -128,7 +128,8 @@ public class ProjectZipExporter {
         m.put("name", ds.name());
         m.put("protocol", ds.protocol().name());
         m.put("basis", ds.basis().name());
-        m.put("endpoint", ds.endpoint());
+        m.put("simulatorPort", ds.simulatorPort());
+        m.put("realDeviceEndpoint", ds.realDeviceEndpoint());
         m.put("runtimeConfig", ds.runtimeConfig());
         m.put("enabled", ds.enabled());
         m.put("schemaVersion", ds.schemaVersion());

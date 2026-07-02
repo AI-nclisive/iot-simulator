@@ -216,11 +216,11 @@ class ScenarioValidationServiceTest {
             OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
             if (sourceId.equals(id)) {
                 return Optional.of(new DataSourceRow(sourceId, projectId, "Synthetic Src",
-                        "OPC_UA", "SYNTHETIC", null, null, null, null, true, now, now, "tester", 0));
+                        "OPC_UA", "SYNTHETIC", null, null, 0, null, null, true, now, now, "tester", 0));
             }
             if (scanSourceId.equals(id)) {
                 return Optional.of(new DataSourceRow(scanSourceId, projectId, "Scan Src",
-                        "OPC_UA", "SCAN", null, null, null, null, true, now, now, "tester", 0));
+                        "OPC_UA", "SCAN", null, null, 0, null, null, true, now, now, "tester", 0));
             }
             return Optional.empty();
         }
@@ -228,7 +228,7 @@ class ScenarioValidationServiceTest {
         @Override
         public com.ainclusive.iotsim.persistence.datasource.DataSourceRow insert(
                 String projectId, String name, String protocol, String basis,
-                String endpointJson, String runtimeConfigJson, String createdBy) {
+                int simulatorPort, String realDeviceEndpoint, String runtimeConfigJson, String createdBy) {
             throw new UnsupportedOperationException();
         }
 
@@ -251,8 +251,8 @@ class ScenarioValidationServiceTest {
 
         @Override
         public Optional<com.ainclusive.iotsim.persistence.datasource.DataSourceRow> update(
-                String id, String name, String endpointJson, String runtimeConfigJson,
-                boolean enabled, long expectedVersion) {
+                String id, String name, int simulatorPort, String realDeviceEndpoint,
+                String runtimeConfigJson, boolean enabled, long expectedVersion) {
             throw new UnsupportedOperationException();
         }
 
