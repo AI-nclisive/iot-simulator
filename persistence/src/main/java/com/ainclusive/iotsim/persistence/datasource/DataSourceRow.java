@@ -14,6 +14,7 @@ public record DataSourceRow(
         int simulatorPort,
         String realDeviceEndpoint,
         String runtimeConfig,
+        String securityConfig,
         boolean enabled,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt,

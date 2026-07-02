@@ -62,6 +62,21 @@ message ConfigureRequest {
   Schema schema = 1;         // protocol-neutral schema the worker projects
   int32 listen_port = 2;     // protocol port the Edge Device connects to (0 = ephemeral)
   map<string, string> options = 3;
+  SecurityConfig security_config = 4;  // endpoint auth; absent/empty = None + Anonymous (IS-131)
+}
+
+// Simulated OPC UA endpoint security (IS-131). Empty message = the historical
+// None/Anonymous server. Passwords arrive pre-hashed (never plaintext on the wire).
+message SecurityConfig {
+  bool anonymous_allowed = 1;
+  bool username_enabled = 2;
+  repeated UserCredential users = 3;
+  // message security (SecurityPolicy/MessageSecurityMode) added in IS-132
+}
+
+message UserCredential {
+  string username = 1;
+  string password_hash = 2;  // salted PBKDF2 hash; the worker verifies against it
 }
 
 message Schema {

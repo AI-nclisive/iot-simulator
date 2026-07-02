@@ -102,7 +102,7 @@ class ProjectOverviewServiceTest {
     private static DataSource source(String id, RuntimeState state) {
         Instant now = Instant.now();
         return new DataSource(id, "p1", "src-" + id, Protocol.OPC_UA, SourceBasis.MANUAL,
-                null, null, 0, null, "{}", false, state, CredentialState.MISSING,
+                null, null, 0, null, "{}", null, false, state, CredentialState.MISSING,
                 "opc.tcp://localhost:0/iotsim", now, now, "local", 0);
     }
 

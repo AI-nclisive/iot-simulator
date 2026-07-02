@@ -76,8 +76,16 @@ layout (`frontend/docs/DESIGN.md`).
   where supported, stored only via the secret store — **never** in entity rows,
   exports, evidence, activity, or summaries (`frontend/docs/UI_SCREEN_SPECS.md` Credential
   Handling).
-- Exportable artifacts are built by a path that structurally excludes secrets
-  (`06_ARTIFACT_FORMATS.md`).
+- A **simulated data source's accepted credentials** (the username/password an
+  Edge Device must present to the simulated OPC UA server) are part of the
+  data-source *definition*, not a real-source connection secret. They are stored
+  as a **salted PBKDF2 hash** in `data_sources.security_config` and exported with
+  the project (so a saved/imported project reproduces the same auth), never in
+  plaintext. This is distinct from the scan/record connection secrets above,
+  which remain session-only and are never persisted or exported (IS-131).
+- Exportable artifacts are built by a path that structurally excludes real-source
+  secrets (`06_ARTIFACT_FORMATS.md`); the simulated server's accepted credentials
+  are the deliberate exception noted above and travel only as hashes.
 
 ## Database connection (both modes)
 

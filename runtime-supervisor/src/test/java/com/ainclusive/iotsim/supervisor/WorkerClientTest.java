@@ -12,6 +12,7 @@ import com.ainclusive.iotsim.workercontract.v1.HelloRequest;
 import com.ainclusive.iotsim.workercontract.v1.HelloResponse;
 import com.ainclusive.iotsim.workercontract.v1.ProtocolDataSourceGrpc;
 import com.ainclusive.iotsim.workercontract.v1.Schema;
+import com.ainclusive.iotsim.workercontract.v1.SecurityConfig;
 import com.ainclusive.iotsim.workercontract.v1.StartRequest;
 import com.ainclusive.iotsim.workercontract.v1.StopRequest;
 import io.grpc.Server;
@@ -58,7 +59,8 @@ class WorkerClientTest {
     void lifecycleRoundTripReflectsHealth() throws Exception {
         int port = startServer(WorkerContract.VERSION);
         try (WorkerClient client = new WorkerClient("127.0.0.1", port)) {
-            client.configure(Schema.getDefaultInstance(), 48400, "127.0.0.1", "127.0.0.1");
+            client.configure(Schema.getDefaultInstance(), 48400, "127.0.0.1", "127.0.0.1",
+                    SecurityConfig.getDefaultInstance());
             client.start();
             assertThat(client.health().getState()).isEqualTo("RUNNING");
             client.stop();

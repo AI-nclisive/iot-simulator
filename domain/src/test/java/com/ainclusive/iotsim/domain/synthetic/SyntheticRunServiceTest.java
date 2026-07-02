@@ -208,11 +208,11 @@ class SyntheticRunServiceTest {
             }
             OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
             return Optional.of(new DataSourceRow(id, PROJECT, "Gen", "OPC_UA", basis,
-                    null, null, 0, null, runtimeConfig, false, now, now, "local", 0));
+                    null, null, 0, null, runtimeConfig, null, false, now, now, "local", 0));
         }
 
         public DataSourceRow insert(String p, String n, String pr, String b, int sp, String rde,
-                String rc, String c) {
+                String rc, String sc, String c) {
             throw new UnsupportedOperationException();
         }
 
@@ -221,7 +221,7 @@ class SyntheticRunServiceTest {
         }
 
         public Optional<DataSourceRow> update(String i, String n, int sp, String rde, String rc,
-                boolean en, long v) {
+                String sc, boolean en, long v) {
             throw new UnsupportedOperationException();
         }
 

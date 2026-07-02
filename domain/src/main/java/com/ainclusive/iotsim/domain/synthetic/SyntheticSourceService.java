@@ -43,7 +43,7 @@ public class SyntheticSourceService {
         // DataSourceService.create gained an atomic initialNodes arg (IS-067) we don't use here.
         DataSource created = dataSources.create(
                 projectId, name, protocol, "SYNTHETIC", simulatorPort, null,
-                json.writeValueAsString(config), null, null, actor);
+                json.writeValueAsString(config), null, null, null, actor);
         schemas.save(projectId, created.id(), nodes);
         // Re-read so the response carries the linked schemaId/schemaVersion.
         return dataSources.get(projectId, created.id());

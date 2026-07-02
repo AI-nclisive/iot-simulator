@@ -1,11 +1,13 @@
 package com.ainclusive.iotsim.worker.opcua;
 
+import com.ainclusive.iotsim.protocolmodel.PasswordHash;
 import com.ainclusive.iotsim.workercontract.v1.ClientEvent;
 import com.ainclusive.iotsim.workercontract.v1.RuntimeEvent;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
@@ -14,6 +16,7 @@ import org.eclipse.milo.opcua.sdk.server.OpcUaServer;
 import org.eclipse.milo.opcua.sdk.server.Session;
 import org.eclipse.milo.opcua.sdk.server.SessionListener;
 import org.eclipse.milo.opcua.sdk.server.api.config.OpcUaServerConfig;
+import org.eclipse.milo.opcua.sdk.server.identity.UsernameIdentityValidator;
 import org.eclipse.milo.opcua.stack.core.security.DefaultCertificateManager;
 import org.eclipse.milo.opcua.stack.core.security.DefaultTrustListManager;
 import org.eclipse.milo.opcua.stack.core.security.SecurityPolicy;
@@ -21,12 +24,17 @@ import org.eclipse.milo.opcua.stack.core.transport.TransportProfile;
 import org.eclipse.milo.opcua.stack.core.types.builtin.LocalizedText;
 import org.eclipse.milo.opcua.stack.core.types.builtin.NodeId;
 import org.eclipse.milo.opcua.stack.core.types.enumerated.MessageSecurityMode;
+import org.eclipse.milo.opcua.stack.core.types.enumerated.UserTokenType;
+import org.eclipse.milo.opcua.stack.core.types.structured.UserTokenPolicy;
 import org.eclipse.milo.opcua.stack.server.EndpointConfiguration;
 import org.eclipse.milo.opcua.stack.server.security.DefaultServerCertificateValidator;
 
 /**
  * A real OPC UA server (Eclipse Milo) with an address space built from the
- * neutral schema, bound to loopback. None security / anonymous for now.
+ * neutral schema. Message security is {@code None}; the accepted user tokens
+ * (Anonymous and/or UserName/password) come from the {@link AuthConfig} — an
+ * empty config keeps the historical None/Anonymous behaviour (IS-131). Transport
+ * message security (Sign/Encrypt) is a later phase (IS-132).
  * See backend-specs/02_WORKER_CONTRACT_AND_IPC.md.
  */
 final class OpcUaServerRuntime {
@@ -38,25 +46,52 @@ final class OpcUaServerRuntime {
     private final int port;
 
     OpcUaServerRuntime(int port, List<VarDef> variables) {
-        this(port, variables, event -> {}, event -> {});
+        this(port, "127.0.0.1", "127.0.0.1", variables, AuthConfig.anonymous(), event -> {}, event -> {});
     }
 
     OpcUaServerRuntime(int port, List<VarDef> variables, Consumer<ClientEvent> clientEventSink) {
-        this(port, variables, clientEventSink, event -> {});
+        this(port, "127.0.0.1", "127.0.0.1", variables, AuthConfig.anonymous(), clientEventSink, event -> {});
     }
 
     OpcUaServerRuntime(int port, List<VarDef> variables, Consumer<ClientEvent> clientEventSink,
             Consumer<RuntimeEvent> runtimeEventSink) {
-        this(port, "127.0.0.1", "127.0.0.1", variables, clientEventSink, runtimeEventSink);
+        this(port, "127.0.0.1", "127.0.0.1", variables, AuthConfig.anonymous(), clientEventSink, runtimeEventSink);
     }
 
     OpcUaServerRuntime(int port, String bindAddress, String advertisedHost, List<VarDef> variables,
             Consumer<ClientEvent> clientEventSink, Consumer<RuntimeEvent> runtimeEventSink) {
+        this(port, bindAddress, advertisedHost, variables, AuthConfig.anonymous(), clientEventSink, runtimeEventSink);
+    }
+
+    OpcUaServerRuntime(int port, String bindAddress, String advertisedHost, List<VarDef> variables,
+            AuthConfig auth, Consumer<ClientEvent> clientEventSink, Consumer<RuntimeEvent> runtimeEventSink) {
         this.runtimeEventSink = runtimeEventSink;
         this.port = port;
         try {
             File pki = Files.createTempDirectory("iotsim-pki").toFile();
             DefaultTrustListManager trustList = new DefaultTrustListManager(pki);
+
+            // USERNAME policy with SecurityPolicy.None: passwords travel in the clear over the
+            // SecurityPolicy.None channel (consistent with None channel security). The built-in
+            // USER_TOKEN_POLICY_USERNAME uses Basic256 which requires a server certificate the
+            // worker does not provision — causing Bad_ConfigurationError on the client side.
+            UserTokenPolicy usernamePolicy = new UserTokenPolicy(
+                    "username",
+                    UserTokenType.UserName,
+                    null,
+                    null,
+                    SecurityPolicy.None.getUri());
+
+            List<UserTokenPolicy> tokenPolicies = new ArrayList<>();
+            if (auth.anonymousAllowed()) {
+                tokenPolicies.add(OpcUaServerConfig.USER_TOKEN_POLICY_ANONYMOUS);
+            }
+            if (auth.usernameEnabled()) {
+                tokenPolicies.add(usernamePolicy);
+            }
+            if (tokenPolicies.isEmpty()) {
+                tokenPolicies.add(OpcUaServerConfig.USER_TOKEN_POLICY_ANONYMOUS);
+            }
 
             EndpointConfiguration endpoint = EndpointConfiguration.newBuilder()
                     .setTransportProfile(TransportProfile.TCP_UASC_UABINARY)
@@ -66,13 +101,15 @@ final class OpcUaServerRuntime {
                     .setPath("/iotsim")
                     .setSecurityPolicy(SecurityPolicy.None)
                     .setSecurityMode(MessageSecurityMode.None)
-                    .addTokenPolicies(OpcUaServerConfig.USER_TOKEN_POLICY_ANONYMOUS)
+                    .addTokenPolicies(tokenPolicies.toArray(new UserTokenPolicy[0]))
                     .build();
 
             OpcUaServerConfig config = OpcUaServerConfig.builder()
                     .setApplicationUri("urn:iotsim:opcua:worker")
                     .setApplicationName(LocalizedText.english("IoT Simulator OPC UA Worker"))
                     .setProductUri("urn:iotsim:opcua")
+                    .setIdentityValidator(new UsernameIdentityValidator(
+                            auth.anonymousAllowed(), challenge -> authenticate(auth, challenge)))
                     .setEndpoints(Set.of(endpoint))
                     .setCertificateManager(new DefaultCertificateManager())
                     .setTrustListManager(trustList)
@@ -133,6 +170,16 @@ final class OpcUaServerRuntime {
     /** NodeId a client uses to address a variable (namespace index + node id). */
     NodeId variableNodeId(String nodeId) {
         return new NodeId(server.getNamespaceTable().getIndex(SchemaNamespace.URI), nodeId);
+    }
+
+    /** True when the challenge names a configured user whose password hash matches. */
+    private static boolean authenticate(AuthConfig auth,
+            UsernameIdentityValidator.AuthenticationChallenge challenge) {
+        if (!auth.usernameEnabled()) {
+            return false;
+        }
+        String hash = auth.userPasswordHashes().get(challenge.getUsername());
+        return hash != null && PasswordHash.matches(challenge.getPassword(), hash);
     }
 
     /** Builds a neutral runtime event with the current wall-clock time in micros. */

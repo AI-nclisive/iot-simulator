@@ -47,7 +47,7 @@ class SyntheticSourceControllerTest {
     private static DataSource sample() {
         Instant now = Instant.now();
         return new DataSource("ds1", PROJECT, "Gen", Protocol.OPC_UA, SourceBasis.SYNTHETIC,
-                "sc1", 1, 4840, null, "{}", false, RuntimeState.STOPPED, CredentialState.MISSING,
+                "sc1", 1, 4840, null, "{}", null, false, RuntimeState.STOPPED, CredentialState.MISSING,
                 "opc.tcp://localhost:4840/iotsim", now, now, "local", 0);
     }
 

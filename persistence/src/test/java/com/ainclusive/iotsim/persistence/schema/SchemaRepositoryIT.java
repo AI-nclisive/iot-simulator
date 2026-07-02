@@ -41,7 +41,7 @@ class SchemaRepositoryIT {
         DSLContext dsl = DSL.using(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
         String projectId = new JooqProjectRepository(dsl).insert("Plant", null, "it").id();
         DataSourceRow source = new JooqDataSourceRepository(dsl)
-                .insert(projectId, "Pump", "OPC_UA", "MANUAL", 4840, null, null, "it");
+                .insert(projectId, "Pump", "OPC_UA", "MANUAL", 4840, null, null, null, "it");
         dataSourceId = source.id();
         schemas = new JooqSchemaRepository(dsl);
     }

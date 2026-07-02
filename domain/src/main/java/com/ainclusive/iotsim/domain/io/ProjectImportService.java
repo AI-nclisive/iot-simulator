@@ -138,17 +138,19 @@ public class ProjectImportService {
                         simulatorPort = SimulatorUrl.defaultPort(Protocol.valueOf(protocol));
                     }
                     String runtimeConfig = ds.path("runtimeConfig").asString(null);
+                    String securityConfig = ds.path("securityConfig").asString(null);
                     boolean enabled = ds.path("enabled").asBoolean(false);
 
                     DataSourceRow row = dataSources.insert(
                             newProject.id(), dsName, protocol, basis, simulatorPort, realDeviceEndpoint,
-                            runtimeConfig, actor);
+                            runtimeConfig, securityConfig, actor);
 
                     // Preserve the exported enabled state: insert() defaults to false;
                     // apply an update only when the exported value is true.
                     if (enabled) {
                         dataSources.update(row.id(), row.name(), row.simulatorPort(),
-                                row.realDeviceEndpoint(), row.runtimeConfig(), true, row.version());
+                                row.realDeviceEndpoint(), row.runtimeConfig(), row.securityConfig(),
+                                true, row.version());
                     }
 
                     if (oldId != null) {

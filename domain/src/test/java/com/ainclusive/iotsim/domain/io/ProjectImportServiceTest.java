@@ -169,6 +169,25 @@ class ProjectImportServiceTest {
         assertThat(fixture.updateCalledCount).isGreaterThan(0);
     }
 
+    @Test
+    void importPreservesSecurityConfigHashes() {
+        // Build a content whose data source carries a hashed securityConfig,
+        // export it, then import it — the hash must survive the round-trip.
+        String storedHash = "{\"userTokens\":{\"anonymous\":false,\"username\":{\"enabled\":true,"
+                + "\"users\":[{\"username\":\"op\",\"passwordHash\":\"pbkdf2-sha256$1$aa$bb\"}]}}}";
+        ProjectExportContent content = contentWithSecurityConfig(storedHash);
+
+        Fixture fixture = new Fixture();
+        fixture.service().importProject(exportStream(content), "local");
+
+        assertThat(fixture.insertedDataSources).hasSize(1);
+        DataSourceRow imported = fixture.insertedDataSources.get(0);
+        assertThat(imported.securityConfig())
+                .isNotNull()
+                .contains("passwordHash")
+                .isEqualTo(storedHash);
+    }
+
     // -------------------------------------------------------------------------
 
     private InputStream exportStream(ProjectExportContent content) {
@@ -189,7 +208,7 @@ class ProjectImportServiceTest {
 
         DataSource ds = new DataSource("ds-1", "proj-1", "OPC UA Source",
                 Protocol.OPC_UA, SourceBasis.SCAN, "schema-1", 1,
-                4840, "device://plc", "{}", true,
+                4840, "device://plc", "{}", null, true,
                 RuntimeState.STOPPED, CredentialState.MISSING,
                 "opc.tcp://localhost:4840/iotsim", now, now, "local", 1L);
 
@@ -206,6 +225,20 @@ class ProjectImportServiceTest {
 
         return new ProjectExportContent(project, List.of(ds), Map.of("ds-1", schema),
                 List.of(rec), List.of(sample));
+    }
+
+    private static ProjectExportContent contentWithSecurityConfig(String securityConfig) {
+        Instant now = Instant.parse("2026-06-01T00:00:00Z");
+        Project project = new Project("proj-sc", "Security Config Project", "desc",
+                Project.ProjectStatus.ACTIVE, now, now, "local", 1L);
+
+        DataSource ds = new DataSource("ds-sc", "proj-sc", "Secure Source",
+                Protocol.OPC_UA, SourceBasis.SCAN, null, null,
+                4840, "device://plc", "{}", securityConfig, false,
+                RuntimeState.STOPPED, CredentialState.MISSING,
+                "opc.tcp://localhost:4840/iotsim", now, now, "local", 1L);
+
+        return new ProjectExportContent(project, List.of(ds), Map.of(), List.of(), List.of());
     }
 
     /** Builds a ZIP with a manifest.json that has the given formatVersion. */
@@ -248,12 +281,12 @@ class ProjectImportServiceTest {
                 @Override
                 public DataSourceRow insert(String projectId, String name, String protocol,
                         String basis, int simulatorPort, String realDeviceEndpoint,
-                        String runtimeConfigJson, String createdBy) {
+                        String runtimeConfigJson, String securityConfigJson, String createdBy) {
                     Instant now = Instant.now();
                     OffsetDateTime odt = OffsetDateTime.ofInstant(now, ZoneOffset.UTC);
                     DataSourceRow row = new DataSourceRow("new-ds-" + counter.incrementAndGet(),
                             projectId, name, protocol, basis, null, null, simulatorPort, realDeviceEndpoint,
-                            runtimeConfigJson, false, odt, odt, createdBy, 0L);
+                            runtimeConfigJson, securityConfigJson, false, odt, odt, createdBy, 0L);
                     insertedDataSources.add(row);
                     return row;
                 }
@@ -275,8 +308,8 @@ class ProjectImportServiceTest {
 
                 @Override
                 public Optional<DataSourceRow> update(String id, String name, int simulatorPort,
-                        String realDeviceEndpoint, String runtimeConfigJson, boolean enabled,
-                        long expectedVersion) {
+                        String realDeviceEndpoint, String runtimeConfigJson, String securityConfigJson,
+                        boolean enabled, long expectedVersion) {
                     updateCalledCount++;
                     // Return the last inserted row with the updated enabled state.
                     if (insertedDataSources.isEmpty()) {
@@ -286,7 +319,7 @@ class ProjectImportServiceTest {
                     OffsetDateTime odt = OffsetDateTime.now(ZoneOffset.UTC);
                     return Optional.of(new DataSourceRow(last.id(), last.projectId(), name,
                             last.protocol(), last.basis(), null, null, simulatorPort, realDeviceEndpoint,
-                            runtimeConfigJson, enabled, last.createdAt(), odt, last.createdBy(),
+                            runtimeConfigJson, securityConfigJson, enabled, last.createdAt(), odt, last.createdBy(),
                             expectedVersion + 1));
                 }
 

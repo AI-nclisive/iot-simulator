@@ -6,6 +6,7 @@ import com.ainclusive.iotsim.api.support.ConnectionConfigRequest;
 import com.ainclusive.iotsim.api.support.CredentialRequests;
 import com.ainclusive.iotsim.domain.datasource.DataSource;
 import com.ainclusive.iotsim.domain.datasource.DataSourceService;
+import com.ainclusive.iotsim.domain.datasource.SecurityConfigRedactor;
 import com.ainclusive.iotsim.domain.support.Page;
 import com.ainclusive.iotsim.protocolmodel.Access;
 import com.ainclusive.iotsim.protocolmodel.DataType;
@@ -103,7 +104,7 @@ public class DataSourceController {
                 : null;
         DataSource ds = dataSources.create(
                 projectId, req.name(), req.protocol(), req.basis(),
-                req.simulatorPort(), req.realDeviceEndpoint(), req.runtimeConfig(),
+                req.simulatorPort(), req.realDeviceEndpoint(), req.runtimeConfig(), req.securityConfig(),
                 CredentialRequests.toCredentials(req.connectionConfig()), initialNodes, "local");
         return ResponseEntity.created(
                         URI.create("/api/v1/projects/" + projectId + "/data-sources/" + ds.id()))
@@ -136,7 +137,7 @@ public class DataSourceController {
         }
         DataSource ds = dataSources.update(
                 projectId, id, req.name(), req.simulatorPort(), req.realDeviceEndpoint(),
-                req.runtimeConfig(), req.enabled(),
+                req.runtimeConfig(), req.securityConfig(), req.enabled(),
                 CredentialRequests.toCredentials(req.connectionConfig()), parseVersion(ifMatch));
         return ResponseEntity.ok().eTag(etag(ds.version())).body(DataSourceResponse.from(ds));
     }
@@ -273,24 +274,26 @@ public class DataSourceController {
 
     public record CreateDataSourceRequest(
             String name, String protocol, String basis, Integer simulatorPort,
-            String realDeviceEndpoint, String runtimeConfig,
+            String realDeviceEndpoint, String runtimeConfig, String securityConfig,
             ConnectionConfigRequest connectionConfig, List<NodeDto> initialSchema) {}
 
     public record UpdateDataSourceRequest(
             String name, Integer simulatorPort, String realDeviceEndpoint, String runtimeConfig,
-            Boolean enabled, ConnectionConfigRequest connectionConfig) {}
+            String securityConfig, Boolean enabled, ConnectionConfigRequest connectionConfig) {}
 
     public record DataSourceResponse(
             String id, String projectId, String name, String protocol, String basis,
             String schemaId, Integer schemaVersion, int simulatorPort, String realDeviceEndpoint,
-            String runtimeConfig, boolean enabled, String runtimeState, String credentialState,
-            String serveUrl, Instant createdAt, Instant updatedAt, String createdBy, long version) {
+            String runtimeConfig, String securityConfig, boolean enabled, String runtimeState,
+            String credentialState, String serveUrl, Instant createdAt, Instant updatedAt,
+            String createdBy, long version) {
 
         public static DataSourceResponse from(DataSource d) {
             return new DataSourceResponse(
                     d.id(), d.projectId(), d.name(), d.protocol().name(), d.basis().name(),
                     d.schemaId(), d.schemaVersion(), d.simulatorPort(), d.realDeviceEndpoint(),
-                    d.runtimeConfig(), d.enabled(), d.runtimeState().name(), d.credentialState().name(),
+                    d.runtimeConfig(), SecurityConfigRedactor.redact(d.securityConfig()),
+                    d.enabled(), d.runtimeState().name(), d.credentialState().name(),
                     d.serveUrl(), d.createdAt(), d.updatedAt(), d.createdBy(), d.version());
         }
     }

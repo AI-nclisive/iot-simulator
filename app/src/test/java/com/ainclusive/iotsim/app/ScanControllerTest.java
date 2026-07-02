@@ -165,7 +165,7 @@ class ScanControllerTest {
     private static DataSource scanned() {
         Instant now = Instant.now();
         return new DataSource("ds1", PROJECT, "Scanned", Protocol.OPC_UA, SourceBasis.SCAN,
-                "schema-1", 1, 4840, null, "{}", false, RuntimeState.STOPPED, CredentialState.MISSING,
+                "schema-1", 1, 4840, null, "{}", null, false, RuntimeState.STOPPED, CredentialState.MISSING,
                 "opc.tcp://localhost:4840/iotsim", now, now, "local", 0);
     }
 }

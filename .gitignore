@@ -33,3 +33,6 @@ data/
 
 # Generated API types (produced by npm run generate:api — not committed)
 frontend/src/generated/
+
+# Claude Code temporary worktrees (never commit)
+.claude/worktrees/

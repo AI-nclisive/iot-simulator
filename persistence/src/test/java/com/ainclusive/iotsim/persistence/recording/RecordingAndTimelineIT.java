@@ -43,7 +43,7 @@ class RecordingAndTimelineIT {
         dsl = DSL.using(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
         projectId = new JooqProjectRepository(dsl).insert("Plant", null, "it").id();
         dataSourceId = new JooqDataSourceRepository(dsl)
-                .insert(projectId, "Pump", "OPC_UA", "MANUAL", 4840, null, null, "it").id();
+                .insert(projectId, "Pump", "OPC_UA", "MANUAL", 4840, null, null, null, "it").id();
         recordings = new JooqRecordingRepository(dsl);
         timeline = new JooqValueTimelineRepository(dsl);
     }

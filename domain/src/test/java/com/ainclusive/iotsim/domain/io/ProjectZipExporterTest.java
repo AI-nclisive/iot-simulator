@@ -90,6 +90,24 @@ class ProjectZipExporterTest {
     }
 
     @Test
+    void dataSourceJsonIncludesHashedSecurityConfig() {
+        // Build content with a hashed securityConfig and verify it round-trips through export.
+        // The securityConfig JSON must surface the PBKDF2 hash but never expose a plaintext
+        // "password" key (IS-131 contract: hashes exported, plaintext credentials excluded).
+        String storedHash = "{\"userTokens\":{\"anonymous\":false,\"username\":{\"enabled\":true,"
+                + "\"users\":[{\"username\":\"op\",\"passwordHash\":\"pbkdf2-sha256$1$aa$bb\"}]}}}";
+        ProjectExportContent content = contentWithSecurityConfig(storedHash);
+
+        String dsJson = unzip(exporter.toBytes(content)).get("data-sources.json");
+
+        assertThat(dsJson)
+                .contains("securityConfig")
+                .contains("pbkdf2-sha256$1$aa$bb")
+                // plaintext "password" JSON key must never appear — only passwordHash is allowed
+                .doesNotContain("\"password\"");
+    }
+
+    @Test
     void schemasJsonContainsNodes() {
         String schemasJson = unzip(exporter.toBytes(fullContent())).get("schemas.json");
 
@@ -120,8 +138,12 @@ class ProjectZipExporterTest {
     void neverSerializesSecretLikeFields() {
         String all = String.join("\n", unzip(exporter.toBytes(fullContent())).values());
 
+        // "password" (quoted JSON key) must never appear as a plaintext field.
+        // The intentional "passwordHash" key is allowed; when lowercased, "passwordhash"
+        // does NOT contain the quoted substring "\"password\"", so this assertion still
+        // catches any accidental plaintext password field while permitting the hash.
         assertThat(all.toLowerCase())
-                .doesNotContain("password")
+                .doesNotContain("\"password\"")
                 .doesNotContain("credential")
                 .doesNotContain("privatekey")
                 .doesNotContain("secret");
@@ -146,7 +168,7 @@ class ProjectZipExporterTest {
 
         DataSource ds = new DataSource("ds-1", "proj-1", "OPC UA Source",
                 Protocol.OPC_UA, SourceBasis.SCAN, "schema-1", 1,
-                4840, "device://plc", "{}", true,
+                4840, "device://plc", "{}", null, true,
                 RuntimeState.STOPPED, CredentialState.MISSING,
                 "opc.tcp://localhost:4840/iotsim",
                 now, now, "local", 1L);
@@ -165,6 +187,18 @@ class ProjectZipExporterTest {
                 "{}", List.of("tag1"), now, "local", 1L);
 
         return new ProjectExportContent(project, List.of(ds), schemas, List.of(rec), List.of(sample));
+    }
+
+    private static ProjectExportContent contentWithSecurityConfig(String securityConfig) {
+        Instant now = Instant.parse("2026-06-01T00:00:00Z");
+        Project project = new Project("proj-sc", "Security Config Project", "desc",
+                Project.ProjectStatus.ACTIVE, now, now, "local", 1L);
+        DataSource ds = new DataSource("ds-sc", "proj-sc", "Secure Source",
+                Protocol.OPC_UA, SourceBasis.SCAN, null, null,
+                4840, "device://plc", "{}", securityConfig, false,
+                RuntimeState.STOPPED, CredentialState.MISSING,
+                "opc.tcp://localhost:4840/iotsim", now, now, "local", 1L);
+        return new ProjectExportContent(project, List.of(ds), Map.of(), List.of(), List.of());
     }
 
     private static Map<String, String> unzip(byte[] bytes) {

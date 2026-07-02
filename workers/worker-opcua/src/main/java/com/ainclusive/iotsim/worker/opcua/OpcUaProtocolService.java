@@ -16,17 +16,20 @@ import com.ainclusive.iotsim.workercontract.v1.RuntimeEvent;
 import com.ainclusive.iotsim.workercontract.v1.ScanRequest;
 import com.ainclusive.iotsim.workercontract.v1.ScanResponse;
 import com.ainclusive.iotsim.workercontract.v1.SchemaNodeMsg;
+import com.ainclusive.iotsim.workercontract.v1.SecurityConfig;
 import com.ainclusive.iotsim.workercontract.v1.StartRequest;
 import com.ainclusive.iotsim.workercontract.v1.StopRequest;
 import com.ainclusive.iotsim.workercontract.v1.StreamRequest;
 import com.ainclusive.iotsim.workercontract.v1.TestConnectionRequest;
 import com.ainclusive.iotsim.workercontract.v1.TestConnectionResponse;
+import com.ainclusive.iotsim.workercontract.v1.UserCredential;
 import com.ainclusive.iotsim.workercontract.v1.Value;
 import com.ainclusive.iotsim.workercontract.v1.ValueBatch;
 import io.grpc.Status;
 import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -92,8 +95,9 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
         }
         String bindAddress = request.getOptions().getOrDefault("bindAddress", "127.0.0.1");
         String advertisedHost = request.getOptions().getOrDefault("advertisedHost", "127.0.0.1");
+        AuthConfig auth = toAuthConfig(request.getSecurityConfig());
         serverRuntime.set(new OpcUaServerRuntime(
-                request.getListenPort(), bindAddress, advertisedHost, variables,
+                request.getListenPort(), bindAddress, advertisedHost, variables, auth,
                 clientEventHub::emit, runtimeEventHub::emit));
         configuredNodes.set(request.getSchema().getNodesCount());
         state.set("CONFIGURED");
@@ -199,6 +203,19 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
     @Override
     public void runtimeEvents(StreamRequest request, StreamObserver<RuntimeEvent> responseObserver) {
         runtimeEventHub.register((ServerCallStreamObserver<RuntimeEvent>) responseObserver);
+    }
+
+    /** Maps the proto SecurityConfig to the worker-local AuthConfig (empty/default → anonymous). */
+    private static AuthConfig toAuthConfig(SecurityConfig sc) {
+        if (sc == null
+                || (!sc.getAnonymousAllowed() && !sc.getUsernameEnabled() && sc.getUsersCount() == 0)) {
+            return AuthConfig.anonymous();
+        }
+        Map<String, String> users = new HashMap<>();
+        for (UserCredential u : sc.getUsersList()) {
+            users.put(u.getUsername(), u.getPasswordHash());
+        }
+        return new AuthConfig(sc.getAnonymousAllowed(), sc.getUsernameEnabled(), users);
     }
 
     /** Maps the wire credential message to the discovery's session-only form. */

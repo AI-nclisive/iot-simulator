@@ -301,11 +301,13 @@ class ScanServiceTest {
 
         @Override
         public DataSourceRow insert(String projectId, String name, String protocol, String basis,
-                int simulatorPort, String realDeviceEndpoint, String runtimeConfigJson, String createdBy) {
+                int simulatorPort, String realDeviceEndpoint, String runtimeConfigJson,
+                String securityConfigJson, String createdBy) {
             OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
             DataSourceRow row = new DataSourceRow("ds-" + (++seq), projectId, name, protocol, basis,
                     null, null, simulatorPort, realDeviceEndpoint,
-                    runtimeConfigJson != null ? runtimeConfigJson : "{}", false, now, now, createdBy, 0);
+                    runtimeConfigJson != null ? runtimeConfigJson : "{}", securityConfigJson,
+                    false, now, now, createdBy, 0);
             rows.add(row);
             return row;
         }
@@ -328,7 +330,8 @@ class ScanServiceTest {
 
         @Override
         public Optional<DataSourceRow> update(String id, String name, int simulatorPort,
-                String realDeviceEndpoint, String runtimeConfigJson, boolean enabled, long expectedVersion) {
+                String realDeviceEndpoint, String runtimeConfigJson, String securityConfigJson,
+                boolean enabled, long expectedVersion) {
             throw new UnsupportedOperationException();
         }
 
@@ -349,6 +352,7 @@ class ScanServiceTest {
                 if (r.id().equals(dataSourceId)) {
                     rows.set(i, new DataSourceRow(r.id(), r.projectId(), r.name(), r.protocol(), r.basis(),
                             schemaId, version, r.simulatorPort(), r.realDeviceEndpoint(), r.runtimeConfig(),
+                            r.securityConfig(),
                             r.enabled(), r.createdAt(), OffsetDateTime.now(ZoneOffset.UTC), r.createdBy(),
                             r.version()));
                     return;

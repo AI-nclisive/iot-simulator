@@ -41,12 +41,12 @@ class DataSourceRepositoryIT {
     @Test
     void insertFindUpdateDeleteWithJsonb() {
         DataSourceRow row = dataSources.insert(projectId, "Pump", "OPC_UA", "SCAN",
-                4840, "opc.tcp://plc:4840", "{}", "local");
+                4840, "opc.tcp://plc:4840", "{}", null, "local");
         assertThat(row.simulatorPort()).isEqualTo(4840);
         assertThat(row.realDeviceEndpoint()).isEqualTo("opc.tcp://plc:4840");
 
         DataSourceRow synthetic = dataSources.insert(projectId, "Sim", "OPC_UA", "SYNTHETIC",
-                4841, null, "{}", "local");
+                4841, null, "{}", null, "local");
         assertThat(synthetic.simulatorPort()).isEqualTo(4841);
         assertThat(synthetic.realDeviceEndpoint()).isNull();
 
@@ -57,7 +57,7 @@ class DataSourceRepositoryIT {
         assertThat(dataSources.findByProject(projectId)).extracting(DataSourceRow::id).contains(row.id());
 
         Optional<DataSourceRow> updated = dataSources.update(
-                row.id(), "Pump 2", 4842, "opc.tcp://plc2:4840", "{}", true, 0);
+                row.id(), "Pump 2", 4842, "opc.tcp://plc2:4840", "{}", null, true, 0);
         assertThat(updated).isPresent();
         assertThat(updated.get().name()).isEqualTo("Pump 2");
         assertThat(updated.get().simulatorPort()).isEqualTo(4842);
@@ -79,7 +79,7 @@ class DataSourceRepositoryIT {
         String url = "opc.tcp://simulator.local:4840";
 
         DataSourceRow created = dataSources.insert(projectId, "OPC Source", "OPC_UA", "MANUAL",
-                4840, url, null, "it");
+                4840, url, null, null, "it");
 
         assertThat(created.realDeviceEndpoint()).isEqualTo(url);
         assertThat(dataSources.findById(created.id()))
@@ -97,7 +97,7 @@ class DataSourceRepositoryIT {
         String url = "opc.tcp://host/path?q=\"a\\b\"";
 
         DataSourceRow created = dataSources.insert(projectId, "Weird", "OPC_UA", "MANUAL",
-                4840, url, null, "it");
+                4840, url, null, null, "it");
 
         assertThat(dataSources.findById(created.id()))
                 .get()
@@ -110,8 +110,8 @@ class DataSourceRepositoryIT {
     @Test
     void updateWithStaleVersionMatchesNothing() {
         DataSourceRow created = dataSources.insert(projectId, "Stale", "MODBUS_TCP", "SCAN",
-                4840, null, null, "it");
-        assertThat(dataSources.update(created.id(), "x", 4840, null, null, true, 999)).isEmpty();
+                4840, null, null, null, "it");
+        assertThat(dataSources.update(created.id(), "x", 4840, null, null, null, true, 999)).isEmpty();
         dataSources.deleteById(created.id());
     }
 
@@ -119,7 +119,7 @@ class DataSourceRepositoryIT {
     void duplicateCreatesNewRowWithSameProtocolAndEndpoint() {
         DataSourceRow source = dataSources.insert(
                 projectId, "Boiler", "OPC_UA", "SCAN",
-                4840, "opc.tcp://boiler1:4840", "{\"rate\":2000}", "it");
+                4840, "opc.tcp://boiler1:4840", "{\"rate\":2000}", null, "it");
 
         Optional<DataSourceRow> copy = dataSources.duplicate(source.id(), "Boiler (copy)", "it");
 
@@ -146,9 +146,25 @@ class DataSourceRepositoryIT {
     }
 
     @Test
+    void insertAndUpdatePersistSecurityConfig() {
+        String stored = "{\"userTokens\":{\"anonymous\":false,"
+                + "\"username\":{\"enabled\":true,\"users\":[{\"username\":\"op\",\"passwordHash\":\"h\"}]}}}";
+        DataSourceRow row = dataSources.insert(
+                projectId, "S", "OPC_UA", "MANUAL", 4840, null, "{}", stored, "local");
+        assertThat(row.securityConfig()).contains("passwordHash");
+
+        DataSourceRow updated = dataSources.update(
+                row.id(), row.name(), row.simulatorPort(), row.realDeviceEndpoint(),
+                row.runtimeConfig(), "{}", row.enabled(), row.version()).orElseThrow();
+        assertThat(updated.securityConfig()).isEqualTo("{}");
+
+        dataSources.deleteById(row.id());
+    }
+
+    @Test
     void findAllReturnsSourcesAcrossProjects() {
-        DataSourceRow a = dataSources.insert(projectId, "A", "OPC_UA", "MANUAL", 4840, null, null, "it");
-        DataSourceRow b = dataSources.insert(projectId, "B", "OPC_UA", "MANUAL", 4841, null, null, "it");
+        DataSourceRow a = dataSources.insert(projectId, "A", "OPC_UA", "MANUAL", 4840, null, null, null, "it");
+        DataSourceRow b = dataSources.insert(projectId, "B", "OPC_UA", "MANUAL", 4841, null, null, null, "it");
 
         List<DataSourceRow> all = dataSources.findAll();
 
@@ -160,9 +176,9 @@ class DataSourceRepositoryIT {
 
     @Test
     void findByProjectPagedReturnsBatchNewestFirst() {
-        DataSourceRow a = dataSources.insert(projectId, "Paged-A", "OPC_UA", "SCAN", 4840, null, null, "it");
-        DataSourceRow b = dataSources.insert(projectId, "Paged-B", "OPC_UA", "SCAN", 4841, null, null, "it");
-        DataSourceRow c = dataSources.insert(projectId, "Paged-C", "MODBUS_TCP", "SCAN", 4842, null, null, "it");
+        DataSourceRow a = dataSources.insert(projectId, "Paged-A", "OPC_UA", "SCAN", 4840, null, null, null, "it");
+        DataSourceRow b = dataSources.insert(projectId, "Paged-B", "OPC_UA", "SCAN", 4841, null, null, null, "it");
+        DataSourceRow c = dataSources.insert(projectId, "Paged-C", "MODBUS_TCP", "SCAN", 4842, null, null, null, "it");
 
         List<DataSourceRow> page1 = dataSources.findByProjectPaged(projectId, null, null, null, 2);
         assertThat(page1).hasSize(2);
