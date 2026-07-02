@@ -58,7 +58,20 @@ function Initialize-Compose {
   throw "neither 'docker compose' nor 'docker-compose' is available"
 }
 function Invoke-Compose {
-  if ($script:ComposeV2) { & docker compose @args } else { & docker-compose @args }
+  # docker/compose write progress + status (e.g. "Container ... Running") to
+  # stderr while still exiting 0. On Windows PowerShell 5.1 that stderr becomes a
+  # terminating error under $ErrorActionPreference='Stop' (PS7 opts out via
+  # $PSNativeCommandUseErrorActionPreference; 5.1 has no equivalent). Run the call
+  # under 'Continue' and fold stderr into stdout as plain text so it prints
+  # instead of throwing. $LASTEXITCODE still reflects docker's real exit code.
+  $eap = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
+  try {
+    if ($script:ComposeV2) { & docker compose @args 2>&1 | ForEach-Object { "$_" } }
+    else { & docker-compose @args 2>&1 | ForEach-Object { "$_" } }
+  } finally {
+    $ErrorActionPreference = $eap
+  }
 }
 
 function Write-Report {
