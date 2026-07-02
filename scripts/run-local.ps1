@@ -85,8 +85,26 @@ function Invoke-Up {
   }
   Initialize-Compose
 
-  if (-not (Test-Path node_modules)) {
+  # Install deps when node_modules is missing OR stale. npm writes
+  # node_modules/.package-lock.json on every install, so if package-lock.json is
+  # newer than that marker (e.g. after a git pull that bumped deps), the install
+  # is out of date and we reinstall. Up-to-date installs are left alone so warm
+  # starts stay fast.
+  $lockFile   = 'package-lock.json'
+  $installMark = Join-Path 'node_modules' '.package-lock.json'
+  $needsInstall = $false
+  if (-not (Test-Path 'node_modules')) {
+    $needsInstall = $true
     Write-Log "node_modules missing - running 'npm ci'..."
+  } elseif (-not (Test-Path $installMark)) {
+    # Folder exists but no install marker - treat as stale to be safe.
+    $needsInstall = $true
+    Write-Log "node_modules has no install marker - running 'npm ci'..."
+  } elseif ((Get-Item $lockFile).LastWriteTimeUtc -gt (Get-Item $installMark).LastWriteTimeUtc) {
+    $needsInstall = $true
+    Write-Log "node_modules is stale (package-lock.json is newer) - running 'npm ci'..."
+  }
+  if ($needsInstall) {
     & npm ci
   }
 
@@ -143,8 +161,20 @@ function Invoke-Up {
       if ((Invoke-RestMethod "http://localhost:$BackendPort/actuator/health" -TimeoutSec 3).status -eq 'UP') { break }
     } catch { }
     if ((Get-Date) -gt $deadline) {
-      Write-Err "backend never reported UP. Last 40 log lines:"
-      Get-Content $BackendLog -Tail 40 -ErrorAction SilentlyContinue
+      $tail = Get-Content $BackendLog -Tail 40 -ErrorAction SilentlyContinue
+      # A changed migration after a git pull leaves the local DB volume on an
+      # older schema; Flyway then refuses to start. Surface the fix instead of
+      # only a raw stack trace.
+      if ($tail -match 'checksum mismatch' -or $tail -match 'FlywayValidateException' -or $tail -match 'Migrations have failed validation') {
+        Write-Err "backend failed: the local database is from an older schema version."
+        Write-Err "recreate it, then start again:"
+        Write-Err "    .\scripts\run-local.ps1 down -Wipe"
+        Write-Err "    .\scripts\run-local.ps1"
+        Write-Err "(this drops local DB data). Backend log tail:"
+      } else {
+        Write-Err "backend never reported UP. Last 40 log lines:"
+      }
+      $tail
       exit 1
     }
     Start-Sleep 2
