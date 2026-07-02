@@ -8,6 +8,7 @@ import { SharedStatePanel } from "../ui/shared-state-panel";
 import { StatusBadge } from "../ui/status-badge";
 import { RecordingExportDialog } from "./recording-export-dialog";
 import { RecordingImportDialog } from "./recording-import-dialog";
+import { SampleImportDialog } from "./sample-import-dialog";
 
 // Display-layer shape for the recordings list — derived from live RecordingResponse via artifacts-store
 export type RecordingRow = {
@@ -164,6 +165,7 @@ function SamplesSection({
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   useEffect(() => {
     if (projectId) {
@@ -185,11 +187,25 @@ function SamplesSection({
   }
 
   return (
+    <>
     <section className="shell-panel px-5 py-5" data-testid="samples-section">
-      <h3 className="text-lg font-semibold text-shell-ink">Samples</h3>
-      <p className="mt-1 text-sm text-shell-muted">
-        Named subsets derived from recordings.
-      </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h3 className="text-lg font-semibold text-shell-ink">Samples</h3>
+          <p className="mt-1 text-sm text-shell-muted">
+            Named subsets derived from recordings.
+          </p>
+        </div>
+        {isAdmin ? (
+          <button
+            className="shell-action shrink-0"
+            type="button"
+            onClick={() => setImportOpen(true)}
+          >
+            Add new
+          </button>
+        ) : null}
+      </div>
 
       {deleteError ? (
         <p className="mt-4 text-sm text-red-600" role="alert">{deleteError}</p>
@@ -272,6 +288,18 @@ function SamplesSection({
         </div>
       )}
     </section>
+
+    <SampleImportDialog
+      open={importOpen}
+      canImport={isAdmin}
+      existingNames={samples.map((s) => s.name)}
+      projectId={projectId}
+      onClose={() => setImportOpen(false)}
+      onImported={() => {
+        setImportOpen(false);
+      }}
+    />
+    </>
   );
 }
 

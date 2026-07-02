@@ -166,6 +166,24 @@ describe("createSample", () => {
   });
 });
 
+// ─── appendSample ─────────────────────────────────────────────────────────────
+
+describe("appendSample", () => {
+  it("prepends sample to existing list without an API call", () => {
+    const existing = makeSampleResponse({ id: "sample-existing", name: "Existing" });
+    useArtifactsStore.setState({ samples: [existing] });
+
+    const newSample = makeSampleResponse({ id: "sample-new", name: "New" });
+    useArtifactsStore.getState().appendSample(newSample);
+
+    const { samples } = useArtifactsStore.getState();
+    expect(samples).toHaveLength(2);
+    expect(samples[0].id).toBe("sample-new");
+    expect(samples[1].id).toBe("sample-existing");
+    expect(mockApiFetch).not.toHaveBeenCalled();
+  });
+});
+
 // ─── deleteSample ─────────────────────────────────────────────────────────────
 
 describe("deleteSample", () => {

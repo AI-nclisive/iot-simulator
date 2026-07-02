@@ -63,6 +63,7 @@ type ArtifactsState = {
   loadSamples: (projectId: string) => Promise<void>;
   createSample: (projectId: string, req: CreateSampleRequest) => Promise<SampleResponse>;
   deleteSample: (projectId: string, sampleId: string) => Promise<void>;
+  appendSample: (sample: SampleResponse) => void;
   // createRecording is kept for backward-compat with RecordingFlowPage
   // which uses start/stop capture endpoints separately; recording IDs are
   // appended to the store after a successful stop.
@@ -123,6 +124,10 @@ export const useArtifactsStore = create<ArtifactsState>((set) => ({
 
   appendRecording: (artifact) => {
     set((state) => ({ artifacts: [artifact, ...state.artifacts] }));
+  },
+
+  appendSample: (sample) => {
+    set((state) => ({ samples: [sample, ...state.samples] }));
   },
 
   // Legacy sync helper — kept so existing call-sites compile.
