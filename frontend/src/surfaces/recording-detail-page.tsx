@@ -28,15 +28,15 @@ export function RecordingDetailPage() {
   const artifacts = useArtifactsStore((s) => s.artifacts);
   const isLoading = useArtifactsStore((s) => s.isLoading);
   const error = useArtifactsStore((s) => s.error);
-  const loadRecordings = useArtifactsStore((s) => s.loadRecordings);
+  const loadRecordingById = useArtifactsStore((s) => s.loadRecordingById);
 
   const [activeTab, setActiveTab] = useState<TabId>("schema");
 
   useEffect(() => {
-    if (currentProjectId && artifacts.length === 0 && !isLoading) {
-      void loadRecordings(currentProjectId);
+    if (currentProjectId && recordingId) {
+      void loadRecordingById(currentProjectId, recordingId);
     }
-  }, [currentProjectId, artifacts.length, isLoading, loadRecordings]);
+  }, [currentProjectId, recordingId, loadRecordingById]);
 
   const recording = artifacts.find((a) => a.id === recordingId) ?? null;
 
