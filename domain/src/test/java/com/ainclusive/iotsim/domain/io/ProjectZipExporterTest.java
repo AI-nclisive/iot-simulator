@@ -146,7 +146,7 @@ class ProjectZipExporterTest {
 
         DataSource ds = new DataSource("ds-1", "proj-1", "OPC UA Source",
                 Protocol.OPC_UA, SourceBasis.SCAN, "schema-1", 1,
-                4840, "device://plc", "{}", true,
+                4840, "device://plc", "{}", null, true,
                 RuntimeState.STOPPED, CredentialState.MISSING,
                 "opc.tcp://localhost:4840/iotsim",
                 now, now, "local", 1L);

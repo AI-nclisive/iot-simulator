@@ -189,7 +189,7 @@ class ProjectImportServiceTest {
 
         DataSource ds = new DataSource("ds-1", "proj-1", "OPC UA Source",
                 Protocol.OPC_UA, SourceBasis.SCAN, "schema-1", 1,
-                4840, "device://plc", "{}", true,
+                4840, "device://plc", "{}", null, true,
                 RuntimeState.STOPPED, CredentialState.MISSING,
                 "opc.tcp://localhost:4840/iotsim", now, now, "local", 1L);
 
@@ -248,12 +248,12 @@ class ProjectImportServiceTest {
                 @Override
                 public DataSourceRow insert(String projectId, String name, String protocol,
                         String basis, int simulatorPort, String realDeviceEndpoint,
-                        String runtimeConfigJson, String createdBy) {
+                        String runtimeConfigJson, String securityConfigJson, String createdBy) {
                     Instant now = Instant.now();
                     OffsetDateTime odt = OffsetDateTime.ofInstant(now, ZoneOffset.UTC);
                     DataSourceRow row = new DataSourceRow("new-ds-" + counter.incrementAndGet(),
                             projectId, name, protocol, basis, null, null, simulatorPort, realDeviceEndpoint,
-                            runtimeConfigJson, false, odt, odt, createdBy, 0L);
+                            runtimeConfigJson, securityConfigJson, false, odt, odt, createdBy, 0L);
                     insertedDataSources.add(row);
                     return row;
                 }
@@ -275,8 +275,8 @@ class ProjectImportServiceTest {
 
                 @Override
                 public Optional<DataSourceRow> update(String id, String name, int simulatorPort,
-                        String realDeviceEndpoint, String runtimeConfigJson, boolean enabled,
-                        long expectedVersion) {
+                        String realDeviceEndpoint, String runtimeConfigJson, String securityConfigJson,
+                        boolean enabled, long expectedVersion) {
                     updateCalledCount++;
                     // Return the last inserted row with the updated enabled state.
                     if (insertedDataSources.isEmpty()) {
@@ -286,7 +286,7 @@ class ProjectImportServiceTest {
                     OffsetDateTime odt = OffsetDateTime.now(ZoneOffset.UTC);
                     return Optional.of(new DataSourceRow(last.id(), last.projectId(), name,
                             last.protocol(), last.basis(), null, null, simulatorPort, realDeviceEndpoint,
-                            runtimeConfigJson, enabled, last.createdAt(), odt, last.createdBy(),
+                            runtimeConfigJson, securityConfigJson, enabled, last.createdAt(), odt, last.createdBy(),
                             expectedVersion + 1));
                 }
 

@@ -32,7 +32,7 @@ class RuntimeStartSpecsTest {
     private static DataSourceRow row(int simulatorPort) {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         return new DataSourceRow("ds-1", "proj-1", "Test", "OPC_UA", "MANUAL",
-                null, null, simulatorPort, null, "{}", false, now, now, "local", 0);
+                null, null, simulatorPort, null, "{}", null, false, now, now, "local", 0);
     }
 
     private static SchemaRepository emptySchemas() {

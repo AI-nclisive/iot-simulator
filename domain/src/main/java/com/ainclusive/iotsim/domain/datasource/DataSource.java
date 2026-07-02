@@ -21,6 +21,7 @@ public record DataSource(
         int simulatorPort,
         String realDeviceEndpoint,
         String runtimeConfig,
+        String securityConfig,
         boolean enabled,
         RuntimeState runtimeState,
         CredentialState credentialState,

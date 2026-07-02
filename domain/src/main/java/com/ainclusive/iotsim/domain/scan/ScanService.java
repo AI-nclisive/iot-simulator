@@ -159,7 +159,7 @@ public class ScanService implements DisposableBean {
             throw new IllegalArgumentException("scan produced an empty schema after resolution");
         }
         DataSource created = dataSources.create(
-                projectId, name, job.protocol(), "SCAN", null, endpoint, null, null, null, actor);
+                projectId, name, job.protocol(), "SCAN", null, endpoint, null, null, null, null, actor);
         schemas.save(projectId, created.id(), nodes);
         // Re-read so the response carries the linked schemaId/schemaVersion.
         return dataSources.get(projectId, created.id());

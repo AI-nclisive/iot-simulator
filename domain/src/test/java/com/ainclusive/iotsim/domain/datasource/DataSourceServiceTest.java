@@ -51,7 +51,7 @@ class DataSourceServiceTest {
 
     @Test
     void createUnderExistingProjectStartsStoppedAtVersionZero() {
-        DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null, null, null, "alice");
+        DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null, null, null, null, "alice");
         assertThat(ds.id()).isNotBlank();
         assertThat(ds.protocol()).isEqualTo(Protocol.OPC_UA);
         assertThat(ds.basis()).isEqualTo(SourceBasis.MANUAL);
@@ -62,37 +62,37 @@ class DataSourceServiceTest {
 
     @Test
     void createDefaultsSimulatorPortAndServeUrlPerProtocol() {
-        DataSource opc = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null, null, null, "a");
+        DataSource opc = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null, null, null, null, "a");
         assertThat(opc.simulatorPort()).isEqualTo(4840);
         assertThat(opc.serveUrl()).isEqualTo("opc.tcp://localhost:4840/iotsim");
 
-        DataSource modbus = service.create(PROJECT, "Valve", "MODBUS_TCP", "MANUAL", null, null, null, null, null, "a");
+        DataSource modbus = service.create(PROJECT, "Valve", "MODBUS_TCP", "MANUAL", null, null, null, null, null, null, "a");
         assertThat(modbus.simulatorPort()).isEqualTo(502);
         assertThat(modbus.serveUrl()).isEqualTo("modbus.tcp://localhost:502");
     }
 
     @Test
     void createWithExplicitSimulatorPortUsesIt() {
-        DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", 15000, null, null, null, null, "a");
+        DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", 15000, null, null, null, null, null, "a");
         assertThat(ds.simulatorPort()).isEqualTo(15000);
         assertThat(ds.serveUrl()).isEqualTo("opc.tcp://localhost:15000/iotsim");
     }
 
     @Test
     void createWithOutOfRangeSimulatorPortThrowsBadInput() {
-        assertThatThrownBy(() -> service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", 70000, null, null, null, null, "a"))
+        assertThatThrownBy(() -> service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", 70000, null, null, null, null, null, "a"))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void createUnderMissingProjectThrowsNotFound() {
-        assertThatThrownBy(() -> service.create("nope", "Pump", "OPC_UA", "MANUAL", null, null, null, null, null, "a"))
+        assertThatThrownBy(() -> service.create("nope", "Pump", "OPC_UA", "MANUAL", null, null, null, null, null, null, "a"))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test
     void createWithInvalidProtocolThrowsBadInput() {
-        assertThatThrownBy(() -> service.create(PROJECT, "Pump", "NOPE", "MANUAL", null, null, null, null, null, "a"))
+        assertThatThrownBy(() -> service.create(PROJECT, "Pump", "NOPE", "MANUAL", null, null, null, null, null, null, "a"))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -101,42 +101,42 @@ class DataSourceServiceTest {
         // Malformed JSON in a jsonb field must surface as 400, not a 500 from the DB driver.
         assertThatThrownBy(() -> service.create(
                         PROJECT, "Pump", "OPC_UA", "MANUAL", null, "opc.tcp://plc:4840", "{not json",
-                        null, null, "a"))
+                        null, null, null, "a"))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void updateWithMalformedRuntimeConfigThrowsBadInput() {
-        DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null, null, null, "a");
+        DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null, null, null, null, "a");
         assertThatThrownBy(() -> service.update(
-                        PROJECT, ds.id(), null, null, null, "{not json", null, null, ds.version()))
+                        PROJECT, ds.id(), null, null, null, "{not json", null, null, null, ds.version()))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void getFromWrongProjectThrowsNotFound() {
-        DataSource ds = service.create(PROJECT, "Pump", "MODBUS_TCP", "SCAN", null, null, null, null, null, "a");
+        DataSource ds = service.create(PROJECT, "Pump", "MODBUS_TCP", "SCAN", null, null, null, null, null, null, "a");
         assertThatThrownBy(() -> service.get("other-project", ds.id()))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test
     void startThenStopTogglesRuntimeState() {
-        DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null, null, null, "a");
+        DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null, null, null, null, "a");
         assertThat(service.start(PROJECT, ds.id()).runtimeState()).isEqualTo(RuntimeState.RUNNING);
         assertThat(service.stop(PROJECT, ds.id()).runtimeState()).isEqualTo(RuntimeState.STOPPED);
     }
 
     @Test
     void updateWithStaleVersionThrowsConflict() {
-        DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null, null, null, "a");
-        assertThatThrownBy(() -> service.update(PROJECT, ds.id(), "x", null, null, null, true, null, ds.version() + 5))
+        DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null, null, null, null, "a");
+        assertThatThrownBy(() -> service.update(PROJECT, ds.id(), "x", null, null, null, null, true, null, ds.version() + 5))
                 .isInstanceOf(ConcurrencyConflictException.class);
     }
 
     @Test
     void deleteRemovesSource() {
-        DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null, null, null, "a");
+        DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null, null, null, null, "a");
         service.delete(PROJECT, ds.id());
         assertThatThrownBy(() -> service.get(PROJECT, ds.id()))
                 .isInstanceOf(ResourceNotFoundException.class);
@@ -144,7 +144,7 @@ class DataSourceServiceTest {
 
     @Test
     void createWithoutCredentialsIsMissing() {
-        DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null, null, null, "a");
+        DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null, null, null, null, "a");
         assertThat(ds.credentialState()).isEqualTo(CredentialState.MISSING);
         assertThat(credentials.has(ds.id())).isFalse();
     }
@@ -152,7 +152,7 @@ class DataSourceServiceTest {
     @Test
     void createWithPasswordCredentialsIsSessionOnlyAndNeverWrittenToTheRow() {
         ConnectionCredentials creds = ConnectionCredentials.password("operator", "s3cr3t");
-        DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", null, "{}", "{}", creds, null, "a");
+        DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", null, "{}", "{}", null, creds, null, "a");
 
         assertThat(ds.credentialState()).isEqualTo(CredentialState.SESSION_ONLY);
         assertThat(credentials.find(ds.id())).contains(creds);
@@ -165,7 +165,7 @@ class DataSourceServiceTest {
     @Test
     void createWithAnonymousCredentialsStaysMissing() {
         DataSource ds = service.create(
-                PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null,
+                PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null, null,
                 ConnectionCredentials.anonymous(), null, "a");
         assertThat(ds.credentialState()).isEqualTo(CredentialState.MISSING);
         assertThat(credentials.has(ds.id())).isFalse();
@@ -173,14 +173,14 @@ class DataSourceServiceTest {
 
     @Test
     void updateStoresCredentialsWithoutChangingThemWhenAbsent() {
-        DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null, null, null, "a");
+        DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null, null, null, null, "a");
 
         // Absent credentials leave state unchanged.
-        DataSource unchanged = service.update(PROJECT, ds.id(), "Renamed", null, null, null, true, null, ds.version());
+        DataSource unchanged = service.update(PROJECT, ds.id(), "Renamed", null, null, null, null, true, null, ds.version());
         assertThat(unchanged.credentialState()).isEqualTo(CredentialState.MISSING);
 
         // Providing credentials stores them session-only and bumps no secret into the row.
-        DataSource withCreds = service.update(PROJECT, ds.id(), null, null, null, null, null,
+        DataSource withCreds = service.update(PROJECT, ds.id(), null, null, null, null, null, null,
                 ConnectionCredentials.password("u", "pw"), unchanged.version());
         assertThat(withCreds.credentialState()).isEqualTo(CredentialState.SESSION_ONLY);
         assertThat(credentials.has(ds.id())).isTrue();
@@ -188,15 +188,15 @@ class DataSourceServiceTest {
 
     @Test
     void updateKeepsSimulatorPortWhenNotProvided() {
-        DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", 12000, null, null, null, null, "a");
-        DataSource updated = service.update(PROJECT, ds.id(), "Renamed", null, null, null, true, null, ds.version());
+        DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", 12000, null, null, null, null, null, "a");
+        DataSource updated = service.update(PROJECT, ds.id(), "Renamed", null, null, null, null, true, null, ds.version());
         assertThat(updated.simulatorPort()).isEqualTo(12000);
     }
 
     @Test
     void clearCredentialsRemovesThem() {
         DataSource ds = service.create(
-                PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null,
+                PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null, null,
                 ConnectionCredentials.password("u", "pw"), null, "a");
         assertThat(ds.credentialState()).isEqualTo(CredentialState.SESSION_ONLY);
 
@@ -208,7 +208,7 @@ class DataSourceServiceTest {
     @Test
     void deleteClearsHeldCredentials() {
         DataSource ds = service.create(
-                PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null,
+                PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null, null,
                 ConnectionCredentials.password("u", "pw"), null, "a");
         service.delete(PROJECT, ds.id());
         assertThat(credentials.has(ds.id())).isFalse();
@@ -216,10 +216,10 @@ class DataSourceServiceTest {
 
     @Test
     void staleUpdateNeverStoresTheSecret() {
-        DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null, null, null, "a");
+        DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null, null, null, null, "a");
         // A conflicting (stale) update carrying a password must fail the version check
         // AND leave the store untouched: credentials are applied only after the check passes.
-        assertThatThrownBy(() -> service.update(PROJECT, ds.id(), "x", null, null, null, true,
+        assertThatThrownBy(() -> service.update(PROJECT, ds.id(), "x", null, null, null, null, true,
                 ConnectionCredentials.password("operator", "s3cr3t"), ds.version() + 5))
                 .isInstanceOf(ConcurrencyConflictException.class);
         assertThat(credentials.has(ds.id())).isFalse();
@@ -227,7 +227,7 @@ class DataSourceServiceTest {
 
     @Test
     void createWithExternalRefIsSessionOnly() {
-        DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null,
+        DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null, null,
                 ConnectionCredentials.externalRef("vault://pump"), null, "a");
         assertThat(ds.credentialState()).isEqualTo(CredentialState.SESSION_ONLY);
         assertThat(credentials.find(ds.id())).map(ConnectionCredentials::mode)
@@ -237,11 +237,11 @@ class DataSourceServiceTest {
     @Test
     void updateWithAnonymousClearsExistingCredentials() {
         DataSource ds = service.create(
-                PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null,
+                PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null, null,
                 ConnectionCredentials.password("u", "pw"), null, "a");
         assertThat(credentials.has(ds.id())).isTrue();
 
-        DataSource cleared = service.update(PROJECT, ds.id(), null, null, null, null, null,
+        DataSource cleared = service.update(PROJECT, ds.id(), null, null, null, null, null, null,
                 ConnectionCredentials.anonymous(), ds.version());
         assertThat(cleared.credentialState()).isEqualTo(CredentialState.MISSING);
         assertThat(credentials.has(ds.id())).isFalse();
@@ -250,7 +250,7 @@ class DataSourceServiceTest {
     @Test
     void clearCredentialsFromWrongProjectThrowsNotFoundAndKeepsTheSecret() {
         DataSource ds = service.create(
-                PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null,
+                PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null, null,
                 ConnectionCredentials.password("u", "pw"), null, "a");
         assertThatThrownBy(() -> service.clearCredentials("other-project", ds.id()))
                 .isInstanceOf(ResourceNotFoundException.class);
@@ -261,7 +261,7 @@ class DataSourceServiceTest {
     @Test
     void duplicateCreatesNewSourceWithCopyNameDisabledAndStopped() {
         DataSource original = service.create(
-                PROJECT, "Pump", "OPC_UA", "MANUAL", null, "device://plc1", "{\"rate\":500}", null, null, "a");
+                PROJECT, "Pump", "OPC_UA", "MANUAL", null, "device://plc1", "{\"rate\":500}", null, null, null, "a");
 
         DataSource copy = service.duplicate(PROJECT, original.id(), "a");
 
@@ -284,7 +284,7 @@ class DataSourceServiceTest {
 
     @Test
     void duplicateOnWrongProjectThrowsNotFound() {
-        DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null, null, null, "a");
+        DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null, null, null, null, "a");
         assertThatThrownBy(() -> service.duplicate("other-project", ds.id(), "a"))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
@@ -301,7 +301,7 @@ class DataSourceServiceTest {
                 new ObjectMapper(),
                 "localhost");
 
-        DataSource original = svc.create(PROJECT, "Sensor", "OPC_UA", "SCAN", null, null, null, null, null, "a");
+        DataSource original = svc.create(PROJECT, "Sensor", "OPC_UA", "SCAN", null, null, null, null, null, null, "a");
         SchemaNode node = new SchemaNode("n1", null, "/root/temp", "Temperature",
                 com.ainclusive.iotsim.protocolmodel.NodeKind.VARIABLE,
                 com.ainclusive.iotsim.protocolmodel.DataType.FLOAT32,
@@ -337,7 +337,7 @@ class DataSourceServiceTest {
                 com.ainclusive.iotsim.protocolmodel.Access.READ,
                 "°C", null);
 
-        DataSource ds = svc.create(PROJECT, "Sensor", "OPC_UA", "IMPORT", null, null, null, null, List.of(node), "a");
+        DataSource ds = svc.create(PROJECT, "Sensor", "OPC_UA", "IMPORT", null, null, null, null, null, List.of(node), "a");
 
         assertThat(ds.basis()).isEqualTo(SourceBasis.IMPORT);
         assertThat(ds.schemaId()).isNotNull();
@@ -352,9 +352,9 @@ class DataSourceServiceTest {
 
     @Test
     void listPagedEmitsCursorWhenResultsExceedLimit() {
-        service.create(PROJECT, "DS-A", "OPC_UA", "MANUAL", null, null, null, null, null, "it");
-        service.create(PROJECT, "DS-B", "OPC_UA", "MANUAL", null, null, null, null, null, "it");
-        service.create(PROJECT, "DS-C", "MODBUS_TCP", "SCAN", null, null, null, null, null, "it");
+        service.create(PROJECT, "DS-A", "OPC_UA", "MANUAL", null, null, null, null, null, null, "it");
+        service.create(PROJECT, "DS-B", "OPC_UA", "MANUAL", null, null, null, null, null, null, "it");
+        service.create(PROJECT, "DS-C", "MODBUS_TCP", "SCAN", null, null, null, null, null, null, "it");
 
         Page<DataSource> page = service.listPaged(PROJECT, null, null, 2);
         assertThat(page.items()).hasSize(2);
@@ -373,8 +373,8 @@ class DataSourceServiceTest {
 
     @Test
     void startRejectsPortHeldByAnotherRunningSource() {
-        DataSource a = service.create(PROJECT, "A", "OPC_UA", "MANUAL", 4840, null, null, null, null, "it");
-        DataSource b = service.create(PROJECT, "B", "OPC_UA", "MANUAL", 4840, null, null, null, null, "it");
+        DataSource a = service.create(PROJECT, "A", "OPC_UA", "MANUAL", 4840, null, null, null, null, null, "it");
+        DataSource b = service.create(PROJECT, "B", "OPC_UA", "MANUAL", 4840, null, null, null, null, null, "it");
         service.start(PROJECT, a.id());   // A now RUNNING on 4840
 
         assertThatThrownBy(() -> service.start(PROJECT, b.id()))
@@ -383,8 +383,8 @@ class DataSourceServiceTest {
 
     @Test
     void startAllowsSamePortWhenOtherSourceIsStopped() {
-        DataSource a = service.create(PROJECT, "A", "OPC_UA", "MANUAL", 4840, null, null, null, null, "it");
-        DataSource b = service.create(PROJECT, "B", "OPC_UA", "MANUAL", 4840, null, null, null, null, "it");
+        DataSource a = service.create(PROJECT, "A", "OPC_UA", "MANUAL", 4840, null, null, null, null, null, "it");
+        DataSource b = service.create(PROJECT, "B", "OPC_UA", "MANUAL", 4840, null, null, null, null, null, "it");
         service.start(PROJECT, a.id());
         service.stop(PROJECT, a.id());    // A STOPPED → 4840 free
 
@@ -395,8 +395,8 @@ class DataSourceServiceTest {
     @Test
     void twoDefaultPortSourcesConflictOnStart() {
         // No explicit port → both default to 4840 → second start conflicts.
-        DataSource a = service.create(PROJECT, "A", "OPC_UA", "MANUAL", null, null, null, null, null, "it");
-        DataSource b = service.create(PROJECT, "B", "OPC_UA", "MANUAL", null, null, null, null, null, "it");
+        DataSource a = service.create(PROJECT, "A", "OPC_UA", "MANUAL", null, null, null, null, null, null, "it");
+        DataSource b = service.create(PROJECT, "B", "OPC_UA", "MANUAL", null, null, null, null, null, null, "it");
         service.start(PROJECT, a.id());
         assertThatThrownBy(() -> service.start(PROJECT, b.id()))
                 .isInstanceOf(PortInUseException.class);
@@ -404,8 +404,8 @@ class DataSourceServiceTest {
 
     @Test
     void startAllowsDifferentPorts() {
-        DataSource a = service.create(PROJECT, "A", "OPC_UA", "MANUAL", 4840, null, null, null, null, "it");
-        DataSource b = service.create(PROJECT, "B", "OPC_UA", "MANUAL", 4841, null, null, null, null, "it");
+        DataSource a = service.create(PROJECT, "A", "OPC_UA", "MANUAL", 4840, null, null, null, null, null, "it");
+        DataSource b = service.create(PROJECT, "B", "OPC_UA", "MANUAL", 4841, null, null, null, null, null, "it");
         service.start(PROJECT, a.id());
         service.start(PROJECT, b.id());
         assertThat(service.get(PROJECT, b.id()).runtimeState()).isEqualTo(RuntimeState.RUNNING);
@@ -413,10 +413,20 @@ class DataSourceServiceTest {
 
     @Test
     void restartingSameSourceIsNotSelfConflict() {
-        DataSource a = service.create(PROJECT, "A", "OPC_UA", "MANUAL", 4840, null, null, null, null, "it");
+        DataSource a = service.create(PROJECT, "A", "OPC_UA", "MANUAL", 4840, null, null, null, null, null, "it");
         service.start(PROJECT, a.id());
         service.start(PROJECT, a.id());   // same id re-start → no throw
         assertThat(service.get(PROJECT, a.id()).runtimeState()).isEqualTo(RuntimeState.RUNNING);
+    }
+
+    @Test
+    void createHashesSecurityConfigPassword() {
+        // mirror the existing test setup for project + service under test
+        String write = "{\"userTokens\":{\"anonymous\":false,\"username\":{\"enabled\":true,"
+                + "\"users\":[{\"username\":\"operator\",\"password\":\"s3cret\"}]}}}";
+        DataSource ds = service.create(PROJECT, "Auth Source", "OPC_UA", "MANUAL",
+                4840, null, "{}", write, null, null, "local");
+        assertThat(ds.securityConfig()).contains("passwordHash").doesNotContain("s3cret");
     }
 
     private static final class InMemoryDataSourceRepository implements DataSourceRepository {
@@ -425,12 +435,14 @@ class DataSourceServiceTest {
 
         @Override
         public DataSourceRow insert(String projectId, String name, String protocol, String basis,
-                int simulatorPort, String realDeviceEndpoint, String runtimeConfigJson, String createdBy) {
+                int simulatorPort, String realDeviceEndpoint, String runtimeConfigJson,
+                String securityConfigJson, String createdBy) {
             OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
             DataSourceRow row = new DataSourceRow(
                     "ds-" + (++seq), projectId, name, protocol, basis, null, null,
                     simulatorPort, realDeviceEndpoint,
                     runtimeConfigJson != null ? runtimeConfigJson : "{}",
+                    securityConfigJson,
                     false, now, now, createdBy, 0);
             rows.add(row);
             return row;
@@ -467,13 +479,15 @@ class DataSourceServiceTest {
 
         @Override
         public Optional<DataSourceRow> update(String id, String name, int simulatorPort,
-                String realDeviceEndpoint, String runtimeConfigJson, boolean enabled, long expectedVersion) {
+                String realDeviceEndpoint, String runtimeConfigJson, String securityConfigJson,
+                boolean enabled, long expectedVersion) {
             for (int i = 0; i < rows.size(); i++) {
                 DataSourceRow r = rows.get(i);
                 if (r.id().equals(id) && r.version() == expectedVersion) {
                     DataSourceRow updated = new DataSourceRow(
                             r.id(), r.projectId(), name, r.protocol(), r.basis(), r.schemaId(),
-                            r.schemaVersion(), simulatorPort, realDeviceEndpoint, runtimeConfigJson, enabled,
+                            r.schemaVersion(), simulatorPort, realDeviceEndpoint, runtimeConfigJson,
+                            securityConfigJson, enabled,
                             r.createdAt(), OffsetDateTime.now(ZoneOffset.UTC), r.createdBy(), r.version() + 1);
                     rows.set(i, updated);
                     return Optional.of(updated);
@@ -493,6 +507,7 @@ class DataSourceServiceTest {
                                 "ds-" + (++seq), source.projectId(), newName,
                                 source.protocol(), source.basis(), null, null,
                                 source.simulatorPort(), source.realDeviceEndpoint(), source.runtimeConfig(),
+                                source.securityConfig(),
                                 false, now, now, createdBy, 0);
                         rows.add(copy);
                         return copy;
@@ -511,6 +526,7 @@ class DataSourceServiceTest {
                     rows.set(i, new DataSourceRow(
                             r.id(), r.projectId(), r.name(), r.protocol(), r.basis(),
                             schemaId, schemaVersion, r.simulatorPort(), r.realDeviceEndpoint(), r.runtimeConfig(),
+                            r.securityConfig(),
                             r.enabled(), r.createdAt(), r.updatedAt(), r.createdBy(), r.version()));
                     return;
                 }

@@ -353,12 +353,13 @@ class RecordingServiceTest {
             }
             OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
             return Optional.of(new DataSourceRow(id, projectId, "src", "OPC_UA", "SCAN",
-                    "sch-1", 2, 0, realDeviceEndpoint, "{}", false, now, now, "local", 0));
+                    "sch-1", 2, 0, realDeviceEndpoint, "{}", null, false, now, now, "local", 0));
         }
 
         @Override
         public DataSourceRow insert(String projectId, String name, String protocol, String basis,
-                int simulatorPort, String realDeviceEndpoint, String runtimeConfigJson, String createdBy) {
+                int simulatorPort, String realDeviceEndpoint, String runtimeConfigJson,
+                String securityConfigJson, String createdBy) {
             throw new UnsupportedOperationException();
         }
 
@@ -375,7 +376,8 @@ class RecordingServiceTest {
 
         @Override
         public Optional<DataSourceRow> update(String id, String name, int simulatorPort,
-                String realDeviceEndpoint, String runtimeConfigJson, boolean enabled, long expectedVersion) {
+                String realDeviceEndpoint, String runtimeConfigJson, String securityConfigJson,
+                boolean enabled, long expectedVersion) {
             throw new UnsupportedOperationException();
         }
 
