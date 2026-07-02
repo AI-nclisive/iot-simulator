@@ -157,46 +157,21 @@ describe("RecordingsPage route", () => {
     expect(screen.getAllByText("Imported").length).toBeGreaterThanOrEqual(1);
   });
 
-  it("renders the samples section", () => {
+  it("renders the Create recording button", () => {
     render(
       <MemoryRouter>
         <RecordingsPage />
       </MemoryRouter>,
     );
-    expect(screen.getByTestId("samples-section")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Create recording" })).toBeTruthy();
   });
 
-  it("renders sample rows from the store", () => {
-    useArtifactsStore.setState({
-      artifacts: [],
-      samples: [
-        {
-          id: "sample-01",
-          projectId: "proj-1",
-          derivedFromRecordingId: "rec-live-01",
-          name: "Morning Burst",
-          selection: "0-100",
-          tags: ["alpha", "prod"],
-          createdAt: "2026-06-30T08:00:00Z",
-          createdBy: "Jordan K.",
-          version: 1,
-        },
-      ],
-      isLoading: false,
-      isSamplesLoading: false,
-      error: null,
-      samplesError: null,
-      loadRecordings: vi.fn().mockResolvedValue(undefined),
-      loadSamples: vi.fn().mockResolvedValue(undefined),
-    });
-
+  it("renders the Import recording button", () => {
     render(
       <MemoryRouter>
         <RecordingsPage />
       </MemoryRouter>,
     );
-    expect(screen.getByText("Morning Burst")).toBeTruthy();
-    expect(screen.getByText("alpha")).toBeTruthy();
-    expect(screen.getByText("Jordan K.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Import recording" })).toBeTruthy();
   });
 });

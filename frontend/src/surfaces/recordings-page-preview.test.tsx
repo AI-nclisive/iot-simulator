@@ -1,14 +1,15 @@
 /**
- * Tests for recordings page preview panel (UI-052)
+ * Tests for recordings page display (UI-052, UI-115)
  *
  * Covers:
- * - FitnessWarning component renders correctly for warn level
- * - FitnessWarning component renders correctly for info level
+ * - Page heading renders correctly
+ * - Empty state renders when no recordings are present
  */
 
 import { cleanup, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { FitnessWarning } from "./recordings-page";
+import { RecordingsPage } from "./recordings-page";
 
 vi.mock("../shell/shell-store", () => ({
   useShellStore: vi.fn(
@@ -44,34 +45,35 @@ vi.mock("../shell/artifacts-store", () => ({
   ),
 }));
 
+vi.mock("../shell/data-sources-store", () => ({
+  useDataSourcesStore: vi.fn(
+    (selector: (s: { dataSources: never[] }) => unknown) =>
+      selector({ dataSources: [] }),
+  ),
+}));
+
 afterEach(() => {
   cleanup();
 });
 
-// ─── FitnessWarning rendering tests ──────────────────────────────────────────
-
-describe("FitnessWarning component — warn level", () => {
-  it("renders Warning: label and message for warn level", () => {
+describe("RecordingsPage — heading", () => {
+  it("renders Recordings heading", () => {
     render(
-      <FitnessWarning
-        level="warn"
-        message="This is a warning message."
-      />,
+      <MemoryRouter>
+        <RecordingsPage />
+      </MemoryRouter>,
     );
-    expect(screen.getByText("Warning:")).toBeTruthy();
-    expect(screen.getByText("This is a warning message.")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /Recordings/i })).toBeTruthy();
   });
 });
 
-describe("FitnessWarning component — info level", () => {
-  it("renders Note: label and message for info level", () => {
+describe("RecordingsPage — empty state", () => {
+  it("renders no results message when recordings list is empty", () => {
     render(
-      <FitnessWarning
-        level="info"
-        message="This is an info message."
-      />,
+      <MemoryRouter>
+        <RecordingsPage />
+      </MemoryRouter>,
     );
-    expect(screen.getByText("Note:")).toBeTruthy();
-    expect(screen.getByText("This is an info message.")).toBeTruthy();
+    expect(screen.getByText("No results.")).toBeTruthy();
   });
 });

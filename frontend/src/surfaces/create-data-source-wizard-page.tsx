@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { resolveAccess } from "../shell/access-policy";
 import { useArtifactsStore } from "../shell/artifacts-store";
@@ -9,22 +9,6 @@ import { apiFetch } from "../api";
 import type { BackendProtocol } from "../api";
 import { SharedStatePanel } from "../ui/shared-state-panel";
 import { StatusBadge } from "../ui/status-badge";
-
-// Backend scan response shapes
-type ScanJobResponse = {
-  jobId: string;
-  status: string;
-};
-
-type ScanPollResponse = {
-  jobId: string;
-  status: string;
-  truncated: boolean;
-  discoveredCount: number;
-  unknownCount: number;
-  message: string;
-  nodes: unknown[];
-};
 
 type DataSourceResponse = {
   id: string;
@@ -48,23 +32,27 @@ type BasisOption = {
 
 export type WizardFormState = {
   basis: SourceBasis | null;
-  importSelectedSampleId: string | null;
+  importSelectedRecordingId: string | null;
   modbusAddressBase: "0" | "1";
   modbusUnitId: string;
   name: string;
   opcUaNamespaceStrategy: "normalize" | "preserve";
   opcUaSecurity: "Basic256Sha256" | "None";
   protocol: ProtocolOption["id"] | null;
+  realDeviceEndpoint: string;
   runtimeBehavior: "start-now" | "stopped";
   scanCredentialConfirmed: boolean;
   scanCredentialMode: "anonymous" | "external-ref" | "password";
   scanPassword: string;
-  scanEndpoint: string;
   scanSecretRef: string;
   scanState: "complete" | "error" | "idle" | "large" | "partial" | "scanning" | "unknown";
   scanTestResult: "auth-error" | "idle" | "success" | "error";
   scanUsername: string;
-  scanJobId: string | null;
+  scheduleEndEnabled: boolean;
+  scheduleEnd: string;
+  scheduleStartEnabled: boolean;
+  scheduleStart: string;
+  simulatorPort: string;
   schemaReviewNote: string;
 };
 
@@ -84,8 +72,8 @@ const protocolOptions: ProtocolOption[] = [
 const basisOptions: BasisOption[] = [
   {
     id: "scan",
-    label: "Scan real source",
-    note: "Promoted path for discovering structure from a live endpoint.",
+    label: "Real source",
+    note: "Connect to a live device endpoint to discover structure and start the simulator.",
     recommended: true,
   },
   {
@@ -96,18 +84,18 @@ const basisOptions: BasisOption[] = [
   {
     id: "import",
     label: "Prepared data",
-    note: "Bring in an existing recording, sample, or schema package.",
+    note: "Use an existing recording as the data source for this simulator.",
   },
 ];
 
-export type WizardStepId = "protocol" | "basis" | "setup" | "import" | "schema" | "runtime" | "review";
+export type WizardStepId = "protocol" | "basis" | "setup" | "import" | "schedule" | "runtime" | "review";
 type WizardStep = { id: WizardStepId; label: string };
 
 const SCAN_STEPS: WizardStep[] = [
   { id: "protocol", label: "Protocol" },
   { id: "basis", label: "Source basis" },
   { id: "setup", label: "Setup" },
-  { id: "schema", label: "Schema" },
+  { id: "schedule", label: "Schedule" },
   { id: "runtime", label: "Runtime" },
   { id: "review", label: "Review" },
 ];
@@ -131,7 +119,7 @@ const DEFAULT_STEPS: WizardStep[] = [
   { id: "protocol", label: "Protocol" },
   { id: "basis", label: "Source basis" },
   { id: "setup", label: "Setup" },
-  { id: "schema", label: "Schema" },
+  { id: "schedule", label: "Schedule" },
   { id: "runtime", label: "Runtime" },
   { id: "review", label: "Review" },
 ];
@@ -195,7 +183,7 @@ export function validationMessage(stepId: WizardStepId, form: WizardFormState, a
       return "Enter a source name to continue.";
     }
 
-    if (stepId === "setup" && form.basis === "scan" && !form.scanEndpoint.trim()) {
+    if (stepId === "setup" && form.basis === "scan" && !form.realDeviceEndpoint.trim()) {
       return "Enter the real endpoint before continuing.";
     }
 
@@ -204,16 +192,23 @@ export function validationMessage(stepId: WizardStepId, form: WizardFormState, a
       if (credentialMessage) return credentialMessage;
     }
 
+    if (!form.simulatorPort.trim() || isNaN(Number(form.simulatorPort)) || Number(form.simulatorPort) < 1 || Number(form.simulatorPort) > 65535) {
+      return "Enter a valid simulator port (1–65535).";
+    }
+
     if (stepId === "import") {
-      if (!form.importSelectedSampleId) {
-        return "Select a sample to continue.";
+      if (!form.importSelectedRecordingId) {
+        return "Select a recording to continue.";
       }
     }
   }
 
-  if (stepId === "schema" && form.basis === "scan") {
-    if (form.scanState === "idle" || form.scanState === "scanning") {
-      return "Run the scan and review the discovery result before continuing.";
+  if (stepId === "schedule") {
+    if (form.scheduleStartEnabled && !form.scheduleStart) {
+      return "Enter a start date and time.";
+    }
+    if (form.scheduleEndEnabled && !form.scheduleEnd) {
+      return "Enter an end date and time.";
     }
   }
 
@@ -274,77 +269,8 @@ function credentialPersistenceLabel(form: WizardFormState) {
   return "Not required";
 }
 
-function resolveScanTestResult(form: WizardFormState): WizardFormState["scanTestResult"] {
-  if (!form.scanEndpoint.trim()) {
-    return "error";
-  }
 
-  if (credentialValidationMessage(form)) {
-    return "auth-error";
-  }
-
-  const loweredEndpoint = form.scanEndpoint.toLowerCase();
-  const loweredPassword = form.scanPassword.toLowerCase();
-  const loweredSecretRef = form.scanSecretRef.toLowerCase();
-
-  if (
-    loweredEndpoint.includes("authfail") ||
-    loweredPassword.includes("invalid") ||
-    loweredSecretRef.includes("invalid")
-  ) {
-    return "auth-error";
-  }
-
-  return "success";
-}
-
-function scanReviewCopy(scanState: WizardFormState["scanState"]) {
-  if (scanState === "complete") {
-    return {
-      message: "Review the discovered structure, then continue when it matches what this source should simulate.",
-      status: "Ready for review",
-    };
-  }
-
-  if (scanState === "partial") {
-    return {
-      message: "Review the discovered subset and continue only if the missing areas are acceptable for this source.",
-      status: "Review partial result",
-    };
-  }
-
-  if (scanState === "large") {
-    return {
-      message: "Review the high-level structure first. You can refine the parameter set later in Schema.",
-      status: "Review large schema",
-    };
-  }
-
-  return {
-    message: "Review the unknown values and continue only if they can be mapped later in schema editing.",
-    status: "Resolve unknown types",
-  };
-}
-
-function resolveScanOutcome(form: WizardFormState): WizardFormState["scanState"] {
-  const endpoint = form.scanEndpoint.toLowerCase();
-
-  if (endpoint.includes("legacy")) {
-    return "unknown";
-  }
-
-  if (endpoint.includes("partial")) {
-    return "partial";
-  }
-
-  if (endpoint.includes("field") || endpoint.includes("lab")) {
-    return "large";
-  }
-
-  return "complete";
-}
-
-function reviewLines(form: WizardFormState, selectedSampleName?: string) {
+function reviewLines(form: WizardFormState, selectedRecordingLabel?: string) {
   const basisLabel = basisOptions.find((option) => option.id === form.basis)?.label ?? "-";
   const runtimeLabel =
     form.runtimeBehavior === "start-now" ? "Start immediately" : "Save without starting";
@@ -353,26 +279,24 @@ function reviewLines(form: WizardFormState, selectedSampleName?: string) {
     { label: "Source name", value: form.name || "-" },
     { label: "Protocol", value: form.protocol ?? "-" },
     { label: "Source basis", value: basisLabel },
-    {
-      label: "Endpoint or input",
-      value:
-        form.basis === "scan"
-          ? form.scanEndpoint || "-"
-          : form.basis === "import"
-            ? selectedSampleName ?? "-"
-            : suggestedEndpoint(form.protocol, form.basis),
-    },
+    { label: "Simulator port", value: form.simulatorPort || "-" },
+    ...(form.basis === "scan"
+      ? [{ label: "Real device endpoint", value: form.realDeviceEndpoint || "-" }]
+      : []),
     ...(form.basis === "scan"
       ? [{ label: "Credentials", value: credentialReviewValue(form) }]
       : []),
     ...(form.basis === "import"
-      ? [{ label: "Sample", value: selectedSampleName ?? "-" }]
+      ? [{ label: "Recording", value: selectedRecordingLabel ?? "-" }]
       : []),
     ...(form.basis === "manual"
       ? [{ label: "Next step", value: "Schema editor opens after creation" }]
       : [{ label: "Runtime behavior", value: runtimeLabel }]),
-    ...(form.basis === "scan"
-      ? [{ label: "Schema note", value: form.schemaReviewNote.trim() || "No note" }]
+    ...(form.scheduleStartEnabled
+      ? [{ label: "Start", value: form.scheduleStart || "-" }]
+      : []),
+    ...(form.scheduleEndEnabled
+      ? [{ label: "End", value: form.scheduleEnd || "-" }]
       : []),
   ];
 }
@@ -385,35 +309,38 @@ export function CreateDataSourceWizardPage() {
   const startDataSource = useDataSourcesStore((state) => state.startDataSource);
   const push = useNotificationStore((state) => state.push);
   const access = resolveAccess(accessMode, sharedRole);
-  const scanPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const samples = useArtifactsStore((state) => state.samples);
-  const isSamplesLoading = useArtifactsStore((state) => state.isSamplesLoading);
-  const samplesError = useArtifactsStore((state) => state.samplesError);
-  const loadSamples = useArtifactsStore((state) => state.loadSamples);
+  const artifacts = useArtifactsStore((state) => state.artifacts);
+  const isArtifactsLoading = useArtifactsStore((state) => state.isLoading);
+  const artifactsError = useArtifactsStore((state) => state.error);
+  const loadRecordings = useArtifactsStore((state) => state.loadRecordings);
 
   const [currentStep, setCurrentStep] = useState(0);
   const [showValidation, setShowValidation] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [form, setForm] = useState<WizardFormState>({
     basis: null,
-    importSelectedSampleId: null,
+    importSelectedRecordingId: null,
     modbusAddressBase: "0",
     modbusUnitId: "1",
     name: "",
     opcUaNamespaceStrategy: "normalize",
     opcUaSecurity: "None",
     protocol: null,
+    realDeviceEndpoint: "",
     runtimeBehavior: "stopped",
     scanCredentialConfirmed: false,
     scanCredentialMode: "anonymous",
     scanPassword: "",
-    scanEndpoint: "",
     scanSecretRef: "",
     scanState: "idle",
     scanTestResult: "idle",
     scanUsername: "",
-    scanJobId: null,
+    scheduleEndEnabled: false,
+    scheduleEnd: "",
+    scheduleStartEnabled: false,
+    scheduleStart: "",
+    simulatorPort: "",
     schemaReviewNote: "",
   });
 
@@ -424,27 +351,20 @@ export function CreateDataSourceWizardPage() {
   const currentProtocol = protocolOptions.find((option) => option.id === form.protocol) ?? null;
   const currentBasis = basisOptions.find((option) => option.id === form.basis) ?? null;
 
-  const selectedSample = useMemo(
-    () => samples.find((s) => s.id === form.importSelectedSampleId) ?? null,
-    [samples, form.importSelectedSampleId],
+  const selectedRecording = useMemo(
+    () => artifacts.find((a) => a.id === form.importSelectedRecordingId) ?? null,
+    [artifacts, form.importSelectedRecordingId],
   );
-  const reviewItems = useMemo(() => reviewLines(form, selectedSample?.name), [form, selectedSample]);
+  const reviewItems = useMemo(
+    () => reviewLines(form, selectedRecording ? `Recording ${selectedRecording.id.slice(0, 8)}` : undefined),
+    [form, selectedRecording],
+  );
 
-  // Load samples when import basis is active
   useEffect(() => {
     if (form.basis === "import" && currentProjectId) {
-      loadSamples(currentProjectId);
+      void loadRecordings(currentProjectId);
     }
-  }, [form.basis, currentProjectId, loadSamples]);
-
-  // Clean up polling on unmount
-  useEffect(() => {
-    return () => {
-      if (scanPollRef.current !== null) {
-        clearInterval(scanPollRef.current);
-      }
-    };
-  }, []);
+  }, [form.basis, currentProjectId, loadRecordings]);
 
   if (!access.canCreateSource) {
     return (
@@ -467,21 +387,25 @@ export function CreateDataSourceWizardPage() {
   function handleProtocolSelect(protocol: ProtocolOption["id"]) {
     updateForm({
       protocol,
-      scanEndpoint:
-        form.basis === "scan" && form.scanEndpoint.trim().length === 0
+      simulatorPort:
+        form.simulatorPort.trim().length === 0
+          ? protocol === "OPC UA" ? "4840" : "502"
+          : form.simulatorPort,
+      realDeviceEndpoint:
+        form.basis === "scan" && form.realDeviceEndpoint.trim().length === 0
           ? suggestedEndpoint(protocol, form.basis)
-          : form.scanEndpoint,
+          : form.realDeviceEndpoint,
     });
   }
 
   function handleBasisSelect(basis: SourceBasis) {
     updateForm({
       basis,
-      importSelectedSampleId: null,
-      scanEndpoint:
-      basis === "scan" && form.scanEndpoint.trim().length === 0
+      importSelectedRecordingId: null,
+      realDeviceEndpoint:
+      basis === "scan" && form.realDeviceEndpoint.trim().length === 0
           ? suggestedEndpoint(form.protocol, basis)
-          : form.scanEndpoint,
+          : form.realDeviceEndpoint,
       scanState: basis === "scan" ? form.scanState : "idle",
       scanTestResult: basis === "scan" ? form.scanTestResult : "idle",
     });
@@ -503,7 +427,7 @@ export function CreateDataSourceWizardPage() {
           method: "POST",
           body: JSON.stringify({
             protocol: backendProtocolForForm(form.protocol),
-            endpointUrl: form.scanEndpoint,
+            endpointUrl: form.realDeviceEndpoint,
           }),
         },
       );
@@ -513,61 +437,6 @@ export function CreateDataSourceWizardPage() {
     }
   }
 
-  async function startScan() {
-    if (!currentProjectId || !form.protocol) {
-      updateForm({ scanState: "error", scanTestResult: "error" });
-      return;
-    }
-    updateForm({ scanState: "scanning" });
-    try {
-      const job = await apiFetch<ScanJobResponse>(
-        `/api/v1/projects/${currentProjectId}/data-sources/scan`,
-        {
-          method: "POST",
-          body: JSON.stringify({
-            protocol: backendProtocolForForm(form.protocol),
-            endpointUrl: form.scanEndpoint,
-          }),
-        },
-      );
-      updateForm({ scanJobId: job.jobId });
-      // Poll every 2 s until done/failed/etc.
-      if (scanPollRef.current !== null) clearInterval(scanPollRef.current);
-      scanPollRef.current = setInterval(async () => {
-        try {
-          const poll = await apiFetch<ScanPollResponse>(
-            `/api/v1/projects/${currentProjectId}/data-sources/scan/${job.jobId}`,
-          );
-          const terminalStatuses = ["DONE", "FAILED", "UNREACHABLE", "AUTH_FAILED", "PARTIAL", "LARGE_SCHEMA"];
-          if (terminalStatuses.includes(poll.status)) {
-            if (scanPollRef.current !== null) clearInterval(scanPollRef.current);
-            if (poll.status === "DONE") {
-              updateForm({ scanState: "complete" });
-            } else if (poll.status === "PARTIAL") {
-              updateForm({ scanState: "partial" });
-            } else if (poll.status === "LARGE_SCHEMA") {
-              updateForm({ scanState: "large" });
-            } else {
-              updateForm({ scanState: "error" });
-            }
-          }
-        } catch {
-          if (scanPollRef.current !== null) clearInterval(scanPollRef.current);
-          updateForm({ scanState: "error" });
-        }
-      }, 2000);
-    } catch {
-      updateForm({ scanState: "error" });
-    }
-  }
-
-  function retryScan() {
-    if (scanPollRef.current !== null) {
-      clearInterval(scanPollRef.current);
-      scanPollRef.current = null;
-    }
-    updateForm({ scanState: "idle", scanJobId: null });
-  }
 
   function handleCredentialModeChange(mode: WizardFormState["scanCredentialMode"]) {
     updateForm({
@@ -621,41 +490,29 @@ export function CreateDataSourceWizardPage() {
     }
 
     try {
-      let createdId: string;
-
-      if (form.basis === "scan" && form.scanJobId) {
-        // Use the scan job create endpoint
-        const data = await apiFetch<DataSourceResponse>(
-          `/api/v1/projects/${currentProjectId}/data-sources/scan/${form.scanJobId}/create`,
-          {
-            method: "POST",
-            body: JSON.stringify({
-              name: form.name.trim(),
-              endpoint: form.scanEndpoint,
-            }),
-          },
-        );
-        createdId = data.id;
-      } else {
-        const endpointUrl =
-          form.basis === "scan"
-            ? form.scanEndpoint
-            : suggestedEndpoint(form.protocol, form.basis);
-        const data = await apiFetch<DataSourceResponse>(
-          `/api/v1/projects/${currentProjectId}/data-sources`,
-          {
-            method: "POST",
-            body: JSON.stringify({
-              name: form.name.trim(),
-              endpoint: JSON.stringify({ url: endpointUrl }),
-              runtimeConfig: JSON.stringify({}),
-              protocol: backendProtocolForForm(form.protocol),
-              basis: form.basis.toUpperCase(),
-            }),
-          },
-        );
-        createdId = data.id;
-      }
+      const data = await apiFetch<DataSourceResponse>(
+        `/api/v1/projects/${currentProjectId}/data-sources`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            name: form.name.trim(),
+            simulatorPort: Number(form.simulatorPort),
+            protocol: backendProtocolForForm(form.protocol),
+            basis: form.basis.toUpperCase(),
+            ...(form.basis === "scan" ? { realDeviceEndpoint: form.realDeviceEndpoint } : {}),
+            ...(form.basis === "import" && form.importSelectedRecordingId
+              ? { recordingId: form.importSelectedRecordingId }
+              : {}),
+            ...(form.scheduleStartEnabled && form.scheduleStart
+              ? { scheduleStart: form.scheduleStart }
+              : {}),
+            ...(form.scheduleEndEnabled && form.scheduleEnd
+              ? { scheduleEnd: form.scheduleEnd }
+              : {}),
+          }),
+        },
+      );
+      const createdId = data.id;
 
       if (form.runtimeBehavior === "start-now") {
         try {
@@ -681,16 +538,31 @@ export function CreateDataSourceWizardPage() {
     return (
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(18rem,1fr)]">
         <div className="space-y-4">
-          <label className="flex flex-col gap-2 text-sm text-shell-muted">
-            Source name
-            <input
-              className="shell-field"
-              placeholder="Line A telemetry source"
-              type="text"
-              value={form.name}
-              onChange={(event) => updateForm({ name: event.target.value })}
-            />
-          </label>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="flex flex-col gap-2 text-sm text-shell-muted">
+              Source name
+              <input
+                className="shell-field"
+                placeholder="Line A telemetry source"
+                type="text"
+                value={form.name}
+                onChange={(event) => updateForm({ name: event.target.value })}
+              />
+            </label>
+            <label className="flex flex-col gap-2 text-sm text-shell-muted">
+              Simulator port
+              <input
+                className="shell-field"
+                inputMode="numeric"
+                max={65535}
+                min={1}
+                placeholder={form.protocol === "OPC UA" ? "4840" : "502"}
+                type="number"
+                value={form.simulatorPort}
+                onChange={(event) => updateForm({ simulatorPort: event.target.value })}
+              />
+            </label>
+          </div>
 
           {form.basis === "scan" ? (
             <div className="space-y-3">
@@ -700,10 +572,10 @@ export function CreateDataSourceWizardPage() {
                   className="shell-field"
                   placeholder={suggestedEndpoint(form.protocol, form.basis)}
                   type="text"
-                    value={form.scanEndpoint}
+                    value={form.realDeviceEndpoint}
                     onChange={(event) =>
                       updateForm({
-                        scanEndpoint: event.target.value,
+                        realDeviceEndpoint: event.target.value,
                         scanState: "idle",
                         scanTestResult: "idle",
                       })
@@ -940,25 +812,25 @@ export function CreateDataSourceWizardPage() {
           {form.basis === "import" ? (
             <div className="space-y-3">
               <p className="text-sm text-shell-muted">
-                Select a sample to use as the data source for this source.
+                Select a recording to use as the data source for this simulator.
               </p>
-              {isSamplesLoading ? (
-                <p className="text-sm text-shell-muted">Loading samples…</p>
-              ) : samplesError ? (
-                <p className="text-sm text-shell-danger">{samplesError}</p>
-              ) : samples.length === 0 ? (
+              {isArtifactsLoading ? (
+                <p className="text-sm text-shell-muted">Loading recordings…</p>
+              ) : artifactsError ? (
+                <p className="text-sm text-shell-danger">{artifactsError}</p>
+              ) : artifacts.length === 0 ? (
                 <section className="rounded-md border border-shell-line bg-shell-base/40 px-4 py-6 text-center">
-                  <p className="text-sm font-medium text-shell-ink">No samples available.</p>
+                  <p className="text-sm font-medium text-shell-ink">No recordings available.</p>
                   <p className="mt-1 text-sm text-shell-muted">
-                    Create a sample from an existing recording first.
+                    Create a recording first from the Recordings page.
                   </p>
                 </section>
               ) : (
                 <ul className="space-y-2">
-                  {samples.map((sample) => {
-                    const isSelected = form.importSelectedSampleId === sample.id;
+                  {artifacts.map((artifact) => {
+                    const isSelected = form.importSelectedRecordingId === artifact.id;
                     return (
-                      <li key={sample.id}>
+                      <li key={artifact.id}>
                         <button
                           className={`w-full rounded-md border px-4 py-3 text-left transition ${
                             isSelected
@@ -966,22 +838,14 @@ export function CreateDataSourceWizardPage() {
                               : "border-shell-line bg-shell-base/55 hover:border-shell-accent/45 hover:bg-white"
                           }`}
                           type="button"
-                          onClick={() => updateForm({ importSelectedSampleId: sample.id })}
+                          onClick={() => updateForm({ importSelectedRecordingId: artifact.id })}
                         >
-                          <p className="text-sm font-medium text-shell-ink">{sample.name}</p>
+                          <p className="text-sm font-medium text-shell-ink">
+                            Recording {artifact.id.slice(0, 8)}
+                          </p>
                           <div className="mt-1 flex flex-wrap items-center gap-2">
-                            {sample.tags.length > 0
-                              ? sample.tags.map((tag) => (
-                                  <span
-                                    key={tag}
-                                    className="rounded bg-shell-base px-1.5 py-0.5 text-xs text-shell-muted"
-                                  >
-                                    {tag}
-                                  </span>
-                                ))
-                              : null}
                             <span className="text-xs text-shell-muted">
-                              {new Date(sample.createdAt).toLocaleDateString("en-GB", {
+                              {new Date(artifact.createdAt).toLocaleDateString("en-GB", {
                                 day: "2-digit",
                                 month: "short",
                                 year: "numeric",
@@ -1030,146 +894,63 @@ export function CreateDataSourceWizardPage() {
     );
   }
 
-  function renderSchemaStep() {
-    const scanCopy = scanReviewCopy(form.scanState);
-
-    if (form.basis === "scan") {
-      return (
-        <div className="space-y-4">
-          {form.scanState === "idle" ? (
-            <SharedStatePanel
-              actionLabel="Start scan"
-              message="Start discovery now. This step cannot be reviewed until the simulator reads the real endpoint."
-              state="warning"
-              title="Scan the endpoint before reviewing schema."
-              onAction={startScan}
-            />
-          ) : null}
-
-          {form.scanState === "scanning" ? (
-            <SharedStatePanel
-              message="The simulator is discovering nodes and preparing a reviewable structure."
-              state="loading"
-              title="Scanning the real source."
-            />
-          ) : null}
-
-          {form.scanState === "error" ? (
-            <SharedStatePanel
-              actionLabel="Retry"
-              message="Go back to Setup if the endpoint or credentials need changes, then test the connection before retrying."
-              state="error"
-              title="The scan could not start."
-              onAction={retryScan}
-            />
-          ) : null}
-
-          {["complete", "partial", "large", "unknown"].includes(form.scanState) ? (
-            <section className="rounded-md border border-shell-line bg-white px-4 py-4">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                <div>
-                    <p className="text-sm font-medium text-shell-ink">Discovery result</p>
-                    <p className="mt-2 text-sm leading-6 text-shell-muted">
-                      {scanCopy.message}
-                    </p>
-                  </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <StatusBadge
-                      label={scanCopy.status}
-                    tone={
-                      form.scanState === "complete"
-                        ? "accent"
-                        : form.scanState === "unknown"
-                          ? "danger"
-                          : "warning"
-                    }
-                  />
-                </div>
-              </div>
-
-                <dl className="mt-4 grid gap-3 text-sm text-shell-muted sm:grid-cols-3">
-                <div>
-                  <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
-                    Endpoint
-                  </dt>
-                  <dd className="mt-2 text-sm text-shell-ink">{form.scanEndpoint}</dd>
-                </div>
-                <div>
-                  <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
-                    Protocol
-                  </dt>
-                  <dd className="mt-2 text-sm text-shell-ink">{form.protocol}</dd>
-                </div>
-                  <div>
-                    <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
-                      Next
-                    </dt>
-                    <dd className="mt-2 text-sm text-shell-ink">Continue into schema review</dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
-                      Credentials
-                    </dt>
-                    <dd className="mt-2 text-sm text-shell-ink">{credentialReviewValue(form)}</dd>
-                  </div>
-                </dl>
-
-              <div className="mt-4">
-                <button className="shell-action" type="button" onClick={retryScan}>
-                  Retry scan
-                </button>
-              </div>
-            </section>
-          ) : null}
-        </div>
-      );
-    }
-
-    if (form.basis === "manual") {
-      return (
-        <div className="space-y-4">
-          <section className="rounded-md border border-shell-line bg-white px-4 py-4">
-            <p className="text-sm font-medium text-shell-ink">Schema Editor handoff</p>
-            <p className="mt-2 text-sm leading-6 text-shell-muted">
-              Structure will be defined in the Schema Editor after this source is saved. Choose a
-              starting template in the Setup step to seed the initial structure.
-            </p>
-          </section>
-
-          <label className="flex flex-col gap-2 text-sm text-shell-muted">
-            Review note
-            <textarea
-              className="shell-field min-h-[7rem] resize-y"
-              placeholder="Optional schema note for this draft path"
-              value={form.schemaReviewNote}
-              onChange={(event) => updateForm({ schemaReviewNote: event.target.value })}
-            />
-          </label>
-        </div>
-      );
-    }
-
-    const note =
-      form.basis === "import"
-        ? "Prepared artifact will seed the initial schema and value shape."
-        : "Synthetic setup will generate the starting schema profile.";
-
+  function renderScheduleStep() {
     return (
       <div className="space-y-4">
         <section className="rounded-md border border-shell-line bg-white px-4 py-4">
-          <p className="text-sm text-shell-ink">{note}</p>
+          <p className="text-sm font-medium text-shell-ink">Recording schedule</p>
+          <p className="mt-2 text-sm leading-6 text-shell-muted">
+            Set a start and end time for this recording, or leave both off to start immediately with no time limit.
+          </p>
         </section>
 
-        <label className="flex flex-col gap-2 text-sm text-shell-muted">
-          Review note
-          <textarea
-            className="shell-field min-h-[7rem] resize-y"
-            placeholder="Optional schema note for this draft path"
-            value={form.schemaReviewNote}
-            onChange={(event) => updateForm({ schemaReviewNote: event.target.value })}
-          />
-        </label>
+        <div className="space-y-4">
+          <label className="flex items-center gap-3 text-sm text-shell-muted">
+            <input
+              checked={form.scheduleStartEnabled}
+              type="checkbox"
+              onChange={(e) => updateForm({ scheduleStartEnabled: e.target.checked, scheduleStart: e.target.checked ? form.scheduleStart : "" })}
+            />
+            Schedule start time
+          </label>
+          {form.scheduleStartEnabled ? (
+            <label className="flex flex-col gap-2 text-sm text-shell-muted">
+              Start at
+              <input
+                className="shell-field"
+                type="datetime-local"
+                value={form.scheduleStart}
+                onChange={(e) => updateForm({ scheduleStart: e.target.value })}
+              />
+            </label>
+          ) : null}
+
+          <label className="flex items-center gap-3 text-sm text-shell-muted">
+            <input
+              checked={form.scheduleEndEnabled}
+              type="checkbox"
+              onChange={(e) => updateForm({ scheduleEndEnabled: e.target.checked, scheduleEnd: e.target.checked ? form.scheduleEnd : "" })}
+            />
+            Schedule end time
+          </label>
+          {form.scheduleEndEnabled ? (
+            <label className="flex flex-col gap-2 text-sm text-shell-muted">
+              End at
+              <input
+                className="shell-field"
+                type="datetime-local"
+                value={form.scheduleEnd}
+                onChange={(e) => updateForm({ scheduleEnd: e.target.value })}
+              />
+            </label>
+          ) : null}
+
+          {!form.scheduleStartEnabled && !form.scheduleEndEnabled ? (
+            <section className="rounded-md border border-shell-accent/30 bg-shell-accent/5 px-4 py-3 text-sm text-shell-ink">
+              The recording will start immediately when the source starts and run without a time limit.
+            </section>
+          ) : null}
+        </div>
       </div>
     );
   }
@@ -1270,8 +1051,8 @@ export function CreateDataSourceWizardPage() {
       return renderSetupStep();
     }
 
-    if (activeStepId === "schema") {
-      return renderSchemaStep();
+    if (activeStepId === "schedule") {
+      return renderScheduleStep();
     }
 
     if (activeStepId === "runtime") {
