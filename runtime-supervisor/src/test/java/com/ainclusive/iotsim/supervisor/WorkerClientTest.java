@@ -58,7 +58,7 @@ class WorkerClientTest {
     void lifecycleRoundTripReflectsHealth() throws Exception {
         int port = startServer(WorkerContract.VERSION);
         try (WorkerClient client = new WorkerClient("127.0.0.1", port)) {
-            client.configure(Schema.getDefaultInstance(), 48400);
+            client.configure(Schema.getDefaultInstance(), 48400, "127.0.0.1", "127.0.0.1");
             client.start();
             assertThat(client.health().getState()).isEqualTo("RUNNING");
             client.stop();

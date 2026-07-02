@@ -20,6 +20,7 @@ import com.ainclusive.iotsim.platform.scan.UnsupportedSourceScanner;
 import com.ainclusive.iotsim.supervisor.HealthPolicy;
 import com.ainclusive.iotsim.supervisor.ProcessWorkerLauncher;
 import com.ainclusive.iotsim.supervisor.Supervisor;
+import com.ainclusive.iotsim.supervisor.WorkerNetwork;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -45,7 +46,11 @@ public class RuntimeConfig {
             DataSourceRepository dataSources, RuntimeEventRepository runtimeEvents,
             ClientConnectionRepository clientConnections, ObjectMapper json,
             ExecutorService runtimeEventExecutor, LiveEventHub liveEventHub,
-            LiveValuesHub liveValuesHub) {
+            LiveValuesHub liveValuesHub,
+            @org.springframework.beans.factory.annotation.Value("${iotsim.simulator.bind-address:0.0.0.0}")
+            String bindAddress,
+            @org.springframework.beans.factory.annotation.Value("${iotsim.simulator.advertised-host:localhost}")
+            String advertisedHost) {
         if (props.isSupervisorMode()) {
             // Persist runtime events off the IPC delivery thread (IS-048), and fan the
             // same events to the live SSE hub (IS-046).
@@ -62,7 +67,8 @@ public class RuntimeConfig {
             return new Supervisor(
                     new ProcessWorkerLauncher(props.workers()), props.restartPolicy(),
                     HealthPolicy.DEFAULT, clientListener, runtimeListener, liveValuesHub,
-                    props.governancePolicy());
+                    props.governancePolicy(),
+                    new WorkerNetwork(bindAddress, advertisedHost));
         }
         return new InMemoryRuntimeController();
     }

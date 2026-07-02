@@ -105,6 +105,7 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
     private final Semaphore admissionPermits;
     /** The configured cap, for the refusal message. {@code <= 0} means unlimited. */
     private final int workerCap;
+    private final WorkerNetwork network;
     private volatile boolean closed;
 
     public Supervisor(WorkerLauncher launcher) {
@@ -169,6 +170,18 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
             RuntimeActivityListener runtimeActivityListener,
             LiveValueListener valueListener,
             ResourceGovernancePolicy governance) {
+        this(launcher, restartPolicy, healthPolicy, clientActivityListener,
+                runtimeActivityListener, valueListener, governance, WorkerNetwork.LOOPBACK);
+    }
+
+    /** Canonical constructor: collaborators + resource-governance (IS-061) + worker network (IS-128). */
+    public Supervisor(WorkerLauncher launcher, RestartPolicy restartPolicy, HealthPolicy healthPolicy,
+            ClientActivityListener clientActivityListener,
+            RuntimeActivityListener runtimeActivityListener,
+            LiveValueListener valueListener,
+            ResourceGovernancePolicy governance,
+            WorkerNetwork network) {
+        this.network = network == null ? WorkerNetwork.LOOPBACK : network;
         this.launcher = launcher;
         this.restartPolicy = restartPolicy;
         this.healthPolicy = healthPolicy;
@@ -748,7 +761,8 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
             try {
                 awaitReady(newClient);
                 newClient.configure(
-                        toProtoSchema(spec.schemaVersion(), spec.schemaNodes()), spec.listenPort());
+                        toProtoSchema(spec.schemaVersion(), spec.schemaNodes()), spec.listenPort(),
+                        network.bindAddress(), network.advertisedHost());
                 // Subscribe to runtime events BEFORE start so SOURCE_START — emitted the
                 // instant the worker's server begins listening — is not missed; the hub
                 // does not buffer. UNIMPLEMENTED on an older worker is non-fatal.
