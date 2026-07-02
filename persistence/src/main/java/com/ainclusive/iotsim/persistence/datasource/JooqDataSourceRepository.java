@@ -23,7 +23,8 @@ public class JooqDataSourceRepository implements DataSourceRepository {
 
     @Override
     public DataSourceRow insert(String projectId, String name, String protocol, String basis,
-            int simulatorPort, String realDeviceEndpoint, String runtimeConfigJson, String createdBy) {
+            int simulatorPort, String realDeviceEndpoint, String runtimeConfigJson,
+            String securityConfigJson, String createdBy) {
         DataSourcesRecord record = dsl.insertInto(DATA_SOURCES)
                 .set(DATA_SOURCES.ID, Ids.newId())
                 .set(DATA_SOURCES.PROJECT_ID, projectId)
@@ -33,6 +34,7 @@ public class JooqDataSourceRepository implements DataSourceRepository {
                 .set(DATA_SOURCES.SIMULATOR_PORT, simulatorPort)
                 .set(DATA_SOURCES.REAL_DEVICE_ENDPOINT, endpointToJsonb(realDeviceEndpoint))
                 .set(DATA_SOURCES.RUNTIME_CONFIG, json(runtimeConfigJson))
+                .set(DATA_SOURCES.SECURITY_CONFIG, json(securityConfigJson))
                 .set(DATA_SOURCES.CREATED_BY, createdBy)
                 .returning()
                 .fetchOne();
@@ -83,12 +85,14 @@ public class JooqDataSourceRepository implements DataSourceRepository {
 
     @Override
     public Optional<DataSourceRow> update(String id, String name, int simulatorPort,
-            String realDeviceEndpoint, String runtimeConfigJson, boolean enabled, long expectedVersion) {
+            String realDeviceEndpoint, String runtimeConfigJson, String securityConfigJson,
+            boolean enabled, long expectedVersion) {
         DataSourcesRecord record = dsl.update(DATA_SOURCES)
                 .set(DATA_SOURCES.NAME, name)
                 .set(DATA_SOURCES.SIMULATOR_PORT, simulatorPort)
                 .set(DATA_SOURCES.REAL_DEVICE_ENDPOINT, endpointToJsonb(realDeviceEndpoint))
                 .set(DATA_SOURCES.RUNTIME_CONFIG, json(runtimeConfigJson))
+                .set(DATA_SOURCES.SECURITY_CONFIG, json(securityConfigJson))
                 .set(DATA_SOURCES.ENABLED, enabled)
                 .set(DATA_SOURCES.UPDATED_AT, OffsetDateTime.now(ZoneOffset.UTC))
                 .set(DATA_SOURCES.VERSION, DATA_SOURCES.VERSION.plus(1))
@@ -115,6 +119,7 @@ public class JooqDataSourceRepository implements DataSourceRepository {
                 .set(DATA_SOURCES.SIMULATOR_PORT, source.getSimulatorPort())
                 .set(DATA_SOURCES.REAL_DEVICE_ENDPOINT, source.getRealDeviceEndpoint())
                 .set(DATA_SOURCES.RUNTIME_CONFIG, source.getRuntimeConfig())
+                .set(DATA_SOURCES.SECURITY_CONFIG, source.getSecurityConfig())
                 .set(DATA_SOURCES.ENABLED, false)
                 .set(DATA_SOURCES.CREATED_BY, createdBy)
                 .returning()
@@ -228,6 +233,7 @@ public class JooqDataSourceRepository implements DataSourceRepository {
                 r.getSimulatorPort(),
                 endpointFromJsonb(r.getRealDeviceEndpoint()),
                 jsonString(r.getRuntimeConfig()),
+                jsonString(r.getSecurityConfig()),
                 Boolean.TRUE.equals(r.getEnabled()),
                 r.getCreatedAt(),
                 r.getUpdatedAt(),
