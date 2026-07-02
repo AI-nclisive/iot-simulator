@@ -38,7 +38,7 @@ used so values and events flow continuously.
 | RPC | Direction | Purpose |
 | --- | --- | --- |
 | `Hello` | sup→wkr | Handshake; exchange contract version, protocol id, capabilities. |
-| `Configure` | sup→wkr | Provide schema (neutral model), protocol bindings, listen port, runtime options. |
+| `Configure` | sup→wkr | Provide schema (neutral model), protocol bindings, listen port, runtime options, and endpoint security. |
 | `Start` | sup→wkr | Begin serving the protocol endpoint. |
 | `Stop` | sup→wkr | Stop serving; keep process alive for reuse or shutdown. |
 | `TestConnection` | sup→wkr | Probe a real endpoint's reachability/auth (client mode); for create-from-scan. |
@@ -50,6 +50,13 @@ used so values and events flow continuously.
 | `InjectFault` | sup→wkr | Activate/clear a fault (neutral or protocol-specific). |
 | `Health` | sup→wkr | Liveness/readiness + resource snapshot. |
 | `Shutdown` | sup→wkr | Graceful process exit. |
+
+`Configure` carries `security_config` (`SecurityConfig`, added in contract
+**1.3.0**, IS-131): the simulated endpoint's accepted user tokens — Anonymous
+and/or UserName (passwords pre-hashed, never plaintext on the wire). An empty
+message = None security / Anonymous only, so unset configs and pre-`1.3.0`
+workers behave exactly as before. Message-layer security
+(SecurityPolicy/MessageSecurityMode) is a later phase (IS-132).
 
 ### Capabilities
 

@@ -5,7 +5,7 @@
 ### Capability: Simulate OPC UA Data Sources
 
 Explanation:
-Users can create and run simulated OPC UA data sources so Edge Devices can connect to them as if they were real industrial instruments.
+Users can create and run simulated OPC UA data sources so Edge Devices can connect to them as if they were real industrial instruments. A simulated server can run without authentication or require username/password authentication, mirroring how a real OPC UA server exposes its security.
 
 Priority:
 P0
