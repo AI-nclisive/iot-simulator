@@ -147,7 +147,7 @@ export function CreateRecordingWizardPage() {
                     <StatusBadge label={ds.protocol} tone="neutral" />
                     <StatusBadge
                       label={ds.status}
-                      tone={ds.status === "Active" ? "positive" : "neutral"}
+                      tone={ds.status === "Active" ? "accent" : "neutral"}
                     />
                   </div>
                 </div>
