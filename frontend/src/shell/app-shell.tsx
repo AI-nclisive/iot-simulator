@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { ToastRegion } from "../ui/notification-pattern";
 import { useNotificationStore } from "./notification-store";
 import { useProjectsStore } from "./projects-store";
@@ -19,6 +19,7 @@ const topLevelNav = [
 
 export function AppShell() {
   const navigate = useNavigate();
+  const location = useLocation();
   const accessMode = useShellStore((state) => state.accessMode);
   const currentProjectId = useShellStore((state) => state.currentProjectId);
   const setCurrentProjectId = useShellStore((state) => state.setCurrentProjectId);
@@ -37,10 +38,10 @@ export function AppShell() {
   }, [loadProjects]);
 
   useEffect(() => {
-    if (!currentProjectId) {
+    if (!currentProjectId && location.pathname !== "/projects") {
       navigate("/projects", { replace: true });
     }
-  }, [currentProjectId, navigate]);
+  }, [currentProjectId, location.pathname, navigate]);
 
   const currentProject = projects.find((p) => p.id === currentProjectId) ?? null;
   const access = resolveAccess(accessMode, sharedRole);

@@ -13,6 +13,12 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+const { mockNavigate } = vi.hoisted(() => ({ mockNavigate: vi.fn() }));
+vi.mock("react-router-dom", async () => {
+  const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
+  return { ...actual, useNavigate: () => mockNavigate };
+});
 import { AppShell } from "./app-shell";
 
 const { mockShellStore, mockNotificationStore, mockProjectsStore } = vi.hoisted(() => ({
@@ -159,5 +165,56 @@ describe("AppShell — NavLink closes nav", () => {
     // Nav should collapse — bare "block" class removed, "hidden" added
     expect(aside.classList.contains("hidden")).toBe(true);
     expect(aside.classList.contains("block")).toBe(false);
+  });
+});
+
+// ── Project selection guard ──────────────────────────────────────────────────
+
+describe("AppShell — project selection guard", () => {
+  function setupEmptyProject() {
+    mockShellStore.mockImplementation((selector: (s: Record<string, unknown>) => unknown) =>
+      selector({
+        accessMode: "local",
+        currentProjectId: "",
+        setCurrentProjectId: vi.fn(),
+        sharedRole: "user",
+      }),
+    );
+    mockNotificationStore.mockImplementation((selector: (s: Record<string, unknown>) => unknown) =>
+      selector({ toasts: [], dismiss: vi.fn() }),
+    );
+    mockProjectsStore.mockImplementation((selector: (s: Record<string, unknown>) => unknown) =>
+      selector({ projects: [], loadProjects: vi.fn().mockResolvedValue(undefined) }),
+    );
+  }
+
+  it("redirects to /projects when currentProjectId is empty and not already on /projects", () => {
+    setupEmptyProject();
+    render(
+      <MemoryRouter initialEntries={["/overview"]}>
+        <AppShell />
+      </MemoryRouter>,
+    );
+    expect(mockNavigate).toHaveBeenCalledWith("/projects", { replace: true });
+  });
+
+  it("does not redirect when already on /projects", () => {
+    setupEmptyProject();
+    render(
+      <MemoryRouter initialEntries={["/projects"]}>
+        <AppShell />
+      </MemoryRouter>,
+    );
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it("does not redirect when currentProjectId is set", () => {
+    setupStores();
+    render(
+      <MemoryRouter initialEntries={["/overview"]}>
+        <AppShell />
+      </MemoryRouter>,
+    );
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 });
