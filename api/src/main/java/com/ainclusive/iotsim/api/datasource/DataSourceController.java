@@ -41,7 +41,6 @@ import org.springframework.web.bind.annotation.RestController;
  * <ul>
  *   <li>List / get — {@link Permission#OBSERVE} (user + admin).
  *   <li>Create / update / delete / duplicate / credentials — {@link Permission#SOURCE_EDIT} (admin).
- *   <li>Start — {@link Permission#SOURCE_START} (user + admin).
  *   <li>Stop — {@link Permission#SOURCE_STOP} (user + admin).
  * </ul>
  */
@@ -60,9 +59,6 @@ public class DataSourceController {
     private static final String SOURCE_EDIT =
             "@permissionService.hasPermission(authentication,"
             + " T(com.ainclusive.iotsim.api.security.Permission).SOURCE_EDIT)";
-    private static final String SOURCE_START =
-            "@permissionService.hasPermission(authentication,"
-            + " T(com.ainclusive.iotsim.api.security.Permission).SOURCE_START)";
     private static final String SOURCE_STOP =
             "@permissionService.hasPermission(authentication,"
             + " T(com.ainclusive.iotsim.api.security.Permission).SOURCE_STOP)";
@@ -182,16 +178,6 @@ public class DataSourceController {
                         URI.create("/api/v1/projects/" + projectId + "/data-sources/" + ds.id()))
                 .eTag(etag(ds.version()))
                 .body(DataSourceResponse.from(ds));
-    }
-
-    @Operation(
-            summary = "Start the data source runtime",
-            description = "Spawns the runtime worker for the data source and returns its updated runtime state.")
-    @PostMapping("/{id}/start")
-    @PreAuthorize(SOURCE_START)
-    public ResponseEntity<DataSourceResponse> start(@PathVariable String projectId, @PathVariable String id) {
-        DataSource ds = dataSources.start(projectId, id);
-        return ResponseEntity.ok().eTag(etag(ds.version())).body(DataSourceResponse.from(ds));
     }
 
     @Operation(
