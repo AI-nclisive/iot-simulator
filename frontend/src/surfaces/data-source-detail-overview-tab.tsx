@@ -91,18 +91,12 @@ export function DataSourceDetailOverviewTab({
             Next action
           </p>
           <div className="mt-3 flex flex-col items-start gap-2">
-            {source.status === "Active" ? (
-              <>
-                <Link className="shell-text-action" to={`/data-sources/${source.id}/record`}>
-                  Start recording
-                </Link>
-                <Link className="shell-text-action" to={`/data-sources/${source.id}/replay`}>
-                  Set up replay
-                </Link>
-              </>
-            ) : (
-              <p className="text-sm text-shell-muted">Start the source to begin recording or replay.</p>
-            )}
+            <Link className="shell-text-action" to={`/data-sources/${source.id}/record`}>
+              Record
+            </Link>
+            <Link className="shell-text-action" to={`/data-sources/${source.id}/replay`}>
+              Simulate
+            </Link>
             <Link className="shell-text-action" to="?tab=values">
               Open Values
             </Link>

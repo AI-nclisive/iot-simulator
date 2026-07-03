@@ -96,7 +96,6 @@ export function DataSourceDetailPreviewPage() {
   const source = useDataSourcesStore((state) =>
     state.dataSources.find((row) => row.id === sourceId),
   );
-  const startDataSource = useDataSourcesStore((state) => state.startDataSource);
   const stopDataSource = useDataSourcesStore((state) => state.stopDataSource);
   const isLoading = useDataSourcesStore((state) => state.isLoading);
   const loadDataSources = useDataSourcesStore((state) => state.loadDataSources);
@@ -170,12 +169,7 @@ export function DataSourceDetailPreviewPage() {
           label: "Stop source",
           onClick: () => setStopConfirmationOpen(true),
         }
-      : !sourceStarted && access.canStartStoppedSource
-        ? {
-            label: "Start source",
-            onClick: () => startDataSource(activeSource.id),
-          }
-        : null;
+      : null;
 
   function setActiveTab(tabId: DetailTabId) {
     if (activeTab === "schema" && schemaUnsaved && tabId !== "schema") {
@@ -255,24 +249,16 @@ export function DataSourceDetailPreviewPage() {
         </dl>
 
         <div className="mt-6 flex flex-wrap items-center gap-2">
-          {access.canRecordSource && sourceStarted ? (
+          {access.canRecordSource ? (
             <Link className="shell-action" to={`/data-sources/${activeSource.id}/record`}>
-              Start recording
+              Record
             </Link>
-          ) : (
-            <button className="shell-action" disabled type="button">
-              Start recording
-            </button>
-          )}
-          {access.canConfigureReplay && sourceStarted ? (
+          ) : null}
+          {access.canConfigureReplay ? (
             <Link className="shell-action" to={`/data-sources/${activeSource.id}/replay`}>
-              Set up replay
+              Simulate
             </Link>
-          ) : (
-            <button className="shell-action" disabled type="button">
-              Set up replay
-            </button>
-          )}
+          ) : null}
           {sourceControlAction ? (
             <button className="shell-action" type="button" onClick={sourceControlAction.onClick}>
               {sourceControlAction.label}
@@ -282,12 +268,6 @@ export function DataSourceDetailPreviewPage() {
             Back to sources
           </Link>
         </div>
-
-        {!sourceStarted && !access.isSharedUser ? (
-          <p className="mt-4 text-sm leading-6 text-shell-muted">
-            Start the source to enable recording and replay.
-          </p>
-        ) : null}
 
         {access.isSharedUser ? (
           <p className="mt-4 text-sm leading-6 text-shell-muted">
