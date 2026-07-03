@@ -803,6 +803,8 @@ Parallel execution:
   Work includes: remove Manual card from basis step; remove dead conditional branches that handle manual-only flows (e.g. schema-editor auto-open); update tests.
   Done when: Manual is not selectable; SCAN / IMPORT / SYNTHETIC paths unchanged; TS build + tests pass.
 - [x] `UI-119` Recording value browser — paginated table (Timestamp, Parameter path, Value, Quality) in Recording detail Values tab; wired to IS-134 `GET .../values` endpoint; cursor pagination "Load more"; replaces "will be available in a future release" placeholder.
+- [x] `UI-122` Recording value browser — filter panel (search by path/nodeId, quality multi-select, from/to time range) above values table; any filter change resets cursor and re-fetches; total reflects filtered count. BE half: IS-136.
+- [x] `UI-123` Recording detail schema tab — render captured schema node tree (path, kind, dataType) fetched from IS-137 `GET .../schema`; collapsible folder nodes; replaces "coming soon" placeholder. BE half: IS-137.
 - [ ] `UI-120` Integrate the regrouped API (6 groups)
   Goal: reflect the backend's 6-group API tags (IS-135) on the frontend API client.
   Depends: IS-135.

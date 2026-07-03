@@ -21,6 +21,7 @@ import com.ainclusive.iotsim.persistence.timeline.ValueTimelineRepository.ValueT
 import com.ainclusive.iotsim.platform.storage.ObjectStore;
 import com.ainclusive.iotsim.protocolmodel.NeutralValue;
 import com.ainclusive.iotsim.protocolmodel.Quality;
+import com.ainclusive.iotsim.protocolmodel.ValueFilter;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.time.Instant;
@@ -380,7 +381,7 @@ class EvidenceServiceTest {
             throw new UnsupportedOperationException();
         }
 
-        public List<ValueTimelineEntry> readPage(String recordingId, long afterSeq, int limit) {
+        public List<ValueTimelineEntry> readPage(String recordingId, long afterSeq, int limit, ValueFilter filter) {
             throw new UnsupportedOperationException();
         }
     }

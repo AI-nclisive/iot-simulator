@@ -20,6 +20,7 @@ import com.ainclusive.iotsim.platform.secret.CredentialStore;
 import com.ainclusive.iotsim.protocolmodel.NeutralValue;
 import com.ainclusive.iotsim.protocolmodel.NodeKind;
 import com.ainclusive.iotsim.protocolmodel.ScanType;
+import com.ainclusive.iotsim.protocolmodel.ValueFilter;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
@@ -162,15 +163,16 @@ public class RecordingService {
     }
 
     /**
-     * Keyset-paginated read of captured values for a recording (IS-134).
+     * Keyset-paginated read of captured values for a recording (IS-134, IS-136).
      * Cursor encodes the last-seen SEQ as a base64url string.
+     * Optional filter narrows results by search term, quality, and time range.
      */
     public RecordingValuesPage listValues(String projectId, String recordingId,
-            String cursor, Integer limit) {
+            String cursor, Integer limit, ValueFilter filter) {
         RecordingRow rec = requireRecording(projectId, recordingId);
         int size = Math.min(limit != null && limit > 0 ? limit : 200, 1000);
         long afterSeq = decodeValueCursor(cursor);
-        List<ValueTimelineEntry> raw = timeline.readPage(recordingId, afterSeq, size + 1);
+        List<ValueTimelineEntry> raw = timeline.readPage(recordingId, afterSeq, size + 1, filter);
         String nextCursor = null;
         if (raw.size() > size) {
             raw = raw.subList(0, size);
@@ -182,8 +184,24 @@ public class RecordingService {
                 e.value().sourceTime(),
                 e.value().value() != null ? String.valueOf(e.value().value()) : null,
                 e.value().quality().name())).toList();
-        return new RecordingValuesPage(items, nextCursor, rec.valueCount());
+        long total = filter.isBlank() ? rec.valueCount() : timeline.countFiltered(recordingId, filter);
+        return new RecordingValuesPage(items, nextCursor, total);
     }
+
+    /**
+     * Returns the schema captured for a recording (IS-137).
+     * Resolves the schema via the recording's data_source_id + schema_version.
+     */
+    public RecordingSchema getRecordingSchema(String projectId, String recordingId) {
+        RecordingRow rec = requireRecording(projectId, recordingId);
+        SchemaWithNodes schema = schemas.findByVersion(rec.dataSourceId(), rec.schemaVersion())
+                .orElseThrow(() -> new ResourceNotFoundException("Schema",
+                        rec.dataSourceId() + "@v" + rec.schemaVersion()));
+        return new RecordingSchema(schema.nodes());
+    }
+
+    /** Schema snapshot linked to a recording (IS-137). */
+    public record RecordingSchema(List<com.ainclusive.iotsim.protocolmodel.SchemaNode> nodes) {}
 
     /** Paginated response for the value browse API (IS-134). */
     public record RecordingValuesPage(

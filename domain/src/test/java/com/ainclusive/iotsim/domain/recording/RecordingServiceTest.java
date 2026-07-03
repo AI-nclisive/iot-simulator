@@ -24,6 +24,7 @@ import com.ainclusive.iotsim.protocolmodel.DataType;
 import com.ainclusive.iotsim.protocolmodel.NeutralValue;
 import com.ainclusive.iotsim.protocolmodel.NodeKind;
 import com.ainclusive.iotsim.protocolmodel.SchemaNode;
+import com.ainclusive.iotsim.protocolmodel.ValueFilter;
 import com.ainclusive.iotsim.protocolmodel.ValueRank;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -224,20 +225,38 @@ class RecordingServiceTest {
                 NeutralValue.good("n3", t.plusSeconds(2), 3.0));
         svc.appendValues(PROJECT, rid, vals);
 
-        var page = svc.listValues(PROJECT, rid, null, 2);
+        var page = svc.listValues(PROJECT, rid, null, 2, ValueFilter.NONE);
         assertThat(page.items()).hasSize(2);
         assertThat(page.items().get(0).parameterId()).isEqualTo("n1");
         assertThat(page.nextCursor()).isNotNull();
 
-        var page2 = svc.listValues(PROJECT, rid, page.nextCursor(), 2);
+        var page2 = svc.listValues(PROJECT, rid, page.nextCursor(), 2, ValueFilter.NONE);
         assertThat(page2.items()).hasSize(1);
         assertThat(page2.items().get(0).parameterId()).isEqualTo("n3");
         assertThat(page2.nextCursor()).isNull();
     }
 
     @Test
+    void getRecordingSchemaReturnsNodes() {
+        Recording r = service.create(PROJECT, SOURCE, com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_AND_DATA, "alice");
+        SchemaNode node = variable("ns=1;s=Temp", DataType.FLOAT64);
+        schemas.setByVersion(r.schemaVersion(), List.of(node));
+        RecordingService.RecordingSchema schema = service.getRecordingSchema(PROJECT, r.id());
+        assertThat(schema.nodes()).hasSize(1);
+        assertThat(schema.nodes().get(0).nodeId()).isEqualTo("ns=1;s=Temp");
+    }
+
+    @Test
+    void getRecordingSchemaThrowsWhenSchemaAbsent() {
+        Recording r = service.create(PROJECT, SOURCE, com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_AND_DATA, "alice");
+        schemas.clear();
+        assertThatThrownBy(() -> service.getRecordingSchema(PROJECT, r.id()))
+                .isInstanceOf(com.ainclusive.iotsim.domain.common.ResourceNotFoundException.class);
+    }
+
+    @Test
     void listValuesThrowsForMissingRecording() {
-        assertThatThrownBy(() -> service.listValues(PROJECT, "no-such-id", null, null))
+        assertThatThrownBy(() -> service.listValues(PROJECT, "no-such-id", null, null, ValueFilter.NONE))
                 .isInstanceOf(com.ainclusive.iotsim.domain.common.ResourceNotFoundException.class);
     }
 
@@ -278,20 +297,34 @@ class RecordingServiceTest {
 
     private static final class FakeSchemaRepository implements SchemaRepository {
         private Supplier<Optional<SchemaWithNodes>> current = Optional::empty;
+        private final java.util.Map<Integer, SchemaWithNodes> byVersion = new java.util.HashMap<>();
 
         void set(int version, List<SchemaNode> nodes) {
             SchemaWithNodes schema = new SchemaWithNodes(
                     "sch-1", SOURCE, version, OffsetDateTime.now(ZoneOffset.UTC), nodes);
             current = () -> Optional.of(schema);
+            byVersion.put(version, schema);
+        }
+
+        void setByVersion(int version, List<SchemaNode> nodes) {
+            SchemaWithNodes schema = new SchemaWithNodes(
+                    "sch-1", SOURCE, version, OffsetDateTime.now(ZoneOffset.UTC), nodes);
+            byVersion.put(version, schema);
         }
 
         void clear() {
             current = Optional::empty;
+            byVersion.clear();
         }
 
         @Override
         public Optional<SchemaWithNodes> findCurrent(String dataSourceId) {
             return current.get();
+        }
+
+        @Override
+        public Optional<SchemaWithNodes> findByVersion(String dataSourceId, int version) {
+            return Optional.ofNullable(byVersion.get(version));
         }
 
         @Override
@@ -377,7 +410,8 @@ class RecordingServiceTest {
         }
 
         @Override
-        public List<ValueTimelineEntry> readPage(String recordingId, long afterSeq, int limit) {
+        public List<ValueTimelineEntry> readPage(
+                String recordingId, long afterSeq, int limit, ValueFilter filter) {
             List<NeutralValue> all = byRecording.getOrDefault(recordingId, List.of());
             List<ValueTimelineEntry> result = new ArrayList<>();
             for (int i = 0; i < all.size(); i++) {
@@ -389,6 +423,11 @@ class RecordingServiceTest {
                 }
             }
             return result;
+        }
+
+        @Override
+        public long countFiltered(String recordingId, ValueFilter filter) {
+            return byRecording.getOrDefault(recordingId, List.of()).size();
         }
     }
 

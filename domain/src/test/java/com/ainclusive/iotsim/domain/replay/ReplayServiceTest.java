@@ -23,6 +23,7 @@ import com.ainclusive.iotsim.platform.runtime.RuntimeStartSpec;
 import com.ainclusive.iotsim.protocolmodel.DeterministicSettings;
 import com.ainclusive.iotsim.protocolmodel.NeutralValue;
 import com.ainclusive.iotsim.protocolmodel.SchemaNode;
+import com.ainclusive.iotsim.protocolmodel.ValueFilter;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -462,7 +463,7 @@ class ReplayServiceTest {
         }
 
         @Override
-        public List<ValueTimelineEntry> readPage(String recordingId, long afterSeq, int limit) {
+        public List<ValueTimelineEntry> readPage(String recordingId, long afterSeq, int limit, ValueFilter filter) {
             throw new UnsupportedOperationException();
         }
     }
