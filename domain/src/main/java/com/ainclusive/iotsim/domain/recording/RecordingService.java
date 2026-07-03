@@ -179,7 +179,9 @@ public class RecordingService {
     }
 
     private static long decodeValueCursor(String cursor) {
-        if (cursor == null || cursor.isBlank()) return -1L;
+        if (cursor == null || cursor.isBlank()) {
+            return -1L;
+        }
         try {
             byte[] bytes = java.util.Base64.getUrlDecoder().decode(cursor);
             return Long.parseLong(new String(bytes, java.nio.charset.StandardCharsets.UTF_8));
