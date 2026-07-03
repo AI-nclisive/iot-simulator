@@ -35,7 +35,6 @@ vi.mock("../shell/data-sources-store", () => ({
   useDataSourcesStore: (selector: (s: Record<string, unknown>) => unknown) =>
     selector({
       createDataSource: vi.fn(() => "src-new"),
-      startDataSource: vi.fn(),
     }),
 }));
 
@@ -108,7 +107,6 @@ const baseScanForm: WizardFormState = {
   opcUaSecurity: "None",
   protocol: "OPC UA",
   realDeviceEndpoint: "opc.tcp://host:4840",
-  runtimeBehavior: "stopped",
   scanCredentialConfirmed: false,
   scanCredentialMode: "password",
   scanPassword: "",

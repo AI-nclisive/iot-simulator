@@ -17,18 +17,15 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const {
   mockLoadDataSources,
-  mockStartDataSource,
   mockStopDataSource,
   mockDataSourcesStore,
   mockShellStore,
 } = vi.hoisted(() => {
   const loadDataSources = vi.fn();
-  const startDataSource = vi.fn();
   const stopDataSource = vi.fn();
 
   return {
     mockLoadDataSources: loadDataSources,
-    mockStartDataSource: startDataSource,
     mockStopDataSource: stopDataSource,
     mockDataSourcesStore: vi.fn(),
     mockShellStore: vi.fn(),
@@ -74,7 +71,6 @@ type StoreState = {
   dataSources: { id: string; name: string; protocol: string; endpoint: string; parameterCount: number; status: string; health: string }[];
   isLoading: boolean;
   loadDataSources: typeof mockLoadDataSources;
-  startDataSource: typeof mockStartDataSource;
   stopDataSource: typeof mockStopDataSource;
 };
 
@@ -83,7 +79,6 @@ function setupDataSourcesStore(partial: Partial<StoreState> = {}) {
     dataSources: [],
     isLoading: false,
     loadDataSources: mockLoadDataSources,
-    startDataSource: mockStartDataSource,
     stopDataSource: mockStopDataSource,
     ...partial,
   };
@@ -207,12 +202,13 @@ describe("DataSourceDetailPreviewPage — source found", () => {
     expect(screen.getByText("Test Source")).toBeTruthy();
   });
 
-  it("shows Start source button when source is stopped", () => {
+  it("shows Record and Simulate links when source is found", () => {
     setupShellStore();
     setupDataSourcesStore({ dataSources: [mockSource], isLoading: false });
 
     renderPage();
 
-    expect(screen.getByRole("button", { name: "Start source" })).toBeTruthy();
+    expect(screen.getAllByRole("link", { name: "Record" }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("link", { name: "Simulate" }).length).toBeGreaterThan(0);
   });
 });

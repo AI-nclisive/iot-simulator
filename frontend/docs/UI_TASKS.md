@@ -806,7 +806,7 @@ Parallel execution:
   Done when: Manual is not selectable; SCAN / IMPORT / SYNTHETIC paths unchanged; TS build + tests pass.
 - [x] `UI-123` Recording schema tab — default Schema tab in RecordingDetailPage; calls `GET .../schema`; renders collapsible folder/variable tree; loading, error, and empty states.
 - [x] `UI-119` Recording value browser — paginated table (Timestamp, Parameter path, Value, Quality) in Recording detail Values tab; wired to IS-134 `GET .../values` endpoint; cursor pagination "Load more"; replaces "will be available in a future release" placeholder.
-- [ ] `UI-125` Replace Start button with Record / Simulate actions
+- [x] `UI-125` Replace Start button with Record / Simulate actions
   Goal: remove the bare Start action from the data-sources list and detail; replace with two explicit runtime actions: Record (opens recording flow) and Simulate (opens recording picker → starts live replay).
   Surface: `Data Sources List`, `Data Source Detail`
   Work includes: remove `startDataSource` store action + `POST .../start` call; add Record action → navigate to existing recording-flow route; add Simulate action → modal picker listing recordings for this DS (pre-select last-used from `runtimeConfig`); on confirm POST .../replay; remove Start button from `data-source-detail-preview-page.tsx` and `data-sources-list-page.tsx`; remove auto-start from `create-data-source-wizard-page.tsx`.
