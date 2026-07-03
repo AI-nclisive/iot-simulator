@@ -4,10 +4,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.ainclusive.iotsim.persistence.datasource.JooqDataSourceRepository;
 import com.ainclusive.iotsim.persistence.project.JooqProjectRepository;
+import com.ainclusive.iotsim.persistence.schema.JooqSchemaRepository;
+import com.ainclusive.iotsim.persistence.schema.SchemaRepository;
 import com.ainclusive.iotsim.persistence.timeline.JooqValueTimelineRepository;
 import com.ainclusive.iotsim.persistence.timeline.ValueTimelineRepository;
+import com.ainclusive.iotsim.persistence.timeline.ValueTimelineRepository.ValueTimelineEntry;
+import com.ainclusive.iotsim.protocolmodel.Access;
+import com.ainclusive.iotsim.protocolmodel.DataType;
 import com.ainclusive.iotsim.protocolmodel.NeutralValue;
+import com.ainclusive.iotsim.protocolmodel.NodeKind;
 import com.ainclusive.iotsim.protocolmodel.Quality;
+import com.ainclusive.iotsim.protocolmodel.SchemaNode;
+import com.ainclusive.iotsim.protocolmodel.ValueFilter;
+import com.ainclusive.iotsim.protocolmodel.ValueRank;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -32,6 +41,7 @@ class RecordingAndTimelineIT {
     static ValueTimelineRepository timeline;
     static String projectId;
     static String dataSourceId;
+    static int schemaVersion;
 
     @BeforeAll
     static void migrateAndWire() {
@@ -46,6 +56,13 @@ class RecordingAndTimelineIT {
                 .insert(projectId, "Pump", "OPC_UA", "MANUAL", 4840, null, null, null, "it").id();
         recordings = new JooqRecordingRepository(dsl);
         timeline = new JooqValueTimelineRepository(dsl);
+        SchemaRepository schemas = new JooqSchemaRepository(dsl);
+        List<SchemaNode> nodes = List.of(
+                new SchemaNode("temp", null, "Plant/Temp", "Temp",
+                        NodeKind.VARIABLE, DataType.FLOAT64, ValueRank.SCALAR, Access.READ, "degC", null),
+                new SchemaNode("humidity", null, "Plant/Humidity", "Humidity",
+                        NodeKind.VARIABLE, DataType.FLOAT64, ValueRank.SCALAR, Access.READ, "%", null));
+        schemaVersion = schemas.saveNewVersion(dataSourceId, nodes).version();
     }
 
     @Test
@@ -90,6 +107,80 @@ class RecordingAndTimelineIT {
         List<RecordingRow> page2 = recordings.findByProjectPaged(projectId, last.createdAt(), last.id(), 2);
         assertThat(page2).extracting(RecordingRow::id).contains(a.id());
         assertThat(page2).extracting(RecordingRow::id).doesNotContain(b.id(), c.id());
+    }
+
+    /** IS-136: search filter matches on schema node path. */
+    @Test
+    void readPageFilterBySearchMatchesPath() {
+        RecordingRow rec = recordings.create(projectId, dataSourceId, schemaVersion, "SCAN_RECORD", "SCHEMA_AND_DATA", "it");
+        Instant t = Instant.parse("2026-06-01T10:00:00Z");
+        timeline.append(rec.id(), List.of(
+                NeutralValue.good("temp", t, 22.0),
+                NeutralValue.good("humidity", t.plusSeconds(1), 55.0)));
+
+        List<ValueTimelineEntry> matches = timeline.readPage(rec.id(), -1, 10,
+                new ValueFilter("Temp", List.of(), null, null));
+        assertThat(matches).hasSize(1);
+        assertThat(matches.get(0).parameterPath()).isEqualTo("Plant/Temp");
+
+        List<ValueTimelineEntry> noMatches = timeline.readPage(rec.id(), -1, 10,
+                new ValueFilter("Pressure", List.of(), null, null));
+        assertThat(noMatches).isEmpty();
+    }
+
+    /** IS-136: quality filter returns only rows with the given quality. */
+    @Test
+    void readPageFilterByQualityReturnsMatchingRows() {
+        RecordingRow rec = recordings.create(projectId, dataSourceId, schemaVersion, "SCAN_RECORD", "SCHEMA_AND_DATA", "it");
+        Instant t = Instant.parse("2026-06-01T11:00:00Z");
+        timeline.append(rec.id(), List.of(
+                NeutralValue.good("temp", t, 20.0),
+                new NeutralValue("temp", t.plusSeconds(1), 21.0, Quality.UNCERTAIN, null),
+                new NeutralValue("temp", t.plusSeconds(2), 22.0, Quality.BAD, null)));
+
+        List<ValueTimelineEntry> goodOnly = timeline.readPage(rec.id(), -1, 10,
+                new ValueFilter(null, List.of(Quality.GOOD), null, null));
+        assertThat(goodOnly).hasSize(1);
+        assertThat(goodOnly.get(0).value().quality()).isEqualTo(Quality.GOOD);
+
+        List<ValueTimelineEntry> badAndUncertain = timeline.readPage(rec.id(), -1, 10,
+                new ValueFilter(null, List.of(Quality.BAD, Quality.UNCERTAIN), null, null));
+        assertThat(badAndUncertain).hasSize(2);
+    }
+
+    /** IS-136: from/to time range filter restricts returned rows. */
+    @Test
+    void readPageFilterByTimeRangeReturnsRowsInRange() {
+        RecordingRow rec = recordings.create(projectId, dataSourceId, schemaVersion, "SCAN_RECORD", "SCHEMA_AND_DATA", "it");
+        Instant base = Instant.parse("2026-06-01T12:00:00Z");
+        timeline.append(rec.id(), List.of(
+                NeutralValue.good("temp", base, 1.0),
+                NeutralValue.good("temp", base.plusSeconds(5), 2.0),
+                NeutralValue.good("temp", base.plusSeconds(10), 3.0)));
+
+        List<ValueTimelineEntry> inRange = timeline.readPage(rec.id(), -1, 10,
+                new ValueFilter(null, List.of(), base.plusSeconds(3), base.plusSeconds(7)));
+        assertThat(inRange).hasSize(1);
+        assertThat(inRange.get(0).value().value()).isEqualTo(2.0);
+    }
+
+    /** IS-136: countFiltered returns accurate filtered total. */
+    @Test
+    void countFilteredReturnsAccurateTotal() {
+        RecordingRow rec = recordings.create(projectId, dataSourceId, schemaVersion, "SCAN_RECORD", "SCHEMA_AND_DATA", "it");
+        Instant t = Instant.parse("2026-06-01T13:00:00Z");
+        timeline.append(rec.id(), List.of(
+                NeutralValue.good("temp", t, 10.0),
+                NeutralValue.good("temp", t.plusSeconds(1), 11.0),
+                new NeutralValue("humidity", t.plusSeconds(2), 50.0, Quality.BAD, null)));
+
+        long goodCount = timeline.countFiltered(rec.id(),
+                new ValueFilter(null, List.of(Quality.GOOD), null, null));
+        assertThat(goodCount).isEqualTo(2);
+
+        long tempCount = timeline.countFiltered(rec.id(),
+                new ValueFilter("Temp", List.of(), null, null));
+        assertThat(tempCount).isEqualTo(2);
     }
 
     /** IS-093: value_timeline is range-partitioned by source_time with a DEFAULT partition. */

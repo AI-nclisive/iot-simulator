@@ -462,7 +462,8 @@ class ReplayServiceTest {
         }
 
         @Override
-        public List<ValueTimelineEntry> readPage(String recordingId, long afterSeq, int limit) {
+        public List<ValueTimelineEntry> readPage(String recordingId, long afterSeq, int limit,
+                com.ainclusive.iotsim.protocolmodel.ValueFilter filter) {
             throw new UnsupportedOperationException();
         }
     }

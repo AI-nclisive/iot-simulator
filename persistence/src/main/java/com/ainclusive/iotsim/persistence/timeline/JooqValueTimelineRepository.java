@@ -4,16 +4,21 @@ import static com.ainclusive.iotsim.persistence.jooq.tables.Recordings.RECORDING
 import static com.ainclusive.iotsim.persistence.jooq.tables.SchemaNodes.SCHEMA_NODES;
 import static com.ainclusive.iotsim.persistence.jooq.tables.Schemas.SCHEMAS;
 import static com.ainclusive.iotsim.persistence.jooq.tables.ValueTimeline.VALUE_TIMELINE;
+import static org.jooq.impl.DSL.coalesce;
 import static org.jooq.impl.DSL.max;
 
 import com.ainclusive.iotsim.persistence.jooq.tables.records.ValueTimelineRecord;
 import com.ainclusive.iotsim.protocolmodel.NeutralValue;
 import com.ainclusive.iotsim.protocolmodel.Quality;
 import com.ainclusive.iotsim.protocolmodel.ValueCodec;
+import com.ainclusive.iotsim.protocolmodel.ValueFilter;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
+import org.jooq.Condition;
 import org.jooq.DSLContext;
+import org.jooq.impl.DSL;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -84,7 +89,8 @@ public class JooqValueTimelineRepository implements ValueTimelineRepository {
     }
 
     @Override
-    public List<ValueTimelineEntry> readPage(String recordingId, long afterSeq, int limit) {
+    public List<ValueTimelineEntry> readPage(
+            String recordingId, long afterSeq, int limit, ValueFilter filter) {
         return dsl
                 .select(VALUE_TIMELINE.SEQ, SCHEMA_NODES.PATH,
                         VALUE_TIMELINE.NODE_ID, VALUE_TIMELINE.SOURCE_TIME,
@@ -98,6 +104,7 @@ public class JooqValueTimelineRepository implements ValueTimelineRepository {
                         .and(SCHEMA_NODES.NODE_ID.eq(VALUE_TIMELINE.NODE_ID)))
                 .where(VALUE_TIMELINE.RECORDING_ID.eq(recordingId))
                 .and(VALUE_TIMELINE.SEQ.greaterThan(afterSeq))
+                .and(buildFilterConditions(filter))
                 .orderBy(VALUE_TIMELINE.SEQ)
                 .limit(limit)
                 .fetch()
@@ -112,6 +119,46 @@ public class JooqValueTimelineRepository implements ValueTimelineRepository {
                                         r.get(VALUE_TIMELINE.VALUE_ENC)),
                                 Quality.valueOf(r.get(VALUE_TIMELINE.QUALITY)),
                                 r.get(VALUE_TIMELINE.QUALITY_REASON))));
+    }
+
+    @Override
+    public long countFiltered(String recordingId, ValueFilter filter) {
+        Integer total = dsl
+                .selectCount()
+                .from(VALUE_TIMELINE)
+                .join(RECORDINGS).on(RECORDINGS.ID.eq(VALUE_TIMELINE.RECORDING_ID))
+                .join(SCHEMAS).on(SCHEMAS.DATA_SOURCE_ID.eq(RECORDINGS.DATA_SOURCE_ID)
+                        .and(SCHEMAS.VERSION.eq(RECORDINGS.SCHEMA_VERSION)))
+                .leftJoin(SCHEMA_NODES).on(SCHEMA_NODES.SCHEMA_ID.eq(SCHEMAS.ID)
+                        .and(SCHEMA_NODES.NODE_ID.eq(VALUE_TIMELINE.NODE_ID)))
+                .where(VALUE_TIMELINE.RECORDING_ID.eq(recordingId))
+                .and(buildFilterConditions(filter))
+                .fetchOne(0, Integer.class);
+        return total == null ? 0 : total;
+    }
+
+    private Condition buildFilterConditions(ValueFilter filter) {
+        List<Condition> conditions = new ArrayList<>();
+        if (filter.search() != null && !filter.search().isBlank()) {
+            String escaped = filter.search().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
+            String pattern = "%" + escaped + "%";
+            conditions.add(
+                    coalesce(SCHEMA_NODES.PATH, VALUE_TIMELINE.NODE_ID)
+                            .likeIgnoreCase(pattern, '\\'));
+        }
+        if (!filter.qualities().isEmpty()) {
+            List<String> names = filter.qualities().stream().map(Enum::name).toList();
+            conditions.add(VALUE_TIMELINE.QUALITY.in(names));
+        }
+        if (filter.from() != null) {
+            conditions.add(VALUE_TIMELINE.SOURCE_TIME.greaterOrEqual(
+                    filter.from().atOffset(ZoneOffset.UTC)));
+        }
+        if (filter.to() != null) {
+            conditions.add(VALUE_TIMELINE.SOURCE_TIME.lessOrEqual(
+                    filter.to().atOffset(ZoneOffset.UTC)));
+        }
+        return conditions.isEmpty() ? DSL.noCondition() : DSL.and(conditions);
     }
 
     private NeutralValue toValue(ValueTimelineRecord r) {
