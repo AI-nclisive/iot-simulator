@@ -1,6 +1,7 @@
 package com.ainclusive.iotsim.persistence.timeline;
 
 import com.ainclusive.iotsim.protocolmodel.NeutralValue;
+import com.ainclusive.iotsim.protocolmodel.ValueFilter;
 import java.time.Instant;
 import java.util.List;
 
@@ -24,8 +25,17 @@ public interface ValueTimelineRepository {
     /**
      * Keyset-paginated read: returns up to {@code limit} entries with {@code seq > afterSeq},
      * ordered by seq. Pass {@code afterSeq = -1} to start from the beginning (IS-134).
+     * Applies optional {@code filter} criteria (IS-136).
      */
-    List<ValueTimelineEntry> readPage(String recordingId, long afterSeq, int limit);
+    List<ValueTimelineEntry> readPage(String recordingId, long afterSeq, int limit, ValueFilter filter);
+
+    /**
+     * Counts the total number of values matching the given filter (IS-136).
+     * Used when a non-blank filter is active so the total reflects filtered rows.
+     */
+    default long countFiltered(String recordingId, ValueFilter filter) {
+        throw new UnsupportedOperationException("countFiltered not implemented");
+    }
 
     /** A single timeline row with its sequence number (used for cursor-based pagination). */
     record ValueTimelineEntry(long seq, String parameterPath, NeutralValue value) {}

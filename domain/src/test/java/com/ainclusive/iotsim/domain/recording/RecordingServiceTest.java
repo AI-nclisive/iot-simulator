@@ -224,12 +224,13 @@ class RecordingServiceTest {
                 NeutralValue.good("n3", t.plusSeconds(2), 3.0));
         svc.appendValues(PROJECT, rid, vals);
 
-        var page = svc.listValues(PROJECT, rid, null, 2);
+        var filter = com.ainclusive.iotsim.protocolmodel.ValueFilter.NONE;
+        var page = svc.listValues(PROJECT, rid, null, 2, filter);
         assertThat(page.items()).hasSize(2);
         assertThat(page.items().get(0).parameterId()).isEqualTo("n1");
         assertThat(page.nextCursor()).isNotNull();
 
-        var page2 = svc.listValues(PROJECT, rid, page.nextCursor(), 2);
+        var page2 = svc.listValues(PROJECT, rid, page.nextCursor(), 2, filter);
         assertThat(page2.items()).hasSize(1);
         assertThat(page2.items().get(0).parameterId()).isEqualTo("n3");
         assertThat(page2.nextCursor()).isNull();
@@ -237,7 +238,8 @@ class RecordingServiceTest {
 
     @Test
     void listValuesThrowsForMissingRecording() {
-        assertThatThrownBy(() -> service.listValues(PROJECT, "no-such-id", null, null))
+        assertThatThrownBy(() -> service.listValues(PROJECT, "no-such-id", null, null,
+                        com.ainclusive.iotsim.protocolmodel.ValueFilter.NONE))
                 .isInstanceOf(com.ainclusive.iotsim.domain.common.ResourceNotFoundException.class);
     }
 
@@ -408,7 +410,8 @@ class RecordingServiceTest {
         }
 
         @Override
-        public List<ValueTimelineEntry> readPage(String recordingId, long afterSeq, int limit) {
+        public List<ValueTimelineEntry> readPage(String recordingId, long afterSeq, int limit,
+                com.ainclusive.iotsim.protocolmodel.ValueFilter filter) {
             List<NeutralValue> all = byRecording.getOrDefault(recordingId, List.of());
             List<ValueTimelineEntry> result = new ArrayList<>();
             for (int i = 0; i < all.size(); i++) {
