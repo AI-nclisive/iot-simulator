@@ -21,7 +21,7 @@ type ProtocolOption = {
   portHint: string;
 };
 
-type SourceBasis = "scan" | "manual" | "import";
+type SourceBasis = "scan" | "import";
 
 type BasisOption = {
   id: SourceBasis;
@@ -77,11 +77,6 @@ const basisOptions: BasisOption[] = [
     recommended: true,
   },
   {
-    id: "manual",
-    label: "Manual schema",
-    note: "Define the starting structure directly when no live source is available.",
-  },
-  {
     id: "import",
     label: "Prepared data",
     note: "Use an existing recording as the data source for this simulator.",
@@ -97,13 +92,6 @@ const SCAN_STEPS: WizardStep[] = [
   { id: "setup", label: "Setup" },
   { id: "schedule", label: "Schedule" },
   { id: "runtime", label: "Runtime" },
-  { id: "review", label: "Review" },
-];
-
-const MANUAL_STEPS: WizardStep[] = [
-  { id: "protocol", label: "Protocol" },
-  { id: "basis", label: "Source basis" },
-  { id: "setup", label: "Manual schema" },
   { id: "review", label: "Review" },
 ];
 
@@ -126,7 +114,6 @@ const DEFAULT_STEPS: WizardStep[] = [
 
 function getActiveSteps(basis: SourceBasis | null): WizardStep[] {
   if (basis === "scan") return SCAN_STEPS;
-  if (basis === "manual") return MANUAL_STEPS;
   if (basis === "import") return IMPORT_STEPS;
   return DEFAULT_STEPS;
 }
@@ -291,9 +278,7 @@ function reviewLines(form: WizardFormState, selectedRecordingLabel?: string) {
     ...(form.basis === "import"
       ? [{ label: "Recording", value: selectedRecordingLabel ?? "-" }]
       : []),
-    ...(form.basis === "manual"
-      ? [{ label: "Next step", value: "Schema editor opens after creation" }]
-      : [{ label: "Runtime behavior", value: runtimeLabel }]),
+    { label: "Runtime behavior", value: runtimeLabel },
     ...(form.scheduleStartEnabled
       ? [{ label: "Start", value: form.scheduleStart || "-" }]
       : []),
@@ -524,11 +509,7 @@ export function CreateDataSourceWizardPage() {
         }
       }
 
-      if (form.basis === "manual") {
-        navigate(`/data-sources/${createdId}?tab=schema`);
-      } else {
-        navigate(`/data-sources/${createdId}`);
-      }
+      navigate(`/data-sources/${createdId}`);
     } catch (err) {
       console.error("[createSource]", err);
       const title = err instanceof Error ? err.message : "Failed to create source";
@@ -803,12 +784,6 @@ export function CreateDataSourceWizardPage() {
                 </select>
               </label>
             </div>
-          ) : null}
-
-          {form.basis === "manual" ? (
-            <section className="rounded-md border border-shell-accent/30 bg-shell-accent/5 px-4 py-3 text-sm text-shell-ink">
-              After creation, the Schema editor opens automatically — add parameters, folders, and data types there.
-            </section>
           ) : null}
 
           {form.basis === "import" ? (

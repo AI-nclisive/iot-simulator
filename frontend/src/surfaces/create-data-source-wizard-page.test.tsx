@@ -1,10 +1,10 @@
 /**
- * Tests for CreateDataSourceWizardPage (UI-037, UI-116)
+ * Tests for CreateDataSourceWizardPage (UI-037, UI-116, UI-121)
  *
  * Covers:
- * - Source name field is shown on the manual schema setup step
+ * - Source name field is shown on the scan setup step
  * - Next is disabled when source name is empty (validation system active)
- * - Next is enabled when source name is filled on manual schema path
+ * - Next is enabled when source name is filled on scan path
  * - validationMessage skips credential validation in local mode (UI-116)
  * - validationMessage enforces credentials in shared mode
  */
@@ -44,7 +44,7 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-async function navigateToManualSetup() {
+async function navigateToScanSetup() {
   render(
     <MemoryRouter>
       <CreateDataSourceWizardPage />
@@ -55,27 +55,40 @@ async function navigateToManualSetup() {
   await userEvent.click(screen.getByText("OPC UA"));
   await userEvent.click(screen.getByRole("button", { name: "Next" }));
 
-  // Step 1: choose manual basis
-  await userEvent.click(screen.getByText("Manual schema"));
+  // Step 1: choose Real source basis
+  await userEvent.click(screen.getByText("Real source"));
   await userEvent.click(screen.getByRole("button", { name: "Next" }));
 }
 
 describe("CreateDataSourceWizardPage — setup step", () => {
-  it("shows Source name field on the manual schema setup step", async () => {
-    await navigateToManualSetup();
+  it("shows Source name field on the setup step", async () => {
+    await navigateToScanSetup();
     expect(screen.getByLabelText("Source name")).toBeTruthy();
   });
 
   it("Next is disabled when source name is empty", async () => {
-    await navigateToManualSetup();
+    await navigateToScanSetup();
     const btn = screen.getByRole("button", { name: "Next" }) as HTMLButtonElement;
     expect(btn.disabled).toBe(true);
   });
 });
 
-describe("CreateDataSourceWizardPage — manual schema validation", () => {
+describe("CreateDataSourceWizardPage — basis step (UI-121)", () => {
+  it("does not show Manual schema option", async () => {
+    render(
+      <MemoryRouter>
+        <CreateDataSourceWizardPage />
+      </MemoryRouter>,
+    );
+    await userEvent.click(screen.getByText("OPC UA"));
+    await userEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.queryByText("Manual schema")).toBeNull();
+  });
+});
+
+describe("CreateDataSourceWizardPage — scan setup validation", () => {
   it("enables Next when source name is filled", async () => {
-    await navigateToManualSetup();
+    await navigateToScanSetup();
     await userEvent.type(screen.getByLabelText("Source name"), "Test source");
 
     const btn = screen.getByRole("button", { name: "Next" }) as HTMLButtonElement;
