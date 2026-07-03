@@ -137,7 +137,7 @@ class RecordingImportExportServiceTest {
         given(projects.findById(PROJECT)).willReturn(Optional.of(projectRow()));
         RecordingRow created = row();
         RecordingRow finalized = row();
-        given(recordings.create(eq(PROJECT), any(), any(Integer.class), eq("IMPORTED"), eq("local")))
+        given(recordings.create(eq(PROJECT), any(), any(Integer.class), eq("IMPORTED"), eq("SCHEMA_AND_DATA"), eq("local")))
                 .willReturn(created);
         given(recordings.finalizeStats(eq(REC_ID), any(), any(), any(Long.class), any(Long.class)))
                 .willReturn(finalized);
@@ -148,14 +148,14 @@ class RecordingImportExportServiceTest {
         Recording result = service.importRecording(PROJECT, zipContent, "local");
 
         assertThat(result).isNotNull();
-        verify(recordings).create(eq(PROJECT), eq("ds-1"), eq(1), eq("IMPORTED"), eq("local"));
+        verify(recordings).create(eq(PROJECT), eq("ds-1"), eq(1), eq("IMPORTED"), eq("SCHEMA_AND_DATA"), eq("local"));
     }
 
     @Test
     void importAppendsValueTimeline() throws Exception {
         given(projects.findById(PROJECT)).willReturn(Optional.of(projectRow()));
         RecordingRow created = row();
-        given(recordings.create(any(), any(), any(Integer.class), any(), any())).willReturn(created);
+        given(recordings.create(any(), any(), any(Integer.class), any(), any(), any())).willReturn(created);
         given(recordings.finalizeStats(any(), any(), any(), any(Long.class), any(Long.class))).willReturn(created);
 
         byte[] zipContent = buildExportZip(PROJECT, REC_ID, "ds-1", 1, values());
@@ -214,7 +214,7 @@ class RecordingImportExportServiceTest {
 
     private static RecordingRow row(String projectId, String id) {
         OffsetDateTime now = Instant.now().atOffset(ZoneOffset.UTC);
-        return new RecordingRow(id, projectId, "ds-1", 1, "SCAN_RECORD",
+        return new RecordingRow(id, projectId, "ds-1", 1, "SCAN_RECORD", "SCHEMA_AND_DATA",
                 now, now, 2L, 0L, now, now, "local", 0L);
     }
 

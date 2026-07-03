@@ -797,6 +797,7 @@ Parallel execution:
   Depends: IS-051 (values SSE stream).
   Done when: no fake timer in `RecordingFlowPage`; value count and state reflect real SSE; TypeScript errors pass.
 
+- [x] `UI-124` Recording wizard — scan type step (schema only vs schema + data): new step between Data source and Review; two options (Schema + data default, Schema only); selected value sent as `scanType` in `POST /recordings` body; review step shows chosen type. BE half: IS-138.
 - [x] `UI-121` Remove manual basis from Create Data Source wizard
   Goal: hide the «Manual» source-basis option — not needed in current scope; SCAN / IMPORT / SYNTHETIC remain.
   Work includes: remove Manual card from basis step; remove dead conditional branches that handle manual-only flows (e.g. schema-editor auto-open); update tests.

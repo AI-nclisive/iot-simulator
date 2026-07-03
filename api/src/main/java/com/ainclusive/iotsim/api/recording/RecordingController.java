@@ -4,6 +4,7 @@ import com.ainclusive.iotsim.api.security.Permission;
 import com.ainclusive.iotsim.domain.recording.Recording;
 import com.ainclusive.iotsim.domain.recording.RecordingService;
 import com.ainclusive.iotsim.domain.support.Page;
+import com.ainclusive.iotsim.protocolmodel.ScanType;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.net.URI;
@@ -74,7 +75,8 @@ public class RecordingController {
         if (req == null || req.dataSourceId() == null || req.dataSourceId().isBlank()) {
             throw new IllegalArgumentException("dataSourceId is required");
         }
-        Recording recording = recordings.create(projectId, req.dataSourceId(), "local");
+        ScanType scanType = req.scanType() != null ? req.scanType() : ScanType.SCHEMA_AND_DATA;
+        Recording recording = recordings.create(projectId, req.dataSourceId(), scanType, "local");
         return ResponseEntity.created(
                         URI.create("/api/v1/projects/" + projectId + "/recordings/" + recording.id()))
                 .eTag(etag(recording.version()))
@@ -96,16 +98,16 @@ public class RecordingController {
         return "\"" + version + "\"";
     }
 
-    public record CreateRecordingRequest(String dataSourceId) {}
+    public record CreateRecordingRequest(String dataSourceId, ScanType scanType) {}
 
     public record RecordingResponse(
             String id, String projectId, String dataSourceId, int schemaVersion, String origin,
-            long valueCount, Instant createdAt, String createdBy, long version) {
+            String scanType, long valueCount, Instant createdAt, String createdBy, long version) {
 
         static RecordingResponse from(Recording r) {
             return new RecordingResponse(
                     r.id(), r.projectId(), r.dataSourceId(), r.schemaVersion(), r.origin(),
-                    r.valueCount(), r.createdAt(), r.createdBy(), r.version());
+                    r.scanType(), r.valueCount(), r.createdAt(), r.createdBy(), r.version());
         }
     }
 }

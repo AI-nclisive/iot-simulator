@@ -1,11 +1,10 @@
 /**
- * Tests for CreateRecordingWizardPage (UI-115, UI-118)
+ * Tests for CreateRecordingWizardPage (UI-115, UI-118, UI-124)
  *
  * Covers:
- * - Step 1 (Data source): shows empty state when no sources available
- * - Step 1: shows data sources; Next disabled until one selected
- * - Step 1: Next enabled after selecting a source
- * - Step 2 (Review): shows Create recording button
+ * - Step 1 (Data source): empty state, source list, Next enabled/disabled
+ * - Step 2 (Scan type): shows options, selection persists to review
+ * - Step 3 (Review): shows Create recording button, selected values
  */
 
 import { cleanup, render, screen } from "@testing-library/react";
@@ -62,6 +61,17 @@ function renderPage() {
   );
 }
 
+async function navigateToScanTypeStep() {
+  renderPage();
+  await userEvent.click(screen.getByText("Plant OPC UA"));
+  await userEvent.click(screen.getByRole("button", { name: "Next" }));
+}
+
+async function navigateToReviewStep() {
+  await navigateToScanTypeStep();
+  await userEvent.click(screen.getByRole("button", { name: "Next" }));
+}
+
 describe("CreateRecordingWizardPage — step 1 (Data source)", () => {
   it("renders data source list", () => {
     renderPage();
@@ -83,19 +93,55 @@ describe("CreateRecordingWizardPage — step 1 (Data source)", () => {
   });
 });
 
-describe("CreateRecordingWizardPage — step 2 (Review)", () => {
+describe("CreateRecordingWizardPage — step 2 (Scan type)", () => {
+  it("shows both scan type options", async () => {
+    await navigateToScanTypeStep();
+    expect(screen.getByText("Schema + data")).toBeTruthy();
+    expect(screen.getByText("Schema only")).toBeTruthy();
+  });
+
+  it("Schema + data is selected by default", async () => {
+    await navigateToScanTypeStep();
+    // The default button should have the selected style (border-shell-accent)
+    const schemaAndDataBtn = screen.getByText("Schema + data").closest("button")!;
+    expect(schemaAndDataBtn.className).toContain("border-shell-accent");
+  });
+
+  it("Schema only can be selected", async () => {
+    await navigateToScanTypeStep();
+    await userEvent.click(screen.getByText("Schema only").closest("button")!);
+    const schemaOnlyBtn = screen.getByText("Schema only").closest("button")!;
+    expect(schemaOnlyBtn.className).toContain("border-shell-accent");
+  });
+
+  it("Next is always enabled on scan type step", async () => {
+    await navigateToScanTypeStep();
+    const btn = screen.getByRole("button", { name: "Next" }) as HTMLButtonElement;
+    expect(btn.disabled).toBe(false);
+  });
+});
+
+describe("CreateRecordingWizardPage — step 3 (Review)", () => {
   it("renders Create recording button on review step", async () => {
-    renderPage();
-    await userEvent.click(screen.getByText("Plant OPC UA"));
-    await userEvent.click(screen.getByRole("button", { name: "Next" }));
+    await navigateToReviewStep();
     expect(screen.getByRole("button", { name: "Create recording" })).toBeTruthy();
   });
 
   it("shows selected source name in review", async () => {
-    renderPage();
-    await userEvent.click(screen.getByText("Plant OPC UA"));
-    await userEvent.click(screen.getByRole("button", { name: "Next" }));
+    await navigateToReviewStep();
     expect(screen.getAllByText("Plant OPC UA").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("shows scan type in review (default: Schema + data)", async () => {
+    await navigateToReviewStep();
+    expect(screen.getByText("Schema + data")).toBeTruthy();
+  });
+
+  it("shows Schema only in review when selected", async () => {
+    await navigateToScanTypeStep();
+    await userEvent.click(screen.getByText("Schema only").closest("button")!);
+    await userEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByText("Schema only")).toBeTruthy();
   });
 });
 

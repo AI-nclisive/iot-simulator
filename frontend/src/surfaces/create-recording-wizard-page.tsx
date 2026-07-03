@@ -8,16 +8,20 @@ import { apiFetch, ApiError } from "../api";
 import { SharedStatePanel } from "../ui/shared-state-panel";
 import { StatusBadge } from "../ui/status-badge";
 
-type RecordingStepId = "source" | "review";
+type RecordingStepId = "source" | "scan-type" | "review";
 type RecordingStep = { id: RecordingStepId; label: string };
 
 const STEPS: RecordingStep[] = [
   { id: "source", label: "Data source" },
+  { id: "scan-type", label: "Scan type" },
   { id: "review", label: "Review" },
 ];
 
+type ScanType = "SCHEMA_AND_DATA" | "SCHEMA_ONLY";
+
 type RecordingWizardForm = {
   dataSourceId: string | null;
+  scanType: ScanType;
 };
 
 function stepChipClass(current: boolean, completed: boolean) {
@@ -26,9 +30,17 @@ function stepChipClass(current: boolean, completed: boolean) {
   return "border-shell-line bg-shell-base/55 text-shell-muted";
 }
 
+function optionButtonClass(selected: boolean) {
+  return `w-full rounded-md border px-4 py-4 text-left transition ${
+    selected
+      ? "border-shell-accent bg-white shadow-sm"
+      : "border-shell-line bg-shell-base/55 hover:border-shell-accent/45 hover:bg-white"
+  }`;
+}
+
 function stepValidation(form: RecordingWizardForm, stepId: RecordingStepId): string | null {
-  if (stepId === "source") {
-    if (!form.dataSourceId) return "Select a data source to continue.";
+  if (stepId === "source" && !form.dataSourceId) {
+    return "Select a data source to continue.";
   }
   return null;
 }
@@ -44,12 +56,14 @@ export function CreateRecordingWizardPage() {
 
   const [currentStep, setCurrentStep] = useState(0);
   const [showValidation, setShowValidation] = useState(false);
-  const [form, setForm] = useState<RecordingWizardForm>({ dataSourceId: null });
+  const [form, setForm] = useState<RecordingWizardForm>({
+    dataSourceId: null,
+    scanType: "SCHEMA_AND_DATA",
+  });
 
   const safeStep = Math.min(currentStep, STEPS.length - 1);
   const activeStepId = STEPS[safeStep].id;
   const currentValidationMessage = stepValidation(form, activeStepId);
-
   const selectedSource = dataSources.find((ds) => ds.id === form.dataSourceId) ?? null;
 
   if (!access.canCreateSource) {
@@ -87,7 +101,7 @@ export function CreateRecordingWizardPage() {
         `/api/v1/projects/${currentProjectId}/recordings`,
         {
           method: "POST",
-          body: JSON.stringify({ dataSourceId: form.dataSourceId }),
+          body: JSON.stringify({ dataSourceId: form.dataSourceId, scanType: form.scanType }),
         },
       );
       push({ tone: "success", title: "Recording created." });
@@ -99,9 +113,7 @@ export function CreateRecordingWizardPage() {
   }
 
   function renderSourceStep() {
-    const runningSources = dataSources.filter((ds) => ds.status === "Active");
     const allSources = dataSources;
-
     if (allSources.length === 0) {
       return (
         <SharedStatePanel
@@ -111,30 +123,23 @@ export function CreateRecordingWizardPage() {
         />
       );
     }
-
     return (
       <div className="space-y-4">
         <section className="rounded-md border border-shell-line bg-white px-4 py-4">
           <p className="text-sm font-medium text-shell-ink">Select a data source</p>
           <p className="mt-2 text-sm leading-6 text-shell-muted">
-            The recording will capture schema and data from the selected source.
-            {runningSources.length === 0 ? " Start a source first to enable active capture." : ""}
+            The recording will capture data from the selected source.
           </p>
         </section>
-
         <div className="space-y-2">
           {allSources.map((ds) => {
             const isSelected = form.dataSourceId === ds.id;
             return (
               <button
                 key={ds.id}
-                className={`w-full rounded-md border px-4 py-4 text-left transition ${
-                  isSelected
-                    ? "border-shell-accent bg-white shadow-sm"
-                    : "border-shell-line bg-shell-base/55 hover:border-shell-accent/45 hover:bg-white"
-                }`}
+                className={optionButtonClass(isSelected)}
                 type="button"
-                onClick={() => setForm({ dataSourceId: ds.id })}
+                onClick={() => setForm((f) => ({ ...f, dataSourceId: ds.id }))}
               >
                 <div className="flex flex-wrap items-center gap-3">
                   <div className="min-w-0 flex-1">
@@ -159,12 +164,41 @@ export function CreateRecordingWizardPage() {
     );
   }
 
+  function renderScanTypeStep() {
+    return (
+      <div className="space-y-3">
+        <button
+          className={optionButtonClass(form.scanType === "SCHEMA_AND_DATA")}
+          type="button"
+          onClick={() => setForm((f) => ({ ...f, scanType: "SCHEMA_AND_DATA" }))}
+        >
+          <p className="text-sm font-medium text-shell-ink">Schema + data</p>
+          <p className="mt-1 text-sm text-shell-muted">
+            Captures schema nodes and all value timeline entries. Use this for replay and analysis.
+          </p>
+        </button>
+        <button
+          className={optionButtonClass(form.scanType === "SCHEMA_ONLY")}
+          type="button"
+          onClick={() => setForm((f) => ({ ...f, scanType: "SCHEMA_ONLY" }))}
+        >
+          <p className="text-sm font-medium text-shell-ink">Schema only</p>
+          <p className="mt-1 text-sm text-shell-muted">
+            Captures schema nodes only — no value writes. Use this to inspect the device structure.
+          </p>
+        </button>
+      </div>
+    );
+  }
+
   function renderReviewStep() {
     if (!selectedSource) return null;
+    const scanTypeLabel = form.scanType === "SCHEMA_ONLY" ? "Schema only" : "Schema + data";
     const items = [
       { label: "Data source", value: selectedSource.name },
       { label: "Protocol", value: selectedSource.protocol },
       { label: "Status", value: selectedSource.status },
+      { label: "Scan type", value: scanTypeLabel },
       ...(selectedSource.endpoint ? [{ label: "Endpoint", value: selectedSource.endpoint }] : []),
     ];
     return (
@@ -233,7 +267,9 @@ export function CreateRecordingWizardPage() {
             />
           ) : null}
 
-          {activeStepId === "source" ? renderSourceStep() : renderReviewStep()}
+          {activeStepId === "source" ? renderSourceStep() : null}
+          {activeStepId === "scan-type" ? renderScanTypeStep() : null}
+          {activeStepId === "review" ? renderReviewStep() : null}
         </div>
       </section>
 
