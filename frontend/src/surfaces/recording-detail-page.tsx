@@ -10,6 +10,7 @@ type TabId = "schema" | "values";
 
 type ValueEntry = {
   parameterId: string;
+  parameterPath: string | null;
   timestamp: string;
   value: string | null;
   quality: string;
@@ -42,6 +43,7 @@ export function RecordingDetailPage() {
 
   const [values, setValues] = useState<ValueEntry[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [valuesTotal, setValuesTotal] = useState<number | null>(null);
   const [valuesLoading, setValuesLoading] = useState(false);
   const [valuesError, setValuesError] = useState<string | null>(null);
   const [valuesLoaded, setValuesLoaded] = useState(false);
@@ -61,11 +63,12 @@ export function RecordingDetailPage() {
       setValuesError(null);
       try {
         const qs = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
-        const page = await apiFetch<{ items: ValueEntry[]; nextCursor: string | null }>(
+        const page = await apiFetch<{ items: ValueEntry[]; nextCursor: string | null; total: number }>(
           `/api/v1/projects/${currentProjectId}/recordings/${recordingId}/values${qs}`,
         );
         setValues((prev) => (cursor ? [...prev, ...page.items] : page.items));
         setNextCursor(page.nextCursor ?? null);
+        setValuesTotal(page.total);
         setValuesLoaded(true);
       } catch (err) {
         setValuesError(err instanceof ApiError ? err.title : "Failed to load values");
@@ -162,7 +165,7 @@ export function RecordingDetailPage() {
                     {formatDate(v.timestamp)}
                   </td>
                   <td className="px-4 py-2 font-mono text-xs text-shell-ink break-all">
-                    {v.parameterId}
+                    {v.parameterPath ?? v.parameterId}
                   </td>
                   <td className="px-4 py-2 text-shell-ink">{v.value ?? "—"}</td>
                   <td className="px-4 py-2">
@@ -200,7 +203,7 @@ export function RecordingDetailPage() {
 
         {!nextCursor && values.length > 0 ? (
           <p className="text-center text-xs text-shell-muted">
-            All {recording!.valueCount.toLocaleString()} values loaded.
+            All {(valuesTotal ?? recording!.valueCount).toLocaleString()} values loaded.
           </p>
         ) : null}
       </div>

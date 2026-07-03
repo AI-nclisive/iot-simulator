@@ -69,12 +69,12 @@ const baseArtifact = {
 };
 
 const sampleValues = [
-  { parameterId: "ns=2;s=Temp", timestamp: "2026-01-01T00:00:00Z", value: "21.5", quality: "GOOD" },
-  { parameterId: "ns=2;s=Press", timestamp: "2026-01-01T00:00:01Z", value: "1013", quality: "GOOD" },
+  { parameterId: "ns=2;s=Temp", parameterPath: "/Root/Temp", timestamp: "2026-01-01T00:00:00Z", value: "21.5", quality: "GOOD" },
+  { parameterId: "ns=2;s=Press", parameterPath: "/Root/Press", timestamp: "2026-01-01T00:00:01Z", value: "1013", quality: "GOOD" },
 ];
 
 beforeEach(() => {
-  mockApiFetch.mockResolvedValue({ items: [], nextCursor: null });
+  mockApiFetch.mockResolvedValue({ items: [], nextCursor: null, total: 0 });
   useArtifactsStore.setState({
     artifacts: [],
     samples: [],
@@ -152,16 +152,16 @@ describe("RecordingDetailPage — values tab (UI-119)", () => {
   });
 
   it("renders value rows in table after API call", async () => {
-    mockApiFetch.mockResolvedValueOnce({ items: sampleValues, nextCursor: null });
+    mockApiFetch.mockResolvedValueOnce({ items: sampleValues, nextCursor: null, total: 2 });
     renderWithId("rec-001");
     await userEvent.click(screen.getByRole("button", { name: "Values" }));
-    await waitFor(() => expect(screen.getByText("ns=2;s=Temp")).toBeTruthy());
-    expect(screen.getByText("ns=2;s=Press")).toBeTruthy();
+    await waitFor(() => expect(screen.getByText("/Root/Temp")).toBeTruthy());
+    expect(screen.getByText("/Root/Press")).toBeTruthy();
     expect(screen.getByText("21.5")).toBeTruthy();
   });
 
   it("shows Load more button when nextCursor is present", async () => {
-    mockApiFetch.mockResolvedValueOnce({ items: sampleValues, nextCursor: "abc123" });
+    mockApiFetch.mockResolvedValueOnce({ items: sampleValues, nextCursor: "abc123", total: 3 });
     renderWithId("rec-001");
     await userEvent.click(screen.getByRole("button", { name: "Values" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Load more" })).toBeTruthy());
@@ -172,8 +172,8 @@ describe("RecordingDetailPage — values tab (UI-119)", () => {
       { parameterId: "ns=2;s=Flow", timestamp: "2026-01-01T00:00:02Z", value: "5.0", quality: "GOOD" },
     ];
     mockApiFetch
-      .mockResolvedValueOnce({ items: sampleValues, nextCursor: "abc123" })
-      .mockResolvedValueOnce({ items: page2, nextCursor: null });
+      .mockResolvedValueOnce({ items: sampleValues, nextCursor: "abc123", total: 3 })
+      .mockResolvedValueOnce({ items: page2, nextCursor: null, total: 3 });
 
     renderWithId("rec-001");
     await userEvent.click(screen.getByRole("button", { name: "Values" }));
@@ -184,7 +184,7 @@ describe("RecordingDetailPage — values tab (UI-119)", () => {
   });
 
   it("shows all-loaded message when all values fetched", async () => {
-    mockApiFetch.mockResolvedValueOnce({ items: sampleValues, nextCursor: null });
+    mockApiFetch.mockResolvedValueOnce({ items: sampleValues, nextCursor: null, total: 2 });
     renderWithId("rec-001");
     await userEvent.click(screen.getByRole("button", { name: "Values" }));
     await waitFor(() =>
@@ -203,7 +203,7 @@ describe("RecordingDetailPage — values tab (UI-119)", () => {
   it("keeps rows visible and shows inline error when Load more fails", async () => {
     const { ApiError } = await import("../api");
     mockApiFetch
-      .mockResolvedValueOnce({ items: sampleValues, nextCursor: "abc123" })
+      .mockResolvedValueOnce({ items: sampleValues, nextCursor: "abc123", total: 3 })
       .mockRejectedValueOnce(new ApiError(500, "Server error", "Internal failure", undefined));
 
     renderWithId("rec-001");
@@ -212,7 +212,7 @@ describe("RecordingDetailPage — values tab (UI-119)", () => {
     await userEvent.click(screen.getByRole("button", { name: "Load more" }));
 
     await waitFor(() => expect(screen.getByText("Server error")).toBeTruthy());
-    expect(screen.getByText("ns=2;s=Temp")).toBeTruthy();
+    expect(screen.getByText("/Root/Temp")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Load more" })).toBeTruthy();
     expect(screen.queryByText("Failed to load values.")).toBeNull();
   });
