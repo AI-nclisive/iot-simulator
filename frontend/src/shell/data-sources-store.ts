@@ -60,7 +60,6 @@ type DataSourcesState = {
   createDataSource: (input: CreateDataSourceInput & { projectId: string }) => Promise<string>;
   deleteDataSource: (rowId: string, projectId?: string) => Promise<void>;
   duplicateDataSource: (rowId: string, projectId?: string) => Promise<void>;
-  startDataSource: (rowId: string, projectId?: string) => Promise<void>;
   stopDataSource: (rowId: string, projectId?: string) => Promise<void>;
   updateSourceConfiguration: (
     rowId: string,
@@ -130,18 +129,6 @@ export const useDataSourcesStore = create<DataSourcesState>((set, get) => ({
     );
     const row = mapDataSource(data);
     set((state) => ({ dataSources: [...state.dataSources, row] }));
-  },
-
-  startDataSource: async (rowId, projectId) => {
-    const pid = projectId ?? get().currentProjectId;
-    const data = await apiFetch<DataSourceResponse>(
-      `/api/v1/projects/${pid}/data-sources/${rowId}/start`,
-      { method: "POST" },
-    );
-    const updated = mapDataSource(data);
-    set((state) => ({
-      dataSources: state.dataSources.map((row) => (row.id === rowId ? updated : row)),
-    }));
   },
 
   stopDataSource: async (rowId, projectId) => {

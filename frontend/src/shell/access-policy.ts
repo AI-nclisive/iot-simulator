@@ -28,7 +28,6 @@ export function resolveAccess(accessMode: AccessMode, sharedRole: SharedRole) {
     canRunScenario: true,
     canStopScenario: true,
     canStopSource: true,
-    canStartStoppedSource: true,
     effectiveRoleLabel: isLocal ? "Trusted local" : roleLabel(sharedRole),
     isAdmin,
     isLocal,

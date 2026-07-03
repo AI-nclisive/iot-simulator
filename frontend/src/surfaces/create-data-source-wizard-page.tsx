@@ -40,7 +40,6 @@ export type WizardFormState = {
   opcUaSecurity: "Basic256Sha256" | "None";
   protocol: ProtocolOption["id"] | null;
   realDeviceEndpoint: string;
-  runtimeBehavior: "start-now" | "stopped";
   scanCredentialConfirmed: boolean;
   scanCredentialMode: "anonymous" | "external-ref" | "password";
   scanPassword: string;
@@ -83,7 +82,7 @@ const basisOptions: BasisOption[] = [
   },
 ];
 
-export type WizardStepId = "protocol" | "basis" | "setup" | "import" | "schedule" | "runtime" | "review";
+export type WizardStepId = "protocol" | "basis" | "setup" | "import" | "schedule" | "review";
 type WizardStep = { id: WizardStepId; label: string };
 
 const SCAN_STEPS: WizardStep[] = [
@@ -91,7 +90,6 @@ const SCAN_STEPS: WizardStep[] = [
   { id: "basis", label: "Source basis" },
   { id: "setup", label: "Setup" },
   { id: "schedule", label: "Schedule" },
-  { id: "runtime", label: "Runtime" },
   { id: "review", label: "Review" },
 ];
 
@@ -99,7 +97,6 @@ const IMPORT_STEPS: WizardStep[] = [
   { id: "protocol", label: "Protocol" },
   { id: "basis", label: "Source basis" },
   { id: "import", label: "Import data" },
-  { id: "runtime", label: "Runtime" },
   { id: "review", label: "Review" },
 ];
 
@@ -108,7 +105,6 @@ const DEFAULT_STEPS: WizardStep[] = [
   { id: "basis", label: "Source basis" },
   { id: "setup", label: "Setup" },
   { id: "schedule", label: "Schedule" },
-  { id: "runtime", label: "Runtime" },
   { id: "review", label: "Review" },
 ];
 
@@ -261,9 +257,6 @@ function credentialPersistenceLabel(form: WizardFormState) {
 
 function reviewLines(form: WizardFormState, selectedRecordingLabel?: string) {
   const basisLabel = basisOptions.find((option) => option.id === form.basis)?.label ?? "-";
-  const runtimeLabel =
-    form.runtimeBehavior === "start-now" ? "Start immediately" : "Save without starting";
-
   return [
     { label: "Source name", value: form.name || "-" },
     { label: "Protocol", value: form.protocol ?? "-" },
@@ -278,7 +271,6 @@ function reviewLines(form: WizardFormState, selectedRecordingLabel?: string) {
     ...(form.basis === "import"
       ? [{ label: "Recording", value: selectedRecordingLabel ?? "-" }]
       : []),
-    { label: "Runtime behavior", value: runtimeLabel },
     ...(form.scheduleStartEnabled
       ? [{ label: "Start", value: form.scheduleStart || "-" }]
       : []),
@@ -293,7 +285,6 @@ export function CreateDataSourceWizardPage() {
   const accessMode = useShellStore((state) => state.accessMode);
   const sharedRole = useShellStore((state) => state.sharedRole);
   const currentProjectId = useShellStore((state) => state.currentProjectId);
-  const startDataSource = useDataSourcesStore((state) => state.startDataSource);
   const push = useNotificationStore((state) => state.push);
   const access = resolveAccess(accessMode, sharedRole);
 
@@ -315,8 +306,7 @@ export function CreateDataSourceWizardPage() {
     opcUaSecurity: "None",
     protocol: null,
     realDeviceEndpoint: "",
-    runtimeBehavior: "stopped",
-    scanCredentialConfirmed: false,
+      scanCredentialConfirmed: false,
     scanCredentialMode: "anonymous",
     scanPassword: "",
     scanSecretRef: "",
@@ -500,14 +490,6 @@ export function CreateDataSourceWizardPage() {
         },
       );
       const createdId = data.id;
-
-      if (form.runtimeBehavior === "start-now") {
-        try {
-          await startDataSource(createdId, currentProjectId);
-        } catch {
-          // Non-fatal: source was created; start failure is surfaced separately
-        }
-      }
 
       navigate(`/data-sources/${createdId}`);
     } catch (err) {
@@ -932,37 +914,6 @@ export function CreateDataSourceWizardPage() {
     );
   }
 
-  function renderRuntimeStep() {
-    return (
-      <div className="grid gap-3 lg:grid-cols-2">
-        <button
-          className={optionButtonClass(form.runtimeBehavior === "stopped")}
-          type="button"
-          onClick={() => updateForm({ runtimeBehavior: "stopped" })}
-        >
-          <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm font-medium text-shell-ink">Save without starting</p>
-              <StatusBadge label="Recommended" tone="accent" />
-            </div>
-            <p className="mt-2 text-sm leading-6 text-shell-muted">
-              Create the source as inactive. You can start it later from the source detail.
-            </p>
-          </button>
-
-        <button
-          className={optionButtonClass(form.runtimeBehavior === "start-now")}
-          type="button"
-          onClick={() => updateForm({ runtimeBehavior: "start-now" })}
-        >
-          <p className="text-sm font-medium text-shell-ink">Start immediately</p>
-          <p className="mt-2 text-sm leading-6 text-shell-muted">
-            Create the source and mark it active right away so you can continue into runtime work.
-          </p>
-        </button>
-      </div>
-    );
-  }
-
   function renderReviewStep() {
     return (
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -1030,10 +981,6 @@ export function CreateDataSourceWizardPage() {
 
     if (activeStepId === "schedule") {
       return renderScheduleStep();
-    }
-
-    if (activeStepId === "runtime") {
-      return renderRuntimeStep();
     }
 
     return renderReviewStep();

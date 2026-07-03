@@ -124,21 +124,6 @@ describe("deleteDataSource", () => {
   });
 });
 
-describe("startDataSource", () => {
-  it("updates the row status from API response", async () => {
-    useDataSourcesStore.setState({
-      dataSources: [
-        { id: "src-01", name: "Source A", protocol: "OPC UA", endpoint: "opc.tcp://test:4840", parameterCount: 0, status: "Stopped", health: "Healthy" },
-      ],
-      currentProjectId: "proj-1",
-    });
-    mockApiFetch.mockResolvedValueOnce(makeDataSourceResponse({ id: "src-01", runtimeState: "RUNNING" }));
-    await useDataSourcesStore.getState().startDataSource("src-01", "proj-1");
-    const row = useDataSourcesStore.getState().dataSources[0];
-    expect(row.status).toBe("Active");
-  });
-});
-
 describe("duplicateDataSource", () => {
   it("calls POST /data-sources/{rowId}/duplicate and appends the copy", async () => {
     useDataSourcesStore.setState({

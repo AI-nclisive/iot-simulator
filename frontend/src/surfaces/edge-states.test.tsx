@@ -22,7 +22,6 @@ function makeDataSourcesStoreMock(overrides: Record<string, unknown> = {}) {
       isLoading: false,
       error: null,
       loadDataSources: mockAsyncNoop,
-      startDataSource: mockAsyncNoop,
       stopDataSource: mockAsyncNoop,
       duplicateDataSource: mockAsyncNoop,
       deleteDataSource: mockAsyncNoop,

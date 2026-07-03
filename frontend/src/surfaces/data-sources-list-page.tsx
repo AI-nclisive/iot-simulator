@@ -71,7 +71,6 @@ export function DataSourcesListPage() {
   const isLoading = useDataSourcesStore((state) => state.isLoading);
   const error = useDataSourcesStore((state) => state.error);
   const loadDataSources = useDataSourcesStore((state) => state.loadDataSources);
-  const startDataSource = useDataSourcesStore((state) => state.startDataSource);
   const stopDataSource = useDataSourcesStore((state) => state.stopDataSource);
   const duplicateDataSource = useDataSourcesStore((state) => state.duplicateDataSource);
   const deleteDataSource = useDataSourcesStore((state) => state.deleteDataSource);
@@ -157,15 +156,6 @@ export function DataSourcesListPage() {
       tone: "danger" as const,
     };
   }, [confirmationRequest, rows]);
-
-  async function startSource(rowId: string) {
-    try {
-      await startDataSource(rowId, currentProjectId);
-    } catch (err) {
-      const title = err instanceof Error ? err.message : "Failed to start source";
-      push({ tone: "error", title });
-    }
-  }
 
   async function duplicateSource(rowId: string) {
     try {
@@ -363,7 +353,6 @@ export function DataSourcesListPage() {
             noResultsTitle="No sources match the current filters."
             onSortChange={setSortState}
             rowActions={(row) => {
-              const sourceStarted = row.status === "Active";
               const actions: TableRowAction<DataSourceRow>[] = [
                 {
                   label: "Open",
@@ -371,16 +360,16 @@ export function DataSourcesListPage() {
                 },
               ];
 
-              if (access.canRecordSource && sourceStarted) {
+              if (access.canRecordSource) {
                 actions.push({
-                  label: "Start recording",
+                  label: "Record",
                   onClick: () => navigate(`/data-sources/${row.id}/record`),
                 });
               }
 
-              if (access.canConfigureReplay && sourceStarted) {
+              if (access.canConfigureReplay) {
                 actions.push({
-                  label: "Set up replay",
+                  label: "Simulate",
                   onClick: () => navigate(`/data-sources/${row.id}/replay`),
                 });
               }
@@ -390,11 +379,6 @@ export function DataSourcesListPage() {
                   label: "Stop source",
                   onClick: () =>
                     setConfirmationRequest({ action: "stop", rowId: row.id }),
-                });
-              } else if (row.status === "Stopped" && access.canStartStoppedSource) {
-                actions.push({
-                  label: "Start source",
-                  onClick: () => startSource(row.id),
                 });
               }
 
