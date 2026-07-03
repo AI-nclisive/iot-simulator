@@ -35,5 +35,8 @@ public interface DataSourceRepository {
             String realDeviceEndpoint, String runtimeConfigJson, String securityConfigJson,
             boolean enabled, long expectedVersion);
 
+    /** Patches only the {@code runtime_config} column (best-effort, no version check). */
+    default void saveRuntimeConfig(String id, String runtimeConfigJson) {}
+
     boolean deleteById(String id);
 }

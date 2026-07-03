@@ -128,6 +128,15 @@ public class JooqDataSourceRepository implements DataSourceRepository {
     }
 
     @Override
+    public void saveRuntimeConfig(String id, String runtimeConfigJson) {
+        dsl.update(DATA_SOURCES)
+                .set(DATA_SOURCES.RUNTIME_CONFIG, json(runtimeConfigJson))
+                .set(DATA_SOURCES.UPDATED_AT, OffsetDateTime.now(ZoneOffset.UTC))
+                .where(DATA_SOURCES.ID.eq(id))
+                .execute();
+    }
+
+    @Override
     public boolean deleteById(String id) {
         return dsl.deleteFrom(DATA_SOURCES).where(DATA_SOURCES.ID.eq(id)).execute() > 0;
     }
