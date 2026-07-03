@@ -369,7 +369,7 @@ class RecordingServiceTest {
             List<ValueTimelineEntry> result = new ArrayList<>();
             for (int i = 0; i < all.size(); i++) {
                 if (i > afterSeq) {
-                    result.add(new ValueTimelineEntry(i, all.get(i)));
+                    result.add(new ValueTimelineEntry(i, all.get(i).nodeId(), all.get(i)));
                     if (result.size() >= limit) {
                         break;
                     }

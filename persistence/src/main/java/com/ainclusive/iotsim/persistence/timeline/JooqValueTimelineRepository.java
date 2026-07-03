@@ -1,5 +1,8 @@
 package com.ainclusive.iotsim.persistence.timeline;
 
+import static com.ainclusive.iotsim.persistence.jooq.tables.Recordings.RECORDINGS;
+import static com.ainclusive.iotsim.persistence.jooq.tables.SchemaNodes.SCHEMA_NODES;
+import static com.ainclusive.iotsim.persistence.jooq.tables.Schemas.SCHEMAS;
 import static com.ainclusive.iotsim.persistence.jooq.tables.ValueTimeline.VALUE_TIMELINE;
 import static org.jooq.impl.DSL.max;
 
@@ -82,13 +85,33 @@ public class JooqValueTimelineRepository implements ValueTimelineRepository {
 
     @Override
     public List<ValueTimelineEntry> readPage(String recordingId, long afterSeq, int limit) {
-        return dsl.selectFrom(VALUE_TIMELINE)
+        return dsl
+                .select(VALUE_TIMELINE.SEQ, SCHEMA_NODES.PATH,
+                        VALUE_TIMELINE.NODE_ID, VALUE_TIMELINE.SOURCE_TIME,
+                        VALUE_TIMELINE.VALUE_KIND, VALUE_TIMELINE.VALUE_ENC,
+                        VALUE_TIMELINE.QUALITY, VALUE_TIMELINE.QUALITY_REASON)
+                .from(VALUE_TIMELINE)
+                .join(RECORDINGS).on(RECORDINGS.ID.eq(VALUE_TIMELINE.RECORDING_ID))
+                .join(SCHEMAS).on(SCHEMAS.DATA_SOURCE_ID.eq(RECORDINGS.DATA_SOURCE_ID)
+                        .and(SCHEMAS.VERSION.eq(RECORDINGS.SCHEMA_VERSION)))
+                .leftJoin(SCHEMA_NODES).on(SCHEMA_NODES.SCHEMA_ID.eq(SCHEMAS.ID)
+                        .and(SCHEMA_NODES.NODE_ID.eq(VALUE_TIMELINE.NODE_ID)))
                 .where(VALUE_TIMELINE.RECORDING_ID.eq(recordingId))
                 .and(VALUE_TIMELINE.SEQ.greaterThan(afterSeq))
                 .orderBy(VALUE_TIMELINE.SEQ)
                 .limit(limit)
                 .fetch()
-                .map(r -> new ValueTimelineEntry(r.getSeq(), toValue(r)));
+                .map(r -> new ValueTimelineEntry(
+                        r.get(VALUE_TIMELINE.SEQ),
+                        r.get(SCHEMA_NODES.PATH),
+                        new NeutralValue(
+                                r.get(VALUE_TIMELINE.NODE_ID),
+                                r.get(VALUE_TIMELINE.SOURCE_TIME).toInstant(),
+                                ValueCodec.decode(
+                                        ValueCodec.Kind.valueOf(r.get(VALUE_TIMELINE.VALUE_KIND)),
+                                        r.get(VALUE_TIMELINE.VALUE_ENC)),
+                                Quality.valueOf(r.get(VALUE_TIMELINE.QUALITY)),
+                                r.get(VALUE_TIMELINE.QUALITY_REASON))));
     }
 
     private NeutralValue toValue(ValueTimelineRecord r) {

@@ -28,5 +28,5 @@ public interface ValueTimelineRepository {
     List<ValueTimelineEntry> readPage(String recordingId, long afterSeq, int limit);
 
     /** A single timeline row with its sequence number (used for cursor-based pagination). */
-    record ValueTimelineEntry(long seq, NeutralValue value) {}
+    record ValueTimelineEntry(long seq, String parameterPath, NeutralValue value) {}
 }

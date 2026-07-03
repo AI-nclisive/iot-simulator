@@ -159,9 +159,9 @@ public class RecordingService {
      * Keyset-paginated read of captured values for a recording (IS-134).
      * Cursor encodes the last-seen SEQ as a base64url string.
      */
-    public Page<RecordingValue> listValues(String projectId, String recordingId,
+    public RecordingValuesPage listValues(String projectId, String recordingId,
             String cursor, Integer limit) {
-        requireRecording(projectId, recordingId);
+        RecordingRow rec = requireRecording(projectId, recordingId);
         int size = Math.min(limit != null && limit > 0 ? limit : 200, 1000);
         long afterSeq = decodeValueCursor(cursor);
         List<ValueTimelineEntry> raw = timeline.readPage(recordingId, afterSeq, size + 1);
@@ -172,11 +172,16 @@ public class RecordingService {
         }
         List<RecordingValue> items = raw.stream().map(e -> new RecordingValue(
                 e.value().nodeId(),
+                e.parameterPath(),
                 e.value().sourceTime(),
                 e.value().value() != null ? String.valueOf(e.value().value()) : null,
                 e.value().quality().name())).toList();
-        return new Page<>(items, nextCursor, size);
+        return new RecordingValuesPage(items, nextCursor, rec.valueCount());
     }
+
+    /** Paginated response for the value browse API (IS-134). */
+    public record RecordingValuesPage(
+            List<RecordingValue> items, String nextCursor, long total) {}
 
     private static long decodeValueCursor(String cursor) {
         if (cursor == null || cursor.isBlank()) {
@@ -196,8 +201,8 @@ public class RecordingService {
     }
 
     /** A single captured value row returned by the browse API (IS-134). */
-    public record RecordingValue(String parameterId, java.time.Instant timestamp,
-            String value, String quality) {}
+    public record RecordingValue(String parameterId, String parameterPath,
+            java.time.Instant timestamp, String value, String quality) {}
 
     private void requireProject(String projectId) {
         if (projects.findById(projectId).isEmpty()) {
