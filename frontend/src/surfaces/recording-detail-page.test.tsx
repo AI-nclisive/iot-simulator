@@ -1,5 +1,5 @@
 /**
- * Tests for RecordingDetailPage (UI-115, UI-119, UI-123)
+ * Tests for RecordingDetailPage (UI-115, UI-119, UI-122, UI-123)
  *
  * Covers:
  * - Loading state while isLoading is true
@@ -16,6 +16,11 @@
  * - Values tab: shows "Load more" when nextCursor present
  * - Values tab: loads second page on "Load more" click
  * - Values tab: shows all-loaded message when no nextCursor
+ * - Values tab filter panel (UI-122): quality checkboxes default all checked
+ * - Values tab filter panel (UI-122): unchecking all quality boxes shows empty state, no API call
+ * - Values tab filter panel (UI-122): unchecking one quality sends qualities param to API
+ * - Values tab filter panel (UI-122): search input is debounced (~300 ms)
+ * - Values tab filter panel (UI-122): from/to datetime inputs pass params to API
  */
 
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
@@ -240,13 +245,12 @@ describe("RecordingDetailPage — values tab empty state", () => {
 describe("RecordingDetailPage — values tab (UI-119)", () => {
   beforeEach(() => {
     useArtifactsStore.setState({ artifacts: [baseArtifact] });
+    // Schema call happens on mount; use mockImplementation to route by URL.
   });
 
   it("renders value rows in table after API call", async () => {
     mockApiFetch.mockImplementation((url: string) => {
-      if ((url as string).endsWith("/schema")) {
-        return Promise.resolve({ nodes: [] });
-      }
+      if ((url as string).endsWith("/schema")) return Promise.resolve({ nodes: [] });
       return Promise.resolve({ items: sampleValues, nextCursor: null, total: 2 });
     });
     renderWithId("rec-001");
@@ -258,9 +262,7 @@ describe("RecordingDetailPage — values tab (UI-119)", () => {
 
   it("shows Load more button when nextCursor is present", async () => {
     mockApiFetch.mockImplementation((url: string) => {
-      if ((url as string).endsWith("/schema")) {
-        return Promise.resolve({ nodes: [] });
-      }
+      if ((url as string).endsWith("/schema")) return Promise.resolve({ nodes: [] });
       return Promise.resolve({ items: sampleValues, nextCursor: "abc123", total: 3 });
     });
     renderWithId("rec-001");
@@ -274,13 +276,9 @@ describe("RecordingDetailPage — values tab (UI-119)", () => {
     ];
     let valuesCallCount = 0;
     mockApiFetch.mockImplementation((url: string) => {
-      if ((url as string).endsWith("/schema")) {
-        return Promise.resolve({ nodes: [] });
-      }
+      if ((url as string).endsWith("/schema")) return Promise.resolve({ nodes: [] });
       valuesCallCount++;
-      if (valuesCallCount === 1) {
-        return Promise.resolve({ items: sampleValues, nextCursor: "abc123", total: 3 });
-      }
+      if (valuesCallCount === 1) return Promise.resolve({ items: sampleValues, nextCursor: "abc123", total: 3 });
       return Promise.resolve({ items: page2, nextCursor: null, total: 3 });
     });
 
@@ -294,9 +292,7 @@ describe("RecordingDetailPage — values tab (UI-119)", () => {
 
   it("shows all-loaded message when all values fetched", async () => {
     mockApiFetch.mockImplementation((url: string) => {
-      if ((url as string).endsWith("/schema")) {
-        return Promise.resolve({ nodes: [] });
-      }
+      if ((url as string).endsWith("/schema")) return Promise.resolve({ nodes: [] });
       return Promise.resolve({ items: sampleValues, nextCursor: null, total: 2 });
     });
     renderWithId("rec-001");
@@ -309,9 +305,7 @@ describe("RecordingDetailPage — values tab (UI-119)", () => {
   it("shows error panel when initial API call fails (no rows loaded)", async () => {
     const { ApiError } = await import("../api");
     mockApiFetch.mockImplementation((url: string) => {
-      if ((url as string).endsWith("/schema")) {
-        return Promise.resolve({ nodes: [] });
-      }
+      if ((url as string).endsWith("/schema")) return Promise.resolve({ nodes: [] });
       return Promise.reject(new ApiError(500, "Server error", "Internal failure", undefined));
     });
     renderWithId("rec-001");
@@ -323,13 +317,9 @@ describe("RecordingDetailPage — values tab (UI-119)", () => {
     const { ApiError } = await import("../api");
     let valuesCallCount = 0;
     mockApiFetch.mockImplementation((url: string) => {
-      if ((url as string).endsWith("/schema")) {
-        return Promise.resolve({ nodes: [] });
-      }
+      if ((url as string).endsWith("/schema")) return Promise.resolve({ nodes: [] });
       valuesCallCount++;
-      if (valuesCallCount === 1) {
-        return Promise.resolve({ items: sampleValues, nextCursor: "abc123", total: 3 });
-      }
+      if (valuesCallCount === 1) return Promise.resolve({ items: sampleValues, nextCursor: "abc123", total: 3 });
       return Promise.reject(new ApiError(500, "Server error", "Internal failure", undefined));
     });
 
@@ -342,5 +332,118 @@ describe("RecordingDetailPage — values tab (UI-119)", () => {
     expect(screen.getByText("/Root/Temp")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Load more" })).toBeTruthy();
     expect(screen.queryByText("Failed to load values.")).toBeNull();
+  });
+});
+
+describe("RecordingDetailPage — filter panel (UI-122)", () => {
+  beforeEach(() => {
+    useArtifactsStore.setState({ artifacts: [baseArtifact] });
+    mockApiFetch.mockImplementation((url: string) => {
+      if ((url as string).endsWith("/schema")) return Promise.resolve({ nodes: [] });
+      return Promise.resolve({ items: sampleValues, nextCursor: null, total: 2 });
+    });
+  });
+
+  it("shows quality checkboxes for GOOD, UNCERTAIN, BAD — all checked by default", async () => {
+    renderWithId("rec-001");
+    await userEvent.click(screen.getByRole("button", { name: "Values" }));
+    await waitFor(() => expect(screen.getByLabelText("GOOD")).toBeTruthy());
+    expect((screen.getByLabelText("GOOD") as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText("UNCERTAIN") as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText("BAD") as HTMLInputElement).checked).toBe(true);
+  });
+
+  it("shows search input in filter panel", async () => {
+    renderWithId("rec-001");
+    await userEvent.click(screen.getByRole("button", { name: "Values" }));
+    await waitFor(() => expect(screen.getByLabelText("Search")).toBeTruthy());
+  });
+
+  it("shows From and To datetime inputs in filter panel", async () => {
+    renderWithId("rec-001");
+    await userEvent.click(screen.getByRole("button", { name: "Values" }));
+    await waitFor(() => expect(screen.getByLabelText("From")).toBeTruthy());
+    expect(screen.getByLabelText("To")).toBeTruthy();
+  });
+
+  it("shows empty state when all quality checkboxes are unchecked — last uncheck makes no API call", async () => {
+    renderWithId("rec-001");
+    await userEvent.click(screen.getByRole("button", { name: "Values" }));
+    await waitFor(() => expect(screen.getByLabelText("GOOD")).toBeTruthy());
+
+    // Uncheck first two (these may each trigger a filtered reload)
+    await userEvent.click(screen.getByLabelText("GOOD"));
+    await userEvent.click(screen.getByLabelText("UNCERTAIN"));
+
+    // Record call count right before unchecking the last box
+    const callsBeforeLast = mockApiFetch.mock.calls.length;
+
+    // Uncheck the final checkbox
+    await userEvent.click(screen.getByLabelText("BAD"));
+
+    await waitFor(() => expect(screen.getByText("No quality selected.")).toBeTruthy());
+    // The final uncheck (0 qualities) must NOT trigger an API call
+    expect(mockApiFetch.mock.calls.length).toBe(callsBeforeLast);
+  });
+
+  it("passes qualities param to API when a quality is unchecked", async () => {
+    renderWithId("rec-001");
+    await userEvent.click(screen.getByRole("button", { name: "Values" }));
+    await waitFor(() => expect(screen.getByLabelText("BAD")).toBeTruthy());
+
+    // Uncheck BAD
+    await userEvent.click(screen.getByLabelText("BAD"));
+
+    await waitFor(() => {
+      const urls = mockApiFetch.mock.calls.map((c: unknown[]) => c[0] as string);
+      const filtered = urls.filter((u) => u.includes("qualities="));
+      expect(filtered.length).toBeGreaterThan(0);
+      const lastFiltered = filtered[filtered.length - 1];
+      expect(lastFiltered).toContain("qualities=");
+      expect(lastFiltered).not.toContain("BAD");
+    });
+  });
+
+  it("passes search param to API after debounce (300 ms)", async () => {
+    // Use fake timers to control debounce timing precisely
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = userEvent.setup({ advanceTimers: (ms) => vi.advanceTimersByTime(ms) });
+
+    renderWithId("rec-001");
+    await user.click(screen.getByRole("button", { name: "Values" }));
+    await waitFor(() => expect(screen.getByLabelText("Search")).toBeTruthy());
+
+    const searchInput = screen.getByLabelText("Search");
+
+    // Type without advancing timers — debounce not yet fired
+    await user.type(searchInput, "Temp");
+
+    // Immediately after typing: no search= in URLs yet
+    const urlsBefore = mockApiFetch.mock.calls.map((c: unknown[]) => c[0] as string);
+    expect(urlsBefore.some((u) => u.includes("search="))).toBe(false);
+
+    // Advance past debounce threshold
+    vi.advanceTimersByTime(350);
+
+    await waitFor(() => {
+      const urls = mockApiFetch.mock.calls.map((c: unknown[]) => c[0] as string);
+      expect(urls.some((u) => u.includes("search=Temp"))).toBe(true);
+    });
+
+    vi.useRealTimers();
+  });
+
+  it("passes from and to params to API when time range is set", async () => {
+    renderWithId("rec-001");
+    await userEvent.click(screen.getByRole("button", { name: "Values" }));
+    await waitFor(() => expect(screen.getByLabelText("From")).toBeTruthy());
+
+    const fromInput = screen.getByLabelText("From") as HTMLInputElement;
+    await userEvent.type(fromInput, "2026-01-01T00:00");
+
+    await waitFor(() => {
+      const urls = mockApiFetch.mock.calls.map((c: unknown[]) => c[0] as string);
+      expect(urls.some((u) => u.includes("from="))).toBe(true);
+    });
   });
 });

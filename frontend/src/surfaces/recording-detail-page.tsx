@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { apiFetch, ApiError } from "../api";
 import { useArtifactsStore } from "../shell/artifacts-store";
@@ -25,6 +25,16 @@ type ValueEntry = {
   quality: string;
 };
 
+type Quality = "GOOD" | "UNCERTAIN" | "BAD";
+const ALL_QUALITIES: Quality[] = ["GOOD", "UNCERTAIN", "BAD"];
+
+type ValueFilters = {
+  qualities: Set<Quality>;
+  search: string;
+  from: string;
+  to: string;
+};
+
 function formatDate(iso: string | null | undefined): string {
   if (!iso) return "—";
   const d = new Date(iso);
@@ -37,6 +47,19 @@ function formatDate(iso: string | null | undefined): string {
     minute: "2-digit",
     hour12: false,
   });
+}
+
+function buildValuesQs(filters: ValueFilters, cursor?: string): string {
+  const params = new URLSearchParams();
+  if (cursor) params.set("cursor", cursor);
+  if (filters.qualities.size < ALL_QUALITIES.length) {
+    params.set("qualities", [...filters.qualities].join(","));
+  }
+  if (filters.search.trim()) params.set("search", filters.search.trim());
+  if (filters.from) params.set("from", filters.from);
+  if (filters.to) params.set("to", filters.to);
+  const qs = params.toString();
+  return qs ? `?${qs}` : "";
 }
 
 export function RecordingDetailPage() {
@@ -64,11 +87,45 @@ export function RecordingDetailPage() {
   const [valuesError, setValuesError] = useState<string | null>(null);
   const [valuesLoaded, setValuesLoaded] = useState(false);
 
+  // Filter state — displayed values (UI bound)
+  const [filters, setFilters] = useState<ValueFilters>({
+    qualities: new Set<Quality>(ALL_QUALITIES),
+    search: "",
+    from: "",
+    to: "",
+  });
+  // Committed search: updated after debounce fires
+  const [committedSearch, setCommittedSearch] = useState("");
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Ref that always holds the latest effective filters so loadValues can read
+  // them without being re-created on every filter change.
+  const filtersRef = useRef<ValueFilters>({
+    qualities: new Set<Quality>(ALL_QUALITIES),
+    search: "",
+    from: "",
+    to: "",
+  });
+
+  // Keep filtersRef in sync whenever filters or committedSearch change
+  useEffect(() => {
+    filtersRef.current = { ...filters, search: committedSearch };
+  });
+
   useEffect(() => {
     if (currentProjectId && recordingId) {
       void loadRecordingById(currentProjectId, recordingId);
     }
   }, [currentProjectId, recordingId, loadRecordingById]);
+
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (searchDebounceRef.current !== null) {
+        clearTimeout(searchDebounceRef.current);
+      }
+    };
+  }, []);
 
   const recording = artifacts.find((a) => a.id === recordingId) ?? null;
 
@@ -96,10 +153,11 @@ export function RecordingDetailPage() {
   const loadValues = useCallback(
     async (cursor?: string) => {
       if (!currentProjectId || !recordingId) return;
+      const activeFilters = filtersRef.current;
       setValuesLoading(true);
       setValuesError(null);
       try {
-        const qs = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
+        const qs = buildValuesQs(activeFilters, cursor);
         const page = await apiFetch<{ items: ValueEntry[]; nextCursor: string | null; total: number }>(
           `/api/v1/projects/${currentProjectId}/recordings/${recordingId}/values${qs}`,
         );
@@ -116,11 +174,41 @@ export function RecordingDetailPage() {
     [currentProjectId, recordingId],
   );
 
+  // Initial values load when switching to the Values tab
   useEffect(() => {
     if (activeTab === "values" && !valuesLoaded && recording && recording.valueCount > 0) {
       void loadValues();
     }
   }, [activeTab, valuesLoaded, recording, loadValues]);
+
+  // Serialized filter key (uses committedSearch, not live search, for the search field)
+  const effectiveSearch = committedSearch;
+  const filtersKey = `${[...filters.qualities].sort().join(",")}|${effectiveSearch}|${filters.from}|${filters.to}`;
+  const prevFiltersKeyRef = useRef<string | null>(null);
+
+  // When filters change after the initial load — reset and re-fetch
+  useEffect(() => {
+    if (!valuesLoaded) return; // initial load not done yet; the other effect handles it
+    if (prevFiltersKeyRef.current === null) {
+      prevFiltersKeyRef.current = filtersKey;
+      return;
+    }
+    if (prevFiltersKeyRef.current === filtersKey) return;
+    prevFiltersKeyRef.current = filtersKey;
+
+    // Empty quality selection → show empty state, no API call
+    if (filters.qualities.size === 0) {
+      setValues([]);
+      setNextCursor(null);
+      setValuesTotal(0);
+      return;
+    }
+    setValues([]);
+    setNextCursor(null);
+    setValuesTotal(null);
+    void loadValues();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtersKey, valuesLoaded]);
 
   function tabClass(tab: TabId) {
     return `border-b-2 px-4 py-2 text-sm font-medium transition ${
@@ -227,6 +315,94 @@ export function RecordingDetailPage() {
     );
   }
 
+  function renderFilterPanel() {
+    return (
+      <div className="flex flex-wrap items-end gap-4 rounded-md border border-shell-line bg-shell-base/40 px-4 py-3 mb-4">
+        {/* Quality filter */}
+        <fieldset className="flex flex-col gap-1">
+          <legend className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted mb-1">
+            Quality
+          </legend>
+          <div className="flex gap-3">
+            {ALL_QUALITIES.map((q) => (
+              <label key={q} className="flex items-center gap-1.5 cursor-pointer select-none text-sm text-shell-ink">
+                <input
+                  type="checkbox"
+                  checked={filters.qualities.has(q)}
+                  aria-label={q}
+                  onChange={(e) => {
+                    setFilters((prev) => {
+                      const next = new Set(prev.qualities);
+                      if (e.target.checked) next.add(q);
+                      else next.delete(q);
+                      return { ...prev, qualities: next };
+                    });
+                  }}
+                />
+                {q}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
+        {/* Search filter */}
+        <div className="flex flex-col gap-1 min-w-[180px]">
+          <label
+            htmlFor="value-search"
+            className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted"
+          >
+            Search
+          </label>
+          <input
+            id="value-search"
+            type="text"
+            placeholder="Filter by parameter…"
+            value={filters.search}
+            className="shell-input text-sm"
+            onChange={(e) => {
+              const val = e.target.value;
+              setFilters((prev) => ({ ...prev, search: val }));
+              if (searchDebounceRef.current !== null) clearTimeout(searchDebounceRef.current);
+              searchDebounceRef.current = setTimeout(() => {
+                setCommittedSearch(val);
+              }, 300);
+            }}
+          />
+        </div>
+
+        {/* Time range */}
+        <div className="flex flex-col gap-1">
+          <span className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
+            From
+          </span>
+          <input
+            type="datetime-local"
+            aria-label="From"
+            value={filters.from}
+            className="shell-input text-sm"
+            onChange={(e) => {
+              setFilters((prev) => ({ ...prev, from: e.target.value }));
+            }}
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
+            To
+          </span>
+          <input
+            type="datetime-local"
+            aria-label="To"
+            value={filters.to}
+            className="shell-input text-sm"
+            onChange={(e) => {
+              setFilters((prev) => ({ ...prev, to: e.target.value }));
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
+
   function renderValuesTab() {
     if (recording!.valueCount === 0) {
       return (
@@ -238,16 +414,42 @@ export function RecordingDetailPage() {
       );
     }
 
+    // Empty quality selection → show empty state without making an API call
+    if (filters.qualities.size === 0) {
+      return (
+        <>
+          {renderFilterPanel()}
+          <SharedStatePanel
+            message="Select at least one quality filter to see values."
+            state="empty"
+            title="No quality selected."
+          />
+        </>
+      );
+    }
+
     if (valuesError && values.length === 0) {
-      return <SharedStatePanel message={valuesError} state="error" title="Failed to load values." />;
+      return (
+        <>
+          {renderFilterPanel()}
+          <SharedStatePanel message={valuesError} state="error" title="Failed to load values." />
+        </>
+      );
     }
 
     if (valuesLoading && values.length === 0) {
-      return <SharedStatePanel message="Loading values…" state="loading" title="" />;
+      return (
+        <>
+          {renderFilterPanel()}
+          <SharedStatePanel message="Loading values…" state="loading" title="" />
+        </>
+      );
     }
 
     return (
       <div className="space-y-4">
+        {renderFilterPanel()}
+
         <div className="overflow-x-auto rounded-md border border-shell-line">
           <table className="w-full text-sm">
             <thead>
