@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
+import com.ainclusive.iotsim.domain.replay.ReplayLiveRunService;
 import com.ainclusive.iotsim.domain.replay.ReplayService;
 import com.ainclusive.iotsim.domain.replay.ReplaySummary;
 import com.ainclusive.iotsim.domain.scenario.ScenarioRunService;
@@ -37,6 +38,7 @@ class RunServiceTest {
     private ScenarioRepository scenarios;
     private RuntimeController runtime;
     private ReplayService replay;
+    private ReplayLiveRunService replayLive;
     private SyntheticRunService synthetic;
     private SyntheticLiveRunService syntheticLive;
     private ScenarioRunService scenarioRun;
@@ -49,11 +51,12 @@ class RunServiceTest {
         scenarios = mock(ScenarioRepository.class);
         runtime = mock(RuntimeController.class);
         replay = mock(ReplayService.class);
+        replayLive = mock(ReplayLiveRunService.class);
         synthetic = mock(SyntheticRunService.class);
         syntheticLive = mock(SyntheticLiveRunService.class);
         scenarioRun = mock(ScenarioRunService.class);
         when(dataSources.findByProject(PROJECT)).thenReturn(List.of());
-        service = new RunService(runs, dataSources, scenarios, runtime, replay, synthetic, syntheticLive, scenarioRun);
+        service = new RunService(runs, dataSources, scenarios, runtime, replay, replayLive, synthetic, syntheticLive, scenarioRun);
     }
 
     private RunRow row(String id, String kind, String state, List<String> sources) {
@@ -100,12 +103,22 @@ class RunServiceTest {
 
     @Test
     void startReplayRoutesWithAutomationTriggerAndInitiator() {
-        when(replay.replay(eq(PROJECT), eq("ds1"), eq("rec1"), any(), eq(false), eq("AUTOMATION"), eq("ci-bot"), eq((String) null)))
+        when(replayLive.start(eq(PROJECT), eq("ds1"), eq("rec1"), any(), eq(false), eq("AUTOMATION"), eq("ci-bot")))
                 .thenReturn(new ReplaySummary("rec1", "ds1", 5, "run-r", "ev", null));
-        when(runs.findById("run-r")).thenReturn(Optional.of(row("run-r", "REPLAY", "COMPLETED", List.of("ds1"))));
+        when(runs.findById("run-r")).thenReturn(Optional.of(row("run-r", "REPLAY", "RUNNING", List.of("ds1"))));
         RunView v = service.start(PROJECT, new StartRunCommand("REPLAY", "ci-bot", "ds1", "rec1", null, null, null, null, false));
         assertThat(v.id()).isEqualTo("run-r");
-        verify(replay).replay(eq(PROJECT), eq("ds1"), eq("rec1"), any(), eq(false), eq("AUTOMATION"), eq("ci-bot"), eq((String) null));
+        assertThat(v.state()).isEqualTo("RUNNING");
+        verify(replayLive).start(eq(PROJECT), eq("ds1"), eq("rec1"), any(), eq(false), eq("AUTOMATION"), eq("ci-bot"));
+    }
+
+    @Test
+    void stopReplayCancelsLiveFeedAndEndsRunStopped() {
+        when(runs.findById("run-r")).thenReturn(Optional.of(row("run-r", "REPLAY", "RUNNING", List.of("ds1"))));
+        when(runs.end(eq("run-r"), eq("STOPPED"), any())).thenReturn(row("run-r", "REPLAY", "STOPPED", List.of("ds1")));
+        service.stop(PROJECT, "run-r");
+        verify(replayLive).stopIfLive("run-r");
+        verify(runs).end(eq("run-r"), eq("STOPPED"), any());
     }
 
     @Test
