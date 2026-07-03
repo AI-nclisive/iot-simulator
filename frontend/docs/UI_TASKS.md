@@ -797,7 +797,7 @@ Parallel execution:
   Depends: IS-051 (values SSE stream).
   Done when: no fake timer in `RecordingFlowPage`; value count and state reflect real SSE; TypeScript errors pass.
 
-- [ ] `UI-119` Recording value browser — paginated table (Timestamp, Parameter path, Value) in Recording detail Values tab; wired to IS-134 `GET .../values` endpoint; cursor pagination "Load more"; replaces "will be available in a future release" placeholder.
+- [x] `UI-119` Recording value browser — paginated table (Timestamp, Parameter path, Value, Quality) in Recording detail Values tab; wired to IS-134 `GET .../values` endpoint; cursor pagination "Load more"; replaces "will be available in a future release" placeholder.
 - [ ] `UI-120` Integrate the regrouped API (6 groups)
   Goal: reflect the backend's 6-group API tags (IS-135) on the frontend API client.
   Depends: IS-135.

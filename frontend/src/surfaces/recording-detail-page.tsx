@@ -1,11 +1,20 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { apiFetch, ApiError } from "../api";
 import { useArtifactsStore } from "../shell/artifacts-store";
 import { useShellStore } from "../shell/shell-store";
 import { SharedStatePanel } from "../ui/shared-state-panel";
 import { StatusBadge } from "../ui/status-badge";
 
 type TabId = "schema" | "values";
+
+type ValueEntry = {
+  parameterId: string;
+  parameterPath: string | null;
+  timestamp: string;
+  value: string | null;
+  quality: string;
+};
 
 function formatDate(iso: string | null | undefined): string {
   if (!iso) return "—";
@@ -32,6 +41,13 @@ export function RecordingDetailPage() {
 
   const [activeTab, setActiveTab] = useState<TabId>("schema");
 
+  const [values, setValues] = useState<ValueEntry[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [valuesTotal, setValuesTotal] = useState<number | null>(null);
+  const [valuesLoading, setValuesLoading] = useState(false);
+  const [valuesError, setValuesError] = useState<string | null>(null);
+  const [valuesLoaded, setValuesLoaded] = useState(false);
+
   useEffect(() => {
     if (currentProjectId && recordingId) {
       void loadRecordingById(currentProjectId, recordingId);
@@ -39,6 +55,35 @@ export function RecordingDetailPage() {
   }, [currentProjectId, recordingId, loadRecordingById]);
 
   const recording = artifacts.find((a) => a.id === recordingId) ?? null;
+
+  const loadValues = useCallback(
+    async (cursor?: string) => {
+      if (!currentProjectId || !recordingId) return;
+      setValuesLoading(true);
+      setValuesError(null);
+      try {
+        const qs = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
+        const page = await apiFetch<{ items: ValueEntry[]; nextCursor: string | null; total: number }>(
+          `/api/v1/projects/${currentProjectId}/recordings/${recordingId}/values${qs}`,
+        );
+        setValues((prev) => (cursor ? [...prev, ...page.items] : page.items));
+        setNextCursor(page.nextCursor ?? null);
+        setValuesTotal(page.total);
+        setValuesLoaded(true);
+      } catch (err) {
+        setValuesError(err instanceof ApiError ? err.title : "Failed to load values");
+      } finally {
+        setValuesLoading(false);
+      }
+    },
+    [currentProjectId, recordingId],
+  );
+
+  useEffect(() => {
+    if (activeTab === "values" && !valuesLoaded && recording && recording.valueCount > 0) {
+      void loadValues();
+    }
+  }, [activeTab, valuesLoaded, recording, loadValues]);
 
   function tabClass(tab: TabId) {
     return `border-b-2 px-4 py-2 text-sm font-medium transition ${
@@ -78,6 +123,89 @@ export function RecordingDetailPage() {
             title="Recording not found."
           />
         </section>
+      </div>
+    );
+  }
+
+  function renderValuesTab() {
+    if (recording!.valueCount === 0) {
+      return (
+        <SharedStatePanel
+          message="No data values were captured in this recording. This recording contains schema only."
+          state="empty"
+          title="No values captured."
+        />
+      );
+    }
+
+    if (valuesError && values.length === 0) {
+      return <SharedStatePanel message={valuesError} state="error" title="Failed to load values." />;
+    }
+
+    if (valuesLoading && values.length === 0) {
+      return <SharedStatePanel message="Loading values…" state="loading" title="" />;
+    }
+
+    return (
+      <div className="space-y-4">
+        <div className="overflow-x-auto rounded-md border border-shell-line">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-shell-line bg-shell-base/55 text-left text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
+                <th className="px-4 py-3">Timestamp</th>
+                <th className="px-4 py-3">Parameter</th>
+                <th className="px-4 py-3">Value</th>
+                <th className="px-4 py-3">Quality</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-shell-line bg-white">
+              {values.map((v, i) => (
+                <tr key={`${v.parameterId}-${v.timestamp}-${i}`}>
+                  <td className="px-4 py-2 font-mono text-xs text-shell-muted whitespace-nowrap">
+                    {formatDate(v.timestamp)}
+                  </td>
+                  <td className="px-4 py-2 font-mono text-xs text-shell-ink break-all">
+                    {v.parameterPath ?? v.parameterId}
+                  </td>
+                  <td className="px-4 py-2 text-shell-ink">{v.value ?? "—"}</td>
+                  <td className="px-4 py-2">
+                    <span
+                      className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${
+                        v.quality === "GOOD"
+                          ? "bg-green-50 text-green-700"
+                          : "bg-amber-50 text-amber-700"
+                      }`}
+                    >
+                      {v.quality}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {nextCursor ? (
+          <div className="flex flex-col items-center gap-2">
+            <button
+              className="shell-action"
+              disabled={valuesLoading}
+              type="button"
+              onClick={() => { setValuesError(null); void loadValues(nextCursor); }}
+            >
+              {valuesLoading ? "Loading…" : "Load more"}
+            </button>
+            {valuesError ? (
+              <p className="text-xs text-red-600">{valuesError}</p>
+            ) : null}
+          </div>
+        ) : null}
+
+        {!nextCursor && values.length > 0 ? (
+          <p className="text-center text-xs text-shell-muted">
+            All {(valuesTotal ?? recording!.valueCount).toLocaleString()} values loaded.
+          </p>
+        ) : null}
       </div>
     );
   }
@@ -154,28 +282,7 @@ export function RecordingDetailPage() {
             />
           ) : null}
 
-          {activeTab === "values" ? (
-            recording.valueCount === 0 ? (
-              <SharedStatePanel
-                message="No data values were captured in this recording. This recording contains schema only."
-                state="empty"
-                title="No values captured."
-              />
-            ) : (
-              <div className="space-y-4">
-                <section className="rounded-md border border-shell-line bg-white px-4 py-4">
-                  <p className="text-sm font-medium text-shell-ink">Captured values</p>
-                  <p className="mt-2 text-sm text-shell-muted">
-                    This recording contains{" "}
-                    <span className="font-medium text-shell-ink">
-                      {recording.valueCount.toLocaleString()}
-                    </span>{" "}
-                    captured data values. Full value browsing will be available in a future release.
-                  </p>
-                </section>
-              </div>
-            )
-          ) : null}
+          {activeTab === "values" ? renderValuesTab() : null}
         </div>
       </section>
     </div>
