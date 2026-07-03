@@ -797,6 +797,10 @@ Parallel execution:
   Depends: IS-051 (values SSE stream).
   Done when: no fake timer in `RecordingFlowPage`; value count and state reflect real SSE; TypeScript errors pass.
 
+- [ ] `UI-120` Integrate the regrouped API (6 groups)
+  Goal: reflect the backend's 6-group API tags (IS-135) on the frontend API client.
+  Depends: IS-135.
+
 - [x] `UI-118` Fix data source detail, schema editor, and create recording wizard bugs
 - [x] `UI-117` Fix project selection persistence — lost on refresh, not shown on direct URL
 - [x] `UI-116` Sample import flow + local-mode auth skip in wizard
