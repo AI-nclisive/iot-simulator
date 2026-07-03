@@ -71,4 +71,18 @@ class SchemaRepositoryIT {
         assertThat(v2.version()).isEqualTo(2);
         assertThat(schemas.findCurrent(dataSourceId).orElseThrow().version()).isEqualTo(2);
     }
+
+    @Test
+    void findByVersionReturnsSavedSchema() {
+        SchemaWithNodes saved = schemas.saveNewVersion(dataSourceId, sampleNodes());
+        Optional<SchemaWithNodes> found = schemas.findByVersion(dataSourceId, saved.version());
+        assertThat(found).isPresent();
+        assertThat(found.get().version()).isEqualTo(saved.version());
+        assertThat(found.get().nodes()).hasSize(2);
+    }
+
+    @Test
+    void findByVersionReturnsEmptyForMissingVersion() {
+        assertThat(schemas.findByVersion(dataSourceId, 99999)).isEmpty();
+    }
 }
