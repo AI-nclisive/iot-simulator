@@ -107,6 +107,16 @@ export function RecordingDetailPage() {
     to: "",
   });
 
+  // Generation counter: incremented on every new filter-triggered loadValues call.
+  // loadValues captures its generation at call time and bails if stale after the
+  // fetch resolves (prevents out-of-order responses overwriting correct data).
+  const loadGenRef = useRef(0);
+
+  // When filters change while the initial load is still in progress, record that a
+  // refresh is needed. The post-load effect checks this flag and re-fetches instead
+  // of just initializing the prevFiltersKey.
+  const pendingFilterRefreshRef = useRef(false);
+
   // Keep filtersRef in sync whenever filters or committedSearch change
   useEffect(() => {
     filtersRef.current = { ...filters, search: committedSearch };
@@ -151,9 +161,12 @@ export function RecordingDetailPage() {
   }, [activeTab, schemaNodes, schemaLoading, schemaError, loadSchema]);
 
   const loadValues = useCallback(
-    async (cursor?: string) => {
+    async (cursor?: string, gen?: number) => {
       if (!currentProjectId || !recordingId) return;
       const activeFilters = filtersRef.current;
+      // Capture the generation for this call. If no gen was provided, bump the counter
+      // (used for initial load and "Load more" clicks which don't race).
+      const callGen = gen ?? ++loadGenRef.current;
       setValuesLoading(true);
       setValuesError(null);
       try {
@@ -161,14 +174,17 @@ export function RecordingDetailPage() {
         const page = await apiFetch<{ items: ValueEntry[]; nextCursor: string | null; total: number }>(
           `/api/v1/projects/${currentProjectId}/recordings/${recordingId}/values${qs}`,
         );
+        // Bail if a newer request has already been dispatched
+        if (callGen !== loadGenRef.current) return;
         setValues((prev) => (cursor ? [...prev, ...page.items] : page.items));
         setNextCursor(page.nextCursor ?? null);
         setValuesTotal(page.total);
         setValuesLoaded(true);
       } catch (err) {
+        if (callGen !== loadGenRef.current) return;
         setValuesError(err instanceof ApiError ? err.title : "Failed to load values");
       } finally {
-        setValuesLoading(false);
+        if (callGen === loadGenRef.current) setValuesLoading(false);
       }
     },
     [currentProjectId, recordingId],
@@ -186,27 +202,50 @@ export function RecordingDetailPage() {
   const filtersKey = `${[...filters.qualities].sort().join(",")}|${effectiveSearch}|${filters.from}|${filters.to}`;
   const prevFiltersKeyRef = useRef<string | null>(null);
 
-  // When filters change after the initial load — reset and re-fetch
+  // When filters change after the initial load — reset and re-fetch.
+  // Also handles the case where filters changed while the initial load was in-flight
+  // (pendingFilterRefreshRef was set by the filter-change handlers below).
   useEffect(() => {
-    if (!valuesLoaded) return; // initial load not done yet; the other effect handles it
-    if (prevFiltersKeyRef.current === null) {
-      prevFiltersKeyRef.current = filtersKey;
+    if (!valuesLoaded) {
+      // Record that a filter change arrived before the initial load finished.
+      // The effect will re-run once valuesLoaded becomes true and will re-fetch.
+      // prevFiltersKeyRef.current === null means the effect hasn't initialized yet;
+      // any change while loading means the default-filter initial fetch will be stale.
+      const defaultFiltersKey = `${ALL_QUALITIES.slice().sort().join(",")}|||`;
+      if (filtersKey !== defaultFiltersKey) {
+        pendingFilterRefreshRef.current = true;
+      }
       return;
     }
-    if (prevFiltersKeyRef.current === filtersKey) return;
+
+    const isFirstRun = prevFiltersKeyRef.current === null;
+    const keyChanged = prevFiltersKeyRef.current !== filtersKey;
+    const hadPendingRefresh = pendingFilterRefreshRef.current;
     prevFiltersKeyRef.current = filtersKey;
+    pendingFilterRefreshRef.current = false;
+
+    // Skip if nothing changed AND there's no pending refresh from pre-load filter change
+    if (!keyChanged && !hadPendingRefresh) return;
 
     // Empty quality selection → show empty state, no API call
     if (filters.qualities.size === 0) {
-      setValues([]);
-      setNextCursor(null);
-      setValuesTotal(0);
+      if (!isFirstRun || hadPendingRefresh) {
+        setValues([]);
+        setNextCursor(null);
+        setValuesTotal(0);
+      }
       return;
     }
+
+    // On first run without a pending refresh: the initial fetch already used the default
+    // filters (all qualities), so no re-fetch is needed.
+    if (isFirstRun && !hadPendingRefresh) return;
+
+    const gen = ++loadGenRef.current;
     setValues([]);
     setNextCursor(null);
     setValuesTotal(null);
-    void loadValues();
+    void loadValues(undefined, gen);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtersKey, valuesLoaded]);
 
