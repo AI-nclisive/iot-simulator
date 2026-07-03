@@ -135,7 +135,7 @@ export function RecordingDetailPage() {
       );
     }
 
-    if (valuesError) {
+    if (valuesError && values.length === 0) {
       return <SharedStatePanel message={valuesError} state="error" title="Failed to load values." />;
     }
 
@@ -183,15 +183,18 @@ export function RecordingDetailPage() {
         </div>
 
         {nextCursor ? (
-          <div className="flex justify-center">
+          <div className="flex flex-col items-center gap-2">
             <button
               className="shell-action"
               disabled={valuesLoading}
               type="button"
-              onClick={() => { void loadValues(nextCursor); }}
+              onClick={() => { setValuesError(null); void loadValues(nextCursor); }}
             >
               {valuesLoading ? "Loading…" : "Load more"}
             </button>
+            {valuesError ? (
+              <p className="text-xs text-red-600">{valuesError}</p>
+            ) : null}
           </div>
         ) : null}
 

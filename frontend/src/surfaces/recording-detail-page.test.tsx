@@ -192,11 +192,28 @@ describe("RecordingDetailPage — values tab (UI-119)", () => {
     );
   });
 
-  it("shows error panel when API call fails", async () => {
+  it("shows error panel when initial API call fails (no rows loaded)", async () => {
     const { ApiError } = await import("../api");
     mockApiFetch.mockRejectedValueOnce(new ApiError(500, "Server error", "Internal failure", undefined));
     renderWithId("rec-001");
     await userEvent.click(screen.getByRole("button", { name: "Values" }));
     await waitFor(() => expect(screen.getByText("Failed to load values.")).toBeTruthy());
+  });
+
+  it("keeps rows visible and shows inline error when Load more fails", async () => {
+    const { ApiError } = await import("../api");
+    mockApiFetch
+      .mockResolvedValueOnce({ items: sampleValues, nextCursor: "abc123" })
+      .mockRejectedValueOnce(new ApiError(500, "Server error", "Internal failure", undefined));
+
+    renderWithId("rec-001");
+    await userEvent.click(screen.getByRole("button", { name: "Values" }));
+    await waitFor(() => screen.getByRole("button", { name: "Load more" }));
+    await userEvent.click(screen.getByRole("button", { name: "Load more" }));
+
+    await waitFor(() => expect(screen.getByText("Server error")).toBeTruthy());
+    expect(screen.getByText("ns=2;s=Temp")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Load more" })).toBeTruthy();
+    expect(screen.queryByText("Failed to load values.")).toBeNull();
   });
 });
