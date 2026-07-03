@@ -113,9 +113,11 @@ public class ReplayLiveRunService {
 
             RuntimeStartSpec startSpec = RuntimeStartSpecs.of(schemas, source, settings);
             runtime.start(dataSourceId, startSpec);
+            saveLastRecording(dataSourceId, recordingId);
 
             if (values.isEmpty()) {
                 // Nothing to replay — complete immediately.
+                runtime.stop(dataSourceId);
                 stampAndEnd(run.id(), evidenceRow.id(), recordingId, settings, 0, "COMPLETED");
                 return new ReplaySummary(recordingId, dataSourceId, 0, run.id(), evidenceRow.id(), settings);
             }
@@ -204,6 +206,15 @@ public class ReplayLiveRunService {
                     manifest(live.recordingId, live.settings, live.cursor));
         } catch (RuntimeException ignored) {
             // advisory count only
+        }
+    }
+
+    private void saveLastRecording(String dataSourceId, String recordingId) {
+        try {
+            dataSources.saveRuntimeConfig(dataSourceId,
+                    json.writeValueAsString(Map.of("lastRecordingId", recordingId)));
+        } catch (RuntimeException ignored) {
+            // best-effort — UI default, not a hard requirement
         }
     }
 

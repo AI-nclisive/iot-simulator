@@ -45,6 +45,7 @@ class ReplayLiveRunServiceTest {
     private CapturingRuntime runtime;
     private FakeRuns runs;
     private FakeEvidence evidence;
+    private FakeDataSources dataSources;
     private MutableClock wall;
 
     @BeforeEach
@@ -52,6 +53,7 @@ class ReplayLiveRunServiceTest {
         runtime = new CapturingRuntime();
         runs = new FakeRuns();
         evidence = new FakeEvidence();
+        dataSources = new FakeDataSources(SOURCE, PROJECT);
         wall = MutableClock.at(T0, ZoneOffset.UTC);
     }
 
@@ -73,7 +75,7 @@ class ReplayLiveRunServiceTest {
 
     private ReplayLiveRunService service(ValueTimelineRepository timeline, RuntimeController rt) {
         return new ReplayLiveRunService(
-                new FakeDataSources(SOURCE, PROJECT),
+                dataSources,
                 new FakeRecordings(RECORDING, PROJECT),
                 timeline,
                 new EmptySchemas(),
@@ -268,9 +270,21 @@ class ReplayLiveRunServiceTest {
 
         assertThat(summary.valueCount()).isEqualTo(0);
         assertThat(runs.byId.get(summary.runId()).state()).isEqualTo("COMPLETED");
+        // Runtime must be stopped — no leak for the empty-timeline path.
+        assertThat(runtime.state(SOURCE)).isEqualTo("STOPPED");
         // Nothing in registry — tick is a no-op.
         svc.tickAll();
         assertThat(runtime.applied).isEmpty();
+    }
+
+    @Test
+    void startPersistsLastRecordingIdIntoRuntimeConfig() {
+        ReplayLiveRunService svc = service();
+
+        svc.start(PROJECT, SOURCE, RECORDING, null, true);
+
+        assertThat(dataSources.savedRuntimeConfig).contains("lastRecordingId");
+        assertThat(dataSources.savedRuntimeConfig).contains(RECORDING);
     }
 
     @Test
@@ -365,7 +379,16 @@ class ReplayLiveRunServiceTest {
         }
     }
 
-    private record FakeDataSources(String id, String projectId) implements DataSourceRepository {
+    private static class FakeDataSources implements DataSourceRepository {
+        final String id;
+        final String projectId;
+        String savedRuntimeConfig;
+
+        FakeDataSources(String id, String projectId) {
+            this.id = id;
+            this.projectId = projectId;
+        }
+
         public Optional<DataSourceRow> findById(String id) {
             if (!this.id.equals(id)) {
                 return Optional.empty();
@@ -373,6 +396,10 @@ class ReplayLiveRunServiceTest {
             OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
             return Optional.of(new DataSourceRow(id, projectId, "src", "OPC_UA", "MANUAL",
                     null, null, 0, null, "{}", null, false, now, now, "local", 0));
+        }
+
+        public void saveRuntimeConfig(String id, String runtimeConfigJson) {
+            this.savedRuntimeConfig = runtimeConfigJson;
         }
 
         public DataSourceRow insert(String p, String n, String pr, String b, int sp, String rde,
