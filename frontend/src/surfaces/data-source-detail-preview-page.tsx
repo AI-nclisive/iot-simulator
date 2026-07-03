@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { resolveAccess } from "../shell/access-policy";
 import { useDataSourcesStore } from "../shell/data-sources-store";
 import { useShellStore } from "../shell/shell-store";
+import { useNotificationStore } from "../shell/notification-store";
 import { useActiveRuns } from "../shell/use-active-runs";
 import { apiFetch } from "../api";
 import { ConfirmationDialog } from "../ui/confirmation-dialog";
@@ -102,6 +103,7 @@ export function DataSourceDetailPreviewPage() {
   const isLoading = useDataSourcesStore((state) => state.isLoading);
   const loadDataSources = useDataSourcesStore((state) => state.loadDataSources);
   const { runs: activeRuns } = useActiveRuns(currentProjectId);
+  const push = useNotificationStore((state) => state.push);
   const access = resolveAccess(accessMode, sharedRole);
   const fetchedForProjectRef = useRef<string | null>(null);
 
@@ -187,8 +189,9 @@ export function DataSourceDetailPreviewPage() {
         `/api/v1/projects/${currentProjectId}/runs/${activeReplayRun.id}/stop`,
         { method: "POST" },
       );
-    } catch {
-      // badge disappears on next active-runs poll; no toast needed
+    } catch (err) {
+      const title = err instanceof Error ? err.message : "Stop failed";
+      push({ tone: "error", title });
     }
   }
 
@@ -283,7 +286,7 @@ export function DataSourceDetailPreviewPage() {
               Simulate
             </Link>
           ) : null}
-          {activeReplayRun ? (
+          {activeReplayRun && access.canConfigureReplay ? (
             <button className="shell-action" type="button" onClick={() => void stopSimulation()}>
               Stop simulation
             </button>

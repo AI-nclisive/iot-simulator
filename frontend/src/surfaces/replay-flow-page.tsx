@@ -224,7 +224,7 @@ export function ReplayFlowPage() {
         },
       );
       setRunId(response.runId);
-      // replayState stays "running" — useActiveRuns poll drives completion
+      runSeenRef.current = true; // run exists at creation; poll drives completion
     } catch (err) {
       const title = err instanceof Error ? err.message : "Replay failed";
       push({ tone: "error", title });
