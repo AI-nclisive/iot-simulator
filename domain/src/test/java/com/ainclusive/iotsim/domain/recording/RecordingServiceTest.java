@@ -370,7 +370,9 @@ class RecordingServiceTest {
             for (int i = 0; i < all.size(); i++) {
                 if (i > afterSeq) {
                     result.add(new ValueTimelineEntry(i, all.get(i)));
-                    if (result.size() >= limit) break;
+                    if (result.size() >= limit) {
+                        break;
+                    }
                 }
             }
             return result;
