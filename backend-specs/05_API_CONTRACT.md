@@ -33,7 +33,8 @@ API layer enforces authz) and decisions D6 (SSE-only) and D7 (`/api/v1`).
 - `GET /projects/{pid}/data-sources` · `POST …/data-sources` ·
   `GET …/data-sources/{id}` · `PATCH …/{id}` · `DELETE …/{id}` ·
   `POST …/{id}/duplicate`
-- Runtime: `POST …/{id}/start` · `POST …/{id}/stop`
+- Runtime: `POST …/{id}/stop` (stops whichever runtime action is active;
+  no bare `start` — the two runtime actions are Capture and Simulate below)
 - Schema: `GET …/{id}/schema` · `PUT …/{id}/schema` (full editor save)
 
 ### Scan (create-from-real-source)
@@ -42,21 +43,26 @@ API layer enforces authz) and decisions D6 (SSE-only) and D7 (`/api/v1`).
 - `GET …/data-sources/scan/{jobId}` → progress / partial / discovered schema
   (states: unreachable, auth failure, partial, large schema, unknown type)
 
-### Recordings & samples
+### Capture (record from a real source)
+- `POST …/data-sources/{id}/recording/start` (body: scanType) → starts a new
+  Recording; worker connects to `realDeviceEndpoint` in client mode
+- `POST …/data-sources/{id}/recording/stop` → ends capture, finalises Recording
 - `GET/POST …/recordings` · `GET …/recordings/{id}` · `DELETE …/recordings/{id}`
-- `POST …/data-sources/{id}/recording/start` · `…/recording/stop`
+- `GET …/recordings/{id}/schema` · `GET …/recordings/{id}/values`
 - `POST …/recordings/import` · `GET …/recordings/{id}/export`
 - `GET/POST …/samples` · `GET …/samples/{id}` · `…/samples/{id}/export`
+
+### Simulate (serve a recording to Edge clients)
+- `POST …/data-sources/{id}/replay` (body: recording/sample ref + deterministic
+  settings + compatibility ack) → starts a live simulation run; worker serves
+  the recorded values at original pace; run stays RUNNING until stopped
+- `POST …/runs/{id}/stop` → ends the simulation run and tears down the worker
 
 ### Scenarios
 - `GET/POST …/scenarios` · `GET/PATCH/DELETE …/scenarios/{id}` ·
   `POST …/scenarios/{id}/duplicate`
 - `GET …/scenarios/{id}/validate`
 - `POST …/scenarios/{id}/run` · `POST …/runs/{runId}/stop`
-
-### Replay
-- `POST …/data-sources/{id}/replay` (body: recording/sample ref + deterministic
-  settings + compatibility ack) → starts a replay run
 
 ### Runs (and test-control for automation)
 - `GET …/runs` · `GET …/runs/{id}` · `POST …/runs/{id}/stop`
@@ -107,8 +113,8 @@ path (`ARCHITECTURE.md`); the UI labels them as potentially stale.
 
 The same endpoints exist for all principals; authorization decides allowed
 actions. Per `SPEC.md` (Assign User Roles): `user` may observe everything
-(incl. evidence) and **operate runtime** — start/stop data-sources and start/stop
-replay and scenario runs; `admin` additionally edits projects/data-sources/
+(incl. evidence) and **operate runtime** — stop data-sources, start/stop
+capture (recording) and start/stop simulation (replay) and scenario runs; `admin` additionally edits projects/data-sources/
 schemas/scenarios, imports/exports, manages retention, and manages access. The
 UI prefers preventing invalid actions before submit; the API still enforces.
 

@@ -142,15 +142,6 @@ class DataSourceControllerTest {
     }
 
     @Test
-    void startReturnsRunningState() {
-        given(service.start(PROJECT, "ds1")).willReturn(sample(0, RuntimeState.RUNNING));
-        ResponseEntity<DataSourceResponse> resp = controller.start(PROJECT, "ds1");
-        assertThat(resp.getStatusCode().value()).isEqualTo(200);
-        assertThat(resp.getBody()).isNotNull();
-        assertThat(resp.getBody().runtimeState()).isEqualTo("RUNNING");
-    }
-
-    @Test
     void deleteReturns204() {
         assertThat(controller.delete(PROJECT, "ds1").getStatusCode().value()).isEqualTo(204);
     }

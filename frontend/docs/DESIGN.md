@@ -54,7 +54,7 @@ It should feel:
 
 The product must present one clear primary story:
 
-`Scan real source -> Record -> Replay`
+`Scan real source -> Record -> Simulate`
 
 That path should be visually and structurally favored because it explains why
 this simulator is valuable.

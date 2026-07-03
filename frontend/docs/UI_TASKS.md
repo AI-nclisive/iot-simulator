@@ -806,6 +806,20 @@ Parallel execution:
   Done when: Manual is not selectable; SCAN / IMPORT / SYNTHETIC paths unchanged; TS build + tests pass.
 - [x] `UI-123` Recording schema tab — default Schema tab in RecordingDetailPage; calls `GET .../schema`; renders collapsible folder/variable tree; loading, error, and empty states.
 - [x] `UI-119` Recording value browser — paginated table (Timestamp, Parameter path, Value, Quality) in Recording detail Values tab; wired to IS-134 `GET .../values` endpoint; cursor pagination "Load more"; replaces "will be available in a future release" placeholder.
+- [ ] `UI-125` Replace Start button with Record / Simulate actions
+  Goal: remove the bare Start action from the data-sources list and detail; replace with two explicit runtime actions: Record (opens recording flow) and Simulate (opens recording picker → starts live replay).
+  Surface: `Data Sources List`, `Data Source Detail`
+  Work includes: remove `startDataSource` store action + `POST .../start` call; add Record action → navigate to existing recording-flow route; add Simulate action → modal picker listing recordings for this DS (pre-select last-used from `runtimeConfig`); on confirm POST .../replay; remove Start button from `data-source-detail-preview-page.tsx` and `data-sources-list-page.tsx`; remove auto-start from `create-data-source-wizard-page.tsx`.
+  Depends: IS-139, IS-140, UI-126.
+  Done when: no bare Start button anywhere; Record leads to recording flow; Simulate opens picker and starts live replay; TypeScript build + vitest pass.
+
+- [ ] `UI-126` Live simulation controls: RUNNING indicator + Stop
+  Goal: when a data source is actively simulating (run RUNNING), show a live indicator and Stop action that ends the run.
+  Surface: `Data Sources List`, `Data Source Detail`
+  Work includes: detect RUNNING replay run for this source from active-runs SSE/poll; show "Simulating" badge with recording name in list row and detail header; Stop button → POST /api/v1/runs/{runId}/stop; SSE state update removes badge on completion.
+  Depends: IS-140.
+  Done when: RUNNING simulation visible in list + detail; Stop ends simulation and clears badge; no stale badge after stop; TypeScript build + vitest pass.
+
 - [ ] `UI-120` Integrate the regrouped API (6 groups)
   Goal: reflect the backend's 6-group API tags (IS-135) on the frontend API client.
   Depends: IS-135.

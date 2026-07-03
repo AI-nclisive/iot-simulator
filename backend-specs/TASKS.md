@@ -162,13 +162,15 @@ Turn the in-memory worker into a real OPC UA simulator (the stated core risk).
 
 ## Wave B — Primary flow against a real source · P0
 
-Make `Scan → Record → Replay` work against real instruments, not provided values.
+Make `Scan → Record → Simulate` work against real instruments, not provided values.
 
 - [x] IS-042 [BE] ✅ [source] Credential handling (secrets, never persisted/exported) — 08/05
 - [x] IS-116 [BE] ✅ [source] Credential-handling test hardening (stale-update touches no secret, constructor secret normalization, mode mapping) — 08/05
 - [x] IS-043 [BE] ✅ [source] Create from scan (real-source discovery) — SPEC: Create From Scan
 - [x] IS-044 [BE] ✅ [schema] Scan-derived schema population — 01
 - [x] IS-045 [BE] ✅ [recording] Live capture from a running real source → recording — SPEC: Record Real Data
+- [x] IS-139 [BE] ✅ [api] Remove user-facing POST .../start — bare data-source start removed from API; DataSourceController.start() and its test deleted; DataSourceService.start() stays internal (used by ScenarioRunService START step). Governance: 05_API_CONTRACT.md updated. FE half: UI-125.
+- [ ] IS-140 [BE] ⬜ [runtime] Live-Simulate: time-paced replay + stop — replay run stays RUNNING while values stream at original recording pace (source_time deltas); POST /runs/{id}/stop tears down worker + ends run STOPPED; last-used recording stored in DataSource.runtimeConfig for UI default. FE half: UI-125, UI-126.
 
 ## Wave C — Observability & evidence · P0
 
