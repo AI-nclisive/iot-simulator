@@ -1,5 +1,5 @@
 /**
- * Tests for RecordingDetailPage (UI-115, UI-119)
+ * Tests for RecordingDetailPage (UI-115, UI-119, UI-123)
  *
  * Covers:
  * - Loading state while isLoading is true
@@ -7,6 +7,10 @@
  * - Not-found state when recording is absent
  * - Recording metadata renders when recording is found
  * - Schema tab is active by default
+ * - Schema tab: empty state when API returns no nodes
+ * - Schema tab: renders folder and variable nodes from API
+ * - Schema tab: shows error panel when API fails
+ * - Schema tab: collapses folder nodes when toggle clicked
  * - Values tab: empty state when valueCount = 0
  * - Values tab: renders table rows from API (UI-119)
  * - Values tab: shows "Load more" when nextCursor present
@@ -73,8 +77,32 @@ const sampleValues = [
   { parameterId: "ns=2;s=Press", parameterPath: "/Root/Press", timestamp: "2026-01-01T00:00:01Z", value: "1013", quality: "GOOD" },
 ];
 
+const sampleSchemaNodes = [
+  {
+    nodeId: "node-root",
+    parentId: null,
+    path: "/Root",
+    displayName: "Root",
+    kind: "FOLDER" as const,
+    dataType: null,
+  },
+  {
+    nodeId: "node-temp",
+    parentId: "node-root",
+    path: "/Root/Temp",
+    displayName: "Temp",
+    kind: "VARIABLE" as const,
+    dataType: "FLOAT64",
+  },
+];
+
 beforeEach(() => {
-  mockApiFetch.mockResolvedValue({ items: [], nextCursor: null, total: 0 });
+  mockApiFetch.mockImplementation((url: string) => {
+    if ((url as string).endsWith("/schema")) {
+      return Promise.resolve({ nodes: [] });
+    }
+    return Promise.resolve({ items: [], nextCursor: null, total: 0 });
+  });
   useArtifactsStore.setState({
     artifacts: [],
     samples: [],
@@ -133,7 +161,70 @@ describe("RecordingDetailPage — recording found", () => {
 
   it("Schema tab is active by default", () => {
     renderWithId("rec-001");
-    expect(screen.getByText("Schema not yet available.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Schema" })).toBeTruthy();
+  });
+});
+
+describe("RecordingDetailPage — schema tab (UI-123)", () => {
+  beforeEach(() => {
+    useArtifactsStore.setState({ artifacts: [baseArtifact] });
+  });
+
+  it("shows empty state when schema has no nodes", async () => {
+    mockApiFetch.mockImplementation((url: string) => {
+      if ((url as string).endsWith("/schema")) {
+        return Promise.resolve({ nodes: [] });
+      }
+      return Promise.resolve({ items: [], nextCursor: null, total: 0 });
+    });
+    renderWithId("rec-001");
+    await waitFor(() => expect(screen.getByText("No schema captured.")).toBeTruthy());
+  });
+
+  it("renders schema nodes from API", async () => {
+    mockApiFetch.mockImplementation((url: string) => {
+      if ((url as string).endsWith("/schema")) {
+        return Promise.resolve({ nodes: sampleSchemaNodes });
+      }
+      return Promise.resolve({ items: [], nextCursor: null, total: 0 });
+    });
+    renderWithId("rec-001");
+    await waitFor(() => expect(screen.getByText("Root")).toBeTruthy());
+    expect(screen.getByText("Temp")).toBeTruthy();
+    expect(screen.getByText("FLOAT64")).toBeTruthy();
+  });
+
+  it("shows error panel when schema API fails", async () => {
+    const { ApiError } = await import("../api");
+    mockApiFetch.mockImplementation((url: string) => {
+      if ((url as string).endsWith("/schema")) {
+        return Promise.reject(new ApiError(500, "Schema load failed", "Internal failure", undefined));
+      }
+      return Promise.resolve({ items: [], nextCursor: null, total: 0 });
+    });
+    renderWithId("rec-001");
+    await waitFor(() => expect(screen.getByText("Failed to load schema.")).toBeTruthy());
+  });
+
+  it("collapses folder nodes when toggle clicked", async () => {
+    mockApiFetch.mockImplementation((url: string) => {
+      if ((url as string).endsWith("/schema")) {
+        return Promise.resolve({ nodes: sampleSchemaNodes });
+      }
+      return Promise.resolve({ items: [], nextCursor: null, total: 0 });
+    });
+    renderWithId("rec-001");
+    // Wait for tree to render
+    await waitFor(() => expect(screen.getByText("Root")).toBeTruthy());
+    // Initially expanded — Temp is visible
+    expect(screen.getByText("Temp")).toBeTruthy();
+    // Click the collapse toggle (▼)
+    await userEvent.click(screen.getByRole("button", { name: "▼" }));
+    // After collapse — Temp should not be visible
+    expect(screen.queryByText("Temp")).toBeNull();
+    // Click again to expand
+    await userEvent.click(screen.getByRole("button", { name: "▶" }));
+    await waitFor(() => expect(screen.getByText("Temp")).toBeTruthy());
   });
 });
 
@@ -152,7 +243,12 @@ describe("RecordingDetailPage — values tab (UI-119)", () => {
   });
 
   it("renders value rows in table after API call", async () => {
-    mockApiFetch.mockResolvedValueOnce({ items: sampleValues, nextCursor: null, total: 2 });
+    mockApiFetch.mockImplementation((url: string) => {
+      if ((url as string).endsWith("/schema")) {
+        return Promise.resolve({ nodes: [] });
+      }
+      return Promise.resolve({ items: sampleValues, nextCursor: null, total: 2 });
+    });
     renderWithId("rec-001");
     await userEvent.click(screen.getByRole("button", { name: "Values" }));
     await waitFor(() => expect(screen.getByText("/Root/Temp")).toBeTruthy());
@@ -161,7 +257,12 @@ describe("RecordingDetailPage — values tab (UI-119)", () => {
   });
 
   it("shows Load more button when nextCursor is present", async () => {
-    mockApiFetch.mockResolvedValueOnce({ items: sampleValues, nextCursor: "abc123", total: 3 });
+    mockApiFetch.mockImplementation((url: string) => {
+      if ((url as string).endsWith("/schema")) {
+        return Promise.resolve({ nodes: [] });
+      }
+      return Promise.resolve({ items: sampleValues, nextCursor: "abc123", total: 3 });
+    });
     renderWithId("rec-001");
     await userEvent.click(screen.getByRole("button", { name: "Values" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Load more" })).toBeTruthy());
@@ -171,9 +272,17 @@ describe("RecordingDetailPage — values tab (UI-119)", () => {
     const page2 = [
       { parameterId: "ns=2;s=Flow", timestamp: "2026-01-01T00:00:02Z", value: "5.0", quality: "GOOD" },
     ];
-    mockApiFetch
-      .mockResolvedValueOnce({ items: sampleValues, nextCursor: "abc123", total: 3 })
-      .mockResolvedValueOnce({ items: page2, nextCursor: null, total: 3 });
+    let valuesCallCount = 0;
+    mockApiFetch.mockImplementation((url: string) => {
+      if ((url as string).endsWith("/schema")) {
+        return Promise.resolve({ nodes: [] });
+      }
+      valuesCallCount++;
+      if (valuesCallCount === 1) {
+        return Promise.resolve({ items: sampleValues, nextCursor: "abc123", total: 3 });
+      }
+      return Promise.resolve({ items: page2, nextCursor: null, total: 3 });
+    });
 
     renderWithId("rec-001");
     await userEvent.click(screen.getByRole("button", { name: "Values" }));
@@ -184,7 +293,12 @@ describe("RecordingDetailPage — values tab (UI-119)", () => {
   });
 
   it("shows all-loaded message when all values fetched", async () => {
-    mockApiFetch.mockResolvedValueOnce({ items: sampleValues, nextCursor: null, total: 2 });
+    mockApiFetch.mockImplementation((url: string) => {
+      if ((url as string).endsWith("/schema")) {
+        return Promise.resolve({ nodes: [] });
+      }
+      return Promise.resolve({ items: sampleValues, nextCursor: null, total: 2 });
+    });
     renderWithId("rec-001");
     await userEvent.click(screen.getByRole("button", { name: "Values" }));
     await waitFor(() =>
@@ -194,7 +308,12 @@ describe("RecordingDetailPage — values tab (UI-119)", () => {
 
   it("shows error panel when initial API call fails (no rows loaded)", async () => {
     const { ApiError } = await import("../api");
-    mockApiFetch.mockRejectedValueOnce(new ApiError(500, "Server error", "Internal failure", undefined));
+    mockApiFetch.mockImplementation((url: string) => {
+      if ((url as string).endsWith("/schema")) {
+        return Promise.resolve({ nodes: [] });
+      }
+      return Promise.reject(new ApiError(500, "Server error", "Internal failure", undefined));
+    });
     renderWithId("rec-001");
     await userEvent.click(screen.getByRole("button", { name: "Values" }));
     await waitFor(() => expect(screen.getByText("Failed to load values.")).toBeTruthy());
@@ -202,9 +321,17 @@ describe("RecordingDetailPage — values tab (UI-119)", () => {
 
   it("keeps rows visible and shows inline error when Load more fails", async () => {
     const { ApiError } = await import("../api");
-    mockApiFetch
-      .mockResolvedValueOnce({ items: sampleValues, nextCursor: "abc123", total: 3 })
-      .mockRejectedValueOnce(new ApiError(500, "Server error", "Internal failure", undefined));
+    let valuesCallCount = 0;
+    mockApiFetch.mockImplementation((url: string) => {
+      if ((url as string).endsWith("/schema")) {
+        return Promise.resolve({ nodes: [] });
+      }
+      valuesCallCount++;
+      if (valuesCallCount === 1) {
+        return Promise.resolve({ items: sampleValues, nextCursor: "abc123", total: 3 });
+      }
+      return Promise.reject(new ApiError(500, "Server error", "Internal failure", undefined));
+    });
 
     renderWithId("rec-001");
     await userEvent.click(screen.getByRole("button", { name: "Values" }));
