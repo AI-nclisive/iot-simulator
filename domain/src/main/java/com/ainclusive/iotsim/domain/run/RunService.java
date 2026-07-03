@@ -1,6 +1,7 @@
 package com.ainclusive.iotsim.domain.run;
 
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
+import com.ainclusive.iotsim.domain.replay.ReplayLiveRunService;
 import com.ainclusive.iotsim.domain.replay.ReplayService;
 import com.ainclusive.iotsim.domain.scenario.ScenarioRunService;
 import com.ainclusive.iotsim.domain.support.Page;
@@ -37,19 +38,22 @@ public class RunService {
     private final DataSourceRepository dataSources;
     private final ScenarioRepository scenarios;
     private final RuntimeController runtime;
-    private final ReplayService replay;
+    private final ReplayService replay;                   // batch primitive (scenario REPLAY steps)
+    private final ReplayLiveRunService replayLive;        // live standalone replay (IS-140)
     private final SyntheticRunService synthetic;          // batch primitive (scenarios)
     private final SyntheticLiveRunService syntheticLive;  // live standalone feed (IS-119)
     private final ScenarioRunService scenarioRun;
 
     public RunService(RunRepository runs, DataSourceRepository dataSources, ScenarioRepository scenarios,
-            RuntimeController runtime, ReplayService replay, SyntheticRunService synthetic,
-            SyntheticLiveRunService syntheticLive, ScenarioRunService scenarioRun) {
+            RuntimeController runtime, ReplayService replay, ReplayLiveRunService replayLive,
+            SyntheticRunService synthetic, SyntheticLiveRunService syntheticLive,
+            ScenarioRunService scenarioRun) {
         this.runs = runs;
         this.dataSources = dataSources;
         this.scenarios = scenarios;
         this.runtime = runtime;
         this.replay = replay;
+        this.replayLive = replayLive;
         this.synthetic = synthetic;
         this.syntheticLive = syntheticLive;
         this.scenarioRun = scenarioRun;
@@ -87,6 +91,7 @@ public class RunService {
 
     public RunView stop(String projectId, String id) {
         RunRow run = require(projectId, id);
+        replayLive.stopIfLive(id);                    // no-op unless it is a live replay run
         syntheticLive.stopIfLive(id);                 // no-op unless it is a live synthetic run
         run.sourceIds().forEach(runtime::stop);
         RunRow after = TERMINAL.contains(run.state())
@@ -108,8 +113,8 @@ public class RunService {
                         ? new DeterministicSettings(cmd.seed(),
                                 cmd.startTime() != null ? Instant.parse(cmd.startTime()) : Instant.now())
                         : null;
-                yield replay.replay(projectId, cmd.dataSourceId(), cmd.recordingId(), settings,
-                        Boolean.TRUE.equals(cmd.compatibilityAck()), "AUTOMATION", initiator, null).runId();
+                yield replayLive.start(projectId, cmd.dataSourceId(), cmd.recordingId(), settings,
+                        Boolean.TRUE.equals(cmd.compatibilityAck()), "AUTOMATION", initiator).runId();
             }
             case "SYNTHETIC" -> {
                 requireField(cmd.dataSourceId(), "dataSourceId");

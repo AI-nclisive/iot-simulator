@@ -1,7 +1,7 @@
 package com.ainclusive.iotsim.api.replay;
 
 import com.ainclusive.iotsim.api.security.Permission;
-import com.ainclusive.iotsim.domain.replay.ReplayService;
+import com.ainclusive.iotsim.domain.replay.ReplayLiveRunService;
 import com.ainclusive.iotsim.domain.replay.ReplaySummary;
 import com.ainclusive.iotsim.protocolmodel.DeterministicSettings;
 import io.swagger.v3.oas.annotations.Operation;
@@ -31,9 +31,9 @@ public class ReplayController {
             "@permissionService.hasPermission(authentication,"
             + " T(com.ainclusive.iotsim.api.security.Permission).REPLAY_START)";
 
-    private final ReplayService replays;
+    private final ReplayLiveRunService replays;
 
-    public ReplayController(ReplayService replays) {
+    public ReplayController(ReplayLiveRunService replays) {
         this.replays = replays;
     }
 
@@ -57,7 +57,7 @@ public class ReplayController {
         DeterministicSettings settings = req.seed() != null
                 ? new DeterministicSettings(req.seed(), req.startTime())
                 : null;
-        ReplaySummary summary = replays.replay(projectId, dataSourceId, req.recordingId(),
+        ReplaySummary summary = replays.start(projectId, dataSourceId, req.recordingId(),
                 settings, Boolean.TRUE.equals(req.compatibilityAck()));
         return new ReplayResponse(summary.recordingId(), summary.dataSourceId(),
                 summary.valueCount(), summary.runId(), summary.evidenceId(),
