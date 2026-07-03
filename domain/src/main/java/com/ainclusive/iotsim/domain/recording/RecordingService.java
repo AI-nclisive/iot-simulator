@@ -189,6 +189,18 @@ public class RecordingService {
     public record RecordingValuesPage(
             List<RecordingValue> items, String nextCursor, long total) {}
 
+    /** Returns the schema captured for a recording (IS-137). */
+    public RecordingSchema getRecordingSchema(String projectId, String recordingId) {
+        RecordingRow rec = requireRecording(projectId, recordingId);
+        SchemaWithNodes schema = schemas.findByVersion(rec.dataSourceId(), rec.schemaVersion())
+                .orElseThrow(() -> new ResourceNotFoundException("Schema",
+                        rec.dataSourceId() + "@v" + rec.schemaVersion()));
+        return new RecordingSchema(schema.nodes());
+    }
+
+    /** Schema snapshot linked to a recording (IS-137). */
+    public record RecordingSchema(List<com.ainclusive.iotsim.protocolmodel.SchemaNode> nodes) {}
+
     private static long decodeValueCursor(String cursor) {
         if (cursor == null || cursor.isBlank()) {
             return -1L;

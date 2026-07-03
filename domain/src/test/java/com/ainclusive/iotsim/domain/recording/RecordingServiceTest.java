@@ -241,6 +241,25 @@ class RecordingServiceTest {
                 .isInstanceOf(com.ainclusive.iotsim.domain.common.ResourceNotFoundException.class);
     }
 
+    @Test
+    void getRecordingSchemaReturnsNodes() {
+        List<SchemaNode> nodes = List.of(variable("temp", DataType.FLOAT64));
+        // schemaVersion = 2 (matches FakeDataSourceRepository default)
+        schemas.setByVersion(SOURCE, 2, nodes);
+        Recording r = service.create(PROJECT, SOURCE, com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_AND_DATA, "alice");
+
+        RecordingService.RecordingSchema schema = service.getRecordingSchema(PROJECT, r.id());
+        assertThat(schema.nodes()).hasSize(1);
+        assertThat(schema.nodes().get(0).nodeId()).isEqualTo("temp");
+    }
+
+    @Test
+    void getRecordingSchemaThrowsWhenSchemaAbsent() {
+        Recording r = service.create(PROJECT, SOURCE, com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_AND_DATA, "alice");
+        assertThatThrownBy(() -> service.getRecordingSchema(PROJECT, r.id()))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
     private static ProjectRepository fakeProjects() {
         return new ProjectRepository() {
             @Override public Optional<ProjectRow> findById(String id) { return Optional.empty(); }
@@ -278,11 +297,18 @@ class RecordingServiceTest {
 
     private static final class FakeSchemaRepository implements SchemaRepository {
         private Supplier<Optional<SchemaWithNodes>> current = Optional::empty;
+        private final Map<String, SchemaWithNodes> byVersion = new HashMap<>();
 
         void set(int version, List<SchemaNode> nodes) {
             SchemaWithNodes schema = new SchemaWithNodes(
                     "sch-1", SOURCE, version, OffsetDateTime.now(ZoneOffset.UTC), nodes);
             current = () -> Optional.of(schema);
+        }
+
+        void setByVersion(String dataSourceId, int version, List<SchemaNode> nodes) {
+            byVersion.put(dataSourceId + "@" + version,
+                    new SchemaWithNodes("sch-" + version, dataSourceId, version,
+                            OffsetDateTime.now(ZoneOffset.UTC), nodes));
         }
 
         void clear() {
@@ -292,6 +318,11 @@ class RecordingServiceTest {
         @Override
         public Optional<SchemaWithNodes> findCurrent(String dataSourceId) {
             return current.get();
+        }
+
+        @Override
+        public Optional<SchemaWithNodes> findByVersion(String dataSourceId, int version) {
+            return Optional.ofNullable(byVersion.get(dataSourceId + "@" + version));
         }
 
         @Override

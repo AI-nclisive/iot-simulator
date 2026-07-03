@@ -52,6 +52,23 @@ public class JooqSchemaRepository implements SchemaRepository {
     }
 
     @Override
+    public Optional<SchemaWithNodes> findByVersion(String dataSourceId, int version) {
+        SchemasRecord schema = dsl.selectFrom(SCHEMAS)
+                .where(SCHEMAS.DATA_SOURCE_ID.eq(dataSourceId).and(SCHEMAS.VERSION.eq(version)))
+                .fetchOne();
+        if (schema == null) {
+            return Optional.empty();
+        }
+        List<SchemaNode> nodes = dsl.selectFrom(SCHEMA_NODES)
+                .where(SCHEMA_NODES.SCHEMA_ID.eq(schema.getId()))
+                .orderBy(SCHEMA_NODES.PATH)
+                .fetch()
+                .map(this::toNode);
+        return Optional.of(new SchemaWithNodes(
+                schema.getId(), dataSourceId, schema.getVersion(), schema.getCreatedAt(), nodes));
+    }
+
+    @Override
     public SchemaWithNodes saveNewVersion(String dataSourceId, List<SchemaNode> nodes) {
         return dsl.transactionResult(cfg -> {
             DSLContext tx = cfg.dsl();
