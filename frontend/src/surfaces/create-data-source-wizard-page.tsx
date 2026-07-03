@@ -278,7 +278,7 @@ function reviewLines(form: WizardFormState, selectedRecordingLabel?: string) {
     ...(form.basis === "import"
       ? [{ label: "Recording", value: selectedRecordingLabel ?? "-" }]
       : []),
-    ...([{ label: "Runtime behavior", value: runtimeLabel }]),
+    { label: "Runtime behavior", value: runtimeLabel },
     ...(form.scheduleStartEnabled
       ? [{ label: "Start", value: form.scheduleStart || "-" }]
       : []),
