@@ -4,6 +4,8 @@ import { resolveAccess } from "../shell/access-policy";
 import { useDataSourcesStore } from "../shell/data-sources-store";
 import { useShellStore } from "../shell/shell-store";
 import { useNotificationStore } from "../shell/notification-store";
+import { useActiveRuns } from "../shell/use-active-runs";
+import { apiFetch } from "../api";
 import { type DataSourceRow } from "./mock-data-sources";
 import { ConfirmationDialog } from "../ui/confirmation-dialog";
 import { SharedStatePanel } from "../ui/shared-state-panel";
@@ -75,6 +77,7 @@ export function DataSourcesListPage() {
   const duplicateDataSource = useDataSourcesStore((state) => state.duplicateDataSource);
   const deleteDataSource = useDataSourcesStore((state) => state.deleteDataSource);
   const push = useNotificationStore((state) => state.push);
+  const { runs: activeRuns } = useActiveRuns(currentProjectId);
 
   useEffect(() => {
     if (currentProjectId) {
@@ -156,6 +159,15 @@ export function DataSourcesListPage() {
       tone: "danger" as const,
     };
   }, [confirmationRequest, rows]);
+
+  async function stopSimulation(runId: string) {
+    try {
+      await apiFetch(`/api/v1/projects/${currentProjectId}/runs/${runId}/stop`, { method: "POST" });
+    } catch (err) {
+      const title = err instanceof Error ? err.message : "Stop failed";
+      push({ tone: "error", title });
+    }
+  }
 
   async function duplicateSource(rowId: string) {
     try {
@@ -266,9 +278,20 @@ export function DataSourcesListPage() {
       header: "State",
       sortable: true,
       sortValue: (row) => stateMeta(row).label,
-      cell: (row) => (
-        <StatusBadge label={stateMeta(row).label} tone={stateMeta(row).tone} />
-      ),
+      cell: (row) => {
+        const replayRun = activeRuns.find(
+          (r) =>
+            r.relatedSourceId === row.id &&
+            r.processType === "Replay" &&
+            r.runState === "running",
+        );
+        return (
+          <div className="flex flex-col gap-1">
+            <StatusBadge label={stateMeta(row).label} tone={stateMeta(row).tone} />
+            {replayRun ? <StatusBadge label="Simulating" tone="accent" /> : null}
+          </div>
+        );
+      },
       className: "w-[8rem]",
     },
     {
@@ -371,6 +394,19 @@ export function DataSourcesListPage() {
                 actions.push({
                   label: "Simulate",
                   onClick: () => navigate(`/data-sources/${row.id}/replay`),
+                });
+              }
+
+              const replayRun = activeRuns.find(
+                (r) =>
+                  r.relatedSourceId === row.id &&
+                  r.processType === "Replay" &&
+                  r.runState === "running",
+              );
+              if (replayRun && access.canConfigureReplay) {
+                actions.push({
+                  label: "Stop simulation",
+                  onClick: () => void stopSimulation(replayRun.id),
                 });
               }
 

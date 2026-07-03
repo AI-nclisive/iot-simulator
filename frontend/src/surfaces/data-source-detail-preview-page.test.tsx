@@ -12,6 +12,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { ActiveRunResponse } from "../shell/use-active-runs";
 
 // ── hoisted mocks ─────────────────────────────────────────────────────────────
 
@@ -20,6 +21,7 @@ const {
   mockStopDataSource,
   mockDataSourcesStore,
   mockShellStore,
+  mockUseActiveRuns,
 } = vi.hoisted(() => {
   const loadDataSources = vi.fn();
   const stopDataSource = vi.fn();
@@ -29,6 +31,7 @@ const {
     mockStopDataSource: stopDataSource,
     mockDataSourcesStore: vi.fn(),
     mockShellStore: vi.fn(),
+    mockUseActiveRuns: vi.fn(() => ({ runs: [] as ActiveRunResponse[], isLoading: false, error: null as string | null })),
   };
 });
 
@@ -38,6 +41,15 @@ vi.mock("../shell/data-sources-store", () => ({
 
 vi.mock("../shell/shell-store", () => ({
   useShellStore: mockShellStore,
+}));
+
+vi.mock("../shell/use-active-runs", () => ({
+  useActiveRuns: mockUseActiveRuns,
+}));
+
+vi.mock("../shell/notification-store", () => ({
+  useNotificationStore: (selector: (s: Record<string, unknown>) => unknown) =>
+    selector({ push: vi.fn() }),
 }));
 
 // jsdom has no EventSource; the live hooks inside tab content need a stub
@@ -210,5 +222,66 @@ describe("DataSourceDetailPreviewPage — source found", () => {
 
     expect(screen.getAllByRole("link", { name: "Record" }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole("link", { name: "Simulate" }).length).toBeGreaterThan(0);
+  });
+});
+
+// ── live simulation controls (UI-126) ─────────────────────────────────────────
+
+describe("DataSourceDetailPreviewPage — live simulation badge", () => {
+  const activeReplayRun = {
+    id: "run-99",
+    label: "Replay",
+    processType: "Replay" as const,
+    runState: "running" as const,
+    startedAt: "2026-01-01T10:00:00Z",
+    initiator: "local",
+    relatedSourceId: SOURCE_ID,
+    relatedLabel: null,
+  };
+
+  it("shows Simulating badge when a RUNNING Replay run is linked to this source", () => {
+    setupShellStore();
+    setupDataSourcesStore({ dataSources: [mockSource], isLoading: false });
+    mockUseActiveRuns.mockReturnValue({ runs: [activeReplayRun], isLoading: false, error: null });
+
+    renderPage();
+
+    expect(screen.getByText("Simulating")).toBeTruthy();
+  });
+
+  it("shows Stop simulation button for admin when active replay run exists", () => {
+    setupShellStore(); // admin role
+    setupDataSourcesStore({ dataSources: [mockSource], isLoading: false });
+    mockUseActiveRuns.mockReturnValue({ runs: [activeReplayRun], isLoading: false, error: null });
+
+    renderPage();
+
+    expect(screen.getByRole("button", { name: "Stop simulation" })).toBeTruthy();
+  });
+
+  it("hides Stop simulation button for shared user without canConfigureReplay", () => {
+    mockShellStore.mockImplementation((sel: (s: Record<string, unknown>) => unknown) =>
+      sel({ currentProjectId: PROJECT_ID, accessMode: "shared", sharedRole: "observer" }),
+    );
+    setupDataSourcesStore({ dataSources: [mockSource], isLoading: false });
+    mockUseActiveRuns.mockReturnValue({ runs: [activeReplayRun], isLoading: false, error: null });
+
+    renderPage();
+
+    expect(screen.queryByRole("button", { name: "Stop simulation" })).toBeNull();
+  });
+
+  it("shows no Simulating badge when active run belongs to a different source", () => {
+    setupShellStore();
+    setupDataSourcesStore({ dataSources: [mockSource], isLoading: false });
+    mockUseActiveRuns.mockReturnValue({
+      runs: [{ ...activeReplayRun, relatedSourceId: "other-src" }],
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(screen.queryByText("Simulating")).toBeNull();
   });
 });

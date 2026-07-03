@@ -38,6 +38,9 @@ vi.mock("../shell/notification-store", () => ({
   useNotificationStore: (selector: (s: Record<string, unknown>) => unknown) =>
     selector({ push: noop }),
 }));
+vi.mock("../shell/use-active-runs", () => ({
+  useActiveRuns: () => ({ runs: [], isLoading: false, error: null }),
+}));
 
 vi.mock("react-router-dom", async () => {
   const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
