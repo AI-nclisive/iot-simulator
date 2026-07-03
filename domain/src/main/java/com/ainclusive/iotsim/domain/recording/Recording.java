@@ -9,6 +9,7 @@ public record Recording(
         String dataSourceId,
         int schemaVersion,
         String origin,
+        String scanType,
         long valueCount,
         Instant createdAt,
         String createdBy,

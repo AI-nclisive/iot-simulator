@@ -169,6 +169,7 @@ public class ProjectZipExporter {
         m.put("dataSourceId", r.dataSourceId());
         m.put("schemaVersion", r.schemaVersion());
         m.put("origin", r.origin());
+        m.put("scanType", r.scanType());
         m.put("valueCount", r.valueCount());
         m.put("createdAt", r.createdAt().toString());
         m.put("createdBy", r.createdBy());

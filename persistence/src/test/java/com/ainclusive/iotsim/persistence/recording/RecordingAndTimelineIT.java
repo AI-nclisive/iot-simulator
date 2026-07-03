@@ -50,7 +50,7 @@ class RecordingAndTimelineIT {
 
     @Test
     void captureAndReplayTimeline() {
-        RecordingRow recording = recordings.create(projectId, dataSourceId, 1, "SCAN_RECORD", "it");
+        RecordingRow recording = recordings.create(projectId, dataSourceId, 1, "SCAN_RECORD", "SCHEMA_AND_DATA", "it");
 
         Instant t = Instant.parse("2026-01-01T00:00:00Z");
         long written = timeline.append(recording.id(), List.of(
@@ -77,9 +77,9 @@ class RecordingAndTimelineIT {
 
     @Test
     void findByProjectPagedReturnsBatchNewestFirst() {
-        RecordingRow a = recordings.create(projectId, dataSourceId, 1, "SCAN_RECORD", "it");
-        RecordingRow b = recordings.create(projectId, dataSourceId, 1, "SCAN_RECORD", "it");
-        RecordingRow c = recordings.create(projectId, dataSourceId, 1, "SCAN_RECORD", "it");
+        RecordingRow a = recordings.create(projectId, dataSourceId, 1, "SCAN_RECORD", "SCHEMA_AND_DATA", "it");
+        RecordingRow b = recordings.create(projectId, dataSourceId, 1, "SCAN_RECORD", "SCHEMA_AND_DATA", "it");
+        RecordingRow c = recordings.create(projectId, dataSourceId, 1, "SCAN_RECORD", "SCHEMA_AND_DATA", "it");
 
         List<RecordingRow> page1 = recordings.findByProjectPaged(projectId, null, null, 2);
         assertThat(page1).hasSize(2);

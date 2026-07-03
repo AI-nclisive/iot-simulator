@@ -197,7 +197,8 @@ public class ProjectImportService {
                     }
                     int schemaVersion = rec.path("schemaVersion").asInt(0);
                     String origin = rec.path("origin").asString("IMPORT");
-                    RecordingRow row = recordings.create(newProject.id(), newDsId, schemaVersion, origin, actor);
+                    String scanType = rec.path("scanType").asString("SCHEMA_AND_DATA");
+                    RecordingRow row = recordings.create(newProject.id(), newDsId, schemaVersion, origin, scanType, actor);
                     if (oldRecId != null) {
                         recIdMap.put(oldRecId, row.id());
                     }

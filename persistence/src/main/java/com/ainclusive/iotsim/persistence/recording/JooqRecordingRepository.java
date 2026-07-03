@@ -22,13 +22,14 @@ public class JooqRecordingRepository implements RecordingRepository {
 
     @Override
     public RecordingRow create(String projectId, String dataSourceId, int schemaVersion,
-            String origin, String createdBy) {
+            String origin, String scanType, String createdBy) {
         RecordingsRecord record = dsl.insertInto(RECORDINGS)
                 .set(RECORDINGS.ID, Ids.newId())
                 .set(RECORDINGS.PROJECT_ID, projectId)
                 .set(RECORDINGS.DATA_SOURCE_ID, dataSourceId)
                 .set(RECORDINGS.SCHEMA_VERSION, schemaVersion)
                 .set(RECORDINGS.ORIGIN, origin)
+                .set(RECORDINGS.SCAN_TYPE, scanType)
                 .set(RECORDINGS.CREATED_BY, createdBy)
                 .returning()
                 .fetchOne();
@@ -86,6 +87,7 @@ public class JooqRecordingRepository implements RecordingRepository {
                 r.getDataSourceId(),
                 r.getSchemaVersion(),
                 r.getOrigin(),
+                r.getScanType(),
                 r.getTimeStart(),
                 r.getTimeEnd(),
                 r.getValueCount(),

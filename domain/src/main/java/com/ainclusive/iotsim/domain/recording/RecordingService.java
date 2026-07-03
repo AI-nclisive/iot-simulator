@@ -19,6 +19,7 @@ import com.ainclusive.iotsim.platform.capture.SourceCapturer;
 import com.ainclusive.iotsim.platform.secret.CredentialStore;
 import com.ainclusive.iotsim.protocolmodel.NeutralValue;
 import com.ainclusive.iotsim.protocolmodel.NodeKind;
+import com.ainclusive.iotsim.protocolmodel.ScanType;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
@@ -52,15 +53,19 @@ public class RecordingService {
         this.projects = projects;
     }
 
-    public Recording create(String projectId, String dataSourceId, String actor) {
+    public Recording create(String projectId, String dataSourceId, ScanType scanType, String actor) {
         DataSourceRow source = requireSource(projectId, dataSourceId);
         int schemaVersion = source.schemaVersion() == null ? 0 : source.schemaVersion();
-        return map(recordings.create(projectId, dataSourceId, schemaVersion, "SCAN_RECORD", actor));
+        String scanTypeStr = scanType != null ? scanType.name() : ScanType.SCHEMA_AND_DATA.name();
+        return map(recordings.create(projectId, dataSourceId, schemaVersion, "SCAN_RECORD", scanTypeStr, actor));
     }
 
-    /** Appends captured values; used by the source reader (and tests). */
+    /** Appends captured values; skipped entirely when the recording is {@code SCHEMA_ONLY}. */
     public long appendValues(String projectId, String recordingId, List<NeutralValue> values) {
-        requireRecording(projectId, recordingId);
+        RecordingRow rec = requireRecording(projectId, recordingId);
+        if (ScanType.SCHEMA_ONLY.name().equals(rec.scanType())) {
+            return 0;
+        }
         return timeline.append(recordingId, values);
     }
 
@@ -95,7 +100,8 @@ public class RecordingService {
         ActiveCapture capture = active.computeIfAbsent(dataSourceId, dsId -> {
             started[0] = true;
             Recording recording = map(recordings.create(
-                    projectId, dsId, schema.version(), "SCAN_RECORD", actor));
+                    projectId, dsId, schema.version(), "SCAN_RECORD",
+                    ScanType.SCHEMA_AND_DATA.name(), actor));
             CaptureSpec spec = new CaptureSpec(source.protocol(), source.realDeviceEndpoint(),
                     credentials.find(dsId).orElse(null), schema.version(), schema.nodes());
             CaptureSession session = capturer.startCapture(
@@ -225,7 +231,7 @@ public class RecordingService {
     private Recording map(RecordingRow r) {
         return new Recording(
                 r.id(), r.projectId(), r.dataSourceId(), r.schemaVersion(), r.origin(),
-                r.valueCount(), r.createdAt().toInstant(), r.createdBy(), r.version());
+                r.scanType(), r.valueCount(), r.createdAt().toInstant(), r.createdBy(), r.version());
     }
 
     /** A live capture in progress: the recording it feeds and the session to stop. */
