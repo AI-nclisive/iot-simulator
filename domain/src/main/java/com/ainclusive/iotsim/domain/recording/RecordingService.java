@@ -11,6 +11,7 @@ import com.ainclusive.iotsim.persistence.recording.RecordingRow;
 import com.ainclusive.iotsim.persistence.schema.SchemaRepository;
 import com.ainclusive.iotsim.persistence.schema.SchemaWithNodes;
 import com.ainclusive.iotsim.persistence.timeline.ValueTimelineRepository;
+import com.ainclusive.iotsim.persistence.timeline.ValueTimelineRepository.ValueTimelineEntry;
 import com.ainclusive.iotsim.platform.capture.CaptureException;
 import com.ainclusive.iotsim.platform.capture.CaptureSession;
 import com.ainclusive.iotsim.platform.capture.CaptureSpec;
@@ -153,6 +154,55 @@ public class RecordingService {
     public Recording get(String projectId, String recordingId) {
         return map(requireRecording(projectId, recordingId));
     }
+
+    /**
+     * Keyset-paginated read of captured values for a recording (IS-134).
+     * Cursor encodes the last-seen SEQ as a base64url string.
+     */
+    public RecordingValuesPage listValues(String projectId, String recordingId,
+            String cursor, Integer limit) {
+        RecordingRow rec = requireRecording(projectId, recordingId);
+        int size = Math.min(limit != null && limit > 0 ? limit : 200, 1000);
+        long afterSeq = decodeValueCursor(cursor);
+        List<ValueTimelineEntry> raw = timeline.readPage(recordingId, afterSeq, size + 1);
+        String nextCursor = null;
+        if (raw.size() > size) {
+            raw = raw.subList(0, size);
+            nextCursor = encodeValueCursor(raw.get(raw.size() - 1).seq());
+        }
+        List<RecordingValue> items = raw.stream().map(e -> new RecordingValue(
+                e.value().nodeId(),
+                e.parameterPath(),
+                e.value().sourceTime(),
+                e.value().value() != null ? String.valueOf(e.value().value()) : null,
+                e.value().quality().name())).toList();
+        return new RecordingValuesPage(items, nextCursor, rec.valueCount());
+    }
+
+    /** Paginated response for the value browse API (IS-134). */
+    public record RecordingValuesPage(
+            List<RecordingValue> items, String nextCursor, long total) {}
+
+    private static long decodeValueCursor(String cursor) {
+        if (cursor == null || cursor.isBlank()) {
+            return -1L;
+        }
+        try {
+            byte[] bytes = java.util.Base64.getUrlDecoder().decode(cursor);
+            return Long.parseLong(new String(bytes, java.nio.charset.StandardCharsets.UTF_8));
+        } catch (RuntimeException e) {
+            throw new IllegalArgumentException("invalid cursor", e);
+        }
+    }
+
+    private static String encodeValueCursor(long seq) {
+        byte[] bytes = Long.toString(seq).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        return java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    }
+
+    /** A single captured value row returned by the browse API (IS-134). */
+    public record RecordingValue(String parameterId, String parameterPath,
+            java.time.Instant timestamp, String value, String quality) {}
 
     private void requireProject(String projectId) {
         if (projects.findById(projectId).isEmpty()) {

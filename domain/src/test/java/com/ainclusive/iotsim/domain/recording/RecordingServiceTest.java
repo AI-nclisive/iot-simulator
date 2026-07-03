@@ -13,6 +13,7 @@ import com.ainclusive.iotsim.persistence.recording.RecordingRow;
 import com.ainclusive.iotsim.persistence.schema.SchemaRepository;
 import com.ainclusive.iotsim.persistence.schema.SchemaWithNodes;
 import com.ainclusive.iotsim.persistence.timeline.ValueTimelineRepository;
+import com.ainclusive.iotsim.persistence.timeline.ValueTimelineRepository.ValueTimelineEntry;
 import com.ainclusive.iotsim.platform.capture.CaptureException;
 import com.ainclusive.iotsim.platform.capture.CaptureSession;
 import com.ainclusive.iotsim.platform.capture.CaptureSpec;
@@ -200,6 +201,34 @@ class RecordingServiceTest {
         assertThat(page2.nextCursor()).isNull();
     }
 
+    @Test
+    void listValuesReturnsFirstPage() {
+        RecordingService svc = service;
+        String rid = svc.create(PROJECT, SOURCE, "test").id();
+        Instant t = Instant.parse("2024-01-01T00:00:00Z");
+        List<NeutralValue> vals = List.of(
+                NeutralValue.good("n1", t, 1.0),
+                NeutralValue.good("n2", t.plusSeconds(1), 2.0),
+                NeutralValue.good("n3", t.plusSeconds(2), 3.0));
+        svc.appendValues(PROJECT, rid, vals);
+
+        var page = svc.listValues(PROJECT, rid, null, 2);
+        assertThat(page.items()).hasSize(2);
+        assertThat(page.items().get(0).parameterId()).isEqualTo("n1");
+        assertThat(page.nextCursor()).isNotNull();
+
+        var page2 = svc.listValues(PROJECT, rid, page.nextCursor(), 2);
+        assertThat(page2.items()).hasSize(1);
+        assertThat(page2.items().get(0).parameterId()).isEqualTo("n3");
+        assertThat(page2.nextCursor()).isNull();
+    }
+
+    @Test
+    void listValuesThrowsForMissingRecording() {
+        assertThatThrownBy(() -> service.listValues(PROJECT, "no-such-id", null, null))
+                .isInstanceOf(com.ainclusive.iotsim.domain.common.ResourceNotFoundException.class);
+    }
+
     private static ProjectRepository fakeProjects() {
         return new ProjectRepository() {
             @Override public Optional<ProjectRow> findById(String id) { return Optional.empty(); }
@@ -332,6 +361,21 @@ class RecordingServiceTest {
         @Override
         public long count(String recordingId) {
             return byRecording.getOrDefault(recordingId, List.of()).size();
+        }
+
+        @Override
+        public List<ValueTimelineEntry> readPage(String recordingId, long afterSeq, int limit) {
+            List<NeutralValue> all = byRecording.getOrDefault(recordingId, List.of());
+            List<ValueTimelineEntry> result = new ArrayList<>();
+            for (int i = 0; i < all.size(); i++) {
+                if (i > afterSeq) {
+                    result.add(new ValueTimelineEntry(i, all.get(i).nodeId(), all.get(i)));
+                    if (result.size() >= limit) {
+                        break;
+                    }
+                }
+            }
+            return result;
         }
     }
 
