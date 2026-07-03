@@ -798,10 +798,8 @@ Parallel execution:
   Done when: no fake timer in `RecordingFlowPage`; value count and state reflect real SSE; TypeScript errors pass.
 
 - [ ] `UI-120` Integrate the regrouped API (6 groups)
-  Goal: reflect the backend's 6-group API tags (IS-135) on the frontend — group the generated API client / API modules (and optionally nav) around the 6 groups.
-  Surface: shared API client layer.
+  Goal: reflect the backend's 6-group API tags (IS-135) on the frontend API client.
   Depends: IS-135.
-  Done when: FE API layer is organized by the 6 groups from `API_INVENTORY.md`; typecheck + vitest pass.
 
 - [x] `UI-118` Fix data source detail, schema editor, and create recording wizard bugs
 - [x] `UI-117` Fix project selection persistence — lost on refresh, not shown on direct URL
