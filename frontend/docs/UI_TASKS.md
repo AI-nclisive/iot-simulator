@@ -802,6 +802,7 @@ Parallel execution:
   Goal: hide the «Manual» source-basis option — not needed in current scope; SCAN / IMPORT / SYNTHETIC remain.
   Work includes: remove Manual card from basis step; remove dead conditional branches that handle manual-only flows (e.g. schema-editor auto-open); update tests.
   Done when: Manual is not selectable; SCAN / IMPORT / SYNTHETIC paths unchanged; TS build + tests pass.
+- [x] `UI-123` Recording schema tab — default Schema tab in RecordingDetailPage; calls `GET .../schema`; renders collapsible folder/variable tree; loading, error, and empty states.
 - [x] `UI-119` Recording value browser — paginated table (Timestamp, Parameter path, Value, Quality) in Recording detail Values tab; wired to IS-134 `GET .../values` endpoint; cursor pagination "Load more"; replaces "will be available in a future release" placeholder.
 - [ ] `UI-120` Integrate the regrouped API (6 groups)
   Goal: reflect the backend's 6-group API tags (IS-135) on the frontend API client.

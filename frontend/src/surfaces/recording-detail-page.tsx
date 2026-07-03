@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { apiFetch, ApiError } from "../api";
 import { useArtifactsStore } from "../shell/artifacts-store";
@@ -7,6 +7,15 @@ import { SharedStatePanel } from "../ui/shared-state-panel";
 import { StatusBadge } from "../ui/status-badge";
 
 type TabId = "schema" | "values";
+
+type SchemaNode = {
+  nodeId: string;
+  parentId: string | null;
+  path: string;
+  displayName: string;
+  kind: "FOLDER" | "VARIABLE";
+  dataType: string | null;
+};
 
 type ValueEntry = {
   parameterId: string;
@@ -41,6 +50,13 @@ export function RecordingDetailPage() {
 
   const [activeTab, setActiveTab] = useState<TabId>("schema");
 
+  // Schema tab state
+  const [schemaNodes, setSchemaNodes] = useState<SchemaNode[] | null>(null);
+  const [schemaLoading, setSchemaLoading] = useState(false);
+  const [schemaError, setSchemaError] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+
+  // Values tab state
   const [values, setValues] = useState<ValueEntry[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [valuesTotal, setValuesTotal] = useState<number | null>(null);
@@ -55,6 +71,27 @@ export function RecordingDetailPage() {
   }, [currentProjectId, recordingId, loadRecordingById]);
 
   const recording = artifacts.find((a) => a.id === recordingId) ?? null;
+
+  const loadSchema = useCallback(async () => {
+    if (!currentProjectId || !recordingId) return;
+    setSchemaLoading(true);
+    try {
+      const data = await apiFetch<{ nodes: SchemaNode[] }>(
+        `/api/v1/projects/${currentProjectId}/recordings/${recordingId}/schema`,
+      );
+      setSchemaNodes(data.nodes ?? []);
+    } catch (err) {
+      setSchemaError(err instanceof ApiError ? err.title : "Failed to load schema.");
+    } finally {
+      setSchemaLoading(false);
+    }
+  }, [currentProjectId, recordingId]);
+
+  useEffect(() => {
+    if (activeTab === "schema" && schemaNodes === null && !schemaLoading && !schemaError) {
+      void loadSchema();
+    }
+  }, [activeTab, schemaNodes, schemaLoading, schemaError, loadSchema]);
 
   const loadValues = useCallback(
     async (cursor?: string) => {
@@ -127,6 +164,69 @@ export function RecordingDetailPage() {
     );
   }
 
+  function renderSchemaTab() {
+    if (schemaNodes === null && !schemaError) {
+      return <SharedStatePanel message="Loading schema…" state="loading" title="" />;
+    }
+    if (schemaError) {
+      return <SharedStatePanel message={schemaError} state="error" title="Failed to load schema." />;
+    }
+    if (schemaNodes === null || schemaNodes.length === 0) {
+      return (
+        <SharedStatePanel
+          message="No schema data was captured."
+          state="empty"
+          title="No schema captured."
+        />
+      );
+    }
+
+    const rootNodes = schemaNodes.filter((n) => n.parentId === null);
+
+    function renderNode(node: SchemaNode, depth: number): React.ReactNode {
+      const isFolder = node.kind === "FOLDER";
+      const isCollapsed = collapsed.has(node.nodeId);
+      const children = schemaNodes!.filter((n) => n.parentId === node.nodeId);
+      return (
+        <div key={node.nodeId} style={{ paddingLeft: `${depth * 16}px` }}>
+          <div className="flex items-center gap-1 py-0.5">
+            {isFolder && (
+              <button
+                type="button"
+                onClick={() =>
+                  setCollapsed((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(node.nodeId)) next.delete(node.nodeId);
+                    else next.add(node.nodeId);
+                    return next;
+                  })
+                }
+                className="text-xs text-shell-muted"
+              >
+                {isCollapsed ? "▶" : "▼"}
+              </button>
+            )}
+            <span
+              className={`text-sm ${isFolder ? "font-medium text-shell-ink" : "text-shell-ink"}`}
+            >
+              {node.displayName}
+            </span>
+            {node.dataType && (
+              <span className="ml-2 text-xs text-shell-muted">{node.dataType}</span>
+            )}
+          </div>
+          {isFolder && !isCollapsed && children.map((child) => renderNode(child, depth + 1))}
+        </div>
+      );
+    }
+
+    return (
+      <div className="rounded-md border border-shell-line bg-white p-4">
+        {rootNodes.map((node) => renderNode(node, 0))}
+      </div>
+    );
+  }
+
   function renderValuesTab() {
     if (recording!.valueCount === 0) {
       return (
@@ -191,13 +291,14 @@ export function RecordingDetailPage() {
               className="shell-action"
               disabled={valuesLoading}
               type="button"
-              onClick={() => { setValuesError(null); void loadValues(nextCursor); }}
+              onClick={() => {
+                setValuesError(null);
+                void loadValues(nextCursor);
+              }}
             >
               {valuesLoading ? "Loading…" : "Load more"}
             </button>
-            {valuesError ? (
-              <p className="text-xs text-red-600">{valuesError}</p>
-            ) : null}
+            {valuesError ? <p className="text-xs text-red-600">{valuesError}</p> : null}
           </div>
         ) : null}
 
@@ -274,15 +375,7 @@ export function RecordingDetailPage() {
         </div>
 
         <div className="py-5">
-          {activeTab === "schema" ? (
-            <SharedStatePanel
-              message="Schema view is coming soon — the captured node structure will be displayed here."
-              state="empty"
-              title="Schema not yet available."
-            />
-          ) : null}
-
-          {activeTab === "values" ? renderValuesTab() : null}
+          {activeTab === "schema" ? renderSchemaTab() : renderValuesTab()}
         </div>
       </section>
     </div>
