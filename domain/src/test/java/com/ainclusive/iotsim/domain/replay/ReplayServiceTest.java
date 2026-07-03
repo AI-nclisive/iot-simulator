@@ -16,6 +16,7 @@ import com.ainclusive.iotsim.persistence.run.RunRow;
 import com.ainclusive.iotsim.persistence.schema.SchemaRepository;
 import com.ainclusive.iotsim.persistence.schema.SchemaWithNodes;
 import com.ainclusive.iotsim.persistence.timeline.ValueTimelineRepository;
+import com.ainclusive.iotsim.persistence.timeline.ValueTimelineRepository.ValueTimelineEntry;
 import com.ainclusive.iotsim.platform.runtime.InMemoryRuntimeController;
 import com.ainclusive.iotsim.platform.runtime.RuntimeController;
 import com.ainclusive.iotsim.platform.runtime.RuntimeStartSpec;
@@ -458,6 +459,11 @@ class ReplayServiceTest {
         @Override
         public long count(String recordingId) {
             return values.size();
+        }
+
+        @Override
+        public List<ValueTimelineEntry> readPage(String recordingId, long afterSeq, int limit) {
+            throw new UnsupportedOperationException();
         }
     }
 

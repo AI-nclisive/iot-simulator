@@ -20,4 +20,13 @@ public interface ValueTimelineRepository {
     List<NeutralValue> readAll(String recordingId);
 
     long count(String recordingId);
+
+    /**
+     * Keyset-paginated read: returns up to {@code limit} entries with {@code seq > afterSeq},
+     * ordered by seq. Pass {@code afterSeq = -1} to start from the beginning (IS-134).
+     */
+    List<ValueTimelineEntry> readPage(String recordingId, long afterSeq, int limit);
+
+    /** A single timeline row with its sequence number (used for cursor-based pagination). */
+    record ValueTimelineEntry(long seq, String parameterPath, NeutralValue value) {}
 }
