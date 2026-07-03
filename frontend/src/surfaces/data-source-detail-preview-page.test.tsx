@@ -40,6 +40,10 @@ vi.mock("../shell/shell-store", () => ({
   useShellStore: mockShellStore,
 }));
 
+vi.mock("../shell/use-active-runs", () => ({
+  useActiveRuns: () => ({ runs: [], isLoading: false, error: null }),
+}));
+
 // jsdom has no EventSource; the live hooks inside tab content need a stub
 class StubEventSource {
   onopen: (() => void) | null = null;

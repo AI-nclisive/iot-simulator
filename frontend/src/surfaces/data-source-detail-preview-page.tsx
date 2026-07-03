@@ -3,6 +3,8 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { resolveAccess } from "../shell/access-policy";
 import { useDataSourcesStore } from "../shell/data-sources-store";
 import { useShellStore } from "../shell/shell-store";
+import { useActiveRuns } from "../shell/use-active-runs";
+import { apiFetch } from "../api";
 import { ConfirmationDialog } from "../ui/confirmation-dialog";
 import { DataSourceDetailClientsTab } from "./data-source-detail-clients-tab";
 import { DataSourceDetailEventsTab } from "./data-source-detail-events-tab";
@@ -99,6 +101,7 @@ export function DataSourceDetailPreviewPage() {
   const stopDataSource = useDataSourcesStore((state) => state.stopDataSource);
   const isLoading = useDataSourcesStore((state) => state.isLoading);
   const loadDataSources = useDataSourcesStore((state) => state.loadDataSources);
+  const { runs: activeRuns } = useActiveRuns(currentProjectId);
   const access = resolveAccess(accessMode, sharedRole);
   const fetchedForProjectRef = useRef<string | null>(null);
 
@@ -170,6 +173,24 @@ export function DataSourceDetailPreviewPage() {
           onClick: () => setStopConfirmationOpen(true),
         }
       : null;
+  const activeReplayRun = activeRuns.find(
+    (r) =>
+      r.relatedSourceId === activeSource.id &&
+      r.processType === "Replay" &&
+      r.runState === "running",
+  ) ?? null;
+
+  async function stopSimulation() {
+    if (!activeReplayRun || !currentProjectId) return;
+    try {
+      await apiFetch(
+        `/api/v1/projects/${currentProjectId}/runs/${activeReplayRun.id}/stop`,
+        { method: "POST" },
+      );
+    } catch {
+      // badge disappears on next active-runs poll; no toast needed
+    }
+  }
 
   function setActiveTab(tabId: DetailTabId) {
     if (activeTab === "schema" && schemaUnsaved && tabId !== "schema") {
@@ -228,6 +249,9 @@ export function DataSourceDetailPreviewPage() {
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge label={activeState.label} tone={activeState.tone} />
             <StatusBadge label={activeSource.health} tone={healthTone(activeSource.health)} />
+            {activeReplayRun ? (
+              <StatusBadge label="Simulating" tone="accent" />
+            ) : null}
           </div>
         </div>
 
@@ -258,6 +282,11 @@ export function DataSourceDetailPreviewPage() {
             <Link className="shell-action" to={`/data-sources/${activeSource.id}/replay`}>
               Simulate
             </Link>
+          ) : null}
+          {activeReplayRun ? (
+            <button className="shell-action" type="button" onClick={() => void stopSimulation()}>
+              Stop simulation
+            </button>
           ) : null}
           {sourceControlAction ? (
             <button className="shell-action" type="button" onClick={sourceControlAction.onClick}>

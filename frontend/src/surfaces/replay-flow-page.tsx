@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams, useParams } from "react-router-dom";
 import { resolveAccess } from "../shell/access-policy";
 import { useArtifactsStore } from "../shell/artifacts-store";
 import { useDataSourcesStore } from "../shell/data-sources-store";
 import { useShellStore } from "../shell/shell-store";
 import { useNotificationStore } from "../shell/notification-store";
+import { useActiveRuns } from "../shell/use-active-runs";
 import { apiFetch } from "../api";
 import { SharedStatePanel } from "../ui/shared-state-panel";
 import { StatusBadge, type StatusTone } from "../ui/status-badge";
@@ -74,11 +75,14 @@ export function ReplayFlowPage() {
   );
   const push = useNotificationStore((state) => state.push);
   const access = resolveAccess(accessMode, sharedRole);
+  const { runs: activeRuns } = useActiveRuns(currentProjectId);
   const [selectedArtifactId, setSelectedArtifactId] = useState(
     searchParams.get("artifactId") ?? artifacts[0]?.id ?? "",
   );
   const [speed, setSpeed] = useState("1x");
   const [replayState, setReplayState] = useState<ReplayUiState>("idle");
+  const [runId, setRunId] = useState<string | null>(null);
+  const runSeenRef = useRef(false);
   const [progress, setProgress] = useState(0);
   const [evidenceState, setEvidenceState] = useState<"Ready" | "Assembling" | "Retry needed">(
     "Ready",
@@ -97,13 +101,29 @@ export function ReplayFlowPage() {
   const canConfigureReplay = access.canConfigureReplay;
   const replayReady = Boolean(selectedArtifact) && compatibleArtifact;
 
-  // TODO(UI-097): no backend progress streaming — progress stays at "running" until
-  // a future SSE or polling endpoint is wired. For now set to 100% on completed.
   useEffect(() => {
     if (replayState === "completed") {
       setProgress(100);
     }
   }, [replayState]);
+
+  // Detect run completion via active-runs poll: once the run has been seen in the
+  // list and then disappears, the server auto-completed it (all values dripped).
+  useEffect(() => {
+    if (!runId || replayState !== "running") {
+      runSeenRef.current = false;
+      return;
+    }
+    const found = activeRuns.some((r) => r.id === runId);
+    if (found) {
+      runSeenRef.current = true;
+    } else if (runSeenRef.current) {
+      setReplayState("completed");
+      setEvidenceState("Ready");
+      setRunId(null);
+      runSeenRef.current = false;
+    }
+  }, [activeRuns, runId, replayState]);
 
   const runtimeEvents = useMemo(() => {
     if (!selectedArtifact) {
@@ -196,15 +216,15 @@ export function ReplayFlowPage() {
     );
 
     try {
-      await apiFetch<ReplayResponse>(
+      const response = await apiFetch<ReplayResponse>(
         `/api/v1/projects/${currentProjectId}/data-sources/${sourceId}/replay`,
         {
           method: "POST",
           body: JSON.stringify({ recordingId: selectedArtifact.id }),
         },
       );
-      setReplayState("completed");
-      setEvidenceState("Ready");
+      setRunId(response.runId);
+      // replayState stays "running" — useActiveRuns poll drives completion
     } catch (err) {
       const title = err instanceof Error ? err.message : "Replay failed";
       push({ tone: "error", title });
@@ -213,10 +233,19 @@ export function ReplayFlowPage() {
     }
   }
 
-  function handleStopReplay() {
-    // TODO(UI-097): no backend stop endpoint — only local state update
+  async function handleStopReplay() {
+    if (!runId || !currentProjectId) return;
+    try {
+      await apiFetch(`/api/v1/projects/${currentProjectId}/runs/${runId}/stop`, { method: "POST" });
+    } catch (err) {
+      const title = err instanceof Error ? err.message : "Stop failed";
+      push({ tone: "error", title });
+      return;
+    }
     setReplayState("failed");
     setEvidenceState("Retry needed");
+    setRunId(null);
+    runSeenRef.current = false;
   }
 
   return (

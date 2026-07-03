@@ -813,7 +813,7 @@ Parallel execution:
   Depends: IS-139, IS-140, UI-126.
   Done when: no bare Start button anywhere; Record leads to recording flow; Simulate opens picker and starts live replay; TypeScript build + vitest pass.
 
-- [ ] `UI-126` Live simulation controls: RUNNING indicator + Stop
+- [x] `UI-126` Live simulation controls: RUNNING indicator + Stop
   Goal: when a data source is actively simulating (run RUNNING), show a live indicator and Stop action that ends the run.
   Surface: `Data Sources List`, `Data Source Detail`
   Work includes: detect RUNNING replay run for this source from active-runs SSE/poll; show "Simulating" badge with recording name in list row and detail header; Stop button → POST /api/v1/runs/{runId}/stop; SSE state update removes badge on completion.
