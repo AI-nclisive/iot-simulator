@@ -13,8 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
  * Path-based major versioning at /api/v1 (decision D7).
  */
 @RestController
-@Tag(name = "Meta", description = "Lightweight metadata endpoint confirming the versioned API surface"
-        + " is reachable.")
+@Tag(name = "Platform")
 @RequestMapping("/api/v1")
 public class MetaController {
 

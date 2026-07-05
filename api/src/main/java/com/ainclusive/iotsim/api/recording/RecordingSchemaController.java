@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /** Exposes the schema captured for a recording (IS-137). */
 @RestController
-@Tag(name = "Recording Schema", description = "Schema captured for a recording.")
+@Tag(name = "Recordings")
 @RequestMapping("/api/v1/projects/{projectId}/recordings/{recordingId}/schema")
 public class RecordingSchemaController {
 

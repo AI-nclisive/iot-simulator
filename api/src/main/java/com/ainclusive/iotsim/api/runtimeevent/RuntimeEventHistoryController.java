@@ -29,8 +29,7 @@ import tools.jackson.databind.ObjectMapper;
  * <p>Authorization (IS-077): read-only — {@link Permission#OBSERVE} (user + admin).
  */
 @RestController
-@Tag(name = "Runtime Events",
-        description = "Read the historical runtime event log (state transitions and errors) for a project.")
+@Tag(name = "Monitoring")
 @RequestMapping("/api/v1/projects")
 public class RuntimeEventHistoryController {
 

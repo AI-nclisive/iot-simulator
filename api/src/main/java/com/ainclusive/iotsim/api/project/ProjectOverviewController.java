@@ -21,9 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
  * <p>Authorization (IS-077): read-only — {@link Permission#OBSERVE} (user + admin).
  */
 @RestController
-@Tag(name = "Project Overview", description = "Read-only aggregated dashboard counts for a project:"
-        + " configured vs running sources, reusable-artifact counts, and how many sources need attention"
-        + " (unhealthy).")
+@Tag(name = "Projects")
 @RequestMapping("/api/v1/projects")
 public class ProjectOverviewController {
 

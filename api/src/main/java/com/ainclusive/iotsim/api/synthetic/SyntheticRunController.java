@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
  * {@link Permission#REPLAY_START} (user + admin).
  */
 @RestController
-@Tag(name = "Synthetic Runs", description = "Start a continuous live synthetic (generated) feed on a data source.")
+@Tag(name = "Runs")
 @RequestMapping("/api/v1/projects/{projectId}/data-sources/{dataSourceId}/run-synthetic")
 public class SyntheticRunController {
 

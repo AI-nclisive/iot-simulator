@@ -26,8 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
  * <p>Authorization (IS-077): read-only — {@link Permission#OBSERVE} (user + admin).
  */
 @RestController
-@Tag(name = "Source Health", description = "Point-in-time runtime state and most-recent error for a single"
-        + " data source. Live transitions arrive on the runtime SSE stream.")
+@Tag(name = "Monitoring")
 public class HealthController {
 
     private static final String OBSERVE =

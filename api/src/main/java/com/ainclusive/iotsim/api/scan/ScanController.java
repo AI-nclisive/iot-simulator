@@ -34,10 +34,7 @@ import org.springframework.web.bind.annotation.RestController;
  * (admin-level) — {@link Permission#SOURCE_EDIT}. Poll (GET) uses {@link Permission#OBSERVE}.
  */
 @RestController
-@Tag(
-        name = "Source Discovery",
-        description = "Test connectivity to a real endpoint and scan its address space, then turn"
-                + " discovered nodes into a new simulated data source.")
+@Tag(name = "Data Sources")
 @RequestMapping("/api/v1/projects/{projectId}/data-sources/scan")
 public class ScanController {
 

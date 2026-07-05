@@ -21,9 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
  * {@link Permission#REPLAY_START} (user + admin).
  */
 @RestController
-@Tag(
-        name = "Replay",
-        description = "Replay a recorded timeline back through a data source.")
+@Tag(name = "Runs")
 @RequestMapping("/api/v1/projects/{projectId}/data-sources/{dataSourceId}/replay")
 public class ReplayController {
 

@@ -33,9 +33,7 @@ import org.springframework.web.bind.annotation.RestController;
  * </ul>
  */
 @RestController
-@Tag(name = "Projects", description = "Create, read, update, duplicate, archive, and delete simulation projects"
-        + " — the top-level container for data sources, scenarios, recordings, and runs."
-        + " Uses ETag / If-Match optimistic concurrency.")
+@Tag(name = "Projects")
 @RequestMapping("/api/v1/projects")
 public class ProjectController {
 

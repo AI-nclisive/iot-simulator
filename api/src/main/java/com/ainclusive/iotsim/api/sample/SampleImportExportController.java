@@ -37,8 +37,7 @@ import org.springframework.web.multipart.MultipartFile;
  * download — {@link Permission#OBSERVE} (user + admin).
  */
 @RestController
-@Tag(name = "Sample Import/Export",
-        description = "Export a sample as a ZIP, download a previously exported ZIP, and import a sample ZIP.")
+@Tag(name = "Samples")
 @RequestMapping("/api/v1/projects/{projectId}/samples")
 public class SampleImportExportController {
 

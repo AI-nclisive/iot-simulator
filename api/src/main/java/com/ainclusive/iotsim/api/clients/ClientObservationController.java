@@ -20,9 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
  * <p>Authorization (IS-077): read-only — {@link Permission#OBSERVE} (user + admin).
  */
 @RestController
-@Tag(name = "Client Observations",
-        description = "Point-in-time view of clients currently connected to a simulated source,"
-                + " plus the full connection history.")
+@Tag(name = "Monitoring")
 public class ClientObservationController {
 
     private static final String OBSERVE =

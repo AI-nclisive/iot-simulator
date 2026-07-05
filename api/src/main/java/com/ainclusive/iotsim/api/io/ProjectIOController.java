@@ -41,9 +41,7 @@ import org.springframework.web.multipart.MultipartFile;
  * <p>Authorization (IS-077): both endpoints require {@link Permission#IMPORT_EXPORT} (admin).
  */
 @RestController
-@Tag(name = "Project Import/Export",
-        description = "Export a whole project as a versioned, secret-free ZIP and import one back"
-                + " as a new project.")
+@Tag(name = "Projects")
 @RequestMapping("/api/v1/projects")
 public class ProjectIOController {
 

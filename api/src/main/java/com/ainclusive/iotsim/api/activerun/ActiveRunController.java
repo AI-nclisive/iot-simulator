@@ -17,8 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
  * <p>GET /api/v1/projects/{projectId}/active-runs → {@code ActiveRunsResponse}
  */
 @RestController
-@Tag(name = "Active Runs", description = "Read-only dashboard view of the currently active (RUNNING or QUEUED)"
-        + " runs in a project.")
+@Tag(name = "Runs")
 @RequestMapping("/api/v1/projects/{projectId}/active-runs")
 public class ActiveRunController {
 

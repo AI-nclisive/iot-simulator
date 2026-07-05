@@ -37,8 +37,7 @@ import org.springframework.web.bind.annotation.RestController;
  * create/update/delete/duplicate — {@link Permission#SCENARIO_EDIT} (admin).
  */
 @RestController
-@Tag(name = "Scenarios", description = "Create, read, update, duplicate, validate, and run synthetic scenarios"
-        + " that script value changes over time.")
+@Tag(name = "Scenarios")
 @RequestMapping("/api/v1/projects/{projectId}/scenarios")
 public class ScenarioController {
 
