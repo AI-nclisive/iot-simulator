@@ -15,7 +15,7 @@ public class OpenApiConfig {
      * The API is grouped into nine Swagger tags, one per domain noun, declared here in workflow
      * order (platform → workspace → sources → data → authoring → execution → output → observation).
      * Controllers reference these names via {@code @Tag(name = ...)}; the descriptions live here so
-     * each group has a single authoritative summary. See API_INVENTORY.md.
+     * each group has a single authoritative summary.
      */
     @Bean
     public OpenAPI iotSimulatorOpenApi() {

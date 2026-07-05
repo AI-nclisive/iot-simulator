@@ -27,13 +27,12 @@ import org.springframework.web.bind.annotation.RestController;
  * {@link OpenApiConfig} (one authoritative summary per group); this test verifies each group a
  * controller uses is actually declared there with a non-blank description. A newly added
  * undocumented controller/endpoint, or a controller tagged with an unknown group, fails here.
- * See API_INVENTORY.md.
  */
 class OpenApiDocumentationConventionTest {
 
     private static final String BASE_PACKAGE = "com.ainclusive.iotsim.api";
 
-    /** The nine Swagger groups the API is organised into. See API_INVENTORY.md and OpenApiConfig. */
+    /** The nine Swagger groups the API is organised into. See OpenApiConfig. */
     private static final Set<String> ALLOWED_GROUPS = Set.of(
             "Platform",
             "Projects",
