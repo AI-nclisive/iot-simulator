@@ -820,8 +820,11 @@ Parallel execution:
   Depends: IS-140.
   Done when: RUNNING simulation visible in list + detail; Stop ends simulation and clears badge; no stale badge after stop; TypeScript build + vitest pass.
 
-- [ ] `UI-120` Integrate the regrouped API (6 groups)
-  Goal: reflect the backend's 6-group API tags (IS-135) on the frontend API client.
+- [x] `UI-120` Integrate the regrouped API (9 groups)
+  Goal: reflect the backend's 9-group API tags (IS-135) on the frontend. No FE code
+  change required — the client (`src/api/client.ts`) calls endpoints by raw path and
+  does not consume OpenAPI tags, which are documentation-only metadata (no path,
+  schema, or behavior change in IS-135). Closed as documentation alignment.
   Depends: IS-135.
 - [x] `UI-118` Fix data source detail, schema editor, and create recording wizard bugs
 - [x] `UI-117` Fix project selection persistence — lost on refresh, not shown on direct URL
