@@ -33,11 +33,7 @@ import tools.jackson.databind.ObjectMapper;
  * export trigger — {@link Permission#IMPORT_EXPORT} (admin).
  */
 @RestController
-@Tag(
-        name = "Run Evidence",
-        description =
-                "List and read run evidence, trigger an evidence export,"
-                + " and download the produced bundle.")
+@Tag(name = "Evidence")
 @RequestMapping("/api/v1/projects/{projectId}/evidence")
 public class EvidenceController {
 

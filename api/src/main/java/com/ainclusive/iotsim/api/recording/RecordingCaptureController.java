@@ -25,10 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
  * {@link Permission#SOURCE_START} / {@link Permission#SOURCE_STOP} (user + admin).
  */
 @RestController
-@Tag(
-        name = "Recording Capture",
-        description =
-                "Start and stop live capture of a running real source into a new recording.")
+@Tag(name = "Recordings")
 @RequestMapping("/api/v1/projects/{projectId}/data-sources/{dataSourceId}/recording")
 public class RecordingCaptureController {
 

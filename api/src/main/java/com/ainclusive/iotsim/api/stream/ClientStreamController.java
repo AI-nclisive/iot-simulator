@@ -24,9 +24,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
  * <p>Authorization (IS-077): read-only SSE — {@link Permission#OBSERVE} (user + admin).
  */
 @RestController
-@Tag(name = "Streams (SSE)",
-        description = "Server-Sent Events (SSE) streams for live push updates: client connect/disconnect,"
-                + " runtime state and health transitions, and value changes.")
+@Tag(name = "Monitoring")
 public class ClientStreamController {
 
     private static final String OBSERVE =

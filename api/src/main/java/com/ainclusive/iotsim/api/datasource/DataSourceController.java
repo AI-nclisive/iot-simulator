@@ -45,11 +45,7 @@ import org.springframework.web.bind.annotation.RestController;
  * </ul>
  */
 @RestController
-@Tag(
-        name = "Data Sources",
-        description = "Create, read, update, duplicate, and delete simulated data sources within a project,"
-                + " plus start/stop their runtime and manage credentials."
-                + " Uses ETag / If-Match optimistic concurrency.")
+@Tag(name = "Data Sources")
 @RequestMapping("/api/v1/projects/{projectId}/data-sources")
 public class DataSourceController {
 

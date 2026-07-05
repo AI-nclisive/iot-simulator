@@ -23,8 +23,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 /** Unified runs resource + test-control for automation (backend-specs/05, IS-089). */
 @RestController
-@Tag(name = "Runs", description = "Unified runs resource and automation test-control: list and inspect runs,"
-        + " read live run/source state, and start or stop a run of any kind.")
+@Tag(name = "Runs")
 @RequestMapping("/api/v1/projects/{projectId}/runs")
 public class RunController {
 

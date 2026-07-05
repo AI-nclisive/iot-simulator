@@ -28,9 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
  * <p>Authorization (IS-077): GET — {@link Permission#OBSERVE}; PUT — {@link Permission#SCHEMA_EDIT}.
  */
 @RestController
-@Tag(
-        name = "Source Schema",
-        description = "Read or replace the value schema (address space / tag layout) of a data source.")
+@Tag(name = "Data Sources")
 @RequestMapping("/api/v1/projects/{projectId}/data-sources/{dataSourceId}/schema")
 public class SchemaController {
 

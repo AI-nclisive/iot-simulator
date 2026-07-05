@@ -27,11 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
  * a recording entity is a configuration action distinct from starting live capture).
  */
 @RestController
-@Tag(
-        name = "Recordings",
-        description =
-                "List, read, and create recordings — captured timelines of real source values"
-                + " that can be replayed.")
+@Tag(name = "Recordings")
 @RequestMapping("/api/v1/projects/{projectId}/recordings")
 public class RecordingController {
 

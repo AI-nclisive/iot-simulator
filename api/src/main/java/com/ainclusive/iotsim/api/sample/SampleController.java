@@ -27,8 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
  * create/delete — {@link Permission#SOURCE_EDIT} (admin: editing recording data).
  */
 @RestController
-@Tag(name = "Samples",
-        description = "List, read, create, and delete reusable value samples used to seed source values and scenarios.")
+@Tag(name = "Samples")
 @RequestMapping("/api/v1/projects/{projectId}/samples")
 public class SampleController {
 

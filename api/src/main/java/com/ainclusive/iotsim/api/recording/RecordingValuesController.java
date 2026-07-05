@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
  * <p>Authorization: {@link Permission#OBSERVE} — same as {@code GET /recordings/{id}}.
  */
 @RestController
-@Tag(name = "Recording Values", description = "Browse captured values for a recording.")
+@Tag(name = "Recordings")
 @RequestMapping("/api/v1/projects/{projectId}/recordings/{recordingId}/values")
 public class RecordingValuesController {
 

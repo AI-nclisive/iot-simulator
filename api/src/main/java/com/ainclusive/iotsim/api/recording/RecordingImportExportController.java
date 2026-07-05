@@ -36,11 +36,7 @@ import org.springframework.web.multipart.MultipartFile;
  * serves the previously-stored blob (404 before first export).
  */
 @RestController
-@Tag(
-        name = "Recording Import/Export",
-        description =
-                "Export a recording as a ZIP, download a previously exported ZIP,"
-                + " and import a recording ZIP.")
+@Tag(name = "Recordings")
 @RequestMapping("/api/v1/projects/{projectId}/recordings")
 public class RecordingImportExportController {
 

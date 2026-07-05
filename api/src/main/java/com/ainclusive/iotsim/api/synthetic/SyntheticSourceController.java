@@ -23,10 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
  * {@link Permission#SOURCE_EDIT}.
  */
 @RestController
-@Tag(
-        name = "Synthetic Sources",
-        description = "Create a data source backed by a synthetic (generated) value profile rather than a"
-                + " real captured endpoint.")
+@Tag(name = "Data Sources")
 @RequestMapping("/api/v1/projects/{projectId}/data-sources/synthetic")
 public class SyntheticSourceController {
 
