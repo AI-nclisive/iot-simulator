@@ -2,13 +2,12 @@ package com.ainclusive.iotsim.api.scenario;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.ainclusive.iotsim.api.scenario.ScenarioController.ScenarioRunResponse;
+import com.ainclusive.iotsim.api.scenario.ScenarioController.ScenarioLiveRunResponse;
 import com.ainclusive.iotsim.api.scenario.ScenarioController.ScenarioValidationResponse;
-import com.ainclusive.iotsim.domain.scenario.ScenarioRunService;
-import com.ainclusive.iotsim.domain.scenario.ScenarioRunSummary;
+import com.ainclusive.iotsim.domain.scenario.ScenarioLiveRunService;
+import com.ainclusive.iotsim.domain.scenario.ScenarioLiveRunSummary;
 import com.ainclusive.iotsim.domain.scenario.ScenarioValidation;
 import com.ainclusive.iotsim.domain.scenario.ScenarioValidationService;
-import com.ainclusive.iotsim.domain.scenario.StepOutcome;
 import com.ainclusive.iotsim.domain.scenario.ValidationIssue;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -22,17 +21,16 @@ class ScenarioControllerRunTest {
         }
     }
 
-    private static final class FakeRun extends ScenarioRunService {
-        FakeRun() { super(null, null, null, null, null, null, null, null, null); }
-        @Override public ScenarioRunSummary run(String p, String id, String trigger, String initiator) {
-            return new ScenarioRunSummary("run-1", "ev-1", "COMPLETED",
-                    List.of(new StepOutcome(0, "MARKER", null, 0, "OK")));
+    private static final class FakeLiveRun extends ScenarioLiveRunService {
+        FakeLiveRun() { super(null, null, null, null, null, null, null, null, null); }
+        @Override public ScenarioLiveRunSummary start(String p, String id, String trigger, String initiator) {
+            return new ScenarioLiveRunSummary("run-1", "ev-1");
         }
     }
 
     @Test
     void validateMapsStatusAndIssues() {
-        ScenarioController c = new ScenarioController(null, new FakeValidation(), new FakeRun());
+        ScenarioController c = new ScenarioController(null, new FakeValidation(), new FakeLiveRun());
         ScenarioValidationResponse resp = c.validate("p1", "scn-1");
         assertThat(resp.status()).isEqualTo("INVALID");
         assertThat(resp.issues()).singleElement()
@@ -40,11 +38,10 @@ class ScenarioControllerRunTest {
     }
 
     @Test
-    void runMapsSummary() {
-        ScenarioController c = new ScenarioController(null, new FakeValidation(), new FakeRun());
-        ScenarioRunResponse resp = c.run("p1", "scn-1", null);
+    void runReturnsRunIdAndEvidenceId() {
+        ScenarioController c = new ScenarioController(null, new FakeValidation(), new FakeLiveRun());
+        ScenarioLiveRunResponse resp = c.run("p1", "scn-1", null);
         assertThat(resp.runId()).isEqualTo("run-1");
-        assertThat(resp.status()).isEqualTo("COMPLETED");
-        assertThat(resp.steps()).singleElement().satisfies(s -> assertThat(s.type()).isEqualTo("MARKER"));
+        assertThat(resp.evidenceId()).isEqualTo("ev-1");
     }
 }
