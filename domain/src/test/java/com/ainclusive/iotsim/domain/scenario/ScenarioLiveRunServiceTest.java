@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -232,5 +233,103 @@ class ScenarioLiveRunServiceTest {
 
         assertThat(summary.runId()).isEqualTo("run-4");
         verify(runs).end(eq("run-4"), eq("COMPLETED"), any());
+    }
+
+    @Test
+    void teardownStopsSourcesThatWereStartedWhenRunFails() {
+        // Scenario: START(src-A), then SYNTHETIC throws → FAILED path.
+        // Teardown must stop src-A because it was started but never stopped within the scenario.
+        stubScenario(
+                new ScenarioStepRow(0, "START", SOURCE, "{}"),
+                new ScenarioStepRow(1, "SYNTHETIC", SOURCE, "{\"durationMs\":0}"));
+        stubValidReady();
+        RunRow parent = runningRun("run-5");
+        when(runs.create(any(), any(), any(), any(), any(), any(), any())).thenReturn(parent);
+        when(runs.start(eq("run-5"), any())).thenReturn(parent);
+        when(evidence.create(any(), eq("run-5"), any()))
+                .thenReturn(new EvidenceRow("ev-5", PROJECT, "run-5", "CAPTURING", "{}", null, null, "local"));
+        org.mockito.Mockito.doThrow(new RuntimeException("synthetic boom"))
+                .when(synthetic).run(eq(PROJECT), eq(SOURCE), any(Long.class), anyString());
+
+        service.start(PROJECT, SCENARIO, "MANUAL", "local");
+
+        verify(runs).end(eq("run-5"), eq("FAILED"), any());
+        // Teardown must have stopped src-A (once via teardown, not once via STOP step)
+        verify(dataSources).start(PROJECT, SOURCE);
+        verify(dataSources).stop(PROJECT, SOURCE);
+    }
+
+    @Test
+    void teardownDoesNotStopSourcesAlreadyStoppedByScenario() {
+        // Scenario: START(src-A), STOP(src-A) — both succeed → COMPLETED.
+        // Teardown must NOT add an extra stop call since src-A was removed from startedSources
+        // when the STOP step executed.
+        stubScenario(
+                new ScenarioStepRow(0, "START", SOURCE, "{}"),
+                new ScenarioStepRow(1, "STOP", SOURCE, "{}"));
+        stubValidReady();
+        stubRunLifecycle("run-6");
+
+        service.start(PROJECT, SCENARIO, "MANUAL", "local");
+
+        verify(runs).end(eq("run-6"), eq("COMPLETED"), any());
+        verify(dataSources).start(PROJECT, SOURCE);
+        // stop() called exactly once — by the explicit STOP step, not by teardown
+        verify(dataSources, times(1)).stop(PROJECT, SOURCE);
+    }
+
+    @Test
+    void teardownIsSkippedOnCompletedRun() {
+        // A scenario with no explicit STOP steps that completes normally.
+        // dataSources.stop() must never be called (teardown is COMPLETED-path exempt).
+        stubScenario(
+                new ScenarioStepRow(0, "START", SOURCE, "{}"),
+                new ScenarioStepRow(1, "MARKER", null, "{}"));
+        stubValidReady();
+        RunRow parent = runningRun("run-7");
+        when(runs.create(any(), any(), any(), any(), any(), any(), any())).thenReturn(parent);
+        when(runs.start(eq("run-7"), any())).thenReturn(parent);
+        RunRow completed = new RunRow("run-7", PROJECT, "SCENARIO", "MANUAL", "local", "COMPLETED",
+                SCENARIO, null, OffsetDateTime.now(), null, OffsetDateTime.now(), List.of(SOURCE), null);
+        when(runs.end(eq("run-7"), eq("COMPLETED"), any())).thenReturn(completed);
+        when(evidence.create(any(), eq("run-7"), any()))
+                .thenReturn(new EvidenceRow("ev-7", PROJECT, "run-7", "CAPTURING", "{}", null, null, "local"));
+
+        service.start(PROJECT, SCENARIO, "MANUAL", "local");
+
+        verify(runs).end(eq("run-7"), eq("COMPLETED"), any());
+        verify(dataSources).start(PROJECT, SOURCE);
+        // No stop() call at all — COMPLETED path skips teardown
+        verify(dataSources, never()).stop(any(), any());
+    }
+
+    @Test
+    void teardownToleratesStopFailuresAndContinues() {
+        // Scenario: START(src-A), START(src-B), then step fails → FAILED + teardown of both.
+        // If stop(src-A) throws, teardown must still attempt stop(src-B).
+        String sourceB = "ds-2";
+        stubScenario(
+                new ScenarioStepRow(0, "START", SOURCE, "{}"),
+                new ScenarioStepRow(1, "START", sourceB, "{}"),
+                new ScenarioStepRow(2, "SYNTHETIC", SOURCE, "{\"durationMs\":0}"));
+        stubValidReady();
+        RunRow parent = runningRun("run-8");
+        when(runs.create(any(), any(), any(), any(), any(), any(), any())).thenReturn(parent);
+        when(runs.start(eq("run-8"), any())).thenReturn(parent);
+        when(evidence.create(any(), eq("run-8"), any()))
+                .thenReturn(new EvidenceRow("ev-8", PROJECT, "run-8", "CAPTURING", "{}", null, null, "local"));
+        org.mockito.Mockito.doThrow(new RuntimeException("synthetic boom"))
+                .when(synthetic).run(eq(PROJECT), eq(SOURCE), any(Long.class), anyString());
+        // stop(src-A) throws during teardown
+        org.mockito.Mockito.doThrow(new RuntimeException("stop failed"))
+                .when(dataSources).stop(PROJECT, SOURCE);
+
+        service.start(PROJECT, SCENARIO, "MANUAL", "local");
+
+        verify(runs).end(eq("run-8"), eq("FAILED"), any());
+        // src-A stop was attempted (even though it threw)
+        verify(dataSources).stop(PROJECT, SOURCE);
+        // src-B stop was also attempted despite src-A's failure
+        verify(dataSources).stop(PROJECT, sourceB);
     }
 }
