@@ -217,6 +217,7 @@ import/export. Modbus moved to Wave G (deferred) — see the note there.
 - [x] IS-124 [BE] ✅ [runtime] OPC UA listen port from `runtimeConfig.listenPort` (deterministic endpoint) + host-wide port-uniqueness at start (`PortInUseException`→409) — 02/03. Enabler for IS-123.
 - [x] IS-125 [BE] ✅ [runtime] Supervisor-mode context boots — `@Primary` on the `runtimeController` bean resolves ambiguous `SourceScanner`/`SourceCapturer` candidates (single Supervisor under 3 bean names) + first supervisor-mode context-boot IT — 02. Enabler for IS-123.
 - [x] IS-122 [BE] ✅ [api] GET /projects/{id}/active-runs — list currently running recordings/replays/scenarios for the dashboard overview panel — 05
+- [ ] IS-145 [BE] ⬜ [source] Synthetic authoring UI + reuse-existing-schema (combined FE+BE, no UI-half split per request) — create-source wizard gains a "Synthetic device" basis + Configure-profile step: pick an existing source's schema, assign a pattern per measurement, create + Run → live values. BE: optional `CreateSyntheticSourceRequest.schemaFromSourceId` so `SyntheticSourceService` full-copies the picked schema (names/paths/units) instead of regenerating from variables; validates variable nodeIds/types against the copied schema; absent ⇒ unchanged. FE: synthetic basis, schema picker + per-measurement pattern editor, `createSyntheticSource`/`runSynthetic` store actions, Run action reusing DataSourceDetailValuesTab; mock "Prefill from recording" button (real stats deferred). SPEC: Generate Synthetic
 
 ## Wave E — Shared-team & security · P1→P2
 

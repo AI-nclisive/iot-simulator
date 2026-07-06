@@ -153,6 +153,96 @@ describe("duplicateDataSource", () => {
   });
 });
 
+describe("createSyntheticSource (IS-145)", () => {
+  it("POSTs to /data-sources/synthetic with the config + schemaFromSourceId and appends the row", async () => {
+    useDataSourcesStore.setState({ dataSources: [], currentProjectId: "proj-1" });
+    mockApiFetch.mockResolvedValueOnce(
+      makeDataSourceResponse({ id: "syn-1", name: "Synthetic A", basis: "SYNTHETIC" }),
+    );
+    const config = {
+      seed: 7,
+      variables: [
+        { nodeId: "temp", dataType: "FLOAT64", pattern: { type: "SINE" as const, min: 0, max: 10, periodMs: 1000 }, updateRateMs: 250 },
+      ],
+    };
+    const id = await useDataSourcesStore.getState().createSyntheticSource({
+      projectId: "proj-1",
+      name: "Synthetic A",
+      protocol: "OPC UA",
+      simulatorPort: 4840,
+      config,
+      schemaFromSourceId: "src-01",
+    });
+    expect(id).toBe("syn-1");
+    expect(mockApiFetch).toHaveBeenCalledWith(
+      "/api/v1/projects/proj-1/data-sources/synthetic",
+      expect.objectContaining({ method: "POST" }),
+    );
+    const body = JSON.parse((mockApiFetch.mock.calls[0][1] as { body: string }).body);
+    expect(body.schemaFromSourceId).toBe("src-01");
+    expect(body.config.variables[0].nodeId).toBe("temp");
+    expect(useDataSourcesStore.getState().dataSources.map((r) => r.id)).toContain("syn-1");
+  });
+
+  it("omits schemaFromSourceId when not provided", async () => {
+    useDataSourcesStore.setState({ dataSources: [], currentProjectId: "proj-1" });
+    mockApiFetch.mockResolvedValueOnce(makeDataSourceResponse({ id: "syn-2", basis: "SYNTHETIC" }));
+    await useDataSourcesStore.getState().createSyntheticSource({
+      projectId: "proj-1",
+      name: "Synthetic B",
+      protocol: "OPC UA",
+      simulatorPort: 4840,
+      config: { seed: null, variables: [] },
+    });
+    const body = JSON.parse((mockApiFetch.mock.calls[0][1] as { body: string }).body);
+    expect(body).not.toHaveProperty("schemaFromSourceId");
+  });
+});
+
+describe("runSynthetic / stopSynthetic (IS-145)", () => {
+  it("runSynthetic POSTs run-synthetic, tracks the runId, and reloads", async () => {
+    useDataSourcesStore.setState({ dataSources: [], currentProjectId: "proj-1", syntheticRunIds: {} });
+    mockApiFetch
+      .mockResolvedValueOnce({ runId: "run-9", state: "RUNNING" }) // run-synthetic
+      .mockResolvedValueOnce({ items: [], nextCursor: null, limit: 50 }); // loadDataSources
+    await useDataSourcesStore.getState().runSynthetic("syn-1", "proj-1");
+    expect(mockApiFetch).toHaveBeenCalledWith(
+      "/api/v1/projects/proj-1/data-sources/syn-1/run-synthetic",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(useDataSourcesStore.getState().syntheticRunIds["syn-1"]).toBe("run-9");
+  });
+
+  it("stopSynthetic stops the tracked run via /runs/{id}/stop and clears the mapping", async () => {
+    useDataSourcesStore.setState({
+      dataSources: [],
+      currentProjectId: "proj-1",
+      syntheticRunIds: { "syn-1": "run-9" },
+    });
+    mockApiFetch
+      .mockResolvedValueOnce(undefined) // /runs/run-9/stop
+      .mockResolvedValueOnce({ items: [], nextCursor: null, limit: 50 }); // loadDataSources
+    await useDataSourcesStore.getState().stopSynthetic("syn-1", "proj-1");
+    expect(mockApiFetch).toHaveBeenCalledWith(
+      "/api/v1/projects/proj-1/runs/run-9/stop",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(useDataSourcesStore.getState().syntheticRunIds["syn-1"]).toBeUndefined();
+  });
+
+  it("stopSynthetic falls back to /data-sources/{id}/stop when no run id is tracked", async () => {
+    useDataSourcesStore.setState({ dataSources: [], currentProjectId: "proj-1", syntheticRunIds: {} });
+    mockApiFetch
+      .mockResolvedValueOnce(undefined) // /data-sources/syn-1/stop
+      .mockResolvedValueOnce({ items: [], nextCursor: null, limit: 50 });
+    await useDataSourcesStore.getState().stopSynthetic("syn-1", "proj-1");
+    expect(mockApiFetch).toHaveBeenCalledWith(
+      "/api/v1/projects/proj-1/data-sources/syn-1/stop",
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+});
+
 describe("mapDataSource (IS-127 field mapping)", () => {
   it("maps serveUrl to endpoint", async () => {
     mockApiFetch.mockResolvedValueOnce({

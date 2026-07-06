@@ -9,6 +9,7 @@ import { apiFetch } from "../api";
 import type { BackendProtocol } from "../api";
 import { SharedStatePanel } from "../ui/shared-state-panel";
 import { StatusBadge } from "../ui/status-badge";
+import { SyntheticProfileStep, type SyntheticProfileValue } from "./synthetic-profile-step";
 
 type DataSourceResponse = {
   id: string;
@@ -21,7 +22,7 @@ type ProtocolOption = {
   portHint: string;
 };
 
-type SourceBasis = "scan" | "import";
+type SourceBasis = "scan" | "import" | "synthetic";
 
 type BasisOption = {
   id: SourceBasis;
@@ -80,9 +81,21 @@ const basisOptions: BasisOption[] = [
     label: "Prepared data",
     note: "Use an existing recording as the data source for this simulator.",
   },
+  {
+    id: "synthetic",
+    label: "Synthetic device",
+    note: "Generate values from patterns, reusing an existing source's schema for structure.",
+  },
 ];
 
-export type WizardStepId = "protocol" | "basis" | "setup" | "import" | "schedule" | "review";
+export type WizardStepId =
+  | "protocol"
+  | "basis"
+  | "setup"
+  | "import"
+  | "configure"
+  | "schedule"
+  | "review";
 type WizardStep = { id: WizardStepId; label: string };
 
 const SCAN_STEPS: WizardStep[] = [
@@ -100,6 +113,13 @@ const IMPORT_STEPS: WizardStep[] = [
   { id: "review", label: "Review" },
 ];
 
+const SYNTHETIC_STEPS: WizardStep[] = [
+  { id: "protocol", label: "Protocol" },
+  { id: "basis", label: "Source basis" },
+  { id: "configure", label: "Configure profile" },
+  { id: "review", label: "Review" },
+];
+
 const DEFAULT_STEPS: WizardStep[] = [
   { id: "protocol", label: "Protocol" },
   { id: "basis", label: "Source basis" },
@@ -111,6 +131,7 @@ const DEFAULT_STEPS: WizardStep[] = [
 function getActiveSteps(basis: SourceBasis | null): WizardStep[] {
   if (basis === "scan") return SCAN_STEPS;
   if (basis === "import") return IMPORT_STEPS;
+  if (basis === "synthetic") return SYNTHETIC_STEPS;
   return DEFAULT_STEPS;
 }
 
@@ -226,6 +247,27 @@ function credentialValidationMessage(form: WizardFormState) {
   return null;
 }
 
+function configureValidationMessage(form: WizardFormState, synthetic: SyntheticProfileValue) {
+  if (!form.name.trim()) {
+    return "Enter a source name to continue.";
+  }
+  if (
+    !form.simulatorPort.trim() ||
+    isNaN(Number(form.simulatorPort)) ||
+    Number(form.simulatorPort) < 1 ||
+    Number(form.simulatorPort) > 65535
+  ) {
+    return "Enter a valid simulator port (1–65535).";
+  }
+  if (!synthetic.schemaFromSourceId) {
+    return "Pick an existing source whose schema you want to reuse.";
+  }
+  if (!synthetic.valid) {
+    return "Configure at least one measurement with a valid pattern.";
+  }
+  return null;
+}
+
 function credentialReviewValue(form: WizardFormState) {
   if (form.scanCredentialMode === "anonymous") {
     return "Anonymous access";
@@ -255,7 +297,11 @@ function credentialPersistenceLabel(form: WizardFormState) {
 }
 
 
-function reviewLines(form: WizardFormState, selectedRecordingLabel?: string) {
+function reviewLines(
+  form: WizardFormState,
+  selectedRecordingLabel?: string,
+  syntheticSummary?: { schemaSourceName: string; measurementCount: number },
+) {
   const basisLabel = basisOptions.find((option) => option.id === form.basis)?.label ?? "-";
   return [
     { label: "Source name", value: form.name || "-" },
@@ -270,6 +316,12 @@ function reviewLines(form: WizardFormState, selectedRecordingLabel?: string) {
       : []),
     ...(form.basis === "import"
       ? [{ label: "Recording", value: selectedRecordingLabel ?? "-" }]
+      : []),
+    ...(form.basis === "synthetic" && syntheticSummary
+      ? [
+          { label: "Schema reused from", value: syntheticSummary.schemaSourceName },
+          { label: "Measurements", value: String(syntheticSummary.measurementCount) },
+        ]
       : []),
     ...(form.scheduleStartEnabled
       ? [{ label: "Start", value: form.scheduleStart || "-" }]
@@ -292,6 +344,18 @@ export function CreateDataSourceWizardPage() {
   const isArtifactsLoading = useArtifactsStore((state) => state.isLoading);
   const artifactsError = useArtifactsStore((state) => state.error);
   const loadRecordings = useArtifactsStore((state) => state.loadRecordings);
+
+  const dataSources = useDataSourcesStore((state) => state.dataSources);
+  const loadDataSources = useDataSourcesStore((state) => state.loadDataSources);
+  const createSyntheticSource = useDataSourcesStore((state) => state.createSyntheticSource);
+
+  const [synthetic, setSynthetic] = useState<SyntheticProfileValue>({
+    schemaFromSourceId: null,
+    config: null,
+    valid: false,
+    measurementCount: 0,
+  });
+  const [syntheticSeed, setSyntheticSeed] = useState("");
 
   const [currentStep, setCurrentStep] = useState(0);
   const [showValidation, setShowValidation] = useState(false);
@@ -324,7 +388,10 @@ export function CreateDataSourceWizardPage() {
   const activeSteps = getActiveSteps(form.basis);
   const safeStep = Math.min(currentStep, activeSteps.length - 1);
   const activeStepId = activeSteps[safeStep].id;
-  const currentValidationMessage = validationMessage(activeStepId, form, accessMode);
+  const currentValidationMessage =
+    activeStepId === "configure"
+      ? configureValidationMessage(form, synthetic)
+      : validationMessage(activeStepId, form, accessMode);
   const currentProtocol = protocolOptions.find((option) => option.id === form.protocol) ?? null;
   const currentBasis = basisOptions.find((option) => option.id === form.basis) ?? null;
 
@@ -332,16 +399,30 @@ export function CreateDataSourceWizardPage() {
     () => artifacts.find((a) => a.id === form.importSelectedRecordingId) ?? null,
     [artifacts, form.importSelectedRecordingId],
   );
+  const syntheticSchemaSourceName = useMemo(
+    () => (dataSources ?? []).find((s) => s.id === synthetic.schemaFromSourceId)?.name ?? "-",
+    [dataSources, synthetic.schemaFromSourceId],
+  );
   const reviewItems = useMemo(
-    () => reviewLines(form, selectedRecording ? `Recording ${selectedRecording.id.slice(0, 8)}` : undefined),
-    [form, selectedRecording],
+    () =>
+      reviewLines(
+        form,
+        selectedRecording ? `Recording ${selectedRecording.id.slice(0, 8)}` : undefined,
+        form.basis === "synthetic"
+          ? { schemaSourceName: syntheticSchemaSourceName, measurementCount: synthetic.measurementCount }
+          : undefined,
+      ),
+    [form, selectedRecording, syntheticSchemaSourceName, synthetic.measurementCount],
   );
 
   useEffect(() => {
     if (form.basis === "import" && currentProjectId) {
       void loadRecordings(currentProjectId);
     }
-  }, [form.basis, currentProjectId, loadRecordings]);
+    if (form.basis === "synthetic" && currentProjectId) {
+      void loadDataSources(currentProjectId);
+    }
+  }, [form.basis, currentProjectId, loadRecordings, loadDataSources]);
 
   if (!access.canCreateSource) {
     return (
@@ -463,6 +544,29 @@ export function CreateDataSourceWizardPage() {
 
     if (!currentProjectId) {
       push({ tone: "error", title: "No project selected. Choose a project from the sidebar first." });
+      return;
+    }
+
+    if (form.basis === "synthetic") {
+      if (!synthetic.config || !synthetic.valid) {
+        setShowValidation(true);
+        return;
+      }
+      try {
+        const createdId = await createSyntheticSource({
+          projectId: currentProjectId,
+          name: form.name.trim(),
+          protocol: form.protocol,
+          simulatorPort: Number(form.simulatorPort),
+          config: synthetic.config,
+          schemaFromSourceId: synthetic.schemaFromSourceId,
+        });
+        navigate(`/data-sources/${createdId}`);
+      } catch (err) {
+        console.error("[createSyntheticSource]", err);
+        const title = err instanceof Error ? err.message : "Failed to create synthetic source";
+        push({ tone: "error", title });
+      }
       return;
     }
 
@@ -914,6 +1018,46 @@ export function CreateDataSourceWizardPage() {
     );
   }
 
+  function renderConfigureStep() {
+    return (
+      <div className="space-y-5">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="flex flex-col gap-2 text-sm text-shell-muted">
+            Source name
+            <input
+              className="shell-field"
+              placeholder="Synthetic Line A"
+              type="text"
+              value={form.name}
+              onChange={(event) => updateForm({ name: event.target.value })}
+            />
+          </label>
+          <label className="flex flex-col gap-2 text-sm text-shell-muted">
+            Simulator port
+            <input
+              className="shell-field"
+              inputMode="numeric"
+              max={65535}
+              min={1}
+              placeholder={form.protocol === "OPC UA" ? "4840" : "502"}
+              type="number"
+              value={form.simulatorPort}
+              onChange={(event) => updateForm({ simulatorPort: event.target.value })}
+            />
+          </label>
+        </div>
+
+        <SyntheticProfileStep
+          projectId={currentProjectId}
+          sources={dataSources ?? []}
+          seed={syntheticSeed}
+          onSeedChange={setSyntheticSeed}
+          onChange={setSynthetic}
+        />
+      </div>
+    );
+  }
+
   function renderReviewStep() {
     return (
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -977,6 +1121,10 @@ export function CreateDataSourceWizardPage() {
 
     if (activeStepId === "setup" || activeStepId === "import") {
       return renderSetupStep();
+    }
+
+    if (activeStepId === "configure") {
+      return renderConfigureStep();
     }
 
     if (activeStepId === "schedule") {

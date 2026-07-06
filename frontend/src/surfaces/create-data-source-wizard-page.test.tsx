@@ -35,6 +35,9 @@ vi.mock("../shell/data-sources-store", () => ({
   useDataSourcesStore: (selector: (s: Record<string, unknown>) => unknown) =>
     selector({
       createDataSource: vi.fn(() => "src-new"),
+      createSyntheticSource: vi.fn(() => "src-syn"),
+      loadDataSources: vi.fn(),
+      dataSources: [],
     }),
 }));
 

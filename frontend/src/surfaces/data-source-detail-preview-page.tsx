@@ -100,6 +100,8 @@ export function DataSourceDetailPreviewPage() {
     state.dataSources.find((row) => row.id === sourceId),
   );
   const stopDataSource = useDataSourcesStore((state) => state.stopDataSource);
+  const runSynthetic = useDataSourcesStore((state) => state.runSynthetic);
+  const stopSynthetic = useDataSourcesStore((state) => state.stopSynthetic);
   const isLoading = useDataSourcesStore((state) => state.isLoading);
   const loadDataSources = useDataSourcesStore((state) => state.loadDataSources);
   const { runs: activeRuns } = useActiveRuns(currentProjectId);
@@ -169,7 +171,7 @@ export function DataSourceDetailPreviewPage() {
   const healthDiagnostic = healthDiagnosticCopy(activeSource);
   const activeState = stateMeta(activeSource);
   const sourceControlAction =
-    sourceStarted && access.canStopSource
+    sourceStarted && access.canStopSource && activeSource.basis !== "SYNTHETIC"
       ? {
           label: "Stop source",
           onClick: () => setStopConfirmationOpen(true),
@@ -191,6 +193,27 @@ export function DataSourceDetailPreviewPage() {
       );
     } catch (err) {
       const title = err instanceof Error ? err.message : "Stop failed";
+      push({ tone: "error", title });
+    }
+  }
+
+  async function runSyntheticSource() {
+    if (!currentProjectId) return;
+    try {
+      await runSynthetic(activeSource.id, currentProjectId);
+      setActiveTab("values");
+    } catch (err) {
+      const title = err instanceof Error ? err.message : "Failed to start synthetic run";
+      push({ tone: "error", title });
+    }
+  }
+
+  async function stopSyntheticSource() {
+    if (!currentProjectId) return;
+    try {
+      await stopSynthetic(activeSource.id, currentProjectId);
+    } catch (err) {
+      const title = err instanceof Error ? err.message : "Failed to stop synthetic run";
       push({ tone: "error", title });
     }
   }
@@ -284,7 +307,18 @@ export function DataSourceDetailPreviewPage() {
         </dl>
 
         <div className="mt-6 flex flex-wrap items-center gap-2">
-          {access.canRecordSource && activeSource.basis !== "IMPORT" ? (
+          {activeSource.basis === "SYNTHETIC" && access.canConfigureReplay ? (
+            sourceStarted ? (
+              <button className="shell-action" type="button" onClick={() => void stopSyntheticSource()}>
+                Stop
+              </button>
+            ) : (
+              <button className="shell-action" type="button" onClick={() => void runSyntheticSource()}>
+                Run
+              </button>
+            )
+          ) : null}
+          {access.canRecordSource && activeSource.basis !== "IMPORT" && activeSource.basis !== "SYNTHETIC" ? (
             <Link className="shell-action" to={`/data-sources/${activeSource.id}/record`}>
               Record
             </Link>

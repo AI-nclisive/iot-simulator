@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
+import { apiFetch } from "../api";
 import { useLiveValues } from "../shell/use-live-values";
 import { useNotificationStore } from "../shell/notification-store";
+import { useShellStore } from "../shell/shell-store";
 import {
   OperationalTable,
   TableToolbar,
@@ -18,6 +20,15 @@ function freshnessTone(freshness: SourceValueRow["freshness"]) {
   return freshness === "Live" ? "accent" : "warning";
 }
 
+/** Map a protocol-neutral schema data type (FLOAT64, INT32, BOOL, …) to the tab's type category. */
+function neutralToUiType(dataType: string | null): SourceValueRow["dataType"] {
+  if (dataType == null) return "string";
+  if (dataType.startsWith("FLOAT")) return "float";
+  if (dataType.startsWith("INT") || dataType.startsWith("UINT")) return "int";
+  if (dataType === "BOOL") return "bool";
+  return "string";
+}
+
 function currentModeLabel(source: DataSourceRow) {
   return source.status === "Active" ? "Run" : "Off";
 }
@@ -30,6 +41,54 @@ export function DataSourceDetailValuesTab({
   const isLive = source.status === "Active";
   const { rows: liveRows, status: liveStatus } = useLiveValues(source.id, isLive);
   const pushNotification = useNotificationStore((state) => state.push);
+  const projectId = useShellStore((state) => state.currentProjectId);
+
+  // The live SSE stream carries only nodeId + value (no data type / name / unit), so join
+  // against the source schema to show the real type, display name, and unit. Without this the
+  // rows fall back to the "string" placeholder in use-live-values (UI-098 TODO).
+  const [schemaMeta, setSchemaMeta] = useState<
+    Record<string, { dataType: SourceValueRow["dataType"]; name: string; path: string; unit: string | null }>
+  >({});
+
+  useEffect(() => {
+    if (!projectId || !source.id) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const schema = await apiFetch<{
+          nodes: {
+            nodeId: string;
+            name: string;
+            path: string;
+            kind: string;
+            dataType: string | null;
+            unit: string | null;
+          }[];
+        }>(`/api/v1/projects/${projectId}/data-sources/${source.id}/schema`);
+        if (cancelled) return;
+        const map: Record<
+          string,
+          { dataType: SourceValueRow["dataType"]; name: string; path: string; unit: string | null }
+        > = {};
+        for (const n of schema.nodes) {
+          if (n.kind === "VARIABLE") {
+            map[n.nodeId] = {
+              dataType: neutralToUiType(n.dataType),
+              name: n.name,
+              path: n.path,
+              unit: n.unit,
+            };
+          }
+        }
+        setSchemaMeta(map);
+      } catch {
+        if (!cancelled) setSchemaMeta({});
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, source.id]);
 
   useEffect(() => {
     if (!isLive) return;
@@ -56,7 +115,23 @@ export function DataSourceDetailValuesTab({
     direction: "asc",
   });
 
-  const values = useMemo(() => liveRows, [liveRows]);
+  // Enrich each live row with its schema metadata (join on nodeId, which the row id encodes
+  // as `${sourceId}:${nodeId}`). Falls back to the raw stream values when no schema is loaded.
+  const values = useMemo(
+    () =>
+      liveRows.map((row) => {
+        const nodeId = row.id.slice(row.sourceId.length + 1);
+        const meta = schemaMeta[nodeId];
+        if (!meta) return row;
+        return {
+          ...row,
+          path: meta.path || meta.name || row.path,
+          dataType: meta.dataType,
+          currentValue: meta.unit ? `${row.currentValue} ${meta.unit}` : row.currentValue,
+        };
+      }),
+    [liveRows, schemaMeta],
+  );
 
   const filteredRows = useMemo(() => {
     return values.filter((row) => {
