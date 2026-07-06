@@ -3,13 +3,12 @@ package com.ainclusive.iotsim.api.scenario;
 import com.ainclusive.iotsim.api.error.PreconditionRequiredException;
 import com.ainclusive.iotsim.api.security.Permission;
 import com.ainclusive.iotsim.domain.scenario.Scenario;
-import com.ainclusive.iotsim.domain.scenario.ScenarioRunService;
-import com.ainclusive.iotsim.domain.scenario.ScenarioRunSummary;
+import com.ainclusive.iotsim.domain.scenario.ScenarioLiveRunService;
+import com.ainclusive.iotsim.domain.scenario.ScenarioLiveRunSummary;
 import com.ainclusive.iotsim.domain.scenario.ScenarioService;
 import com.ainclusive.iotsim.domain.scenario.ScenarioStep;
 import com.ainclusive.iotsim.domain.scenario.ScenarioValidation;
 import com.ainclusive.iotsim.domain.scenario.ScenarioValidationService;
-import com.ainclusive.iotsim.domain.scenario.StepOutcome;
 import com.ainclusive.iotsim.domain.scenario.ValidationIssue;
 import com.ainclusive.iotsim.domain.support.Page;
 import io.swagger.v3.oas.annotations.Operation;
@@ -53,13 +52,13 @@ public class ScenarioController {
 
     private final ScenarioService scenarios;
     private final ScenarioValidationService validationService;
-    private final ScenarioRunService runService;
+    private final ScenarioLiveRunService liveRunService;
 
     public ScenarioController(ScenarioService scenarios,
-            ScenarioValidationService validationService, ScenarioRunService runService) {
+            ScenarioValidationService validationService, ScenarioLiveRunService liveRunService) {
         this.scenarios = scenarios;
         this.validationService = validationService;
-        this.runService = runService;
+        this.liveRunService = liveRunService;
     }
 
     @Operation(summary = "List scenarios",
@@ -154,14 +153,16 @@ public class ScenarioController {
     }
 
     @Operation(summary = "Run a scenario",
-            description = "Starts a scenario run and returns its summary, including the per-step outcomes.")
+            description = "Starts a scenario run asynchronously and returns immediately with runId and evidenceId."
+                    + " Steps execute in the background; use GET /runs/{runId} to poll status.")
     @PostMapping("/{id}/run")
     @PreAuthorize(REPLAY_START)
-    public ScenarioRunResponse run(@PathVariable String projectId, @PathVariable String id,
+    public ScenarioLiveRunResponse run(@PathVariable String projectId, @PathVariable String id,
             @RequestBody(required = false) RunScenarioRequest req) {
         String trigger = req != null ? req.trigger() : null;
         String initiator = req != null ? req.initiator() : null;
-        return ScenarioRunResponse.from(runService.run(projectId, id, trigger, initiator));
+        ScenarioLiveRunSummary summary = liveRunService.start(projectId, id, trigger, initiator);
+        return new ScenarioLiveRunResponse(summary.runId(), summary.evidenceId());
     }
 
     private static List<ScenarioStep> toSteps(List<StepDto> dtos) {
@@ -208,19 +209,8 @@ public class ScenarioController {
         }
     }
 
-    public record StepOutcomeResponse(int ordinal, String type, String childRunId, long applied, String state) {
-        static StepOutcomeResponse from(StepOutcome o) {
-            return new StepOutcomeResponse(o.ordinal(), o.type(), o.childRunId(), o.applied(), o.state());
-        }
-    }
-
-    public record ScenarioRunResponse(String runId, String evidenceId, String status,
-            List<StepOutcomeResponse> steps) {
-        static ScenarioRunResponse from(ScenarioRunSummary s) {
-            return new ScenarioRunResponse(s.runId(), s.evidenceId(), s.status(),
-                    s.steps().stream().map(StepOutcomeResponse::from).toList());
-        }
-    }
+    /** Async run response: scenario steps execute in the background; poll GET /runs/{runId} for status. */
+    public record ScenarioLiveRunResponse(String runId, String evidenceId) {}
 
     public record StepDto(String type, String targetSourceId, String params) {}
 

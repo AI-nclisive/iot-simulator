@@ -12,8 +12,10 @@ import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.domain.replay.ReplayLiveRunService;
 import com.ainclusive.iotsim.domain.replay.ReplayService;
 import com.ainclusive.iotsim.domain.replay.ReplaySummary;
+import com.ainclusive.iotsim.domain.scenario.ScenarioLiveRunService;
+import com.ainclusive.iotsim.domain.scenario.ScenarioLiveRunSummary;
 import com.ainclusive.iotsim.domain.scenario.ScenarioRunService;
-import com.ainclusive.iotsim.domain.scenario.ScenarioRunSummary;
+
 import com.ainclusive.iotsim.domain.synthetic.SyntheticLiveRunService;
 import com.ainclusive.iotsim.domain.synthetic.SyntheticLiveRunSummary;
 import com.ainclusive.iotsim.domain.synthetic.SyntheticRunService;
@@ -42,6 +44,7 @@ class RunServiceTest {
     private SyntheticRunService synthetic;
     private SyntheticLiveRunService syntheticLive;
     private ScenarioRunService scenarioRun;
+    private ScenarioLiveRunService scenarioLive;
     private RunService service;
 
     @BeforeEach
@@ -55,8 +58,10 @@ class RunServiceTest {
         synthetic = mock(SyntheticRunService.class);
         syntheticLive = mock(SyntheticLiveRunService.class);
         scenarioRun = mock(ScenarioRunService.class);
+        scenarioLive = mock(ScenarioLiveRunService.class);
         when(dataSources.findByProject(PROJECT)).thenReturn(List.of());
-        service = new RunService(runs, dataSources, scenarios, runtime, replay, replayLive, synthetic, syntheticLive, scenarioRun);
+        service = new RunService(runs, dataSources, scenarios, runtime, replay, replayLive, synthetic,
+                syntheticLive, scenarioRun, scenarioLive);
     }
 
     private RunRow row(String id, String kind, String state, List<String> sources) {
@@ -171,12 +176,12 @@ class RunServiceTest {
 
     @Test
     void startScenarioRoutesWithAutomationTriggerAndInitiator() {
-        when(scenarioRun.run(eq(PROJECT), eq("sc1"), eq("AUTOMATION"), eq("ci-bot")))
-                .thenReturn(new ScenarioRunSummary("run-sc", "ev-sc", "COMPLETED", List.of()));
-        when(runs.findById("run-sc")).thenReturn(Optional.of(row("run-sc", "SCENARIO", "COMPLETED", List.of())));
+        when(scenarioLive.start(eq(PROJECT), eq("sc1"), eq("AUTOMATION"), eq("ci-bot")))
+                .thenReturn(new ScenarioLiveRunSummary("run-sc", "ev-sc"));
+        when(runs.findById("run-sc")).thenReturn(Optional.of(row("run-sc", "SCENARIO", "RUNNING", List.of())));
         RunView v = service.start(PROJECT, new StartRunCommand("SCENARIO", "ci-bot", null, null, null, "sc1", null, null, null));
         assertThat(v.id()).isEqualTo("run-sc");
-        verify(scenarioRun).run(eq(PROJECT), eq("sc1"), eq("AUTOMATION"), eq("ci-bot"));
+        verify(scenarioLive).start(eq(PROJECT), eq("sc1"), eq("AUTOMATION"), eq("ci-bot"));
     }
 
     // ---- per-kind field validation ----
