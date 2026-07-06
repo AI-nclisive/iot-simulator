@@ -26,6 +26,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
@@ -56,6 +57,7 @@ public class ScenarioLiveRunService {
 
     private final ConcurrentMap<String, ScenarioExecution> registry = new ConcurrentHashMap<>();
 
+    @Autowired
     public ScenarioLiveRunService(ScenarioRepository scenarios, ScenarioValidationService validation,
             RunRepository runs, EvidenceRepository evidence, RuntimeEventRepository events,
             DataSourceService dataSources, ReplayService replay, SyntheticRunService synthetic,
