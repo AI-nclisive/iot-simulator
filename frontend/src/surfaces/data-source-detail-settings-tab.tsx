@@ -7,10 +7,6 @@ import { SharedStatePanel } from "../ui/shared-state-panel";
 import { StatusBadge } from "../ui/status-badge";
 import type { DataSourceRow } from "../shell/data-sources-store";
 
-function endpointIsValid(endpoint: string) {
-  return endpoint.trim().length > 0 && !endpoint.includes(" ");
-}
-
 export function DataSourceDetailSettingsTab({
   source,
 }: {
@@ -23,36 +19,42 @@ export function DataSourceDetailSettingsTab({
   );
   const access = resolveAccess(accessMode, sharedRole);
   const [name, setName] = useState(source.name);
-  const [endpoint, setEndpoint] = useState(source.endpoint);
+  const [realDeviceEndpoint, setRealDeviceEndpoint] = useState(
+    source.realDeviceEndpoint ?? "",
+  );
   const [savedMessage, setSavedMessage] = useState("");
   const [lockState] = useState<EditLockState>({ kind: "unlocked" });
 
   const isLockedByOther = lockState.kind === "locked-by-other" || lockState.kind === "stale";
   const isEditable = access.isAdmin && !isLockedByOther;
+  const isScanBasis = source.basis === "SCAN";
 
-  const hasChanges = name !== source.name || endpoint !== source.endpoint;
+  const hasChanges = isScanBasis
+    ? name !== source.name || realDeviceEndpoint !== (source.realDeviceEndpoint ?? "")
+    : name !== source.name;
 
-  // Only validate when the user has made changes — never on initial open or after reset
   const validationMessage = useMemo(() => {
     if (!hasChanges) return "";
     if (name.trim().length === 0) return "Name is required.";
-    if (!endpointIsValid(endpoint)) return "Endpoint is required and cannot contain spaces.";
+    if (isScanBasis && !realDeviceEndpoint.trim()) return "Real device endpoint is required.";
     return "";
-  }, [endpoint, name, hasChanges]);
+  }, [realDeviceEndpoint, name, hasChanges, isScanBasis]);
 
   const canSave = isEditable && hasChanges && validationMessage.length === 0;
 
   function resetForm() {
     setName(source.name);
-    setEndpoint(source.endpoint);
+    setRealDeviceEndpoint(source.realDeviceEndpoint ?? "");
     setSavedMessage("");
   }
 
-  function saveChanges() {
+  async function saveChanges() {
     if (!canSave) return;
-    updateSourceConfiguration(source.id, {
-      endpoint: endpoint.trim(),
+    await updateSourceConfiguration(source.id, {
       name: name.trim(),
+      ...(isScanBasis
+        ? { realDeviceEndpoint: realDeviceEndpoint.trim() || null }
+        : {}),
     });
     setSavedMessage("Saved");
   }
@@ -100,18 +102,28 @@ export function DataSourceDetailSettingsTab({
           />
         </label>
 
+        {isScanBasis ? (
+          <label className="flex flex-col gap-2 text-sm text-shell-muted">
+            Real device endpoint
+            <input
+              className="shell-field"
+              disabled={!isEditable}
+              placeholder="opc.tcp://device:4840"
+              type="text"
+              value={realDeviceEndpoint}
+              onChange={(event) => {
+                setRealDeviceEndpoint(event.target.value);
+                setSavedMessage("");
+              }}
+            />
+          </label>
+        ) : null}
+
         <label className="flex flex-col gap-2 text-sm text-shell-muted">
-          Endpoint
-          <input
-            className="shell-field"
-            disabled={!isEditable}
-            type="text"
-            value={endpoint}
-            onChange={(event) => {
-              setEndpoint(event.target.value);
-              setSavedMessage("");
-            }}
-          />
+          Simulator serve URL
+          <div className="shell-field cursor-default select-none bg-shell-base/40 text-shell-muted font-mono text-xs">
+            {source.endpoint || "—"}
+          </div>
         </label>
 
         <label className="flex flex-col gap-2 text-sm text-shell-muted">
@@ -138,7 +150,7 @@ export function DataSourceDetailSettingsTab({
           className="shell-action"
           disabled={!canSave}
           type="button"
-          onClick={saveChanges}
+          onClick={() => { void saveChanges(); }}
         >
           Save changes
         </button>
