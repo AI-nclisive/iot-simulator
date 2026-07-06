@@ -4,7 +4,6 @@ import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.domain.replay.ReplayLiveRunService;
 import com.ainclusive.iotsim.domain.replay.ReplayService;
 import com.ainclusive.iotsim.domain.scenario.ScenarioLiveRunService;
-import com.ainclusive.iotsim.domain.scenario.ScenarioRunService;
 import com.ainclusive.iotsim.domain.support.Page;
 import com.ainclusive.iotsim.domain.support.PageCursor;
 import com.ainclusive.iotsim.domain.synthetic.SyntheticLiveRunService;
@@ -43,13 +42,12 @@ public class RunService {
     private final ReplayLiveRunService replayLive;        // live standalone replay (IS-140)
     private final SyntheticRunService synthetic;          // batch primitive (scenarios)
     private final SyntheticLiveRunService syntheticLive;  // live standalone feed (IS-119)
-    private final ScenarioRunService scenarioRun;
     private final ScenarioLiveRunService scenarioLive;    // async scenario engine (IS-141)
 
     public RunService(RunRepository runs, DataSourceRepository dataSources, ScenarioRepository scenarios,
             RuntimeController runtime, ReplayService replay, ReplayLiveRunService replayLive,
             SyntheticRunService synthetic, SyntheticLiveRunService syntheticLive,
-            ScenarioRunService scenarioRun, ScenarioLiveRunService scenarioLive) {
+            ScenarioLiveRunService scenarioLive) {
         this.runs = runs;
         this.dataSources = dataSources;
         this.scenarios = scenarios;
@@ -58,7 +56,6 @@ public class RunService {
         this.replayLive = replayLive;
         this.synthetic = synthetic;
         this.syntheticLive = syntheticLive;
-        this.scenarioRun = scenarioRun;
         this.scenarioLive = scenarioLive;
     }
 

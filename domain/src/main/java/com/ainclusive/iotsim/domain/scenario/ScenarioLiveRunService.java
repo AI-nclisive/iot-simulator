@@ -5,7 +5,6 @@ import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.domain.common.ScenarioInvalidException;
 import com.ainclusive.iotsim.domain.datasource.DataSourceService;
 import com.ainclusive.iotsim.domain.replay.ReplayService;
-import com.ainclusive.iotsim.domain.replay.ReplaySummary;
 import com.ainclusive.iotsim.domain.synthetic.SyntheticRunService;
 import com.ainclusive.iotsim.persistence.evidence.EvidenceRepository;
 import com.ainclusive.iotsim.persistence.evidence.EvidenceRow;
@@ -132,8 +131,14 @@ public class ScenarioLiveRunService {
             Future<?> future = executor.submit(() ->
                     executeSteps(projectId, runId, scenario, finalSettings));
 
-            // Replace the placeholder with the real future (no-op if already removed by stop/completion).
-            registry.computeIfPresent(runId, (k, old) -> new ScenarioExecution(runId, evidenceId, future));
+            // Replace the placeholder with the real future. If stopIfLive() removed the
+            // placeholder between registry.put and here, computeIfPresent is a no-op and
+            // stillLive is false — cancel the just-submitted task immediately.
+            boolean stillLive = registry.computeIfPresent(runId,
+                    (k, old) -> new ScenarioExecution(runId, evidenceId, future)) != null;
+            if (!stillLive) {
+                future.cancel(true);
+            }
             return new ScenarioLiveRunSummary(runId, evidenceId);
         } catch (RuntimeException e) {
             runs.end(run.id(), "FAILED", now());
@@ -171,26 +176,41 @@ public class ScenarioLiveRunService {
         try {
             for (ScenarioStepRow step : scenario.steps()) {
                 if (Thread.interrupted()) {
-                    runs.end(runId, "STOPPED", now());
+                    safeEnd(runId, "STOPPED");
                     registry.remove(runId);
                     return;
                 }
-                events.append(projectId, step.targetSourceId(), runId, "SCENARIO_STEP", now(),
-                        stepPayload(step));
+                // WAIT/MARKER have no targetSourceId; only append events for steps with a source
+                if (step.targetSourceId() != null && !step.targetSourceId().isBlank()) {
+                    events.append(projectId, step.targetSourceId(), runId, "SCENARIO_STEP", now(),
+                            stepPayload(step));
+                }
                 execute(projectId, step, runId, settings);
             }
             runs.end(runId, "COMPLETED", now());
         } catch (IllegalStateException e) {
             // WAIT sleep interrupted — Thread.currentThread().interrupt() was called in sleep()
             if (Thread.currentThread().isInterrupted() || e.getCause() instanceof InterruptedException) {
-                runs.end(runId, "STOPPED", now());
+                safeEnd(runId, "STOPPED");
             } else {
-                runs.end(runId, "FAILED", now());
+                safeEnd(runId, "FAILED");
             }
         } catch (RuntimeException e) {
-            runs.end(runId, "FAILED", now());
+            safeEnd(runId, "FAILED");
         } finally {
             registry.remove(runId);
+        }
+    }
+
+    /**
+     * Best-effort terminal-state write. A DB failure during the error-handling path must
+     * not escape the background thread or prevent registry cleanup (done in finally).
+     */
+    private void safeEnd(String runId, String state) {
+        try {
+            runs.end(runId, state, now());
+        } catch (RuntimeException ignored) {
+            // intentionally swallowed — registry cleanup still happens in finally
         }
     }
 
