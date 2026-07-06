@@ -6,7 +6,7 @@ import { useDataSourcesStore } from "../shell/data-sources-store";
 import { useShellStore } from "../shell/shell-store";
 import { useNotificationStore } from "../shell/notification-store";
 import { useActiveRuns } from "../shell/use-active-runs";
-import { apiFetch } from "../api";
+import { apiFetch, ApiError } from "../api";
 import { SharedStatePanel } from "../ui/shared-state-panel";
 import { StatusBadge, type StatusTone } from "../ui/status-badge";
 import { DeterministicRunSettings, type DeterministicSettings } from "./deterministic-run-settings";
@@ -32,6 +32,14 @@ function replayTone(state: ReplayUiState): StatusTone {
   }
 
   return "neutral";
+}
+
+function replayLabel(state: ReplayUiState): string {
+  if (state === "idle") return "Ready";
+  if (state === "running") return "Running";
+  if (state === "completed") return "Done";
+  if (state === "failed") return "Failed";
+  return state;
 }
 
 function evidenceTone(status: "Ready" | "Assembling" | "Retry needed"): StatusTone {
@@ -90,6 +98,7 @@ export function ReplayFlowPage() {
   const [runStartedAt, setRunStartedAt] = useState("Not started");
   const [deterministicSettings, setDeterministicSettings] = useState<DeterministicSettings | null>(null);
   const [deterministicOpen, setDeterministicOpen] = useState(false);
+  const [schemaMismatch, setSchemaMismatch] = useState(false);
 
   const selectedArtifact = useMemo(
     () => artifacts.find((artifact) => artifact.id === selectedArtifactId),
@@ -200,11 +209,12 @@ export function ReplayFlowPage() {
 
   const activeSource = source;
 
-  async function handleStartReplay() {
+  async function startReplay(compatibilityAck = false) {
     if (!selectedArtifact || !replayReady || !canConfigureReplay || !currentProjectId || !sourceId) {
       return;
     }
 
+    setSchemaMismatch(false);
     setEvidenceState("Assembling");
     setProgress(0);
     setReplayState("running");
@@ -220,17 +230,27 @@ export function ReplayFlowPage() {
         `/api/v1/projects/${currentProjectId}/data-sources/${sourceId}/replay`,
         {
           method: "POST",
-          body: JSON.stringify({ recordingId: selectedArtifact.id }),
+          body: JSON.stringify({ recordingId: selectedArtifact.id, compatibilityAck }),
         },
       );
       setRunId(response.runId);
-      runSeenRef.current = true; // run exists at creation; poll drives completion
+      runSeenRef.current = true;
     } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        setReplayState("idle");
+        setEvidenceState("Ready");
+        setSchemaMismatch(true);
+        return;
+      }
       const title = err instanceof Error ? err.message : "Replay failed";
       push({ tone: "error", title });
       setReplayState("failed");
       setEvidenceState("Retry needed");
     }
+  }
+
+  function handleStartReplay() {
+    return startReplay(false);
   }
 
   async function handleStopReplay() {
@@ -260,7 +280,7 @@ export function ReplayFlowPage() {
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge label="Replay" tone="accent" />
             <StatusBadge label={source.protocol} tone="neutral" />
-            <StatusBadge label={replayState} tone={replayTone(replayState)} />
+            <StatusBadge label={replayLabel(replayState)} tone={replayTone(replayState)} />
             <StatusBadge label={`Evidence: ${evidenceState}`} tone={evidenceTone(evidenceState)} />
           </div>
         </div>
@@ -383,12 +403,38 @@ export function ReplayFlowPage() {
           ) : null}
         </div>
 
+        {schemaMismatch && (
+          <div className="mt-6 rounded-md border border-amber-200 bg-amber-50 px-4 py-4">
+            <p className="text-sm font-medium text-amber-900">Schema version mismatch</p>
+            <p className="mt-1 text-sm text-amber-800">
+              This recording was captured with a different schema version than the source currently
+              has. The replay may produce unexpected results.
+            </p>
+            <div className="mt-3 flex gap-3">
+              <button
+                className="shell-action"
+                type="button"
+                onClick={() => startReplay(true)}
+              >
+                Run anyway
+              </button>
+              <button
+                className="shell-text-action"
+                type="button"
+                onClick={() => setSchemaMismatch(false)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="mt-6 flex flex-wrap items-center gap-2">
           {replayState !== "running" ? (
             <button
               className="shell-action"
               disabled={
-                !canConfigureReplay || !selectedArtifact || !replayReady
+                !canConfigureReplay || !selectedArtifact || !replayReady || schemaMismatch
               }
               type="button"
               onClick={handleStartReplay}

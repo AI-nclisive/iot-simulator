@@ -11,6 +11,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { ActiveRunResponse } from "../shell/use-active-runs";
+import { ApiError } from "../api";
 
 const SOURCE_ID = "src-1";
 const PROJECT_ID = "proj-1";
@@ -29,7 +30,20 @@ const { mockUseActiveRuns, mockApiFetch } = vi.hoisted(() => ({
 }));
 
 vi.mock("../shell/use-active-runs", () => ({ useActiveRuns: mockUseActiveRuns }));
-vi.mock("../api", () => ({ apiFetch: mockApiFetch }));
+vi.mock("../api", () => ({
+  apiFetch: mockApiFetch,
+  ApiError: class ApiError extends Error {
+    constructor(
+      public readonly status: number,
+      public readonly title: string,
+      public readonly detail: string | undefined,
+      public readonly type: string | undefined,
+    ) {
+      super(title);
+      this.name = "ApiError";
+    }
+  },
+}));
 
 vi.mock("../shell/shell-store", () => ({
   useShellStore: (selector: (s: Record<string, unknown>) => unknown) =>
@@ -120,7 +134,49 @@ describe("ReplayFlowPage — completion detection via active-runs poll", () => {
 
     // After POST: runSeenRef.current = true and activeRuns = [] → effect drives to completed.
     await waitFor(() => {
-      expect(screen.getByText("completed")).toBeTruthy();
+      expect(screen.getByText("Done")).toBeTruthy();
+    });
+  });
+});
+
+// ── 409 schema-mismatch → "Run anyway" retry (UI-138) ────────────────────────
+
+describe("ReplayFlowPage — 409 schema-mismatch → Run anyway (UI-138)", () => {
+  it("shows schema-mismatch panel on 409 and retries with compatibilityAck=true on Run anyway", async () => {
+    // First POST returns 409 (schema version mismatch).
+    mockApiFetch.mockRejectedValueOnce(
+      new ApiError(409, "Schema version mismatch", undefined, undefined),
+    );
+    // Second POST (Run anyway) succeeds.
+    mockApiFetch.mockResolvedValueOnce({
+      recordingId: ARTIFACT_ID,
+      dataSourceId: SOURCE_ID,
+      valueCount: 3,
+      runId: RUN_ID,
+      evidenceId: "ev-1",
+    });
+
+    renderPage();
+
+    await act(async () => {
+      await userEvent.click(screen.getByRole("button", { name: /start replay/i }));
+    });
+
+    // Schema-mismatch panel should appear after 409.
+    await waitFor(() => {
+      expect(screen.getByText("Schema version mismatch")).toBeTruthy();
+    });
+
+    // "Run anyway" button is visible and clicking it retries with compatibilityAck.
+    await act(async () => {
+      await userEvent.click(screen.getByRole("button", { name: /run anyway/i }));
+    });
+
+    await waitFor(() => {
+      const calls = mockApiFetch.mock.calls;
+      const retryCall = calls[calls.length - 1];
+      const body = JSON.parse(retryCall[1].body as string) as Record<string, unknown>;
+      expect(body.compatibilityAck).toBe(true);
     });
   });
 });

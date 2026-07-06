@@ -12,7 +12,7 @@ type SchemaNode = {
   nodeId: string;
   parentId: string | null;
   path: string;
-  displayName: string;
+  name: string;
   kind: "FOLDER" | "VARIABLE";
   dataType: string | null;
 };
@@ -336,7 +336,7 @@ export function RecordingDetailPage() {
             <span
               className={`text-sm ${isFolder ? "font-medium text-shell-ink" : "text-shell-ink"}`}
             >
-              {node.displayName}
+              {node.name}
             </span>
             {node.dataType && (
               <span className="ml-2 text-xs text-shell-muted">{node.dataType}</span>
