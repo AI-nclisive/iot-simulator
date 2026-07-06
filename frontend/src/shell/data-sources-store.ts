@@ -25,17 +25,6 @@ type DataSourceResponse = {
   version: number;
 };
 
-/** Kept for test-file compatibility — parses old JSON-wrapped endpoint values. */
-export function parseEndpointUrl(raw: string | null): string {
-  if (!raw) return "";
-  try {
-    const parsed = JSON.parse(raw);
-    const url = parsed?.url;
-    return typeof url === "string" && url.trim() ? url : "";
-  } catch {
-    return raw;
-  }
-}
 
 function mapDataSource(d: DataSourceResponse): DataSourceRow {
   return {

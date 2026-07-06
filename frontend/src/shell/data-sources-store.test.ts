@@ -11,7 +11,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi, type MockedFunction } from "vitest";
-import { useDataSourcesStore, parseEndpointUrl } from "./data-sources-store";
+import { useDataSourcesStore } from "./data-sources-store";
 import { apiFetch, mapProtocol, mapRuntimeStateToStatus, mapRuntimeStateToHealth } from "../api";
 
 vi.mock("../api", () => ({
@@ -47,16 +47,26 @@ void _mapProtocol;
 void _mapRuntimeStateToStatus;
 void _mapRuntimeStateToHealth;
 
-function makeDataSourceResponse(overrides: Partial<{ id: string; name: string; runtimeState: string }> = {}) {
+function makeDataSourceResponse(overrides: Partial<{
+  id: string;
+  name: string;
+  runtimeState: string;
+  basis: "SCAN" | "MANUAL" | "IMPORT" | "SYNTHETIC";
+  simulatorPort: number;
+  realDeviceEndpoint: string | null;
+  serveUrl: string;
+}> = {}) {
   return {
     id: overrides.id ?? "src-01",
     projectId: "proj-1",
     name: overrides.name ?? "Line A",
     protocol: "OPC_UA" as const,
-    basis: "SCAN" as const,
+    basis: overrides.basis ?? ("SCAN" as const),
     schemaId: null,
     schemaVersion: null,
-    endpoint: "opc.tcp://test:4840",
+    simulatorPort: overrides.simulatorPort ?? 4840,
+    realDeviceEndpoint: overrides.realDeviceEndpoint !== undefined ? overrides.realDeviceEndpoint : "opc.tcp://device:4840",
+    serveUrl: overrides.serveUrl ?? "opc.tcp://localhost:4840",
     runtimeConfig: null,
     enabled: true,
     runtimeState: (overrides.runtimeState ?? "STOPPED") as "STOPPED",
@@ -114,7 +124,7 @@ describe("deleteDataSource", () => {
   it("removes the row from dataSources after DELETE", async () => {
     useDataSourcesStore.setState({
       dataSources: [
-        { id: "src-01", name: "Source A", protocol: "OPC UA", endpoint: "opc.tcp://test:4840", parameterCount: 0, status: "Stopped", health: "Healthy" },
+        { id: "src-01", name: "Source A", protocol: "OPC UA", endpoint: "opc.tcp://localhost:4840", parameterCount: 0, status: "Stopped", health: "Healthy" },
       ],
       currentProjectId: "proj-1",
     });
@@ -128,7 +138,7 @@ describe("duplicateDataSource", () => {
   it("calls POST /data-sources/{rowId}/duplicate and appends the copy", async () => {
     useDataSourcesStore.setState({
       dataSources: [
-        { id: "src-01", name: "Source A", protocol: "OPC UA", endpoint: "opc.tcp://test:4840", parameterCount: 0, status: "Stopped", health: "Healthy" },
+        { id: "src-01", name: "Source A", protocol: "OPC UA", endpoint: "opc.tcp://localhost:4840", parameterCount: 0, status: "Stopped", health: "Healthy" },
       ],
       currentProjectId: "proj-1",
     });
@@ -143,28 +153,54 @@ describe("duplicateDataSource", () => {
   });
 });
 
-describe("parseEndpointUrl", () => {
-  it("returns empty string for null", () => {
-    expect(parseEndpointUrl(null)).toBe("");
+describe("mapDataSource (IS-127 field mapping)", () => {
+  it("maps serveUrl to endpoint", async () => {
+    mockApiFetch.mockResolvedValueOnce({
+      items: [makeDataSourceResponse({ serveUrl: "opc.tcp://sim:4840" })],
+      nextCursor: null,
+      limit: 50,
+    });
+    await useDataSourcesStore.getState().loadDataSources("proj-1");
+    expect(useDataSourcesStore.getState().dataSources[0].endpoint).toBe("opc.tcp://sim:4840");
   });
 
-  it("extracts url from valid jsonb object", () => {
-    expect(parseEndpointUrl('{"url":"opc.tcp://host:4840"}')).toBe("opc.tcp://host:4840");
+  it("maps basis from the response", async () => {
+    mockApiFetch.mockResolvedValueOnce({
+      items: [makeDataSourceResponse({ basis: "IMPORT" })],
+      nextCursor: null,
+      limit: 50,
+    });
+    await useDataSourcesStore.getState().loadDataSources("proj-1");
+    expect(useDataSourcesStore.getState().dataSources[0].basis).toBe("IMPORT");
   });
 
-  it("returns raw string when JSON has no .url field", () => {
-    expect(parseEndpointUrl('{"host":"localhost"}')).toBe('{"host":"localhost"}');
+  it("maps realDeviceEndpoint from the response (SCAN source)", async () => {
+    mockApiFetch.mockResolvedValueOnce({
+      items: [makeDataSourceResponse({ basis: "SCAN", realDeviceEndpoint: "opc.tcp://device:4840" })],
+      nextCursor: null,
+      limit: 50,
+    });
+    await useDataSourcesStore.getState().loadDataSources("proj-1");
+    expect(useDataSourcesStore.getState().dataSources[0].realDeviceEndpoint).toBe("opc.tcp://device:4840");
   });
 
-  it("returns raw string when input is not valid JSON", () => {
-    expect(parseEndpointUrl("opc.tcp://plain:4840")).toBe("opc.tcp://plain:4840");
+  it("maps null realDeviceEndpoint for non-SCAN sources", async () => {
+    mockApiFetch.mockResolvedValueOnce({
+      items: [makeDataSourceResponse({ basis: "IMPORT", realDeviceEndpoint: null })],
+      nextCursor: null,
+      limit: 50,
+    });
+    await useDataSourcesStore.getState().loadDataSources("proj-1");
+    expect(useDataSourcesStore.getState().dataSources[0].realDeviceEndpoint).toBeNull();
   });
 
-  it('returns raw string when JSON.parse returns "null"', () => {
-    expect(parseEndpointUrl("null")).toBe("null");
-  });
-
-  it("returns empty string for empty string input", () => {
-    expect(parseEndpointUrl("")).toBe("");
+  it("maps simulatorPort from the response", async () => {
+    mockApiFetch.mockResolvedValueOnce({
+      items: [makeDataSourceResponse({ simulatorPort: 44818 })],
+      nextCursor: null,
+      limit: 50,
+    });
+    await useDataSourcesStore.getState().loadDataSources("proj-1");
+    expect(useDataSourcesStore.getState().dataSources[0].simulatorPort).toBe(44818);
   });
 });
