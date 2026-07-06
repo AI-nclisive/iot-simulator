@@ -51,6 +51,7 @@ class ScenarioLiveRunServiceTest {
     private RuntimeEventRepository events;
     private DataSourceService dataSources;
     private ReplayService replay;
+    private ScenarioStepListener stepListener;
     private SyntheticRunService synthetic;
     private ScenarioLiveRunService service;
 
@@ -74,8 +75,10 @@ class ScenarioLiveRunServiceTest {
         dataSources = mock(DataSourceService.class);
         replay = mock(ReplayService.class);
         synthetic = mock(SyntheticRunService.class);
+        stepListener = mock(ScenarioStepListener.class);
         service = new ScenarioLiveRunService(scenarios, validation, runs, evidence, events,
                 dataSources, replay, synthetic, new ObjectMapper(), DIRECT);
+        service.setStepListener(stepListener);
     }
 
     // ---- helpers ----
@@ -301,6 +304,31 @@ class ScenarioLiveRunServiceTest {
         verify(dataSources).start(PROJECT, SOURCE);
         // No stop() call at all — COMPLETED path skips teardown
         verify(dataSources, never()).stop(any(), any());
+    }
+
+    @Test
+    void teardownStopsStartedSourcesWhenInterruptedBetweenSteps() {
+        // Scenario: START(src-A) then WAIT(long). dataSources.start() sets the thread interrupt flag
+        // so the next loop iteration's Thread.interrupted() check fires → STOPPED path → teardown.
+        stubScenario(
+                new ScenarioStepRow(0, "START", SOURCE, "{}"),
+                new ScenarioStepRow(1, "WAIT", null, "{\"durationMs\":60000}"));
+        stubValidReady();
+        RunRow parent = runningRun("run-9");
+        when(runs.create(any(), any(), any(), any(), any(), any(), any())).thenReturn(parent);
+        when(runs.start(eq("run-9"), any())).thenReturn(parent);
+        when(evidence.create(any(), eq("run-9"), any()))
+                .thenReturn(new EvidenceRow("ev-9", PROJECT, "run-9", "CAPTURING", "{}", null, null, "local"));
+        // Interrupt the thread after the START step so WAIT's loop-top check detects it.
+        org.mockito.Mockito.doAnswer(inv -> { Thread.currentThread().interrupt(); return null; })
+                .when(dataSources).start(PROJECT, SOURCE);
+
+        service.start(PROJECT, SCENARIO, "MANUAL", "local");
+
+        verify(runs).end(eq("run-9"), eq("STOPPED"), any());
+        // src-A was added to startedSources before the interrupt; teardown must stop it.
+        verify(dataSources).stop(PROJECT, SOURCE);
+        verify(stepListener).onRunFinished(PROJECT, "run-9", "STOPPED");
     }
 
     @Test

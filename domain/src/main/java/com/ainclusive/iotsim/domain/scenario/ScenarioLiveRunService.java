@@ -192,7 +192,7 @@ public class ScenarioLiveRunService {
                 if (Thread.interrupted()) {
                     teardown(projectId, startedSources);
                     safeEnd(runId, "STOPPED");
-                    stepListener.onRunFinished(projectId, runId, "STOPPED");
+                    safeNotify(() -> stepListener.onRunFinished(projectId, runId, "STOPPED"));
                     registry.remove(runId);
                     return;
                 }
@@ -235,6 +235,14 @@ public class ScenarioLiveRunService {
             runs.end(runId, state, now());
         } catch (RuntimeException ignored) {
             // intentionally swallowed — registry cleanup still happens in finally
+        }
+    }
+
+    private static void safeNotify(Runnable action) {
+        try {
+            action.run();
+        } catch (RuntimeException ignored) {
+            // SSE publish failures must not corrupt run-state bookkeeping
         }
     }
 
