@@ -64,12 +64,42 @@ class ScenarioValidationServiceTest {
     }
 
     @Test
-    void faultStepIsWarningButReady() {
+    void faultStepWithValidKindIsReady() {
         var f = new Fixture();
-        String id = f.scenario(new ScenarioStepRow(0, "FAULT", null, "{}"));
+        String id = f.scenario(new ScenarioStepRow(0, "FAULT", f.SOURCE, "{\"kind\":\"DELAY\"}"));
         ScenarioValidation v = f.service.validate(f.PROJECT, id);
         assertThat(v.status()).isEqualTo("READY");
-        assertThat(v.issues()).anySatisfy(i -> assertThat(i.severity()).isEqualTo("WARNING"));
+        assertThat(v.issues()).isEmpty();
+    }
+
+    @Test
+    void faultStepWithMissingSourceIdIsInvalid() {
+        var f = new Fixture();
+        String id = f.scenario(new ScenarioStepRow(0, "FAULT", null, "{\"kind\":\"DELAY\"}"));
+        ScenarioValidation v = f.service.validate(f.PROJECT, id);
+        assertThat(v.status()).isEqualTo("INVALID");
+        assertThat(v.issues()).anySatisfy(i ->
+                assertThat(i.severity()).isEqualTo(ValidationIssue.ERROR));
+    }
+
+    @Test
+    void faultStepWithMissingKindIsInvalid() {
+        var f = new Fixture();
+        String id = f.scenario(new ScenarioStepRow(0, "FAULT", f.SOURCE, "{}"));
+        ScenarioValidation v = f.service.validate(f.PROJECT, id);
+        assertThat(v.status()).isEqualTo("INVALID");
+        assertThat(v.issues()).anySatisfy(i ->
+                assertThat(i.severity()).isEqualTo(ValidationIssue.ERROR));
+    }
+
+    @Test
+    void faultStepWithUnknownKindIsWarningButReady() {
+        var f = new Fixture();
+        String id = f.scenario(new ScenarioStepRow(0, "FAULT", f.SOURCE, "{\"kind\":\"UNKNOWN_KIND\"}"));
+        ScenarioValidation v = f.service.validate(f.PROJECT, id);
+        assertThat(v.status()).isEqualTo("READY");
+        assertThat(v.issues()).anySatisfy(i ->
+                assertThat(i.severity()).isEqualTo(ValidationIssue.WARNING));
     }
 
     @Test

@@ -36,12 +36,11 @@ public interface RuntimeController {
     long applyValues(String dataSourceId, List<NeutralValue> values);
 
     /**
-     * Injects or clears a named fault on the running data-source worker. A default
-     * no-op is provided so existing implementations remain valid; the supervisor
-     * overrides this to forward the RPC to the worker.
+     * Injects or clears a fault on a running data-source worker. The default is a no-op
+     * (implementations that do not yet support fault injection need not override this).
      */
     default void injectFault(String dataSourceId, String kind, String layer, boolean active,
             Map<String, String> params) {
-        // no-op by default; implementations override
+        // no-op default: override in real implementations
     }
 }

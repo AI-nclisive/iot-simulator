@@ -1,6 +1,5 @@
 package com.ainclusive.iotsim.domain.scenario;
 
-import com.ainclusive.iotsim.domain.common.FeatureNotAvailableException;
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.domain.common.ScenarioInvalidException;
 import com.ainclusive.iotsim.domain.datasource.DataSourceService;
@@ -64,11 +63,6 @@ public class ScenarioRunService {
                 .filter(s -> s.projectId().equals(projectId))
                 .orElseThrow(() -> new ResourceNotFoundException("Scenario", scenarioId));
 
-        // Pre-flight, before any run row exists.
-        if (scenario.steps().stream().anyMatch(s -> "FAULT".equals(s.type()))) {
-            throw new FeatureNotAvailableException(
-                    "scenario contains a FAULT step; fault injection is not available until IS-087/IS-088");
-        }
         ScenarioValidation v = validation.validate(projectId, scenarioId);
         if (ScenarioValidation.INVALID.equals(v.status())) {
             throw new ScenarioInvalidException(scenarioId,
@@ -131,6 +125,16 @@ public class ScenarioRunService {
             }
             case "MARKER" -> {
                 return new StepOutcome(at, "MARKER", null, 0, "OK");
+            }
+            case "FAULT" -> {
+                String kind = text(step.params(), "kind");
+                if (kind == null || kind.isBlank()) {
+                    throw new IllegalArgumentException("FAULT step missing required param: kind");
+                }
+                String layer = text(step.params(), "layer");
+                dataSources.injectFault(projectId, step.targetSourceId(), kind,
+                        layer != null ? layer : "NEUTRAL", true, Map.of());
+                return new StepOutcome(at, "FAULT", null, 0, "OK");
             }
             default -> throw new IllegalArgumentException("unexecutable step type: " + step.type());
         }

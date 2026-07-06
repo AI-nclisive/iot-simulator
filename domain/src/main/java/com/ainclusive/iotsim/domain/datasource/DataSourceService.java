@@ -16,6 +16,7 @@ import com.ainclusive.iotsim.platform.secret.CredentialStore;
 import com.ainclusive.iotsim.protocolmodel.SchemaNode;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -158,6 +159,12 @@ public class DataSourceService {
         DataSourceRow row = requireRow(projectId, id);
         runtime.stop(id);
         return map(row);
+    }
+
+    public void injectFault(String projectId, String id, String kind, String layer,
+            boolean active, Map<String, String> params) {
+        requireRow(projectId, id);
+        runtime.injectFault(id, kind, layer, active, params);
     }
 
     /**
