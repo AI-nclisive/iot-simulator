@@ -2,6 +2,7 @@ package com.ainclusive.iotsim.platform.runtime;
 
 import com.ainclusive.iotsim.protocolmodel.NeutralValue;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Port for controlling a data-source's runtime. The domain depends on this
@@ -33,4 +34,14 @@ public interface RuntimeController {
 
     /** Pushes neutral values to the running data-source (replay/synthetic). Returns the count applied. */
     long applyValues(String dataSourceId, List<NeutralValue> values);
+
+    /**
+     * Injects or clears a named fault on the running data-source worker. A default
+     * no-op is provided so existing implementations remain valid; the supervisor
+     * overrides this to forward the RPC to the worker.
+     */
+    default void injectFault(String dataSourceId, String kind, String layer, boolean active,
+            Map<String, String> params) {
+        // no-op by default; implementations override
+    }
 }

@@ -10,6 +10,7 @@ import com.ainclusive.iotsim.workercontract.v1.HealthRequest;
 import com.ainclusive.iotsim.workercontract.v1.HealthResponse;
 import com.ainclusive.iotsim.workercontract.v1.HelloRequest;
 import com.ainclusive.iotsim.workercontract.v1.HelloResponse;
+import com.ainclusive.iotsim.workercontract.v1.InjectFaultRequest;
 import com.ainclusive.iotsim.workercontract.v1.ProtocolDataSourceGrpc;
 import com.ainclusive.iotsim.workercontract.v1.Schema;
 import com.ainclusive.iotsim.workercontract.v1.SecurityConfig;
@@ -21,6 +22,7 @@ import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
@@ -76,12 +78,42 @@ class WorkerClientTest {
         }
     }
 
+    @Test
+    void injectFaultBuildsRequestCorrectly() throws Exception {
+        int port = startServer(WorkerContract.VERSION);
+        try (WorkerClient client = new WorkerClient("127.0.0.1", port)) {
+            Ack ack = client.injectFault("BAD_VALUE", "NEUTRAL", true, Map.of("severity", "HIGH"));
+            assertThat(ack.getOk()).isTrue();
+        }
+    }
+
+    @Test
+    void injectFaultClearsSendsFalseActive() throws Exception {
+        int port = startServer(WorkerContract.VERSION);
+        try (WorkerClient client = new WorkerClient("127.0.0.1", port)) {
+            // activate then clear
+            client.injectFault("CONNECTION_DROP", "PROTOCOL", true, Map.of());
+            Ack ack = client.injectFault("CONNECTION_DROP", "PROTOCOL", false, Map.of());
+            assertThat(ack.getOk()).isTrue();
+        }
+    }
+
+    @Test
+    void injectFaultAcceptsNullParams() throws Exception {
+        int port = startServer(WorkerContract.VERSION);
+        try (WorkerClient client = new WorkerClient("127.0.0.1", port)) {
+            Ack ack = client.injectFault("DELAY", "NEUTRAL", true, null);
+            assertThat(ack.getOk()).isTrue();
+        }
+    }
+
     /** Minimal worker stand-in returning a configurable contract version. */
     private static final class TestProtocolService
             extends ProtocolDataSourceGrpc.ProtocolDataSourceImplBase {
 
         private final String contractVersion;
         private final AtomicReference<String> state = new AtomicReference<>("READY");
+        private final AtomicReference<InjectFaultRequest> lastFaultRequest = new AtomicReference<>();
 
         TestProtocolService(String contractVersion) {
             this.contractVersion = contractVersion;
@@ -118,6 +150,12 @@ class WorkerClientTest {
         public void health(HealthRequest request, StreamObserver<HealthResponse> obs) {
             obs.onNext(HealthResponse.newBuilder().setLive(true).setState(state.get()).build());
             obs.onCompleted();
+        }
+
+        @Override
+        public void injectFault(InjectFaultRequest request, StreamObserver<Ack> obs) {
+            lastFaultRequest.set(request);
+            ackOk(obs);
         }
 
         private static void ackOk(StreamObserver<Ack> obs) {

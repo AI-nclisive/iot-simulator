@@ -9,6 +9,7 @@ import com.ainclusive.iotsim.workercontract.v1.HealthRequest;
 import com.ainclusive.iotsim.workercontract.v1.HealthResponse;
 import com.ainclusive.iotsim.workercontract.v1.HelloRequest;
 import com.ainclusive.iotsim.workercontract.v1.HelloResponse;
+import com.ainclusive.iotsim.workercontract.v1.InjectFaultRequest;
 import com.ainclusive.iotsim.workercontract.v1.ProtocolDataSourceGrpc;
 import com.ainclusive.iotsim.workercontract.v1.RuntimeEvent;
 import com.ainclusive.iotsim.workercontract.v1.ScanRequest;
@@ -29,6 +30,7 @@ import io.grpc.stub.ClientResponseObserver;
 import io.grpc.stub.StreamObserver;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -95,6 +97,16 @@ public final class WorkerClient implements AutoCloseable {
 
     public Ack stop() {
         return stub.stop(StopRequest.getDefaultInstance());
+    }
+
+    public Ack injectFault(String kind, String layer, boolean active, Map<String, String> params) {
+        InjectFaultRequest req = InjectFaultRequest.newBuilder()
+                .setKind(kind)
+                .setLayer(layer)
+                .setActive(active)
+                .putAllParams(params != null ? params : Map.of())
+                .build();
+        return stub.injectFault(req);
     }
 
     public HealthResponse health() {

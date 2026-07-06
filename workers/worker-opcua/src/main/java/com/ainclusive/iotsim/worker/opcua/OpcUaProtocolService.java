@@ -11,6 +11,7 @@ import com.ainclusive.iotsim.workercontract.v1.HealthRequest;
 import com.ainclusive.iotsim.workercontract.v1.HealthResponse;
 import com.ainclusive.iotsim.workercontract.v1.HelloRequest;
 import com.ainclusive.iotsim.workercontract.v1.HelloResponse;
+import com.ainclusive.iotsim.workercontract.v1.InjectFaultRequest;
 import com.ainclusive.iotsim.workercontract.v1.ProtocolDataSourceGrpc;
 import com.ainclusive.iotsim.workercontract.v1.RuntimeEvent;
 import com.ainclusive.iotsim.workercontract.v1.ScanRequest;
@@ -52,6 +53,19 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
     private final Map<String, String> nodeDataTypes = new ConcurrentHashMap<>();
     private final ClientEventHub clientEventHub = new ClientEventHub();
     private final RuntimeEventHub runtimeEventHub = new RuntimeEventHub();
+    /**
+     * State for a single active fault entry. {@code delayMs} is only meaningful for
+     * the {@code DELAY} fault kind; defaults to 100 ms when the caller omits the param.
+     */
+    record FaultState(boolean active, long delayMs) {
+        static final long DEFAULT_DELAY_MS = 100L;
+    }
+
+    /**
+     * Active faults keyed by {@code "kind:layer"} so the same fault kind can be
+     * independently active at NEUTRAL vs PROTOCOL layer.
+     */
+    private final Map<String, FaultState> activeFaults = new ConcurrentHashMap<>();
 
     /** Total values received via ApplyValues (introspection/tests). */
     public long appliedCount() {
@@ -205,6 +219,47 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
         runtimeEventHub.register((ServerCallStreamObserver<RuntimeEvent>) responseObserver);
     }
 
+    /**
+     * Activates or clears a named fault (IS-088). Active faults are tracked in
+     * {@link #activeFaults} and applied during value serving: {@code BAD_VALUE} and
+     * {@code MISSING_VALUE} mark values with bad quality; {@code CONNECTION_DROP}
+     * returns an error on value projection; {@code DELAY} adds artificial latency.
+     * The RPC always acks success — fault state is advisory.
+     */
+    @Override
+    public void injectFault(InjectFaultRequest request, StreamObserver<Ack> responseObserver) {
+        String key = request.getKind() + ":" + request.getLayer();
+        if (request.getActive()) {
+            long delayMs = FaultState.DEFAULT_DELAY_MS;
+            String delayParam = request.getParamsMap().get("delay_ms");
+            if (delayParam != null && !delayParam.isBlank()) {
+                try {
+                    delayMs = Long.parseLong(delayParam);
+                } catch (NumberFormatException ignored) {
+                    // fall back to default
+                }
+            }
+            activeFaults.put(key, new FaultState(true, delayMs));
+        } else {
+            activeFaults.remove(key);
+        }
+        responseObserver.onNext(Ack.newBuilder().setOk(true).build());
+        responseObserver.onCompleted();
+    }
+
+    /**
+     * Returns {@code true} when a fault of the given kind is active on ANY layer
+     * (used by the projection path which is layer-agnostic at call time).
+     */
+    public boolean isFaultActive(String kind) {
+        return activeFaults.keySet().stream().anyMatch(k -> k.startsWith(kind + ":"));
+    }
+
+    /** Returns the stored {@link FaultState} for the given compound key, or {@code null}. */
+    FaultState faultState(String kind, String layer) {
+        return activeFaults.get(kind + ":" + layer);
+    }
+
     /** Maps the proto SecurityConfig to the worker-local AuthConfig (empty/default → anonymous). */
     private static AuthConfig toAuthConfig(SecurityConfig sc) {
         if (sc == null
@@ -287,7 +342,36 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
         if (runtime == null) {
             return;
         }
+        // CONNECTION_DROP: treat the whole batch as a connection error — skip projection.
+        if (isFaultActive("CONNECTION_DROP")) {
+            runtimeEventHub.emit(RuntimeEvent.newBuilder()
+                    .setType("ERROR")
+                    .setAtMicros(System.currentTimeMillis() * 1_000L)
+                    .setDetail("CONNECTION_DROP fault active — value batch dropped")
+                    .build());
+            return;
+        }
+        // DELAY: add artificial latency before projecting values.
+        // Use the delay_ms stored in the fault state; fall back to the default if no
+        // state is found (defensive: state should always exist when isFaultActive is true).
+        if (isFaultActive("DELAY")) {
+            long delayMs = activeFaults.entrySet().stream()
+                    .filter(e -> e.getKey().startsWith("DELAY:"))
+                    .map(e -> e.getValue().delayMs())
+                    .findFirst()
+                    .orElse(FaultState.DEFAULT_DELAY_MS);
+            try {
+                Thread.sleep(delayMs);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
         for (Value value : batch.getValuesList()) {
+            // BAD_VALUE / MISSING_VALUE: skip projecting real values — OPC UA clients
+            // receive the last good value (unchanged), simulating a bad-quality read.
+            if (isFaultActive("BAD_VALUE") || isFaultActive("MISSING_VALUE")) {
+                continue;
+            }
             String dataType = nodeDataTypes.get(value.getNodeId());
             if (dataType != null) {
                 try {
