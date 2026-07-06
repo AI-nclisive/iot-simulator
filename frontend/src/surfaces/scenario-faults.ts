@@ -7,18 +7,28 @@
  * plain-language behavior description so the fault panel can make all of that
  * clear up front.
  *
- * Shapes align with the backend fault model (04_DB_SCHEMA: kind / layer /
- * target / params jsonb; IS-087). Faults are never auto-healed — a fault stays
- * until its duration elapses or the scenario clears it.
+ * Shapes align with the backend fault model (IS-087):
+ *   BAD_VALUE | MISSING_VALUE | DELAY | CONNECTION_DROP | TIMEOUT | PROTOCOL_ERROR | SOURCE_UNAVAILABLE
+ * Faults are never auto-healed — a fault stays until its duration elapses or the scenario clears it.
  */
 
-export type FaultKind = "drop" | "delay" | "corrupt" | "quality";
+export type FaultKind =
+  | "BAD_VALUE"
+  | "MISSING_VALUE"
+  | "DELAY"
+  | "CONNECTION_DROP"
+  | "TIMEOUT"
+  | "PROTOCOL_ERROR"
+  | "SOURCE_UNAVAILABLE";
 
 export const FAULT_KIND_LABELS: Record<FaultKind, string> = {
-  drop: "Drop values",
-  delay: "Delay values",
-  corrupt: "Corrupt values",
-  quality: "Force bad quality",
+  BAD_VALUE: "Bad value",
+  MISSING_VALUE: "Missing value",
+  DELAY: "Delay values",
+  CONNECTION_DROP: "Connection drop",
+  TIMEOUT: "Timeout",
+  PROTOCOL_ERROR: "Protocol error",
+  SOURCE_UNAVAILABLE: "Source unavailable",
 };
 
 export type FaultParamKind = "number" | "select";
@@ -37,18 +47,9 @@ export interface FaultParamSpec {
 
 /** Per-kind parameter specs (beyond the shared timing fields). */
 export const FAULT_PARAM_SPECS: Record<FaultKind, FaultParamSpec[]> = {
-  drop: [
-    {
-      key: "dropRate",
-      label: "Drop rate",
-      kind: "number",
-      required: true,
-      unit: "%",
-      max: 100,
-      hint: "Percentage of values silently dropped while active.",
-    },
-  ],
-  delay: [
+  BAD_VALUE: [],
+  MISSING_VALUE: [],
+  DELAY: [
     {
       key: "delayMs",
       label: "Added latency",
@@ -58,30 +59,10 @@ export const FAULT_PARAM_SPECS: Record<FaultKind, FaultParamSpec[]> = {
       hint: "Extra delay applied to each value.",
     },
   ],
-  corrupt: [
-    {
-      key: "corruptRate",
-      label: "Corruption rate",
-      kind: "number",
-      required: true,
-      unit: "%",
-      max: 100,
-      hint: "Percentage of values replaced with corrupted data.",
-    },
-  ],
-  quality: [
-    {
-      key: "quality",
-      label: "Reported quality",
-      kind: "select",
-      required: true,
-      options: [
-        { value: "BAD", label: "Bad" },
-        { value: "UNCERTAIN", label: "Uncertain" },
-      ],
-      hint: "Quality flag stamped on values while active.",
-    },
-  ],
+  CONNECTION_DROP: [],
+  TIMEOUT: [],
+  PROTOCOL_ERROR: [],
+  SOURCE_UNAVAILABLE: [],
 };
 
 /** Shared timing fields for every fault kind. */
@@ -125,22 +106,22 @@ export function describeFault(config: Record<string, unknown>): string {
 
   const timing = faultTimingSentence(config);
   switch (kind) {
-    case "drop": {
-      const rate = config.dropRate;
-      return `Silently drops ${rate ?? "…"}% of values${timing}. Consumers see gaps, not errors.`;
-    }
-    case "delay": {
+    case "BAD_VALUE":
+      return `Injects corrupted/invalid values${timing}. Consumers receive data with bad content.`;
+    case "MISSING_VALUE":
+      return `Silently drops values${timing}. Consumers see gaps — no data arrives.`;
+    case "DELAY": {
       const ms = config.delayMs;
       return `Adds ${ms ?? "…"} ms of latency to each value${timing}.`;
     }
-    case "corrupt": {
-      const rate = config.corruptRate;
-      return `Replaces ${rate ?? "…"}% of values with corrupted data${timing}.`;
-    }
-    case "quality": {
-      const q = config.quality;
-      return `Stamps values with ${q ?? "…"} quality${timing}. Values keep flowing but are flagged.`;
-    }
+    case "CONNECTION_DROP":
+      return `Drops the connection to the source${timing}. No values are delivered until restored.`;
+    case "TIMEOUT":
+      return `Causes read operations to time out${timing}. Consumers receive timeout errors.`;
+    case "PROTOCOL_ERROR":
+      return `Injects protocol-level errors${timing}. Consumers receive malformed or unexpected messages.`;
+    case "SOURCE_UNAVAILABLE":
+      return `Makes the source report as unavailable${timing}. Consumers receive unavailability errors.`;
     default:
       return "";
   }

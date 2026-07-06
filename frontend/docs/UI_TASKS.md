@@ -827,6 +827,15 @@ Parallel execution:
   Depends: IS-136 scenarios API.
   Done when: scenarios page loads from backend; create/rename/duplicate/delete/save call API; FE↔BE step mapper handles all step types; TypeScript build + vitest pass.
 
+- [x] `UI-130` Align FAULT step params to backend fault model
+  Goal: replace the 4 placeholder FE fault kinds (drop/delay/corrupt/quality) with the IS-087 backend contract: BAD_VALUE, MISSING_VALUE, DELAY, CONNECTION_DROP, TIMEOUT, PROTOCOL_ERROR, SOURCE_UNAVAILABLE. Only DELAY has a required param (delayMs); all others are param-free.
+  Surface: `Scenario Builder` — fault step editor and config panel.
+  Work includes: rewrite `scenario-faults.ts` (FaultKind, FAULT_KIND_LABELS, FAULT_PARAM_SPECS, describeFault); update STEP_FIELD_SPECS.fault kind options in `scenario-steps.ts`; update scenario-faults.test.ts and fault-config-panel.test.tsx.
+  Depends: IS-087, IS-088, UI-127.
+  Done when: FAULT step kind options match IS-087 contract; params round-trip to backend; typecheck + vitest green.
+
+- [ ] `UI-128` Scenario step editor — real source/recording pickers + server validation
+
 - [x] `UI-129` Wire scenario run/stop to backend API + live SSE run view
   Goal: replace mock-backed run view with live SSE data; wire run/stop actions to real backend.
   Surface: `Scenarios`, `Scenario Run View`

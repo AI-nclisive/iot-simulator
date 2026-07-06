@@ -1,5 +1,5 @@
 /**
- * Tests for FaultConfigPanel (UI-063).
+ * Tests for FaultConfigPanel (UI-063 / UI-130).
  */
 
 import { cleanup, render, screen } from "@testing-library/react";
@@ -15,58 +15,61 @@ describe("FaultConfigPanel", () => {
     expect(screen.getByText(/Choose a fault kind above/)).toBeTruthy();
   });
 
-  it("shows drop-rate param for a drop fault plus timing fields", () => {
-    render(<FaultConfigPanel config={{ kind: "drop" }} canEdit onChange={() => {}} />);
-    expect(screen.getByLabelText(/Drop rate/)).toBeTruthy();
+  it("shows delayMs param for DELAY plus timing fields", () => {
+    render(<FaultConfigPanel config={{ kind: "DELAY" }} canEdit onChange={() => {}} />);
+    expect(screen.getByLabelText(/Added latency/)).toBeTruthy();
     expect(screen.getByLabelText(/Start after/)).toBeTruthy();
     expect(screen.getByLabelText(/Duration/)).toBeTruthy();
   });
 
-  it("shows a quality select for a quality fault", () => {
-    render(<FaultConfigPanel config={{ kind: "quality" }} canEdit onChange={() => {}} />);
-    expect(screen.getByLabelText(/Reported quality/)).toBeTruthy();
+  it("shows no kind-specific params for BAD_VALUE (only timing)", () => {
+    render(<FaultConfigPanel config={{ kind: "BAD_VALUE" }} canEdit onChange={() => {}} />);
+    // No kind-specific params — only timing and behavior description present.
+    expect(screen.getByLabelText(/Start after/)).toBeTruthy();
+    expect(screen.getByText(/What this does/)).toBeTruthy();
+  });
+
+  it("shows no kind-specific params for CONNECTION_DROP", () => {
+    render(<FaultConfigPanel config={{ kind: "CONNECTION_DROP" }} canEdit onChange={() => {}} />);
+    expect(screen.getByLabelText(/Start after/)).toBeTruthy();
   });
 
   it("commits a numeric param and clamps negatives to 0", async () => {
     const onChange = vi.fn();
     const user = userEvent.setup();
-    render(<FaultConfigPanel config={{ kind: "delay" }} canEdit onChange={onChange} />);
+    render(<FaultConfigPanel config={{ kind: "DELAY" }} canEdit onChange={onChange} />);
     await user.type(screen.getByLabelText(/Added latency/), "-5");
     const last = onChange.mock.calls.at(-1)!;
     expect(last[0]).toBe("delayMs");
     expect(last[1]).toBe(0);
   });
 
-  it("clamps a percentage param to its max (100)", async () => {
-    const onChange = vi.fn();
-    const user = userEvent.setup();
-    render(<FaultConfigPanel config={{ kind: "drop" }} canEdit onChange={onChange} />);
-    // Fire a single change with an over-max value (the component is controlled,
-    // so per-keystroke typing would re-read the unchanged prop each time).
-    const input = screen.getByLabelText(/Drop rate/);
-    await user.click(input);
-    await user.paste("250");
-    const last = onChange.mock.calls.at(-1)!;
-    expect(last[0]).toBe("dropRate");
-    expect(last[1]).toBe(100);
-  });
-
-  it("renders the plain-language behavior description", () => {
+  it("renders the plain-language behavior description for MISSING_VALUE", () => {
     render(
       <FaultConfigPanel
-        config={{ kind: "drop", dropRate: 40, durationSeconds: 15 }}
+        config={{ kind: "MISSING_VALUE", durationSeconds: 15 }}
         canEdit
         onChange={() => {}}
       />,
     );
     expect(screen.getByText(/What this does/)).toBeTruthy();
-    expect(screen.getByText(/40%/)).toBeTruthy();
     expect(screen.getByText(/for 15s/)).toBeTruthy();
   });
 
+  it("renders the plain-language description for DELAY with latency", () => {
+    render(
+      <FaultConfigPanel
+        config={{ kind: "DELAY", delayMs: 40 }}
+        canEdit
+        onChange={() => {}}
+      />,
+    );
+    expect(screen.getByText(/40 ms/)).toBeTruthy();
+  });
+
   it("is read-only when canEdit is false", () => {
-    render(<FaultConfigPanel config={{ kind: "drop" }} canEdit={false} onChange={() => {}} />);
-    const input = screen.getByLabelText(/Drop rate/) as HTMLInputElement;
+    render(<FaultConfigPanel config={{ kind: "DELAY" }} canEdit={false} onChange={() => {}} />);
+    const input = screen.getByLabelText(/Added latency/) as HTMLInputElement;
     expect(input.disabled).toBe(true);
   });
 });
