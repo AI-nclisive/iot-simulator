@@ -846,6 +846,13 @@ Parallel execution:
   Depends: IS-087, IS-088, UI-127.
   Done when: FAULT step kind options match IS-087 contract; params round-trip to backend; typecheck + vitest green.
 
+- [x] `UI-133` Fix data-source frontend shape mismatch — align to IS-127 backend payload
+  Goal: the frontend DataSourceResponse still used the old endpoint field removed in IS-127. Fix all layers so the UI shows the simulator serve URL, real device endpoint, source type (basis), and sends the right fields in settings PUT.
+  Surface: Data Source Detail — header, overview tab, settings tab, action buttons.
+  Work includes: update DataSourceResponse type (simulatorPort/realDeviceEndpoint/serveUrl/basis); update DataSourceRow; update mapDataSource(); update updateSourceConfiguration PUT body; update settings tab to edit realDeviceEndpoint (SCAN only) + async save; update detail header; update overview tab; hide Record button for IMPORT; rename Simulate to Replay recording for IMPORT.
+  Depends: IS-127.
+  Done when: detail header shows serveUrl; overview shows real device endpoint; source type shown; IMPORT sources show Replay recording; settings save correct; typecheck + vitest green.
+
 - [ ] `UI-128` Scenario step editor — real source/recording pickers + server validation
 
 - [x] `UI-129` Wire scenario run/stop to backend API + live SSE run view

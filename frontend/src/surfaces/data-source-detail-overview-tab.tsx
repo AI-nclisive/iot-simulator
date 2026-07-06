@@ -73,16 +73,39 @@ export function DataSourceDetailOverviewTab({
           <dl className="mt-5 grid gap-3 text-sm text-shell-muted sm:grid-cols-2">
             <div>
               <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
-                Endpoint
+                Simulator serve URL
               </dt>
-              <dd className="mt-2 text-sm text-shell-ink">{source.endpoint}</dd>
+              <dd className="mt-2 font-mono text-sm text-shell-ink">{source.endpoint || "—"}</dd>
             </div>
+            {source.basis === "SCAN" ? (
+              <div>
+                <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
+                  Real device endpoint
+                </dt>
+                <dd className="mt-2 font-mono text-sm text-shell-ink">
+                  {source.realDeviceEndpoint || "—"}
+                </dd>
+              </div>
+            ) : null}
             <div>
               <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
                 Protocol
               </dt>
               <dd className="mt-2 text-sm text-shell-ink">{source.protocol}</dd>
             </div>
+            {source.basis ? (
+              <div>
+                <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
+                  Source type
+                </dt>
+                <dd className="mt-2 text-sm text-shell-ink">
+                  {source.basis === "SCAN" ? "Real device scan"
+                    : source.basis === "IMPORT" ? "Prepared data (recording)"
+                    : source.basis === "SYNTHETIC" ? "Synthetic generation"
+                    : "Manual schema"}
+                </dd>
+              </div>
+            ) : null}
           </dl>
         </div>
 
@@ -91,11 +114,13 @@ export function DataSourceDetailOverviewTab({
             Next action
           </p>
           <div className="mt-3 flex flex-col items-start gap-2">
-            <Link className="shell-text-action" to={`/data-sources/${source.id}/record`}>
-              Record
-            </Link>
+            {source.basis !== "IMPORT" ? (
+              <Link className="shell-text-action" to={`/data-sources/${source.id}/record`}>
+                Record
+              </Link>
+            ) : null}
             <Link className="shell-text-action" to={`/data-sources/${source.id}/replay`}>
-              Simulate
+              {source.basis === "IMPORT" ? "Replay recording" : "Simulate"}
             </Link>
             <Link className="shell-text-action" to="?tab=values">
               Open Values

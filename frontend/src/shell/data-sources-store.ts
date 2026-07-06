@@ -3,7 +3,7 @@ import { apiFetch, ApiError, mapProtocol, mapRuntimeStateToStatus, mapRuntimeSta
 import type { DataSourceRow } from "../surfaces/mock-data-sources";
 import type { BackendProtocol, BackendRuntimeState, Page } from "../api";
 
-// Backend response shape from GET/POST/PUT /api/v1/projects/{pid}/data-sources
+// Backend response shape from GET/POST/PUT /api/v1/projects/{pid}/data-sources (IS-127 shape)
 type DataSourceResponse = {
   id: string;
   projectId: string;
@@ -12,7 +12,9 @@ type DataSourceResponse = {
   basis: "SCAN" | "MANUAL" | "IMPORT" | "SYNTHETIC";
   schemaId: string | null;
   schemaVersion: number | null;
-  endpoint: string | null;
+  simulatorPort: number;
+  realDeviceEndpoint: string | null;
+  serveUrl: string;
   runtimeConfig: string | null;
   enabled: boolean;
   runtimeState: BackendRuntimeState;
@@ -23,6 +25,7 @@ type DataSourceResponse = {
   version: number;
 };
 
+/** Kept for test-file compatibility — parses old JSON-wrapped endpoint values. */
 export function parseEndpointUrl(raw: string | null): string {
   if (!raw) return "";
   try {
@@ -39,7 +42,10 @@ function mapDataSource(d: DataSourceResponse): DataSourceRow {
     id: d.id,
     name: d.name,
     protocol: mapProtocol(d.protocol),
-    endpoint: parseEndpointUrl(d.endpoint),
+    basis: d.basis,
+    simulatorPort: d.simulatorPort,
+    realDeviceEndpoint: d.realDeviceEndpoint ?? null,
+    endpoint: d.serveUrl ?? "",
     parameterCount: 0, // TODO(UI-097): no backend field — will come from schema node count
     status: mapRuntimeStateToStatus(d.runtimeState),
     health: mapRuntimeStateToHealth(d.runtimeState) ?? "Healthy",
@@ -50,6 +56,12 @@ type CreateDataSourceInput = {
   endpoint: string;
   name: string;
   protocol: DataSourceRow["protocol"];
+};
+
+type UpdateSourceConfigInput = {
+  name: string;
+  simulatorPort?: number;
+  realDeviceEndpoint?: string | null;
 };
 
 type DataSourcesState = {
@@ -63,7 +75,7 @@ type DataSourcesState = {
   stopDataSource: (rowId: string, projectId?: string) => Promise<void>;
   updateSourceConfiguration: (
     rowId: string,
-    input: Pick<CreateDataSourceInput, "endpoint" | "name">,
+    input: UpdateSourceConfigInput,
     projectId?: string,
   ) => Promise<void>;
   currentProjectId: string;
@@ -145,12 +157,12 @@ export const useDataSourcesStore = create<DataSourcesState>((set, get) => ({
 
   updateSourceConfiguration: async (rowId, input, projectId) => {
     const pid = projectId ?? get().currentProjectId;
+    const body: Record<string, unknown> = { name: input.name };
+    if (input.simulatorPort !== undefined) body.simulatorPort = input.simulatorPort;
+    if (input.realDeviceEndpoint !== undefined) body.realDeviceEndpoint = input.realDeviceEndpoint;
     const data = await apiFetch<DataSourceResponse>(
       `/api/v1/projects/${pid}/data-sources/${rowId}`,
-      {
-        method: "PUT",
-        body: JSON.stringify({ name: input.name, endpoint: input.endpoint }),
-      },
+      { method: "PUT", body: JSON.stringify(body) },
     );
     const updated = mapDataSource(data);
     set((state) => ({

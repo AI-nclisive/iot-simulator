@@ -245,7 +245,15 @@ export function DataSourceDetailPreviewPage() {
           <div className="min-w-0 max-w-3xl">
             <h2 className="text-2xl font-semibold text-shell-ink">{activeSource.name}</h2>
             {activeSource.endpoint ? (
-              <p className="mt-2 text-sm leading-6 text-shell-muted">{activeSource.endpoint}</p>
+              <p className="mt-2 font-mono text-sm text-shell-muted">{activeSource.endpoint}</p>
+            ) : null}
+            {activeSource.basis === "SCAN" && activeSource.realDeviceEndpoint ? (
+              <p className="mt-1 text-xs text-shell-muted">
+                Real device: <span className="font-mono">{activeSource.realDeviceEndpoint}</span>
+              </p>
+            ) : null}
+            {activeSource.basis === "IMPORT" ? (
+              <p className="mt-1 text-xs text-shell-muted">Prepared data source (replay from recording)</p>
             ) : null}
           </div>
 
@@ -276,14 +284,14 @@ export function DataSourceDetailPreviewPage() {
         </dl>
 
         <div className="mt-6 flex flex-wrap items-center gap-2">
-          {access.canRecordSource ? (
+          {access.canRecordSource && activeSource.basis !== "IMPORT" ? (
             <Link className="shell-action" to={`/data-sources/${activeSource.id}/record`}>
               Record
             </Link>
           ) : null}
           {access.canConfigureReplay ? (
             <Link className="shell-action" to={`/data-sources/${activeSource.id}/replay`}>
-              Simulate
+              {activeSource.basis === "IMPORT" ? "Replay recording" : "Simulate"}
             </Link>
           ) : null}
           {activeReplayRun && access.canConfigureReplay ? (
