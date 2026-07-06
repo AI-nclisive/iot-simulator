@@ -18,6 +18,7 @@ import com.ainclusive.iotsim.protocolmodel.DeterministicSettings;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -134,8 +135,7 @@ public class ScenarioLiveRunService {
                     executeSteps(projectId, runId, scenario, finalSettings));
 
             // Replace the placeholder with the real future. If stopIfLive() removed the
-            // placeholder between registry.put and here, computeIfPresent is a no-op and
-            // stillLive is false — cancel the just-submitted task immediately.
+            // placeholder between registry.put and here, cancel the just-submitted task.
             boolean stillLive = registry.computeIfPresent(runId,
                     (k, old) -> new ScenarioExecution(runId, evidenceId, future)) != null;
             if (!stillLive) {
@@ -175,9 +175,12 @@ public class ScenarioLiveRunService {
 
     private void executeSteps(String projectId, String runId, ScenarioRow scenario,
             DeterministicSettings settings) {
+        List<String> startedSources = new ArrayList<>();
+        boolean completed = false;
         try {
             for (ScenarioStepRow step : scenario.steps()) {
                 if (Thread.interrupted()) {
+                    teardown(projectId, startedSources);
                     safeEnd(runId, "STOPPED");
                     registry.remove(runId);
                     return;
@@ -187,27 +190,29 @@ public class ScenarioLiveRunService {
                     events.append(projectId, step.targetSourceId(), runId, "SCENARIO_STEP", now(),
                             stepPayload(step));
                 }
-                execute(projectId, step, runId, settings);
+                execute(projectId, step, runId, settings, startedSources);
             }
-            runs.end(runId, "COMPLETED", now());
+            completed = true;
         } catch (IllegalStateException e) {
             // WAIT sleep interrupted — Thread.currentThread().interrupt() was called in sleep()
             if (Thread.currentThread().isInterrupted() || e.getCause() instanceof InterruptedException) {
+                teardown(projectId, startedSources);
                 safeEnd(runId, "STOPPED");
             } else {
+                teardown(projectId, startedSources);
                 safeEnd(runId, "FAILED");
             }
         } catch (RuntimeException e) {
+            teardown(projectId, startedSources);
             safeEnd(runId, "FAILED");
         } finally {
+            if (completed) {
+                safeEnd(runId, "COMPLETED");
+            }
             registry.remove(runId);
         }
     }
 
-    /**
-     * Best-effort terminal-state write. A DB failure during the error-handling path must
-     * not escape the background thread or prevent registry cleanup (done in finally).
-     */
     private void safeEnd(String runId, String state) {
         try {
             runs.end(runId, state, now());
@@ -216,11 +221,27 @@ public class ScenarioLiveRunService {
         }
     }
 
+    private void teardown(String projectId, List<String> startedSources) {
+        for (String sourceId : startedSources) {
+            try {
+                dataSources.stop(projectId, sourceId);
+            } catch (RuntimeException ignored) {
+                // best-effort teardown; individual stop failures must not block the rest
+            }
+        }
+    }
+
     private void execute(String projectId, ScenarioStepRow step, String parentRunId,
-            DeterministicSettings settings) {
+            DeterministicSettings settings, List<String> startedSources) {
         switch (step.type()) {
-            case "START" -> dataSources.start(projectId, step.targetSourceId());
-            case "STOP" -> dataSources.stop(projectId, step.targetSourceId());
+            case "START" -> {
+                dataSources.start(projectId, step.targetSourceId());
+                startedSources.add(step.targetSourceId());
+            }
+            case "STOP" -> {
+                dataSources.stop(projectId, step.targetSourceId());
+                startedSources.remove(step.targetSourceId());
+            }
             case "REPLAY" -> replay.replay(projectId, step.targetSourceId(),
                     text(step.params(), "recordingId"), settings,
                     bool(step.params(), "compatibilityAck"), parentRunId);
