@@ -869,6 +869,12 @@ Parallel execution:
   Work includes: make `saveChanges` async; `await updateSourceConfiguration(...)` before calling `setSavedMessage("Saved")`; 2 behavioral tests added.
   Done when: "Saved" badge only appears after the update call resolves; typecheck + vitest green.
 
+- [x] `UI-138` Fix recording/replay UX bugs — schema field names, idle label, 409 compat ack, no-endpoint guard
+  Goal: address several UX regressions in the recording and replay flows.
+  Surface: `Recording Detail`, `Recording Flow`, `Replay Flow`.
+  Work includes: fix field name display in recording detail (schema-based names); fix "Idle" label on replay when source has no real endpoint; handle 409 schema-mismatch response in replay — show "Run anyway" confirmation panel with `compatibilityAck=true` retry; disable "Start recording" button and show panel when source has no real device endpoint.
+  Done when: 409 → schema-mismatch → "Run anyway" retry flow tested; `!hasRealEndpoint` disabled path tested; typecheck + vitest green.
+
 - [ ] `UI-128` Scenario step editor — real source/recording pickers + server validation
 
 - [x] `UI-129` Wire scenario run/stop to backend API + live SSE run view

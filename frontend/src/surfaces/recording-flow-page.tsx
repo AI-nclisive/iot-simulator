@@ -96,6 +96,7 @@ export function RecordingFlowPage() {
   const push = useNotificationStore((state) => state.push);
   const access = resolveAccess(accessMode, sharedRole);
   const captureAllowed = access.canRecordSource;
+  const hasRealEndpoint = Boolean(source?.endpoint);
   const [recordingState, setRecordingState] = useState<RecordingUiState>("ready");
   const [durationSeconds, setDurationSeconds] = useState(0);
   const [valueCount, setValueCount] = useState(0);
@@ -299,7 +300,8 @@ export function RecordingFlowPage() {
           {!captureActive ? (
             <button
               className="shell-action"
-              disabled={!captureAllowed}
+              disabled={!captureAllowed || !hasRealEndpoint}
+              title={!hasRealEndpoint ? "This source has no real device endpoint to capture from" : undefined}
               type="button"
               onClick={handleStartRecording}
             >
@@ -333,6 +335,14 @@ export function RecordingFlowPage() {
               message="Shared User can inspect capture state, but starting or saving recordings is restricted to Admin."
               state="locked"
               title="Recording is read-only in this role."
+            />
+          </div>
+        ) : !hasRealEndpoint ? (
+          <div className="mt-6">
+            <SharedStatePanel
+              message="This source was created without a real device endpoint (synthetic or import). Live capture requires a source configured with a real OPC UA or Modbus TCP address."
+              state="empty"
+              title="No real device endpoint configured."
             />
           </div>
         ) : null}
