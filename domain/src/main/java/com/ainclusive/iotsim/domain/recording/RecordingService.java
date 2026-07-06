@@ -59,7 +59,11 @@ public class RecordingService {
         DataSourceRow source = requireSource(projectId, dataSourceId);
         int schemaVersion = source.schemaVersion() == null ? 0 : source.schemaVersion();
         String scanTypeStr = scanType != null ? scanType.name() : ScanType.SCHEMA_AND_DATA.name();
-        String safeName = (name != null && !name.isBlank()) ? name.trim() : null;
+        String trimmedName = (name != null && !name.isBlank()) ? name.trim() : null;
+        if (trimmedName != null && trimmedName.length() > 255) {
+            throw new IllegalArgumentException("Recording name must not exceed 255 characters");
+        }
+        String safeName = trimmedName;
         return map(recordings.create(projectId, dataSourceId, schemaVersion, "SCAN_RECORD",
                 scanTypeStr, safeName, actor));
     }

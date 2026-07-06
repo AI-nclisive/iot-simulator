@@ -262,7 +262,38 @@ class RecordingServiceTest {
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
-    private static ProjectRepository fakeProjects() {
+
+    @Test
+    void createWithNameStoresAndReturnsTrimmedName() {
+        Recording r = service.create(PROJECT, SOURCE,
+                com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_ONLY, "  My Recording  ", "bob");
+        assertThat(r.name()).isEqualTo("My Recording");
+    }
+
+    @Test
+    void createWithNullNameReturnsNullName() {
+        Recording r = service.create(PROJECT, SOURCE,
+                com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_ONLY, null, "bob");
+        assertThat(r.name()).isNull();
+    }
+
+    @Test
+    void createWithBlankNameReturnsNullName() {
+        Recording r = service.create(PROJECT, SOURCE,
+                com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_ONLY, "   ", "bob");
+        assertThat(r.name()).isNull();
+    }
+
+    @Test
+    void createWithNameExceeding255CharsThrowsIllegalArgument() {
+        String longName = "a".repeat(256);
+        assertThatThrownBy(() -> service.create(PROJECT, SOURCE,
+                        com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_ONLY, longName, "bob"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("255");
+    }
+
+        private static ProjectRepository fakeProjects() {
         return new ProjectRepository() {
             @Override public Optional<ProjectRow> findById(String id) { return Optional.empty(); }
             @Override public ProjectRow insert(String n, String d, String c) { throw new UnsupportedOperationException(); }
