@@ -16,6 +16,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.ainclusive.iotsim.api.error.GlobalExceptionHandler;
+import com.ainclusive.iotsim.api.stream.LiveStreamSubscriptions;
 import com.ainclusive.iotsim.domain.common.ConcurrencyConflictException;
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.domain.common.ScenarioInvalidException;
@@ -72,6 +73,9 @@ class ScenarioControllerMvcTest {
 
     @MockitoBean
     ScenarioLiveRunService liveRunService;
+
+    @MockitoBean
+    LiveStreamSubscriptions liveStreamSubscriptions;
 
     private static Scenario sample(long version) {
         return new Scenario("scn-1", "p1", "Flow", "DRAFT", "{}",
