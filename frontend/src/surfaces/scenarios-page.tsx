@@ -81,12 +81,12 @@ export function ScenariosPage() {
     direction: "asc",
   });
 
-  // Load on mount when scenarios are empty and not already loading
+  // Load on mount when scenarios are empty and not already loading or in error state
   useEffect(() => {
-    if (currentProjectId && !isLoading && scenarios.length === 0) {
+    if (currentProjectId && !isLoading && !error && scenarios.length === 0) {
       void loadScenarios(currentProjectId);
     }
-  }, [currentProjectId, isLoading, scenarios.length, loadScenarios]);
+  }, [currentProjectId, isLoading, error, scenarios.length, loadScenarios]);
 
   const filtered = useMemo(() => {
     const query = searchValue.trim().toLowerCase();

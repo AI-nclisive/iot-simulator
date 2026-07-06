@@ -68,6 +68,7 @@ export function ScenarioBuilderPage() {
   const scenario = useScenariosStore((s) => s.scenarios.find((x) => x.id === scenarioId));
   const steps = useScenariosStore((s) => s.steps[scenarioId] ?? EMPTY_STEPS);
   const isLoading = useScenariosStore((s) => s.isLoading);
+  const error = useScenariosStore((s) => s.error);
   const addStep = useScenariosStore((s) => s.addStep);
   const updateStep = useScenariosStore((s) => s.updateStep);
   const removeStep = useScenariosStore((s) => s.removeStep);
@@ -88,11 +89,12 @@ export function ScenarioBuilderPage() {
 
   // Load on mount only when the store is empty (no scenarios loaded yet).
   // If the store is populated but this scenario ID isn't found, it's a genuine 404.
+  // Guard on error to avoid an infinite retry loop when loadScenarios fails.
   useEffect(() => {
-    if (!scenario && scenarios.length === 0 && !isLoading && currentProjectId) {
+    if (!scenario && scenarios.length === 0 && !isLoading && !error && currentProjectId) {
       void loadScenarios(currentProjectId);
     }
-  }, [scenario, scenarios.length, isLoading, currentProjectId, loadScenarios]);
+  }, [scenario, scenarios.length, isLoading, error, currentProjectId, loadScenarios]);
 
   const validation = useMemo(() => validateScenario(steps), [steps]);
   const stepIssueIds = useMemo(
