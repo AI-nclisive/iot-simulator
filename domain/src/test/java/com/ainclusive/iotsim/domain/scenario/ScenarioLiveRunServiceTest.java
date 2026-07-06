@@ -11,7 +11,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.ainclusive.iotsim.domain.common.FeatureNotAvailableException;
 import com.ainclusive.iotsim.domain.common.ScenarioInvalidException;
 import com.ainclusive.iotsim.domain.datasource.DataSourceService;
 import com.ainclusive.iotsim.domain.replay.ReplayService;
@@ -114,11 +113,33 @@ class ScenarioLiveRunServiceTest {
     // ---- tests ----
 
     @Test
-    void faultStepIsRejectedWithoutCreatingARun() {
-        stubScenario(new ScenarioStepRow(0, "FAULT", null, "{}"));
-        assertThatThrownBy(() -> service.start(PROJECT, SCENARIO, "MANUAL", "local"))
-                .isInstanceOf(FeatureNotAvailableException.class);
-        verify(runs, never()).create(anyString(), anyString(), any(), any(), any(), any(), any());
+    void faultStepInjectsFaultAndClearsAfterDuration() {
+        stubScenario(new ScenarioStepRow(0, "FAULT", SOURCE, "{\"kind\":\"DELAY\",\"durationMs\":1}"));
+        stubValidReady();
+        stubRunLifecycle("run-fault-1");
+
+        service.start(PROJECT, SCENARIO, "MANUAL", "local");
+
+        // fault activated, then cleared after durationMs
+        verify(dataSources, times(2)).injectFault(eq(PROJECT), eq(SOURCE),
+                eq("DELAY"), eq("NEUTRAL"), any(Boolean.class), any());
+        verify(runs).end(eq("run-fault-1"), eq("COMPLETED"), any());
+    }
+
+    @Test
+    void faultStepWithNoDurationLeavesActive() {
+        // no durationMs → fault stays active; teardown on COMPLETED path does NOT clear
+        // (teardownFaults is only called on STOPPED/FAILED, not COMPLETED)
+        stubScenario(new ScenarioStepRow(0, "FAULT", SOURCE, "{\"kind\":\"TIMEOUT\"}"));
+        stubValidReady();
+        stubRunLifecycle("run-fault-2");
+
+        service.start(PROJECT, SCENARIO, "MANUAL", "local");
+
+        // injectFault called exactly once with active=true; no auto-clear on COMPLETED path
+        verify(dataSources, times(1)).injectFault(eq(PROJECT), eq(SOURCE),
+                eq("TIMEOUT"), eq("NEUTRAL"), eq(true), any());
+        verify(runs).end(eq("run-fault-2"), eq("COMPLETED"), any());
     }
 
     @Test

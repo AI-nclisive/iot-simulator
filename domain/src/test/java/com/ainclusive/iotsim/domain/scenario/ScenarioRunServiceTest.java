@@ -12,7 +12,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.ainclusive.iotsim.domain.common.FeatureNotAvailableException;
 import com.ainclusive.iotsim.domain.common.ScenarioInvalidException;
 import com.ainclusive.iotsim.domain.datasource.DataSourceService;
 import com.ainclusive.iotsim.domain.replay.ReplayService;
@@ -81,11 +80,40 @@ class ScenarioRunServiceTest {
     }
 
     @Test
-    void faultStepIsRejectedWithoutCreatingARun() {
+    void faultStepWithInvalidParamsIsRejectedAsInvalid() {
+        // FAULT step with null targetSourceId → validation returns INVALID → ScenarioInvalidException,
+        // still without creating a run row.
         stubScenario(new ScenarioStepRow(0, "FAULT", null, "{}"));
+        when(validation.validate(PROJECT, SCENARIO))
+                .thenReturn(new ScenarioValidation("INVALID",
+                        List.of(new ValidationIssue(0, "ERROR", "FAULT step requires a target source"))));
         assertThatThrownBy(() -> service.run(PROJECT, SCENARIO, "MANUAL", "local"))
-                .isInstanceOf(FeatureNotAvailableException.class);
+                .isInstanceOf(ScenarioInvalidException.class);
         verify(runs, never()).create(anyString(), anyString(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void validFaultStepInjectsAndReturnsOk() {
+        stubScenario(new ScenarioStepRow(0, "FAULT", SOURCE, "{\"kind\":\"BAD_VALUE\",\"layer\":\"PROTOCOL\"}"));
+        stubValidReady();
+        RunRow parent = parentRun();
+        when(runs.create(eq(PROJECT), eq("SCENARIO"), any(), any(), any(), eq(SCENARIO), eq((String) null)))
+                .thenReturn(parent);
+        when(runs.start(eq("run-parent"), any())).thenReturn(parent);
+        RunRow completedParent = new RunRow("run-parent", PROJECT, "SCENARIO", "MANUAL", "local", "COMPLETED",
+                SCENARIO, null, OffsetDateTime.now(), null, OffsetDateTime.now(), List.of(SOURCE), null);
+        when(runs.end(eq("run-parent"), eq("COMPLETED"), any())).thenReturn(completedParent);
+        when(evidence.create(eq(PROJECT), eq("run-parent"), anyString()))
+                .thenReturn(new EvidenceRow("ev-1", PROJECT, "run-parent", "CAPTURING", "{}", null, null, "local"));
+
+        ScenarioRunSummary summary = service.run(PROJECT, SCENARIO, "MANUAL", "local");
+
+        assertThat(summary.status()).isEqualTo("COMPLETED");
+        assertThat(summary.steps()).hasSize(1).first().satisfies(s -> {
+            assertThat(s.type()).isEqualTo("FAULT");
+            assertThat(s.state()).isEqualTo("OK");
+        });
+        verify(dataSources).injectFault(PROJECT, SOURCE, "BAD_VALUE", "PROTOCOL", true, java.util.Map.of());
     }
 
     @Test

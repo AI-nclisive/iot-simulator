@@ -1,6 +1,5 @@
 package com.ainclusive.iotsim.domain.scenario;
 
-import com.ainclusive.iotsim.domain.common.FeatureNotAvailableException;
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.domain.common.ScenarioInvalidException;
 import com.ainclusive.iotsim.domain.datasource.DataSourceService;
@@ -107,11 +106,6 @@ public class ScenarioLiveRunService {
                 .filter(s -> s.projectId().equals(projectId))
                 .orElseThrow(() -> new ResourceNotFoundException("Scenario", scenarioId));
 
-        // Pre-flight, before any run row exists.
-        if (scenario.steps().stream().anyMatch(s -> "FAULT".equals(s.type()))) {
-            throw new FeatureNotAvailableException(
-                    "scenario contains a FAULT step; fault injection is not available until IS-087/IS-088");
-        }
         ScenarioValidation v = validation.validate(projectId, scenarioId);
         if (ScenarioValidation.INVALID.equals(v.status())) {
             throw new ScenarioInvalidException(scenarioId,
@@ -186,10 +180,12 @@ public class ScenarioLiveRunService {
     private void executeSteps(String projectId, String runId, ScenarioRow scenario,
             DeterministicSettings settings) {
         List<String> startedSources = new ArrayList<>();
+        List<ActiveFault> startedFaults = new ArrayList<>();
         boolean completed = false;
         try {
             for (ScenarioStepRow step : scenario.steps()) {
                 if (Thread.interrupted()) {
+                    teardownFaults(startedFaults);
                     teardown(projectId, startedSources);
                     safeEnd(runId, "STOPPED");
                     safeNotify(() -> stepListener.onRunFinished(projectId, runId, "STOPPED"));
@@ -202,22 +198,25 @@ public class ScenarioLiveRunService {
                             stepPayload(step));
                 }
                 stepListener.onStepStarted(projectId, runId, step.ordinal(), step.type());
-                execute(projectId, step, runId, settings, startedSources);
+                execute(projectId, step, runId, settings, startedSources, startedFaults);
                 stepListener.onStepCompleted(projectId, runId, step.ordinal(), step.type());
             }
             completed = true;
         } catch (IllegalStateException e) {
             // WAIT sleep interrupted — Thread.currentThread().interrupt() was called in sleep()
             if (Thread.currentThread().isInterrupted() || e.getCause() instanceof InterruptedException) {
+                teardownFaults(startedFaults);
                 teardown(projectId, startedSources);
                 safeEnd(runId, "STOPPED");
                 stepListener.onRunFinished(projectId, runId, "STOPPED");
             } else {
+                teardownFaults(startedFaults);
                 teardown(projectId, startedSources);
                 safeEnd(runId, "FAILED");
                 stepListener.onRunFinished(projectId, runId, "FAILED");
             }
         } catch (RuntimeException e) {
+            teardownFaults(startedFaults);
             teardown(projectId, startedSources);
             safeEnd(runId, "FAILED");
             stepListener.onRunFinished(projectId, runId, "FAILED");
@@ -256,8 +255,19 @@ public class ScenarioLiveRunService {
         }
     }
 
+    private void teardownFaults(List<ActiveFault> startedFaults) {
+        for (ActiveFault fault : startedFaults) {
+            try {
+                dataSources.injectFault(fault.projectId(), fault.sourceId(), fault.kind(), fault.layer(),
+                        false, Map.of());
+            } catch (RuntimeException ignored) {
+                // best-effort teardown; individual fault-clear failures must not block the rest
+            }
+        }
+    }
+
     private void execute(String projectId, ScenarioStepRow step, String parentRunId,
-            DeterministicSettings settings, List<String> startedSources) {
+            DeterministicSettings settings, List<String> startedSources, List<ActiveFault> startedFaults) {
         switch (step.type()) {
             case "START" -> {
                 dataSources.start(projectId, step.targetSourceId());
@@ -274,6 +284,23 @@ public class ScenarioLiveRunService {
                     longValue(step.params(), "durationMs"), parentRunId);
             case "WAIT" -> sleep(Math.min(longValue(step.params(), "durationMs"), MAX_WAIT_MS));
             case "MARKER" -> { /* no-op */ }
+            case "FAULT" -> {
+                String kind = text(step.params(), "kind");
+                if (kind == null || kind.isBlank()) {
+                    throw new IllegalArgumentException("FAULT step missing required param: kind");
+                }
+                String layerRaw = text(step.params(), "layer");
+                String layer = (layerRaw == null || layerRaw.isBlank()) ? "NEUTRAL" : layerRaw;
+                long durationMs = longValue(step.params(), "durationMs");
+                dataSources.injectFault(projectId, step.targetSourceId(), kind, layer, true, Map.of());
+                startedFaults.add(new ActiveFault(projectId, step.targetSourceId(), kind, layer));
+                if (durationMs > 0) {
+                    sleep(Math.min(durationMs, MAX_WAIT_MS));
+                    dataSources.injectFault(projectId, step.targetSourceId(), kind, layer, false, Map.of());
+                    startedFaults.removeIf(f -> f.sourceId().equals(step.targetSourceId())
+                            && f.kind().equals(kind) && f.layer().equals(layer));
+                }
+            }
             default -> throw new IllegalArgumentException("unexecutable step type: " + step.type());
         }
     }
@@ -356,4 +383,7 @@ public class ScenarioLiveRunService {
 
     /** In-memory handle for one running async scenario execution. */
     record ScenarioExecution(String runId, String evidenceId, Future<?> future) {}
+
+    /** Tracks a fault injected during execution so teardown can clear it. */
+    record ActiveFault(String projectId, String sourceId, String kind, String layer) {}
 }

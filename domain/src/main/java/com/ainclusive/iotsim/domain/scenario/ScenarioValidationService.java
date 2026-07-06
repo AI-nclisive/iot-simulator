@@ -63,8 +63,7 @@ public class ScenarioValidationService {
             case "SYNTHETIC" -> validateSynthetic(projectId, step, issues);
             case "WAIT" -> requirePositiveLong(step.params(), "durationMs", at, issues);
             case "MARKER" -> { /* always valid */ }
-            case "FAULT" -> issues.add(new ValidationIssue(at, ValidationIssue.WARNING,
-                    "FAULT steps are not executable until IS-087/IS-088"));
+            case "FAULT" -> validateFault(step, at, issues);
             default -> issues.add(new ValidationIssue(at, ValidationIssue.ERROR,
                     "unknown step type: " + step.type()));
         }
@@ -117,6 +116,25 @@ public class ScenarioValidationService {
             }
         });
         requirePositiveLong(step.params(), "durationMs", at, issues);
+    }
+
+    private static final List<String> VALID_FAULT_KINDS = List.of(
+            "BAD_VALUE", "MISSING_VALUE", "DELAY", "CONNECTION_DROP",
+            "TIMEOUT", "PROTOCOL_ERROR", "SOURCE_UNAVAILABLE");
+
+    private void validateFault(ScenarioStepRow step, int at, List<ValidationIssue> issues) {
+        if (step.targetSourceId() == null || step.targetSourceId().isBlank()) {
+            issues.add(new ValidationIssue(at, ValidationIssue.ERROR, "FAULT step requires a target source"));
+            return;
+        }
+        String kind = text(step.params(), "kind");
+        if (kind == null || kind.isBlank()) {
+            issues.add(new ValidationIssue(at, ValidationIssue.ERROR, "FAULT step requires a kind"));
+            return;
+        }
+        if (!VALID_FAULT_KINDS.contains(kind)) {
+            issues.add(new ValidationIssue(at, ValidationIssue.WARNING, "unknown fault kind: " + kind));
+        }
     }
 
     private void requirePositiveLong(String paramsJson, String field, int at, List<ValidationIssue> issues) {

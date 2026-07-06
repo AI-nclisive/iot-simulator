@@ -40,6 +40,11 @@ public class InMemoryRuntimeController implements RuntimeController {
         return values.size();
     }
 
+    @Override
+    public void injectFault(String dataSourceId, String kind, String layer, boolean active, Map<String, String> params) {
+        // no-op: in-memory controller does not support fault injection
+    }
+
     /** Total values applied to a source (test/introspection helper). */
     public long appliedCount(String dataSourceId) {
         return appliedCounts.getOrDefault(dataSourceId, 0L);
