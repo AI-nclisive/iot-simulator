@@ -176,6 +176,7 @@ public class ScenarioLiveRunService {
     private void executeSteps(String projectId, String runId, ScenarioRow scenario,
             DeterministicSettings settings) {
         List<String> startedSources = new ArrayList<>();
+        boolean completed = false;
         try {
             for (ScenarioStepRow step : scenario.steps()) {
                 if (Thread.interrupted()) {
@@ -191,7 +192,7 @@ public class ScenarioLiveRunService {
                 }
                 execute(projectId, step, runId, settings, startedSources);
             }
-            runs.end(runId, "COMPLETED", now());
+            completed = true;
         } catch (IllegalStateException e) {
             // WAIT sleep interrupted — Thread.currentThread().interrupt() was called in sleep()
             if (Thread.currentThread().isInterrupted() || e.getCause() instanceof InterruptedException) {
@@ -205,6 +206,9 @@ public class ScenarioLiveRunService {
             teardown(projectId, startedSources);
             safeEnd(runId, "FAILED");
         } finally {
+            if (completed) {
+                safeEnd(runId, "COMPLETED");
+            }
             registry.remove(runId);
         }
     }
