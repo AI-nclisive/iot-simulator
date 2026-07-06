@@ -69,6 +69,7 @@ export function ScenariosPage() {
   const loadScenarios = useScenariosStore((state) => state.loadScenarios);
   const runScenario = useScenariosStore((state) => state.runScenario);
   const stopScenario = useScenariosStore((state) => state.stopScenario);
+  const liveRuns = useScenariosStore((state) => state.liveRuns);
   const duplicateScenario = useScenariosStore((state) => state.duplicateScenario);
   const createScenario = useScenariosStore((state) => state.createScenario);
   const pushNotification = useNotificationStore((state) => state.push);
@@ -184,12 +185,16 @@ export function ScenariosPage() {
   }
 
   async function handleRun(row: ScenarioRow) {
-    await runScenario(currentProjectId, row.id);
+    const runId = await runScenario(currentProjectId, row.id);
+    if (!runId) return;
     pushNotification({ tone: "success", title: `Started "${row.name}".` });
+    navigate(`/scenarios/${row.id}/run`);
   }
 
   function handleStopConfirmed(row: ScenarioRow) {
-    stopScenario(row.id);
+    const runId = liveRuns[row.id]?.runId;
+    if (!runId) return;
+    void stopScenario(currentProjectId, row.id, runId);
     pushNotification({ tone: "success", title: `Stopped "${row.name}".` });
   }
 
