@@ -281,3 +281,74 @@ describe("addStep / removeStep / moveStep", () => {
     expect(stepIds).toEqual([id2, id1]);
   });
 });
+
+describe("onRunFinished", () => {
+  it("maps 'failed' terminal state to Failed runState on the scenario", () => {
+    useScenariosStore.setState({
+      scenarios: [makeScenarioRow({ id: "scn-1", name: "X", runState: "Running" })],
+      liveRuns: { "scn-1": { runId: "run-1", evidenceId: null, state: "running", stepOrdinals: {} } },
+    });
+    useScenariosStore.getState().onRunFinished("scn-1", "failed");
+    expect(useScenariosStore.getState().scenarios[0].runState).toBe("Failed");
+    expect(useScenariosStore.getState().liveRuns["scn-1"].state).toBe("failed");
+  });
+
+  it("maps 'stopped' terminal state to Stopped runState on the scenario", () => {
+    useScenariosStore.setState({
+      scenarios: [makeScenarioRow({ id: "scn-1", name: "X", runState: "Running" })],
+      liveRuns: { "scn-1": { runId: "run-1", evidenceId: null, state: "running", stepOrdinals: {} } },
+    });
+    useScenariosStore.getState().onRunFinished("scn-1", "stopped");
+    expect(useScenariosStore.getState().scenarios[0].runState).toBe("Stopped");
+  });
+
+  it("maps 'completed' terminal state to Not running runState on the scenario", () => {
+    useScenariosStore.setState({
+      scenarios: [makeScenarioRow({ id: "scn-1", name: "X", runState: "Running" })],
+      liveRuns: { "scn-1": { runId: "run-1", evidenceId: null, state: "running", stepOrdinals: {} } },
+    });
+    useScenariosStore.getState().onRunFinished("scn-1", "completed");
+    expect(useScenariosStore.getState().scenarios[0].runState).toBe("Not running");
+  });
+
+  it("still updates runState when called with no liveRun entry (SSE fire after unmount)", () => {
+    useScenariosStore.setState({
+      scenarios: [makeScenarioRow({ id: "scn-1", name: "X", runState: "Running" })],
+      liveRuns: {},
+    });
+    useScenariosStore.getState().onRunFinished("scn-1", "failed");
+    expect(useScenariosStore.getState().scenarios[0].runState).toBe("Failed");
+  });
+});
+
+describe("clearLiveRun", () => {
+  it("removes the liveRuns entry without changing runState when scenario is still running", () => {
+    useScenariosStore.setState({
+      scenarios: [makeScenarioRow({ id: "scn-1", name: "X", runState: "Running" })],
+      liveRuns: { "scn-1": { runId: "run-1", evidenceId: null, state: "running", stepOrdinals: {} } },
+    });
+    useScenariosStore.getState().clearLiveRun("scn-1");
+    expect(useScenariosStore.getState().liveRuns["scn-1"]).toBeUndefined();
+    expect(useScenariosStore.getState().scenarios[0].runState).toBe("Running");
+  });
+
+  it("removes the liveRuns entry without changing a terminal runState", () => {
+    useScenariosStore.setState({
+      scenarios: [makeScenarioRow({ id: "scn-1", name: "X", runState: "Stopped" })],
+      liveRuns: { "scn-1": { runId: "run-1", evidenceId: null, state: "stopped", stepOrdinals: {} } },
+    });
+    useScenariosStore.getState().clearLiveRun("scn-1");
+    expect(useScenariosStore.getState().liveRuns["scn-1"]).toBeUndefined();
+    expect(useScenariosStore.getState().scenarios[0].runState).toBe("Stopped");
+  });
+
+  it("is safe to call when no liveRun exists", () => {
+    useScenariosStore.setState({
+      scenarios: [makeScenarioRow({ id: "scn-1", name: "X", runState: "Not running" })],
+      liveRuns: {},
+    });
+    expect(() => useScenariosStore.getState().clearLiveRun("scn-1")).not.toThrow();
+    expect(useScenariosStore.getState().scenarios[0].runState).toBe("Not running");
+  });
+});
+

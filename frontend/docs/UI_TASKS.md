@@ -839,6 +839,11 @@ Parallel execution:
   Fix: when source is stopped, render a clear "Source is not running" info panel instead of the empty table. Remove dependency on mock static store for the stopped path. Live values still stream from SSE when source is active.
   Done when: stopped source shows informative panel with start instructions; running source shows live SSE values; typecheck passes.
 
+- [x] `UI-134` Fix scenario status reset — preserve runState when navigating away from run view
+  Goal: scenario list showed "Not running" immediately after the user navigated away from the run view, even when the scenario was still running on the backend. Root cause: `clearLiveRun` unconditionally reset `runState` to "Not running" on SSE cleanup.
+  Fix: `onRunFinished` now updates `scenarios[].runState` to the terminal state ("Stopped" / "Failed" / "Not running"); `clearLiveRun` only removes the `liveRuns` SSE entry without touching `runState`.
+  Done when: navigating away from run view while a scenario is running keeps its runState; run-finished SSE event updates runState correctly; typecheck + vitest pass.
+
 - [x] `UI-130` Align FAULT step params to backend fault model
   Goal: replace the 4 placeholder FE fault kinds (drop/delay/corrupt/quality) with the IS-087 backend contract: BAD_VALUE, MISSING_VALUE, DELAY, CONNECTION_DROP, TIMEOUT, PROTOCOL_ERROR, SOURCE_UNAVAILABLE. Only DELAY has a required param (delayMs); all others are param-free.
   Surface: `Scenario Builder` — fault step editor and config panel.
