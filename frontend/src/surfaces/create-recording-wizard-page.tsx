@@ -67,6 +67,7 @@ export function CreateRecordingWizardPage() {
   const activeStepId = STEPS[safeStep].id;
   const currentValidationMessage = stepValidation(form, activeStepId);
   const selectedSource = dataSources.find((ds) => ds.id === form.dataSourceId) ?? null;
+  const captureBlocked = form.scanType === "SCHEMA_AND_DATA" && !selectedSource?.endpoint;
 
   if (!access.canCreateSource) {
     return (
@@ -98,6 +99,15 @@ export function CreateRecordingWizardPage() {
 
   async function createRecording() {
     if (!form.dataSourceId || !currentProjectId) return;
+
+    // SCHEMA_AND_DATA: real live capture — navigate to RecordingFlowPage which
+    // handles POST .../recording/start + stop and saves the recording.
+    if (form.scanType === "SCHEMA_AND_DATA") {
+      navigate(`/data-sources/${form.dataSourceId}/recording`);
+      return;
+    }
+
+    // SCHEMA_ONLY: create a shell row — no live capture needed.
     try {
       const trimmedName = form.name.trim();
       const result = await apiFetch<{ id: string }>(
@@ -181,7 +191,8 @@ export function CreateRecordingWizardPage() {
         >
           <p className="text-sm font-medium text-shell-ink">Schema + data</p>
           <p className="mt-1 text-sm text-shell-muted">
-            Captures schema nodes and all value timeline entries. Use this for replay and analysis.
+            Opens the live capture flow — connects to the device, streams values, and saves the
+            recording when you stop. Use this for replay and analysis.
           </p>
         </button>
         <button
@@ -191,9 +202,17 @@ export function CreateRecordingWizardPage() {
         >
           <p className="text-sm font-medium text-shell-ink">Schema only</p>
           <p className="mt-1 text-sm text-shell-muted">
-            Captures schema nodes only — no value writes. Use this to inspect the device structure.
+            Creates a schema-only recording shell — no value capture. Use this to inspect the device
+            structure without live data.
           </p>
         </button>
+        {captureBlocked ? (
+          <SharedStatePanel
+            message="The selected source has no real device endpoint. Schema + data capture requires a source configured with a real OPC UA or Modbus TCP address. Switch to Schema only, or go back and select a different source."
+            state="warning"
+            title="Live capture not available for this source."
+          />
+        ) : null}
       </div>
     );
   }
@@ -201,6 +220,7 @@ export function CreateRecordingWizardPage() {
   function renderReviewStep() {
     if (!selectedSource) return null;
     const scanTypeLabel = form.scanType === "SCHEMA_ONLY" ? "Schema only" : "Schema + data";
+    const liveCapture = form.scanType === "SCHEMA_AND_DATA";
     const items = [
       { label: "Data source", value: selectedSource.name },
       { label: "Protocol", value: selectedSource.protocol },
@@ -235,6 +255,19 @@ export function CreateRecordingWizardPage() {
             </div>
           ))}
         </div>
+        {captureBlocked ? (
+          <SharedStatePanel
+            message="Schema + data capture requires a real device endpoint. Go back and select Schema only, or choose a source with a real endpoint."
+            state="warning"
+            title="Live capture not available for this source."
+          />
+        ) : liveCapture ? (
+          <SharedStatePanel
+            message="Clicking 'Start capture' will open the live recording page where you connect to the device, stream values, and save the result when done."
+            state="empty"
+            title="This will open the live capture flow."
+          />
+        ) : null}
       </div>
     );
   }
@@ -312,8 +345,13 @@ export function CreateRecordingWizardPage() {
               Back
             </button>
             {safeStep === STEPS.length - 1 ? (
-              <button className="shell-action" type="button" onClick={() => { void createRecording(); }}>
-                Create recording
+              <button
+                className="shell-action"
+                disabled={activeStepId === "review" && captureBlocked}
+                type="button"
+                onClick={() => { void createRecording(); }}
+              >
+                {form.scanType === "SCHEMA_AND_DATA" ? "Start capture" : "Create recording"}
               </button>
             ) : (
               <button
