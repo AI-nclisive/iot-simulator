@@ -16,5 +16,6 @@ dependencies {
 
     testImplementation(project(":persistence"))
     testImplementation(libs.spring.boot.starter.test)
+    testImplementation(libs.spring.boot.starter.webmvc.test)
     testImplementation(libs.spring.security.test)
 }
