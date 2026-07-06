@@ -236,6 +236,19 @@ describe("renameScenario", () => {
     await useScenariosStore.getState().renameScenario("proj-1", "scn-1", "   ");
     expect(mockApiFetch).not.toHaveBeenCalled();
   });
+
+  it("rolls back the optimistic name update on PATCH failure", async () => {
+    useScenariosStore.setState({
+      scenarios: [makeScenarioRow({ id: "scn-1", name: "Alpha" })],
+      steps: {},
+      versions: { "scn-1": 1 },
+    });
+    mockApiFetch.mockRejectedValueOnce(new Error("Server error"));
+    await useScenariosStore.getState().renameScenario("proj-1", "scn-1", "Beta");
+    const scn = useScenariosStore.getState().scenarios.find((s) => s.id === "scn-1");
+    expect(scn?.name).toBe("Alpha");
+    expect(useScenariosStore.getState().error).toBeTruthy();
+  });
 });
 
 describe("addStep / removeStep / moveStep", () => {
