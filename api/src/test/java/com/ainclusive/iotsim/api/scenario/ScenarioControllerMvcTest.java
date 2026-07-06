@@ -23,7 +23,9 @@ import com.ainclusive.iotsim.domain.scenario.Scenario;
 import com.ainclusive.iotsim.domain.scenario.ScenarioLiveRunService;
 import com.ainclusive.iotsim.domain.scenario.ScenarioLiveRunSummary;
 import com.ainclusive.iotsim.domain.scenario.ScenarioService;
+import com.ainclusive.iotsim.domain.scenario.ScenarioValidation;
 import com.ainclusive.iotsim.domain.scenario.ScenarioValidationService;
+import com.ainclusive.iotsim.domain.scenario.ValidationIssue;
 import com.ainclusive.iotsim.domain.support.Page;
 import java.time.Instant;
 import java.util.List;
@@ -190,6 +192,17 @@ class ScenarioControllerMvcTest {
                         .content("{\"name\":\"X\"}"))
                 .andExpect(status().is(428))
                 .andExpect(jsonPath("$.status").value(428));
+    }
+
+    @Test
+    void validateReturns200WithStatusAndIssues() throws Exception {
+        when(validationService.validate(anyString(), anyString()))
+                .thenReturn(new ScenarioValidation("INVALID",
+                        List.of(new ValidationIssue(0, "ERROR", "step 0: source required"))));
+        mvc.perform(get(BASE + "/scn-1/validate"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("INVALID"))
+                .andExpect(jsonPath("$.issues[0].message").value("step 0: source required"));
     }
 
     @Test
