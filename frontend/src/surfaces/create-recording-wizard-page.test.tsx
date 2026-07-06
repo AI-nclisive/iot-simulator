@@ -137,8 +137,15 @@ describe("CreateRecordingWizardPage — step 2 (Scan type)", () => {
 });
 
 describe("CreateRecordingWizardPage — step 3 (Review)", () => {
-  it("renders Create recording button on review step", async () => {
+  it("renders Start capture button on review step (default scan type is SCHEMA_AND_DATA)", async () => {
     await navigateToReviewStep();
+    expect(screen.getByRole("button", { name: "Start capture" })).toBeTruthy();
+  });
+
+  it("renders Create recording button on review step when SCHEMA_ONLY selected", async () => {
+    await navigateToScanTypeStep();
+    await userEvent.click(screen.getByText("Schema only").closest("button")!);
+    await userEvent.click(screen.getByRole("button", { name: "Next" }));
     expect(screen.getByRole("button", { name: "Create recording" })).toBeTruthy();
   });
 
@@ -202,5 +209,46 @@ describe("CreateRecordingWizardPage — POST body name (UI-131)", () => {
 
     const body = JSON.parse(mockApiFetch.mock.calls[0][1].body as string) as Record<string, unknown>;
     expect(Object.prototype.hasOwnProperty.call(body, "name")).toBe(false);
+  });
+});
+
+// ── UI-132 routing ────────────────────────────────────────────────────────────
+
+describe("CreateRecordingWizardPage — UI-132 routing", () => {
+  it("Start capture navigates to /data-sources/:id/recording without API call (SCHEMA_AND_DATA)", async () => {
+    await navigateToReviewStep();
+    await userEvent.click(screen.getByRole("button", { name: "Start capture" }));
+    expect(mockNavigate).toHaveBeenCalledWith("/data-sources/src-1/recording");
+    expect(mockApiFetch).not.toHaveBeenCalled();
+  });
+
+  it("Create recording calls POST /recordings and navigates to detail page (SCHEMA_ONLY)", async () => {
+    mockApiFetch.mockResolvedValueOnce({ id: "rec-42" });
+    await navigateToScanTypeStep();
+    await userEvent.click(screen.getByText("Schema only").closest("button")!);
+    await userEvent.click(screen.getByRole("button", { name: "Next" }));
+    await userEvent.click(screen.getByRole("button", { name: "Create recording" }));
+    expect(mockApiFetch).toHaveBeenCalledWith(
+      "/api/v1/projects/proj-1/recordings",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(mockNavigate).toHaveBeenCalledWith("/recordings/rec-42");
+  });
+
+  it("Start capture is disabled when source has no real device endpoint (SCHEMA_AND_DATA blocked)", async () => {
+    setupSources([
+      { id: "src-empty", name: "No Endpoint Source", protocol: "OPC UA", status: "Stopped", endpoint: "" },
+    ]);
+    render(
+      <MemoryRouter>
+        <CreateRecordingWizardPage />
+      </MemoryRouter>,
+    );
+    await userEvent.click(screen.getByText("No Endpoint Source"));
+    await userEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByText("Live capture not available for this source.")).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Next" }));
+    const startBtn = screen.getByRole("button", { name: "Start capture" }) as HTMLButtonElement;
+    expect(startBtn.disabled).toBe(true);
   });
 });

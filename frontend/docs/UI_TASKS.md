@@ -875,7 +875,12 @@ Parallel execution:
   Work includes: fix field name display in recording detail (schema-based names); fix "Idle" label on replay when source has no real endpoint; handle 409 schema-mismatch response in replay — show "Run anyway" confirmation panel with `compatibilityAck=true` retry; disable "Start recording" button and show panel when source has no real device endpoint.
   Done when: 409 → schema-mismatch → "Run anyway" retry flow tested; `!hasRealEndpoint` disabled path tested; typecheck + vitest green.
 
-- [ ] `UI-128` Scenario step editor — real source/recording pickers + server validation
+- [x] `UI-132` Recording wizard — redirect SCHEMA_AND_DATA to live capture flow
+  Goal: when user selects "Schema + data" scan type in the recording wizard and clicks "Start capture", navigate to RecordingFlowPage (live capture flow) instead of calling POST /recordings. SCHEMA_ONLY keeps the existing shell-creation path. Adds endpoint guard and contextual explanation panels.
+  Surface: `Create Recording Wizard`.
+  Work includes: `createRecording()` in `create-recording-wizard-page.tsx` branches on scanType; live-capture warning added to scan-type step; capture-blocked warning added to review step; button label changes to "Start capture" for SCHEMA_AND_DATA.
+  Depends: UI-115 (recording flow page exists), IS-045 (POST .../recording/start).
+  Done when: SCHEMA_AND_DATA → navigates to /data-sources/:id/recording; SCHEMA_ONLY → POST /recordings as before; typecheck + vitest green.
 
 - [x] `UI-131` Recording name field — wizard input, store mapping, list + detail display
   Goal: surface the optional `name` field (from IS-144) end-to-end in the frontend.
