@@ -877,6 +877,13 @@ Parallel execution:
 
 - [ ] `UI-128` Scenario step editor — real source/recording pickers + server validation
 
+- [x] `UI-131` Recording name field — wizard input, store mapping, list + detail display
+  Goal: surface the optional `name` field (from IS-144) end-to-end in the frontend.
+  Surface: `Create Recording Wizard`, `Recordings list`, `Recording Detail`
+  Work includes: add `name?: string` to `ReusableArtifact`; add `name` to `RecordingResponse` and `mapRecording()` in `artifacts-store.ts`; add name text input to wizard review step; pass trimmed name in POST body; show name as primary label in recordings list (with source as subtitle when both present); include name in list search; show name in detail page header (with id as secondary).
+  Depends: IS-144.
+  Done when: wizard sends name; list shows name as primary label; detail page header shows name; typecheck + vitest green.
+
 - [x] `UI-129` Wire scenario run/stop to backend API + live SSE run view
   Goal: replace mock-backed run view with live SSE data; wire run/stop actions to real backend.
   Surface: `Scenarios`, `Scenario Run View`

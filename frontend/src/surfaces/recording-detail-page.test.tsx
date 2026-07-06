@@ -170,6 +170,23 @@ describe("RecordingDetailPage — recording found", () => {
   });
 });
 
+describe("RecordingDetailPage — header name field (UI-131)", () => {
+  it("shows recording name as header when name is present", () => {
+    useArtifactsStore.setState({ artifacts: [{ ...baseArtifact, name: "My Pump Scan" }] });
+    renderWithId("rec-001");
+    expect(screen.getByText("My Pump Scan")).toBeTruthy();
+    // id prefix also visible alongside the name
+    expect(screen.getByText("rec-001".slice(0, 8))).toBeTruthy();
+  });
+
+  it("shows 'Recording <id>' fallback when name is absent", () => {
+    useArtifactsStore.setState({ artifacts: [baseArtifact] });
+    renderWithId("rec-001");
+    expect(screen.getByText("Recording")).toBeTruthy();
+    expect(screen.getByText("rec-001".slice(0, 8))).toBeTruthy();
+  });
+});
+
 describe("RecordingDetailPage — schema tab (UI-123)", () => {
   beforeEach(() => {
     useArtifactsStore.setState({ artifacts: [baseArtifact] });

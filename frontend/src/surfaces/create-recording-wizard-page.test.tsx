@@ -13,12 +13,27 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CreateRecordingWizardPage } from "./create-recording-wizard-page";
 
-const { mockNavigate } = vi.hoisted(() => ({ mockNavigate: vi.fn() }));
+const { mockNavigate, mockApiFetch } = vi.hoisted(() => ({
+  mockNavigate: vi.fn(),
+  mockApiFetch: vi.fn(),
+}));
 
 vi.mock("react-router-dom", async () => {
   const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
   return { ...actual, useNavigate: () => mockNavigate };
 });
+
+vi.mock("../api", () => ({
+  apiFetch: mockApiFetch,
+  ApiError: class ApiError extends Error {
+    constructor(
+      public readonly status: number,
+      public readonly title: string,
+      public readonly detail: string | undefined,
+      public readonly type: string | undefined,
+    ) { super(title); this.name = "ApiError"; }
+  },
+}));
 
 vi.mock("../shell/shell-store", () => ({
   useShellStore: (selector: (s: Record<string, unknown>) => unknown) =>
@@ -154,5 +169,38 @@ describe("CreateRecordingWizardPage — empty sources", () => {
       </MemoryRouter>,
     );
     expect(screen.getByText("No data sources available.")).toBeTruthy();
+  });
+});
+
+// ── POST body: name field (UI-131) ────────────────────────────────────────────
+
+async function navigateToReviewSchemaOnly() {
+  await navigateToScanTypeStep();
+  await userEvent.click(screen.getByText("Schema only").closest("button")!);
+  await userEvent.click(screen.getByRole("button", { name: "Next" }));
+}
+
+describe("CreateRecordingWizardPage — POST body name (UI-131)", () => {
+  it("includes trimmed name in POST body when non-empty", async () => {
+    mockApiFetch.mockResolvedValue({ id: "rec-42" });
+    await navigateToReviewSchemaOnly();
+
+    const nameInput = screen.getByLabelText(/recording name/i);
+    await userEvent.type(nameInput, "  My Pump Scan  ");
+
+    await userEvent.click(screen.getByRole("button", { name: "Create recording" }));
+
+    const body = JSON.parse(mockApiFetch.mock.calls[0][1].body as string) as Record<string, unknown>;
+    expect(body.name).toBe("My Pump Scan");
+  });
+
+  it("omits name from POST body when left blank", async () => {
+    mockApiFetch.mockResolvedValue({ id: "rec-43" });
+    await navigateToReviewSchemaOnly();
+
+    await userEvent.click(screen.getByRole("button", { name: "Create recording" }));
+
+    const body = JSON.parse(mockApiFetch.mock.calls[0][1].body as string) as Record<string, unknown>;
+    expect(Object.prototype.hasOwnProperty.call(body, "name")).toBe(false);
   });
 });

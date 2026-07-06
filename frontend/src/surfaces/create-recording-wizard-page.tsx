@@ -22,6 +22,7 @@ type ScanType = "SCHEMA_AND_DATA" | "SCHEMA_ONLY";
 type RecordingWizardForm = {
   dataSourceId: string | null;
   scanType: ScanType;
+  name: string;
 };
 
 function stepChipClass(current: boolean, completed: boolean) {
@@ -59,6 +60,7 @@ export function CreateRecordingWizardPage() {
   const [form, setForm] = useState<RecordingWizardForm>({
     dataSourceId: null,
     scanType: "SCHEMA_AND_DATA",
+    name: "",
   });
 
   const safeStep = Math.min(currentStep, STEPS.length - 1);
@@ -97,11 +99,16 @@ export function CreateRecordingWizardPage() {
   async function createRecording() {
     if (!form.dataSourceId || !currentProjectId) return;
     try {
+      const trimmedName = form.name.trim();
       const result = await apiFetch<{ id: string }>(
         `/api/v1/projects/${currentProjectId}/recordings`,
         {
           method: "POST",
-          body: JSON.stringify({ dataSourceId: form.dataSourceId, scanType: form.scanType }),
+          body: JSON.stringify({
+            dataSourceId: form.dataSourceId,
+            scanType: form.scanType,
+            ...(trimmedName ? { name: trimmedName } : {}),
+          }),
         },
       );
       push({ tone: "success", title: "Recording created." });
@@ -202,15 +209,32 @@ export function CreateRecordingWizardPage() {
       ...(selectedSource.endpoint ? [{ label: "Endpoint", value: selectedSource.endpoint }] : []),
     ];
     return (
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {items.map((item) => (
-          <div key={item.label} className="rounded-md border border-shell-line bg-white px-4 py-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
-              {item.label}
-            </p>
-            <p className="mt-2 text-sm text-shell-ink">{item.value}</p>
-          </div>
-        ))}
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-shell-ink" htmlFor="recording-name">
+            Recording name
+            <span className="ml-1 text-xs text-shell-muted">(optional)</span>
+          </label>
+          <input
+            className="shell-field mt-2 w-full max-w-sm"
+            id="recording-name"
+            maxLength={255}
+            placeholder="e.g. Pump A baseline scan"
+            type="text"
+            value={form.name}
+            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+          />
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {items.map((item) => (
+            <div key={item.label} className="rounded-md border border-shell-line bg-white px-4 py-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
+                {item.label}
+              </p>
+              <p className="mt-2 text-sm text-shell-ink">{item.value}</p>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }

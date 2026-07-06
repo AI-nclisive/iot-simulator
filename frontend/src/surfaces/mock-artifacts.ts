@@ -2,6 +2,7 @@ export type ArtifactOrigin = "captured" | "imported";
 
 export type ReusableArtifact = {
   id: string;
+  name?: string;
   sourceId?: string;
   origin?: ArtifactOrigin;
   createdAt: string;

@@ -10,6 +10,7 @@ import { RecordingImportDialog } from "./recording-import-dialog";
 
 export type RecordingRow = {
   id: string;
+  name?: string;
   sourceId: string;
   sourceName: string;
   origin: "captured" | "imported";
@@ -67,6 +68,7 @@ export function RecordingsPage() {
 
   const storeRows: RecordingRow[] = storeArtifacts.map((a) => ({
     id: a.id,
+    name: a.name,
     sourceId: a.sourceId ?? "",
     sourceName: sourceNameById.get(a.sourceId ?? "") ?? "",
     origin: a.origin ?? "captured",
@@ -91,8 +93,9 @@ export function RecordingsPage() {
     if (searchQuery.trim() !== "") {
       const q = searchQuery.toLowerCase();
       const capturedByMatch = row.capturedBy.toLowerCase().includes(q);
-      const nameMatch = (row.sourceName || row.sourceId).toLowerCase().includes(q);
-      if (!capturedByMatch && !nameMatch) return false;
+      const sourceMatch = (row.sourceName || row.sourceId).toLowerCase().includes(q);
+      const recordingNameMatch = (row.name ?? "").toLowerCase().includes(q);
+      if (!capturedByMatch && !sourceMatch && !recordingNameMatch) return false;
     }
     return true;
   });
@@ -208,8 +211,11 @@ export function RecordingsPage() {
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div className="min-w-0">
                           <p className="font-medium text-sm text-shell-ink">
-                            {row.sourceName || row.sourceId || `Recording ${row.id.slice(0, 8)}`}
+                            {row.name || row.sourceName || row.sourceId || `Recording ${row.id.slice(0, 8)}`}
                           </p>
+                          {row.name && row.sourceName ? (
+                            <p className="mt-0.5 text-xs text-shell-muted">{row.sourceName}</p>
+                          ) : null}
                           <p className="mt-1 text-xs text-shell-muted">
                             {formatDate(row.capturedAt)} · {row.capturedBy}
                           </p>

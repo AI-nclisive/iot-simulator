@@ -9,6 +9,7 @@ type RecordingResponse = {
   dataSourceId: string;
   schemaVersion: number;
   origin: string;
+  name?: string;
   valueCount: number;
   createdAt: string;
   createdBy: string;
@@ -18,6 +19,7 @@ type RecordingResponse = {
 function mapRecording(r: RecordingResponse): ReusableArtifact {
   return {
     id: r.id,
+    name: r.name,
     createdAt: r.createdAt,
     createdBy: r.createdBy,
     sourceId: r.dataSourceId,
