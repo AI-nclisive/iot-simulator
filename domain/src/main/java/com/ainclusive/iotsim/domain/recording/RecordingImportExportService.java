@@ -137,6 +137,7 @@ public class RecordingImportExportService {
                 manifest.schemaVersion(),
                 "IMPORTED",
                 "SCHEMA_AND_DATA",
+                null,
                 actor);
 
         if (!payload.values().isEmpty()) {
@@ -332,6 +333,6 @@ public class RecordingImportExportService {
     private Recording map(RecordingRow r) {
         return new Recording(
                 r.id(), r.projectId(), r.dataSourceId(), r.schemaVersion(), r.origin(),
-                r.scanType(), r.valueCount(), r.createdAt().toInstant(), r.createdBy(), r.version());
+                r.scanType(), r.name(), r.valueCount(), r.createdAt().toInstant(), r.createdBy(), r.version());
     }
 }

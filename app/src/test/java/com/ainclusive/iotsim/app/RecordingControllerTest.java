@@ -30,14 +30,14 @@ class RecordingControllerTest {
     }
 
     private static Recording sample() {
-        return new Recording("rec1", "p1", "ds1", 1, "SCAN_RECORD", "SCHEMA_AND_DATA", 0, Instant.now(), "local", 0);
+        return new Recording("rec1", "p1", "ds1", 1, "SCAN_RECORD", "SCHEMA_AND_DATA", null, 0, Instant.now(), "local", 0);
     }
 
     @Test
     void createReturns201WithEtag() {
-        given(service.create(any(), any(), any(), any())).willReturn(sample());
+        given(service.create(any(), any(), any(), any(), any())).willReturn(sample());
         ResponseEntity<RecordingResponse> resp =
-                controller.create("p1", new CreateRecordingRequest("ds1", null));
+                controller.create("p1", new CreateRecordingRequest("ds1", null, null));
         assertThat(resp.getStatusCode().value()).isEqualTo(201);
         assertThat(resp.getHeaders().getETag()).isEqualTo("\"0\"");
         assertThat(resp.getBody()).isNotNull();
@@ -46,7 +46,7 @@ class RecordingControllerTest {
 
     @Test
     void createWithoutDataSourceIsRejected() {
-        assertThatThrownBy(() -> controller.create("p1", new CreateRecordingRequest(" ", null)))
+        assertThatThrownBy(() -> controller.create("p1", new CreateRecordingRequest(" ", null, null)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 

@@ -43,7 +43,7 @@ class RecordingImportExportControllerTest {
     private static final String REC_ID = "rec-1";
 
     private static Recording recording() {
-        return new Recording(REC_ID, PROJECT, "ds-1", 1, "SCAN_RECORD", "SCHEMA_AND_DATA", 5,
+        return new Recording(REC_ID, PROJECT, "ds-1", 1, "SCAN_RECORD", "SCHEMA_AND_DATA", null, 5,
                 Instant.parse("2026-01-01T00:00:00Z"), "local", 0);
     }
 

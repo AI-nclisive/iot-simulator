@@ -10,6 +10,7 @@ public record Recording(
         int schemaVersion,
         String origin,
         String scanType,
+        String name,
         long valueCount,
         Instant createdAt,
         String createdBy,

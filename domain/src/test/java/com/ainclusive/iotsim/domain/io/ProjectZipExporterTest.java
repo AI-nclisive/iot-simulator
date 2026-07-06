@@ -181,7 +181,7 @@ class ProjectZipExporterTest {
         Map<String, SchemaWithNodes> schemas = Map.of("ds-1", schema);
 
         Recording rec = new Recording("rec-1", "proj-1", "ds-1", 1, "SCAN_RECORD", "SCHEMA_AND_DATA",
-                100L, now, "local", 1L);
+                null, 100L, now, "local", 1L);
 
         Sample sample = new Sample("smp-1", "proj-1", "rec-1", "Sample A",
                 "{}", List.of("tag1"), now, "local", 1L);

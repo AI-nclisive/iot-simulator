@@ -107,6 +107,6 @@ class ProjectOverviewServiceTest {
     }
 
     private static Recording recording(String id) {
-        return new Recording(id, "p1", "ds", 1, "SCAN_RECORD", "SCHEMA_AND_DATA", 0L, Instant.now(), "local", 0);
+        return new Recording(id, "p1", "ds", 1, "SCAN_RECORD", "SCHEMA_AND_DATA", null, 0L, Instant.now(), "local", 0);
     }
 }

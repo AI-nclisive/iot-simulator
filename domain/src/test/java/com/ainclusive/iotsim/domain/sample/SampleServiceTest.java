@@ -222,12 +222,12 @@ class SampleServiceTest {
             }
             OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
             return Optional.of(new RecordingRow(id, projectId, "ds-1", 1, "SCAN_RECORD",
-                    "SCHEMA_AND_DATA", null, null, 0, 0, now, now, "local", 0));
+                    "SCHEMA_AND_DATA", null, null, null, 0, 0, now, now, "local", 0));
         }
 
         @Override
         public RecordingRow create(String projectId, String dataSourceId, int schemaVersion,
-                String origin, String scanType, String createdBy) {
+                String origin, String scanType, String name, String createdBy) {
             throw new UnsupportedOperationException();
         }
 

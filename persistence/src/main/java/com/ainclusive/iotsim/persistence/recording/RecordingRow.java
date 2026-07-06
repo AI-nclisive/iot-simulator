@@ -10,6 +10,7 @@ public record RecordingRow(
         int schemaVersion,
         String origin,
         String scanType,
+        String name,
         OffsetDateTime timeStart,
         OffsetDateTime timeEnd,
         long valueCount,

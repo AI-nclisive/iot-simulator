@@ -8,7 +8,7 @@ import java.util.Optional;
 public interface RecordingRepository {
 
     RecordingRow create(String projectId, String dataSourceId, int schemaVersion,
-            String origin, String scanType, String createdBy);
+            String origin, String scanType, String name, String createdBy);
 
     Optional<RecordingRow> findById(String id);
 
