@@ -834,6 +834,11 @@ Parallel execution:
   Depends: IS-136 scenarios API.
   Done when: scenarios page loads from backend; create/rename/duplicate/delete/save call API; FE↔BE step mapper handles all step types; TypeScript build + vitest pass.
 
+- [x] `UI-136` Data source values tab — stopped-state panel when source is not running
+  Goal: values tab showed zero rows and a misleading "no visible runtime rows" message for stopped sources, because it filtered mock data by real backend source IDs that never matched.
+  Fix: when source is stopped, render a clear "Source is not running" info panel instead of the empty table. Remove dependency on mock static store for the stopped path. Live values still stream from SSE when source is active.
+  Done when: stopped source shows informative panel with start instructions; running source shows live SSE values; typecheck passes.
+
 - [x] `UI-130` Align FAULT step params to backend fault model
   Goal: replace the 4 placeholder FE fault kinds (drop/delay/corrupt/quality) with the IS-087 backend contract: BAD_VALUE, MISSING_VALUE, DELAY, CONNECTION_DROP, TIMEOUT, PROTOCOL_ERROR, SOURCE_UNAVAILABLE. Only DELAY has a required param (delayMs); all others are param-free.
   Surface: `Scenario Builder` — fault step editor and config panel.

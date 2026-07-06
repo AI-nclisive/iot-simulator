@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { useSourceValuesStore } from "../shell/source-values-store";
 import { useLiveValues } from "../shell/use-live-values";
 import { useNotificationStore } from "../shell/notification-store";
 import {
@@ -8,9 +7,9 @@ import {
   type ActiveTableFilter,
   type TableColumn,
   type TableFilterControl,
-  type TableRowAction,
   type TableSortState,
 } from "../ui/table-pattern";
+import { SharedStatePanel } from "../ui/shared-state-panel";
 import { StatusBadge } from "../ui/status-badge";
 import type { DataSourceRow } from "../shell/data-sources-store";
 import type { SourceValueRow } from "./mock-source-values";
@@ -28,16 +27,10 @@ export function DataSourceDetailValuesTab({
 }: {
   source: DataSourceRow;
 }) {
-  // Live values stream while the source is running; the static store is the
-  // fallback for stopped sources (no live stream to subscribe to).
   const isLive = source.status === "Active";
   const { rows: liveRows, status: liveStatus } = useLiveValues(source.id, isLive);
-
-  const storeValues = useSourceValuesStore((state) => state.values);
-  const togglePinnedValue = useSourceValuesStore((state) => state.togglePinnedValue);
   const pushNotification = useNotificationStore((state) => state.push);
 
-  // Surface stream connection issues through the shared notification pattern.
   useEffect(() => {
     if (!isLive) return;
     if (liveStatus === "reconnecting") {
@@ -63,13 +56,7 @@ export function DataSourceDetailValuesTab({
     direction: "asc",
   });
 
-  const values = useMemo(
-    () =>
-      isLive
-        ? liveRows
-        : storeValues.filter((valueRow) => valueRow.sourceId === source.id),
-    [isLive, liveRows, storeValues, source.id],
-  );
+  const values = useMemo(() => liveRows, [liveRows]);
 
   const filteredRows = useMemo(() => {
     return values.filter((row) => {
@@ -206,20 +193,47 @@ export function DataSourceDetailValuesTab({
     freshnessFilter !== "all" ||
     pinFilter !== "all";
 
+  if (!isLive) {
+    return (
+      <div className="space-y-5">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0 max-w-3xl">
+            <p className="text-sm font-medium text-shell-ink">Current values</p>
+            <p className="mt-2 text-sm leading-6 text-shell-muted">
+              Parameter definitions live in Schema. Values shows live readings while
+              the source is running.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusBadge label="Off" tone="neutral" />
+            <StatusBadge
+              label={`${source.parameterCount.toLocaleString()} parameters`}
+              tone="neutral"
+            />
+          </div>
+        </div>
+        <SharedStatePanel
+          message="Start the source from the Overview tab or the source list to see live parameter readings here."
+          state="empty"
+          title="Source is not running."
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 max-w-3xl">
           <p className="text-sm font-medium text-shell-ink">Current values</p>
           <p className="mt-2 text-sm leading-6 text-shell-muted">
-            Parameter definitions live in Schema. Values shows current readings
-            from those parameters; recordings, samples, and evidence stay in
-            their own surfaces.
+            Parameter definitions live in Schema. Values shows live readings
+            from those parameters while the source is running.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <StatusBadge label={`Mode: ${currentModeLabel(source)}`} tone="neutral" />
+          <StatusBadge label="Run" tone="accent" />
           <StatusBadge
             label={`${source.parameterCount.toLocaleString()} parameters`}
             tone="neutral"
@@ -242,25 +256,13 @@ export function DataSourceDetailValuesTab({
 
       <OperationalTable
         columns={columns}
-        emptyMessage="No runtime values are available for this source yet."
-        emptyTitle="This source has no visible runtime rows."
+        emptyMessage="No live values have arrived yet. The source is running — values appear as parameters publish updates."
+        emptyTitle="Waiting for live values."
         hasQueryState={hasQueryState}
         noResultsMessage="Try a different search term or clear one of the active filters."
         noResultsTitle="No runtime values match the current filters."
         onSortChange={setSortState}
-        rowActions={(row) => {
-          // Pin persistence lives in the static store keyed by mock ids; it does
-          // not apply to live-stream rows, so only offer it in the static view.
-          if (isLive) return [];
-          const actions: TableRowAction<SourceValueRow>[] = [
-            {
-              label: row.pinned ? "Unpin" : "Pin",
-              onClick: () => togglePinnedValue(row.id),
-            },
-          ];
-
-          return actions;
-        }}
+        rowActions={() => []}
         rowKey={(row) => row.id}
         rows={filteredRows}
         sortState={sortState}
