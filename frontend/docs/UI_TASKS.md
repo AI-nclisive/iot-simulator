@@ -844,6 +844,11 @@ Parallel execution:
   Fix: `onRunFinished` now updates `scenarios[].runState` to the terminal state ("Stopped" / "Failed" / "Not running"); `clearLiveRun` only removes the `liveRuns` SSE entry without touching `runState`.
   Done when: navigating away from run view while a scenario is running keeps its runState; run-finished SSE event updates runState correctly; typecheck + vitest pass.
 
+- [x] `UI-135` Overview dashboard clarity — separate live sources from active runs; remove Activity nav stub
+  Goal: Overview showed "5 sources" badge but an empty list, confusing users. The badge counted SSE-connected data sources while the list showed active run processes (recordings/replays/scenarios) — two unrelated concepts. Activity nav link opened an empty stub page.
+  Fix: wrapped sources badge in a clearly-labeled "Live data sources" card with a link to the data sources list; added "Active runs" section header above the run list; improved empty-state copy; removed Activity from top-level nav (route kept).
+  Done when: overview clearly distinguishes connected sources from active runs; Activity no longer shows in nav; typecheck passes.
+
 - [x] `UI-130` Align FAULT step params to backend fault model
   Goal: replace the 4 placeholder FE fault kinds (drop/delay/corrupt/quality) with the IS-087 backend contract: BAD_VALUE, MISSING_VALUE, DELAY, CONNECTION_DROP, TIMEOUT, PROTOCOL_ERROR, SOURCE_UNAVAILABLE. Only DELAY has a required param (delayMs); all others are param-free.
   Surface: `Scenario Builder` — fault step editor and config panel.

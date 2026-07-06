@@ -88,18 +88,30 @@ export function RuntimeDashboardPanel() {
       ) : null}
 
       {sources.length > 0 ? (
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          <StatusBadge label={`${sources.length} sources`} tone="neutral" />
-          {unhealthy.length > 0 ? (
-            <StatusBadge
-              label={`${unhealthy.length} need attention`}
-              tone="warning"
-            />
-          ) : (
-            <StatusBadge label="All healthy" tone="accent" />
-          )}
+        <div className="mb-5 rounded-md border border-shell-line bg-white px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
+            Live data sources
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <StatusBadge label={`${sources.length} connected`} tone="neutral" />
+            {unhealthy.length > 0 ? (
+              <StatusBadge
+                label={`${unhealthy.length} need attention`}
+                tone="warning"
+              />
+            ) : (
+              <StatusBadge label="All healthy" tone="accent" />
+            )}
+          </div>
+          <p className="mt-2 text-xs text-shell-muted">
+            <Link className="shell-text-action" to="/data-sources">View data sources</Link>
+          </p>
         </div>
       ) : null}
+
+      <p className="mb-3 text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
+        Active runs
+      </p>
 
       {error ? (
         <div className="mb-4 rounded-md border border-shell-danger/30 bg-shell-danger/10 px-3 py-2 text-sm text-shell-danger">
@@ -109,9 +121,9 @@ export function RuntimeDashboardPanel() {
         <RunSkeleton />
       ) : runs.length === 0 ? (
         <SharedStatePanel
-          message="Start a source, recording, replay, or scenario to bring active runtime back into view here."
+          message="Recordings, replays, and scenario runs appear here while they are active. Start a recording or replay from a data source, or run a scenario."
           state="empty"
-          title="No active runtime is shown right now."
+          title="No active runs."
         />
       ) : (
         <div className="space-y-3">

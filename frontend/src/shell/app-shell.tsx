@@ -12,7 +12,6 @@ const topLevelNav = [
   { to: "/recordings", label: "Recordings" },
   { to: "/scenarios", label: "Scenarios" },
   { to: "/evidence", label: "Evidence" },
-  { to: "/activity", label: "Activity" },
   { to: "/settings", label: "Settings" },
   { to: "/admin", label: "Admin" },
 ] as const;
