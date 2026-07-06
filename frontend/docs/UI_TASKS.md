@@ -863,6 +863,12 @@ Parallel execution:
   Depends: IS-127.
   Done when: detail header shows serveUrl; overview shows real device endpoint; source type shown; IMPORT sources show Replay recording; settings save correct; typecheck + vitest green.
 
+- [x] `UI-137` Fix data source settings — Saved badge shown before async save completes
+  Goal: `saveChanges` in `DataSourceDetailSettingsTab` was synchronous, so the "Saved" badge appeared before the API call resolved; also the "Unsaved changes" and "Saved" badges could both be visible simultaneously.
+  Surface: `Data Source Detail` — Settings tab.
+  Work includes: make `saveChanges` async; `await updateSourceConfiguration(...)` before calling `setSavedMessage("Saved")`; 2 behavioral tests added.
+  Done when: "Saved" badge only appears after the update call resolves; typecheck + vitest green.
+
 - [ ] `UI-128` Scenario step editor — real source/recording pickers + server validation
 
 - [x] `UI-129` Wire scenario run/stop to backend API + live SSE run view
