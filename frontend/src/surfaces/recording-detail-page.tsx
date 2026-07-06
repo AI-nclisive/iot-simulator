@@ -565,8 +565,19 @@ export function RecordingDetailPage() {
               ← Recordings
             </button>
             <h2 className="mt-2 text-2xl font-semibold text-shell-ink">
-              Recording{" "}
-              <span className="font-mono text-lg text-shell-muted">{recording.id.slice(0, 8)}</span>
+              {recording.name ? (
+                <>
+                  {recording.name}
+                  <span className="ml-2 font-mono text-base text-shell-muted font-normal">
+                    {recording.id.slice(0, 8)}
+                  </span>
+                </>
+              ) : (
+                <>
+                  Recording{" "}
+                  <span className="font-mono text-lg text-shell-muted">{recording.id.slice(0, 8)}</span>
+                </>
+              )}
             </h2>
           </div>
           <StatusBadge

@@ -202,3 +202,25 @@ describe("deleteSample", () => {
     expect(samples[0].id).toBe("sample-02");
   });
 });
+
+describe("mapRecording — name field (UI-131)", () => {
+  it("maps a present name from the API response", async () => {
+    mockApiFetch.mockResolvedValueOnce({
+      items: [{ ...makeRecordingResponse({ id: "rec-n1" }), name: "My capture" }],
+      nextCursor: null, limit: 50,
+    });
+    await useArtifactsStore.getState().loadRecordings("proj-1");
+    const artifact = useArtifactsStore.getState().artifacts.find((a) => a.id === "rec-n1");
+    expect(artifact?.name).toBe("My capture");
+  });
+
+  it("maps undefined when name is absent in the API response", async () => {
+    mockApiFetch.mockResolvedValueOnce({
+      items: [makeRecordingResponse({ id: "rec-n2" })],
+      nextCursor: null, limit: 50,
+    });
+    await useArtifactsStore.getState().loadRecordings("proj-1");
+    const artifact = useArtifactsStore.getState().artifacts.find((a) => a.id === "rec-n2");
+    expect(artifact?.name).toBeUndefined();
+  });
+});
