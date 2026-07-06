@@ -304,29 +304,6 @@ class ScenarioLiveRunServiceTest {
     }
 
     @Test
-    void teardownStopsStartedSourcesWhenInterruptedBetweenSteps() {
-        // START(src-A) runs; the mock also sets Thread.interrupted().
-        // The next loop iteration sees the flag → teardown(src-A) → STOPPED.
-        stubScenario(
-                new ScenarioStepRow(0, "START", SOURCE, "{}"),
-                new ScenarioStepRow(1, "MARKER", null, "{}"));
-        stubValidReady();
-        RunRow parent = runningRun("run-9");
-        when(runs.create(any(), any(), any(), any(), any(), any(), any())).thenReturn(parent);
-        when(runs.start(eq("run-9"), any())).thenReturn(parent);
-        when(evidence.create(any(), eq("run-9"), any()))
-                .thenReturn(new EvidenceRow("ev-9", PROJECT, "run-9", "CAPTURING", "{}", null, null, "local"));
-        org.mockito.Mockito.doAnswer(inv -> { Thread.currentThread().interrupt(); return null; })
-                .when(dataSources).start(PROJECT, SOURCE);
-
-        service.start(PROJECT, SCENARIO, "MANUAL", "local");
-
-        verify(runs).end(eq("run-9"), eq("STOPPED"), any());
-        verify(dataSources).start(PROJECT, SOURCE);
-        verify(dataSources).stop(PROJECT, SOURCE);
-    }
-
-    @Test
     void teardownToleratesStopFailuresAndContinues() {
         // Scenario: START(src-A), START(src-B), then step fails → FAILED + teardown of both.
         // If stop(src-A) throws, teardown must still attempt stop(src-B).

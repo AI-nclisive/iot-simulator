@@ -30,7 +30,7 @@ class ScenarioControllerRunTest {
 
     @Test
     void validateMapsStatusAndIssues() {
-        ScenarioController c = new ScenarioController(null, new FakeValidation(), new FakeLiveRun());
+        ScenarioController c = new ScenarioController(null, new FakeValidation(), new FakeLiveRun(), null);
         ScenarioValidationResponse resp = c.validate("p1", "scn-1");
         assertThat(resp.status()).isEqualTo("INVALID");
         assertThat(resp.issues()).singleElement()
@@ -38,8 +38,8 @@ class ScenarioControllerRunTest {
     }
 
     @Test
-    void runReturnsRunIdAndEvidenceId() {
-        ScenarioController c = new ScenarioController(null, new FakeValidation(), new FakeLiveRun());
+    void runReturnsSummary() {
+        ScenarioController c = new ScenarioController(null, null, new FakeLiveRun(), null);
         ScenarioLiveRunResponse resp = c.run("p1", "scn-1", null);
         assertThat(resp.runId()).isEqualTo("run-1");
         assertThat(resp.evidenceId()).isEqualTo("ev-1");

@@ -58,6 +58,16 @@ public class ScenarioLiveRunService {
 
     private final ConcurrentMap<String, ScenarioExecution> registry = new ConcurrentHashMap<>();
 
+    // volatile so the @Autowired setter change is visible to background threads immediately
+    private volatile ScenarioStepListener stepListener = ScenarioStepListener.noop();
+
+    @Autowired(required = false)
+    public void setStepListener(ScenarioStepListener stepListener) {
+        if (stepListener != null) {
+            this.stepListener = stepListener;
+        }
+    }
+
     @Autowired
     public ScenarioLiveRunService(ScenarioRepository scenarios, ScenarioValidationService validation,
             RunRepository runs, EvidenceRepository evidence, RuntimeEventRepository events,
@@ -182,6 +192,7 @@ public class ScenarioLiveRunService {
                 if (Thread.interrupted()) {
                     teardown(projectId, startedSources);
                     safeEnd(runId, "STOPPED");
+                    stepListener.onRunFinished(projectId, runId, "STOPPED");
                     registry.remove(runId);
                     return;
                 }
@@ -190,7 +201,9 @@ public class ScenarioLiveRunService {
                     events.append(projectId, step.targetSourceId(), runId, "SCENARIO_STEP", now(),
                             stepPayload(step));
                 }
+                stepListener.onStepStarted(projectId, runId, step.ordinal(), step.type());
                 execute(projectId, step, runId, settings, startedSources);
+                stepListener.onStepCompleted(projectId, runId, step.ordinal(), step.type());
             }
             completed = true;
         } catch (IllegalStateException e) {
@@ -198,16 +211,20 @@ public class ScenarioLiveRunService {
             if (Thread.currentThread().isInterrupted() || e.getCause() instanceof InterruptedException) {
                 teardown(projectId, startedSources);
                 safeEnd(runId, "STOPPED");
+                stepListener.onRunFinished(projectId, runId, "STOPPED");
             } else {
                 teardown(projectId, startedSources);
                 safeEnd(runId, "FAILED");
+                stepListener.onRunFinished(projectId, runId, "FAILED");
             }
         } catch (RuntimeException e) {
             teardown(projectId, startedSources);
             safeEnd(runId, "FAILED");
+            stepListener.onRunFinished(projectId, runId, "FAILED");
         } finally {
             if (completed) {
                 safeEnd(runId, "COMPLETED");
+                stepListener.onRunFinished(projectId, runId, "COMPLETED");
             }
             registry.remove(runId);
         }

@@ -2,6 +2,8 @@ package com.ainclusive.iotsim.api.scenario;
 
 import com.ainclusive.iotsim.api.error.PreconditionRequiredException;
 import com.ainclusive.iotsim.api.security.Permission;
+import com.ainclusive.iotsim.api.stream.LiveStreamSubscriptions;
+import com.ainclusive.iotsim.api.stream.StreamKey;
 import com.ainclusive.iotsim.domain.scenario.Scenario;
 import com.ainclusive.iotsim.domain.scenario.ScenarioLiveRunService;
 import com.ainclusive.iotsim.domain.scenario.ScenarioLiveRunSummary;
@@ -16,6 +18,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import java.net.URI;
 import java.time.Instant;
 import java.util.List;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -28,6 +31,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
  * Scenario authoring CRUD within a project (backend-specs/05_API_CONTRACT.md, IS-085).
@@ -53,12 +57,15 @@ public class ScenarioController {
     private final ScenarioService scenarios;
     private final ScenarioValidationService validationService;
     private final ScenarioLiveRunService liveRunService;
+    private final LiveStreamSubscriptions subscriptions;
 
     public ScenarioController(ScenarioService scenarios,
-            ScenarioValidationService validationService, ScenarioLiveRunService liveRunService) {
+            ScenarioValidationService validationService, ScenarioLiveRunService liveRunService,
+            LiveStreamSubscriptions subscriptions) {
         this.scenarios = scenarios;
         this.validationService = validationService;
         this.liveRunService = liveRunService;
+        this.subscriptions = subscriptions;
     }
 
     @Operation(summary = "List scenarios",
@@ -163,6 +170,19 @@ public class ScenarioController {
         String initiator = req != null ? req.initiator() : null;
         ScenarioLiveRunSummary summary = liveRunService.start(projectId, id, trigger, initiator);
         return new ScenarioLiveRunResponse(summary.runId(), summary.evidenceId());
+    }
+
+    @Operation(summary = "Stream scenario run step events",
+            description = "Opens a Server-Sent Events stream that pushes step-started, step-completed,"
+                    + " and run-finished events for the given scenario run.")
+    @GetMapping(value = "/{id}/runs/{runId}/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @PreAuthorize(OBSERVE)
+    public SseEmitter streamRunEvents(
+            @PathVariable String projectId,
+            @PathVariable String id,
+            @PathVariable String runId,
+            @RequestHeader(value = "Last-Event-ID", required = false) String lastEventId) {
+        return subscriptions.subscribe(StreamKey.scenarioRun(runId), lastEventId);
     }
 
     private static List<ScenarioStep> toSteps(List<StepDto> dtos) {
