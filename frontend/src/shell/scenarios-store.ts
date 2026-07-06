@@ -111,6 +111,8 @@ export const useScenariosStore = create<ScenariosState>((set, get) => ({
   renameScenario: async (projectId: string, id: string, name: string) => {
     const trimmed = name.trim();
     if (!trimmed) return;
+    // Capture previous name for rollback
+    const prevName = get().scenarios.find((s) => s.id === id)?.name ?? "";
     // Optimistic local update
     set((state) => ({
       scenarios: state.scenarios.map((s) =>
@@ -131,8 +133,13 @@ export const useScenariosStore = create<ScenariosState>((set, get) => ({
         versions: { ...state.versions, [id]: data.version },
       }));
     } catch (err) {
-      const message = err instanceof ApiError ? err.title : "Failed to rename scenario";
-      set({ error: message });
+      // Roll back the optimistic update on failure
+      set((state) => ({
+        scenarios: state.scenarios.map((s) =>
+          s.id === id ? { ...s, name: prevName } : s,
+        ),
+        error: err instanceof ApiError ? err.title : "Failed to rename scenario",
+      }));
     }
   },
 

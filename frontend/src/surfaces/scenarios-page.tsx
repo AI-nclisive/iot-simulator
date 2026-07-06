@@ -244,7 +244,7 @@ export function ScenariosPage() {
         <button
           className="shell-action"
           type="button"
-          onClick={() => void loadScenarios(currentProjectId)}
+          onClick={() => { if (currentProjectId) void loadScenarios(currentProjectId); }}
         >
           Retry
         </button>

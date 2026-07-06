@@ -132,11 +132,11 @@ export function toApiStep(step: ScenarioStep): { type: string; targetSourceId: s
 // ── BE → FE mapper ────────────────────────────────────────────────────────────
 
 function stepTypeFromApi(type: string): ScenarioStepType {
-  const lower = type.toLowerCase() as ScenarioStepType;
+  const lower = type.toLowerCase();
   const validTypes: ScenarioStepType[] = [
     "start", "stop", "replay", "synthetic", "fault", "wait", "marker",
   ];
-  return validTypes.includes(lower) ? lower : "marker";
+  return (validTypes as string[]).includes(lower) ? (lower as ScenarioStepType) : "marker";
 }
 
 /**
