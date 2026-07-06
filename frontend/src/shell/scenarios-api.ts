@@ -6,6 +6,7 @@
  * targetSourceId at top level, params JSON string).
  */
 
+import { apiFetch } from "../api";
 import {
   STEP_TYPE_LABELS,
   isStepConfigured,
@@ -222,4 +223,26 @@ export function fromApiScenario(row: ScenarioApiRow): ScenarioRow {
     lockedBy: null,
     updatedAt: row.updatedAt,
   };
+}
+
+// ── Live run ──────────────────────────────────────────────────────────────────
+
+export interface ScenarioLiveRunResponse {
+  runId: string;
+  evidenceId: string;
+}
+
+/**
+ * Stop a running scenario run.
+ * POST /api/v1/projects/{pid}/scenarios/{id}/runs/{runId}/stop → 204
+ */
+export async function stopScenarioRun(
+  projectId: string,
+  scenarioId: string,
+  runId: string,
+): Promise<void> {
+  await apiFetch<undefined>(
+    `/api/v1/projects/${projectId}/scenarios/${scenarioId}/runs/${runId}/stop`,
+    { method: "POST" },
+  );
 }

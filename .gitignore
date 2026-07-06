@@ -36,3 +36,4 @@ frontend/src/generated/
 
 # Claude Code temporary worktrees (never commit)
 .claude/worktrees/
+node_modules

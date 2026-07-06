@@ -827,6 +827,13 @@ Parallel execution:
   Depends: IS-136 scenarios API.
   Done when: scenarios page loads from backend; create/rename/duplicate/delete/save call API; FE↔BE step mapper handles all step types; TypeScript build + vitest pass.
 
+- [x] `UI-129` Wire scenario run/stop to backend API + live SSE run view
+  Goal: replace mock-backed run view with live SSE data; wire run/stop actions to real backend.
+  Surface: `Scenarios`, `Scenario Run View`
+  Work includes: `stopScenarioRun` in scenarios-api; `LiveRunState` + `liveRuns` + `clearLiveRun` in scenarios-store; `runScenario` stores runId/evidenceId; `stopScenario` calls stop API; run view subscribes to SSE step-started/step-completed/run-finished events via EventSource; scenario-run.ts mock removed.
+  Depends: IS-141.
+  Done when: Run navigates to live SSE view; stop calls API; step timeline updates from SSE; TypeScript build + vitest pass.
+
 - [x] `UI-120` Integrate the regrouped API (9 groups)
   Goal: reflect the backend's 9-group API tags (IS-135) on the frontend. No FE code
   change required — the client (`src/api/client.ts`) calls endpoints by raw path and

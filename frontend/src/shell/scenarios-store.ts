@@ -19,10 +19,18 @@ import {
   toApiStep,
   fromApiStep,
   fromApiScenario,
+  stopScenarioRun,
   type ScenarioApiRow,
 } from "./scenarios-api";
 
 export type { ScenarioRow, ScenarioRunState, ScenarioLastRun } from "./scenarios-api";
+
+export interface LiveRunState {
+  runId: string;
+  evidenceId: string | null;
+  state: "running" | "stopped" | "completed" | "failed";
+  stepOrdinals: Record<number, "active" | "done">;
+}
 
 let stepSeq = 1000;
 
@@ -32,6 +40,8 @@ type ScenariosState = {
   steps: Record<string, ScenarioStep[]>;
   /** Per-scenario version for optimistic concurrency (PATCH If-Match). */
   versions: Record<string, number>;
+  /** Live run state keyed by scenario id. */
+  liveRuns: Record<string, LiveRunState>;
   isLoading: boolean;
   error: string | null;
 
@@ -53,15 +63,20 @@ type ScenariosState = {
   removeStep: (scenarioId: string, stepId: string) => void;
   moveStep: (scenarioId: string, stepId: string, direction: "up" | "down") => void;
 
-  // Run (fire-and-forget until IS-141+UI-129)
+  // Run / stop
   runScenario: (projectId: string, id: string) => Promise<string | null>;
-  stopScenario: (id: string) => void;
+  stopScenario: (projectId: string, id: string, runId: string) => Promise<void>;
+  /** Called by the run view when SSE run-finished fires — updates liveRun.state without removing it. */
+  onRunFinished: (id: string, state: LiveRunState["state"]) => void;
+  /** Called when the run view unmounts — removes liveRuns entry and resets runState. */
+  clearLiveRun: (id: string) => void;
 };
 
 export const useScenariosStore = create<ScenariosState>((set, get) => ({
   scenarios: [],
   steps: {},
   versions: {},
+  liveRuns: {},
   isLoading: false,
   error: null,
 
@@ -270,7 +285,7 @@ export const useScenariosStore = create<ScenariosState>((set, get) => ({
       return { steps: { ...state.steps, [scenarioId]: next } };
     }),
 
-  // ── Run (no-op until IS-141+UI-129) ─────────────────────────────────────
+  // ── Run / stop ───────────────────────────────────────────────────────────
 
   runScenario: async (projectId: string, id: string) => {
     try {
@@ -278,14 +293,63 @@ export const useScenariosStore = create<ScenariosState>((set, get) => ({
         `/api/v1/projects/${projectId}/scenarios/${id}/run`,
         { method: "POST" },
       );
+      set((state) => ({
+        liveRuns: {
+          ...state.liveRuns,
+          [id]: {
+            runId: data.runId,
+            evidenceId: data.evidenceId ?? null,
+            state: "running",
+            stepOrdinals: {},
+          },
+        },
+        scenarios: state.scenarios.map((s) =>
+          s.id === id ? { ...s, runState: "Running" as const } : s,
+        ),
+      }));
       return data.runId;
     } catch {
-      // Fire-and-forget for now; UI-129 will add live run view
       return null;
     }
   },
 
-  stopScenario: (_id: string) => {
-    // No-op until IS-141+UI-129
+  stopScenario: async (projectId: string, id: string, runId: string) => {
+    try {
+      await stopScenarioRun(projectId, id, runId);
+      set((state) => ({
+        liveRuns: state.liveRuns[id]
+          ? {
+              ...state.liveRuns,
+              [id]: { ...state.liveRuns[id], state: "stopped" as const },
+            }
+          : state.liveRuns,
+        scenarios: state.scenarios.map((s) =>
+          s.id === id ? { ...s, runState: "Stopped" as const } : s,
+        ),
+      }));
+    } catch {
+      // Swallow — UI shows stoppedLocally flag regardless
+    }
+  },
+
+  onRunFinished: (id: string, state: LiveRunState["state"]) => {
+    set((prev) => ({
+      liveRuns: prev.liveRuns[id]
+        ? { ...prev.liveRuns, [id]: { ...prev.liveRuns[id], state } }
+        : prev.liveRuns,
+    }));
+  },
+
+  clearLiveRun: (id: string) => {
+    set((state) => {
+      const liveRuns = { ...state.liveRuns };
+      delete liveRuns[id];
+      return {
+        liveRuns,
+        scenarios: state.scenarios.map((s) =>
+          s.id === id ? { ...s, runState: "Not running" as const } : s,
+        ),
+      };
+    });
   },
 }));

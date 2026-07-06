@@ -1,27 +1,25 @@
 /**
- * scenario-run-view-page.tsx — Scenario Run View (UI-065).
+ * scenario-run-view-page.tsx — Scenario Run View (UI-129).
  *
- * Read-only observation of one scenario run: run summary, current step, ordered
- * step timeline, involved sources, faults, clients, events, and evidence state.
- * All users can inspect; stopping a run is allowed for User and Admin. Answers
- * "what is the scenario doing right now and what happened just before".
- *
- * Mock-backed via scenario-run.ts until the run API + live streams land.
+ * Live observation of one scenario run: run summary, current step, ordered
+ * step timeline, events, and evidence state. Subscribes to the SSE stream
+ * for step-started / step-completed / run-finished events. Stopping a run
+ * calls POST /…/runs/{runId}/stop via the store.
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useNotificationStore } from "../shell/notification-store";
 import { useScenariosStore } from "../shell/scenarios-store";
+import { useShellStore } from "../shell/shell-store";
 import { ConfirmationDialog } from "../ui/confirmation-dialog";
 import { SharedStatePanel } from "../ui/shared-state-panel";
 import { StatusBadge, type StatusTone } from "../ui/status-badge";
-import {
-  mockRunFor,
-  type EvidenceState,
-  type RunStatus,
-  type RunStepStatus,
-} from "./scenario-run";
+
+type RunStatus = "queued" | "running" | "stopped" | "failed" | "completed" | "stale";
+type RunStepStatus = "pending" | "active" | "done" | "skipped" | "failed";
+type EvidenceState = "none" | "collecting" | "available";
+
 
 function runStatusTone(status: RunStatus): StatusTone {
   switch (status) {
@@ -73,18 +71,99 @@ export function ScenarioRunViewPage() {
 
   const scenario = useScenariosStore((s) => s.scenarios.find((x) => x.id === scenarioId));
   const stopScenario = useScenariosStore((s) => s.stopScenario);
+  const onRunFinished = useScenariosStore((s) => s.onRunFinished);
+  const clearLiveRun = useScenariosStore((s) => s.clearLiveRun);
+  const liveRuns = useScenariosStore((s) => s.liveRuns);
+  const steps = useScenariosStore((s) => s.steps);
+  const currentProjectId = useShellStore((s) => s.currentProjectId);
   const pushNotification = useNotificationStore((s) => s.push);
+
+  const liveRun = liveRuns[scenarioId];
 
   const [confirmStop, setConfirmStop] = useState(false);
   // Track a local stopped overlay so the Stop action reflects immediately.
   const [stoppedLocally, setStoppedLocally] = useState(false);
+  const [stepOrdinals, setStepOrdinals] = useState<Record<number, "active" | "done">>({});
+  const [finalState, setFinalState] = useState<"running" | "stopped" | "completed" | "failed">("running");
+  const [sseStale, setSseStale] = useState(false);
+  const staleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const run = useMemo(
-    () => (scenario ? mockRunFor(scenario.id, scenario.name) : null),
-    [scenario],
-  );
+  // Reset SSE state when liveRun changes (new run started)
+  useEffect(() => {
+    setStepOrdinals({});
+    setFinalState("running");
+    setSseStale(false);
+    setStoppedLocally(false);
+  }, [liveRun?.runId]);
 
-  if (!scenario || !run) {
+  // Subscribe to SSE stream when we have a live run
+  useEffect(() => {
+    if (!liveRun || !currentProjectId) return;
+
+    const url = `/api/v1/projects/${currentProjectId}/scenarios/${scenarioId}/runs/${liveRun.runId}/events`;
+    const es = new EventSource(url);
+
+    function resetStaleTimer() {
+      if (staleTimerRef.current !== null) {
+        clearTimeout(staleTimerRef.current);
+      }
+      staleTimerRef.current = setTimeout(() => {
+        setSseStale(true);
+      }, 5000);
+    }
+
+    resetStaleTimer();
+
+    es.addEventListener("step-started", (e: MessageEvent) => {
+      resetStaleTimer();
+      setSseStale(false);
+      try {
+        const data = JSON.parse(e.data as string) as { ordinal: number; type: string };
+        setStepOrdinals((prev) => ({ ...prev, [data.ordinal]: "active" }));
+      } catch {
+        // ignore parse errors
+      }
+    });
+
+    es.addEventListener("step-completed", (e: MessageEvent) => {
+      resetStaleTimer();
+      setSseStale(false);
+      try {
+        const data = JSON.parse(e.data as string) as { ordinal: number; type: string };
+        setStepOrdinals((prev) => ({ ...prev, [data.ordinal]: "done" }));
+      } catch {
+        // ignore parse errors
+      }
+    });
+
+    es.addEventListener("run-finished", (e: MessageEvent) => {
+      resetStaleTimer();
+      setSseStale(false);
+      try {
+        const data = JSON.parse(e.data as string) as { state: string };
+        const s = data.state?.toLowerCase();
+        if (s === "completed" || s === "stopped" || s === "failed") {
+          setFinalState(s as "completed" | "stopped" | "failed");
+          onRunFinished(scenarioId, s as "completed" | "stopped" | "failed");
+        }
+      } catch {
+        // ignore parse errors
+      }
+      es.close();
+    });
+
+    return () => {
+      if (staleTimerRef.current !== null) {
+        clearTimeout(staleTimerRef.current);
+      }
+      es.close();
+      // Clear the live-run entry so the scenarios list no longer shows "Running".
+      clearLiveRun(scenarioId);
+    };
+  }, [liveRun?.runId, currentProjectId, scenarioId]);
+
+  // No active run — show placeholder panel
+  if (!scenario) {
     return (
       <div className="px-4 py-6">
         <SharedStatePanel
@@ -99,13 +178,55 @@ export function ScenarioRunViewPage() {
     );
   }
 
-  const status: RunStatus = stoppedLocally ? "stopped" : run.status;
-  const isRunning = status === "running";
-  const currentStep =
-    run.currentStepIndex !== null ? run.timeline[run.currentStepIndex] : null;
+  if (!liveRun) {
+    return (
+      <div className="px-4 py-6">
+        <SharedStatePanel
+          state="empty"
+          title="No active run."
+          message="This scenario is not currently running. Start a run from the scenarios list."
+        />
+        <button className="shell-action mt-4" type="button" onClick={() => navigate("/scenarios")}>
+          Back to scenarios
+        </button>
+      </div>
+    );
+  }
+
+  // Derive display status
+  const displayStatus: RunStatus = (() => {
+    if (stoppedLocally || liveRun.state === "stopped" || finalState === "stopped") return "stopped";
+    if (finalState === "completed") return "completed";
+    if (finalState === "failed") return "failed";
+    if (sseStale) return "stale";
+    return "running";
+  })();
+
+  const isRunning = displayStatus === "running" || displayStatus === "stale";
+
+  // Build timeline from store steps (ordinal = array index)
+  const scenarioSteps = steps[scenarioId] ?? [];
+  const timeline = scenarioSteps.map((step, idx) => {
+    const ordinalState = stepOrdinals[idx];
+    const stepStatus: RunStepStatus = ordinalState === "active" ? "active" : ordinalState === "done" ? "done" : "pending";
+    return { step, stepStatus, idx };
+  });
+
+  const currentStepEntry = timeline.find((t) => t.stepStatus === "active") ?? null;
+
+  // Evidence state
+  const evidenceState: EvidenceState = (() => {
+    if (liveRun.evidenceId && (displayStatus === "completed" || displayStatus === "stopped")) {
+      return "available";
+    }
+    if (displayStatus === "running" || displayStatus === "stale") {
+      return "collecting";
+    }
+    return "none";
+  })();
 
   function handleStopConfirmed() {
-    stopScenario(scenario!.id);
+    void stopScenario(currentProjectId, scenarioId, liveRun!.runId);
     setStoppedLocally(true);
     pushNotification({ tone: "success", title: `Stopped "${scenario!.name}".` });
   }
@@ -124,10 +245,10 @@ export function ScenarioRunViewPage() {
           </button>
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-xl font-semibold text-shell-ink">{scenario.name}</h1>
-            <StatusBadge label={status} tone={runStatusTone(status)} />
+            <StatusBadge label={displayStatus} tone={runStatusTone(displayStatus)} />
           </div>
           <p className="mt-1 text-sm text-shell-muted">
-            Started by {run.initiator} at {formatTime(run.startedAt)}
+            Run ID: {liveRun.runId}
           </p>
         </div>
         <div className="flex gap-2">
@@ -156,10 +277,10 @@ export function ScenarioRunViewPage() {
         className="rounded-md border border-shell-accent/25 bg-shell-accent/5 px-4 py-3"
       >
         <p className="text-xs uppercase tracking-wide text-shell-muted">Current step</p>
-        {currentStep && isRunning ? (
+        {currentStepEntry && isRunning ? (
           <p className="mt-1 text-sm font-medium text-shell-ink">
-            {currentStep.label}{" "}
-            <span className="text-shell-muted">({currentStep.type})</span>
+            {currentStepEntry.step.label}{" "}
+            <span className="text-shell-muted">({currentStepEntry.step.type})</span>
           </p>
         ) : (
           <p className="mt-1 text-sm text-shell-muted">
@@ -173,72 +294,36 @@ export function ScenarioRunViewPage() {
         <section aria-label="Step timeline" className="flex min-h-0 flex-col rounded-lg border border-shell-line bg-white">
           <div className="border-b border-shell-line px-4 py-3">
             <h2 className="text-sm font-semibold text-shell-ink">Step timeline</h2>
+            {sseStale && isRunning ? (
+              <p className="mt-1 text-xs text-shell-warning">
+                Live updates paused — connection may be stale.
+              </p>
+            ) : null}
           </div>
-          <ol className="min-h-0 flex-1 divide-y divide-shell-line overflow-y-auto">
-            {run.timeline.map((step, idx) => (
-              <li key={step.stepId} className="flex items-center gap-3 px-4 py-2.5">
-                <span className="text-xs text-shell-muted">{idx + 1}</span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-shell-ink">{step.label}</p>
-                  <p className="text-xs text-shell-muted">
-                    {step.type} · {step.startedAt ? formatTime(step.startedAt) : "not started"}
-                  </p>
-                </div>
-                <StatusBadge label={step.status} tone={stepStatusTone(step.status)} />
-              </li>
-            ))}
-          </ol>
+          {timeline.length === 0 ? (
+            <p className="px-4 py-3 text-sm text-shell-muted">No steps in this scenario.</p>
+          ) : (
+            <ol className="min-h-0 flex-1 divide-y divide-shell-line overflow-y-auto">
+              {timeline.map(({ step, stepStatus, idx }) => (
+                <li key={step.id} className="flex items-center gap-3 px-4 py-2.5">
+                  <span className="text-xs text-shell-muted">{idx + 1}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-shell-ink">{step.label}</p>
+                    <p className="text-xs text-shell-muted">{step.type}</p>
+                  </div>
+                  <StatusBadge label={stepStatus} tone={stepStatusTone(stepStatus)} />
+                </li>
+              ))}
+            </ol>
+          )}
         </section>
 
-        {/* Right column: sources, faults, clients, events, evidence */}
+        {/* Right column: sources, events, evidence */}
         <div className="flex min-h-0 flex-col gap-4 overflow-y-auto">
           {/* Sources */}
           <section aria-label="Sources involved" className="rounded-lg border border-shell-line bg-white px-4 py-3">
             <h2 className="mb-2 text-sm font-semibold text-shell-ink">Sources</h2>
-            {run.sources.map((src) => (
-              <div key={src.sourceId} className="flex items-center justify-between py-1">
-                <button
-                  className="shell-text-action text-left text-sm"
-                  type="button"
-                  onClick={() => navigate(`/data-sources/${src.sourceId}`)}
-                >
-                  {src.name}
-                </button>
-                <StatusBadge
-                  label={src.state}
-                  tone={src.state === "Active" ? "accent" : src.state === "Error" ? "danger" : "neutral"}
-                />
-              </div>
-            ))}
-          </section>
-
-          {/* Faults */}
-          {run.faults.length > 0 ? (
-            <section aria-label="Faults" className="rounded-lg border border-shell-line bg-white px-4 py-3">
-              <h2 className="mb-2 text-sm font-semibold text-shell-ink">Faults</h2>
-              {run.faults.map((f) => (
-                <div key={f.stepId} className="flex items-center justify-between py-1 text-sm">
-                  <span className="text-shell-ink">
-                    {f.label} <span className="text-shell-muted">({f.kind})</span>
-                  </span>
-                  <StatusBadge label={f.active ? "Active" : "Armed"} tone={f.active ? "danger" : "neutral"} />
-                </div>
-              ))}
-            </section>
-          ) : null}
-
-          {/* Clients */}
-          <section aria-label="Clients" className="rounded-lg border border-shell-line bg-white px-4 py-3">
-            <h2 className="mb-2 text-sm font-semibold text-shell-ink">Clients ({run.clients.length})</h2>
-            {run.clients.map((c) => (
-              <div key={c.clientId} className="flex items-center justify-between py-1 text-sm">
-                <span className="font-mono text-shell-ink">{c.clientId}</span>
-                <StatusBadge
-                  label={c.connected ? "Connected" : "Disconnected"}
-                  tone={c.connected ? "accent" : "neutral"}
-                />
-              </div>
-            ))}
+            <p className="text-sm text-shell-muted">No source data during this run.</p>
           </section>
 
           {/* Evidence */}
@@ -246,21 +331,21 @@ export function ScenarioRunViewPage() {
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold text-shell-ink">Evidence</h2>
               <StatusBadge
-                label={evidenceLabel(run.evidence)}
-                tone={run.evidence === "available" ? "accent" : run.evidence === "collecting" ? "warning" : "neutral"}
+                label={evidenceLabel(evidenceState)}
+                tone={evidenceState === "available" ? "accent" : evidenceState === "collecting" ? "warning" : "neutral"}
               />
             </div>
-            {run.evidence === "available" && run.evidenceId ? (
+            {evidenceState === "available" && liveRun.evidenceId ? (
               <button
                 className="shell-text-action mt-2 text-sm"
                 type="button"
-                onClick={() => navigate(`/evidence/${run.evidenceId}`)}
+                onClick={() => navigate(`/evidence/${liveRun.evidenceId}`)}
               >
                 Open evidence
               </button>
             ) : (
               <p className="mt-1 text-xs text-shell-muted">
-                {run.evidence === "collecting"
+                {evidenceState === "collecting"
                   ? "Evidence is being collected while the run is active."
                   : "No evidence captured for this run."}
               </p>
@@ -270,15 +355,9 @@ export function ScenarioRunViewPage() {
           {/* Events */}
           <section aria-label="Events" className="rounded-lg border border-shell-line bg-white px-4 py-3">
             <h2 className="mb-2 text-sm font-semibold text-shell-ink">Recent events</h2>
-            <ul className="space-y-1.5">
-              {run.events.map((ev, i) => (
-                <li key={`${ev.at}-${i}`} className="text-sm">
-                  <span className="text-shell-muted">{formatTime(ev.at)}</span>{" "}
-                  <span className="font-medium text-shell-ink">{ev.type}</span>
-                  <span className="text-shell-muted"> — {ev.detail}</span>
-                </li>
-              ))}
-            </ul>
+            <p className="text-sm text-shell-muted">
+              No events captured.
+            </p>
           </section>
         </div>
       </div>

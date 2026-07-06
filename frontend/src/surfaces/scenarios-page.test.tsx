@@ -41,6 +41,7 @@ vi.mock("../api", () => ({
   },
 }));
 
+import { apiFetch } from "../api";
 import { ScenariosPage } from "./scenarios-page";
 import { useScenariosStore } from "../shell/scenarios-store";
 import type { ScenarioRow } from "../shell/scenarios-store";
@@ -148,7 +149,7 @@ describe("ScenariosPage", () => {
     expect(within(row).getByRole("button", { name: "Open" })).toBeTruthy();
   });
 
-  it("runs an idle scenario and shows a success toast", async () => {
+  it("runs an idle scenario, shows a success toast, and navigates to the run view", async () => {
     const user = userEvent.setup();
     renderPage();
     const row = screen.getByText("Morning ramp-up").closest("tr")!;
@@ -157,12 +158,26 @@ describe("ScenariosPage", () => {
     expect(mockNotifyPush).toHaveBeenCalledWith(
       expect.objectContaining({ tone: "success", title: expect.stringContaining("Started") }),
     );
+    expect(screen.getByText("Run view")).toBeTruthy();
+  });
+
+  it("does not navigate when runScenario returns null (API error)", async () => {
+    vi.mocked(apiFetch).mockRejectedValueOnce(new Error("network error"));
+    const user = userEvent.setup();
+    renderPage();
+    const row = screen.getByText("Morning ramp-up").closest("tr")!;
+    await user.click(within(row).getByRole("button", { name: "Run" }));
+
+    expect(mockNotifyPush).not.toHaveBeenCalled();
+    expect(screen.queryByText("Run view")).toBeNull();
   });
 
   it("stops a running scenario through the confirmation dialog and shows a toast", async () => {
-    // Clear the lock so the running scenario is stoppable from here.
+    // Clear the lock so the running scenario is stoppable, and seed liveRuns
+    // so the stop guard finds a runId to pass to the API.
     useScenariosStore.setState((s) => ({
       scenarios: s.scenarios.map((x) => (x.id === "scn-02" ? { ...x, lockedBy: null } : x)),
+      liveRuns: { "scn-02": { runId: "run-99", evidenceId: null, state: "running", stepOrdinals: {} } },
     }));
     const user = userEvent.setup();
     renderPage();
