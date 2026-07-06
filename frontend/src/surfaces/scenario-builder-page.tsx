@@ -12,7 +12,7 @@
  * edit it; an Admin can edit. A scenario locked by another editor is read-only.
  */
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { resolveAccess } from "../shell/access-policy";
 import { useNotificationStore } from "../shell/notification-store";
@@ -62,23 +62,37 @@ export function ScenarioBuilderPage() {
 
   const accessMode = useShellStore((state) => state.accessMode);
   const sharedRole = useShellStore((state) => state.sharedRole);
+  const currentProjectId = useShellStore((state) => state.currentProjectId);
   const access = resolveAccess(accessMode, sharedRole);
 
   const scenario = useScenariosStore((s) => s.scenarios.find((x) => x.id === scenarioId));
   const steps = useScenariosStore((s) => s.steps[scenarioId] ?? EMPTY_STEPS);
+  const isLoading = useScenariosStore((s) => s.isLoading);
   const addStep = useScenariosStore((s) => s.addStep);
   const updateStep = useScenariosStore((s) => s.updateStep);
   const removeStep = useScenariosStore((s) => s.removeStep);
   const moveStep = useScenariosStore((s) => s.moveStep);
   const runScenario = useScenariosStore((s) => s.runScenario);
+  const saveScenarioSteps = useScenariosStore((s) => s.saveScenarioSteps);
+  const loadScenarios = useScenariosStore((s) => s.loadScenarios);
+  const renameScenario = useScenariosStore((s) => s.renameScenario);
   const pushNotification = useNotificationStore((s) => s.push);
 
+  const scenarios = useScenariosStore((s) => s.scenarios);
   const [selectedStepId, setSelectedStepId] = useState<string | null>(steps[0]?.id ?? null);
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState(scenario?.name ?? "");
+  const [isSaving, setIsSaving] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
-  const renameScenario = useScenariosStore((s) => s.renameScenario);
+
+  // Load on mount only when the store is empty (no scenarios loaded yet).
+  // If the store is populated but this scenario ID isn't found, it's a genuine 404.
+  useEffect(() => {
+    if (!scenario && scenarios.length === 0 && !isLoading && currentProjectId) {
+      void loadScenarios(currentProjectId);
+    }
+  }, [scenario, scenarios.length, isLoading, currentProjectId, loadScenarios]);
 
   const validation = useMemo(() => validateScenario(steps), [steps]);
   const stepIssueIds = useMemo(
@@ -86,9 +100,6 @@ export function ScenarioBuilderPage() {
     [validation],
   );
 
-  // A scenario locked by another editor is read-only here (mock phase: any lock
-  // is treated as someone else's — see scenarios-page rationale). An admin with
-  // no lock conflict can edit; a user can never edit, only inspect + run.
   const lockedByOther = scenario?.lockedBy != null;
   const canEdit = access.canEditScenario && !lockedByOther;
 
@@ -101,6 +112,13 @@ export function ScenarioBuilderPage() {
       : "ready";
 
   if (!scenario) {
+    if (isLoading) {
+      return (
+        <div className="flex h-full items-center justify-center px-4 py-6">
+          <p className="text-sm text-shell-muted">Loading scenario…</p>
+        </div>
+      );
+    }
     return (
       <div className="px-4 py-6">
         <SharedStatePanel
@@ -127,15 +145,22 @@ export function ScenarioBuilderPage() {
     if (selectedStepId === stepId) setSelectedStepId(null);
   }
 
-  function handleRun() {
+  async function handleRun() {
     if (!validation.ready) return;
-    runScenario(scenarioId);
+    await runScenario(currentProjectId, scenarioId);
     pushNotification({ tone: "success", title: `Started "${scenario!.name}".` });
   }
 
-  function handleSave() {
-    // No backend yet; the store is already the source of truth in the mock phase.
-    pushNotification({ tone: "success", title: "Scenario saved." });
+  async function handleSave() {
+    setIsSaving(true);
+    try {
+      await saveScenarioSteps(currentProjectId, scenarioId);
+      pushNotification({ tone: "success", title: "Scenario saved." });
+    } catch {
+      pushNotification({ tone: "error", title: "Save failed. Please try again." });
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   return (
@@ -159,7 +184,7 @@ export function ScenarioBuilderPage() {
                 autoFocus
                 onChange={(e) => setNameValue(e.target.value)}
                 onBlur={() => {
-                  renameScenario(scenario.id, nameValue);
+                  void renameScenario(currentProjectId, scenario.id, nameValue);
                   setEditingName(false);
                 }}
                 onKeyDown={(e) => {
@@ -185,8 +210,13 @@ export function ScenarioBuilderPage() {
         </div>
         <div className="flex gap-2">
           {canEdit ? (
-            <button className="shell-action" type="button" onClick={handleSave}>
-              Save
+            <button
+              className="shell-action"
+              type="button"
+              disabled={isSaving}
+              onClick={() => { void handleSave(); }}
+            >
+              {isSaving ? "Saving…" : "Save"}
             </button>
           ) : null}
           {access.canRunScenario ? (
@@ -195,7 +225,7 @@ export function ScenarioBuilderPage() {
               type="button"
               disabled={!validation.ready}
               title={validation.ready ? undefined : "Resolve validation issues to run"}
-              onClick={handleRun}
+              onClick={() => { void handleRun(); }}
             >
               Run
             </button>

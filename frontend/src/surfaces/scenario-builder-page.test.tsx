@@ -1,5 +1,5 @@
 /**
- * Tests for ScenarioBuilderPage (UI-061 builder shell)
+ * Tests for ScenarioBuilderPage (UI-061 builder shell / UI-127 API wiring)
  *
  * Covers:
  * - Renders step list + details panel for a scenario
@@ -25,23 +25,80 @@ vi.mock("../shell/notification-store", () => ({
   useNotificationStore: (sel: (s: object) => unknown) => sel({ push: mockNotifyPush }),
 }));
 
+vi.mock("../api", () => ({
+  apiFetch: vi.fn().mockResolvedValue({ runId: "run-1", status: "RUNNING" }),
+  ApiError: class ApiError extends Error {
+    constructor(
+      public readonly status: number,
+      public readonly title: string,
+      public readonly detail: string | undefined,
+      public readonly type: string | undefined,
+    ) {
+      super(title);
+      this.name = "ApiError";
+    }
+  },
+}));
+
 import { ScenarioBuilderPage } from "./scenario-builder-page";
 import { useScenariosStore } from "../shell/scenarios-store";
-import { scenarioRows, stepsByScenario } from "./mock-scenarios";
+import type { ScenarioRow } from "../shell/scenarios-store";
+import type { ScenarioStep } from "./scenario-steps";
+
+function makeRow(overrides: Partial<ScenarioRow> & { id: string; name: string }): ScenarioRow {
+  return {
+    description: overrides.description ?? "A test scenario.",
+    stepCount: overrides.stepCount ?? 0,
+    runState: overrides.runState ?? "Not running",
+    lastRun: overrides.lastRun ?? { at: null, outcome: null },
+    owner: overrides.owner ?? "Test User",
+    lockedBy: overrides.lockedBy ?? null,
+    updatedAt: overrides.updatedAt ?? "2026-07-01T00:00:00Z",
+    ...overrides,
+  };
+}
+
+const testScenarios: ScenarioRow[] = [
+  makeRow({ id: "scn-01", name: "Morning ramp-up", stepCount: 3 }),
+  makeRow({
+    id: "scn-02",
+    name: "Packaging fault drill",
+    stepCount: 2,
+    runState: "Running",
+    lockedBy: "Anna Kosol",
+  }),
+  makeRow({ id: "scn-04", name: "Empty template", stepCount: 0 }),
+];
+
+const testSteps: Record<string, ScenarioStep[]> = {
+  "scn-01": [
+    { id: "st-1", type: "start", label: "Line A telemetry", config: { sourceId: "src-01" }, configured: true },
+    { id: "st-2", type: "replay", label: "Calibration recording", config: { sourceId: "src-01", recordingId: "rec-12" }, configured: true },
+    { id: "st-3", type: "wait", label: "Hold 30s", config: { seconds: 30 }, configured: true },
+  ],
+  "scn-02": [
+    { id: "st-1", type: "start", label: "Packaging cell stream", config: { sourceId: "src-02" }, configured: true },
+    { id: "st-2", type: "fault", label: "Quality fault", config: {}, configured: false },
+  ],
+  "scn-04": [],
+};
 
 function setRole(opts: { accessMode?: "local" | "shared"; sharedRole?: "admin" | "user" } = {}) {
   const { accessMode = "local", sharedRole = "admin" } = opts;
   mockShellStore.mockImplementation((selector: (s: object) => unknown) =>
-    selector({ accessMode, sharedRole }),
+    selector({ accessMode, sharedRole, currentProjectId: "proj-1" }),
   );
 }
 
 beforeEach(() => {
   useScenariosStore.setState({
-    scenarios: scenarioRows.map((s) => ({ ...s })),
+    scenarios: testScenarios.map((s) => ({ ...s })),
     steps: Object.fromEntries(
-      Object.entries(stepsByScenario).map(([k, v]) => [k, v.map((s) => ({ ...s }))]),
+      Object.entries(testSteps).map(([k, v]) => [k, v.map((s) => ({ ...s }))]),
     ),
+    versions: { "scn-01": 1, "scn-02": 1, "scn-04": 1 },
+    isLoading: false,
+    error: null,
   });
   mockNotifyPush.mockClear();
   setRole();
@@ -89,14 +146,14 @@ describe("ScenarioBuilderPage", () => {
     expect(run.disabled).toBe(true);
   });
 
-  it("enables Run when ready and runs the scenario", async () => {
+  it("enables Run when ready and shows a success toast on click", async () => {
     const user = userEvent.setup();
     renderBuilder("scn-01");
     const run = screen.getByRole("button", { name: "Run" }) as HTMLButtonElement;
     expect(run.disabled).toBe(false);
     await user.click(run);
-    expect(useScenariosStore.getState().scenarios.find((s) => s.id === "scn-01")?.runState).toBe(
-      "Running",
+    expect(mockNotifyPush).toHaveBeenCalledWith(
+      expect.objectContaining({ tone: "success", title: expect.stringContaining("Started") }),
     );
   });
 

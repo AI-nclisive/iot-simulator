@@ -1,34 +1,49 @@
 /**
- * scenarios-store.ts — in-memory scenarios state for the landing page (UI-060).
+ * scenarios-store.ts — async API-backed scenarios state (UI-127).
  *
- * Holds the scenario list and the run/stop/duplicate actions the landing page
- * exposes. Backed by the mock fixtures until the scenarios API lands; the store
- * boundary means swapping in real API calls later touches only this file
- * (same approach as data-sources-store).
+ * Replaces the in-memory mock store with real API calls for scenarios CRUD
+ * and validation. Step mutations remain local (synchronous) — call
+ * saveScenarioSteps to persist them. Run/stop remain no-ops until IS-141+UI-129.
  */
 
 import { create } from "zustand";
-import { scenarioRows, stepsByScenario, type ScenarioRow } from "../surfaces/mock-scenarios";
+import { apiFetch, ApiError } from "../api";
+import type { Page } from "../api";
 import {
   STEP_TYPE_LABELS,
   isStepConfigured,
   type ScenarioStep,
   type ScenarioStepType,
 } from "../surfaces/scenario-steps";
+import {
+  toApiStep,
+  fromApiStep,
+  fromApiScenario,
+  type ScenarioApiRow,
+} from "./scenarios-api";
 
-let duplicateSeq = 100;
+export type { ScenarioRow, ScenarioRunState, ScenarioLastRun } from "./scenarios-api";
+
 let stepSeq = 1000;
 
 type ScenariosState = {
-  scenarios: ScenarioRow[];
-  /** Ordered steps per scenario id (builder shell, UI-061). */
+  scenarios: import("./scenarios-api").ScenarioRow[];
+  /** Ordered steps per scenario id (builder shell). */
   steps: Record<string, ScenarioStep[]>;
-  runScenario: (id: string) => void;
-  stopScenario: (id: string) => void;
-  duplicateScenario: (id: string) => string | null;
-  createScenario: () => string;
-  // Builder step operations
-  renameScenario: (id: string, name: string) => void;
+  /** Per-scenario version for optimistic concurrency (PATCH If-Match). */
+  versions: Record<string, number>;
+  isLoading: boolean;
+  error: string | null;
+
+  loadScenarios: (projectId: string) => Promise<void>;
+  createScenario: (projectId: string) => Promise<string | null>;
+  renameScenario: (projectId: string, id: string, name: string) => Promise<void>;
+  duplicateScenario: (projectId: string, id: string) => Promise<string | null>;
+  deleteScenario: (projectId: string, id: string) => Promise<void>;
+  /** PATCH the scenario with its current local steps. */
+  saveScenarioSteps: (projectId: string, id: string) => Promise<void>;
+
+  // Step mutations (local only — call saveScenarioSteps to persist)
   addStep: (scenarioId: string, type: ScenarioStepType) => string;
   updateStep: (
     scenarioId: string,
@@ -37,81 +52,163 @@ type ScenariosState = {
   ) => void;
   removeStep: (scenarioId: string, stepId: string) => void;
   moveStep: (scenarioId: string, stepId: string, direction: "up" | "down") => void;
+
+  // Run (fire-and-forget until IS-141+UI-129)
+  runScenario: (projectId: string, id: string) => Promise<string | null>;
+  stopScenario: (id: string) => void;
 };
 
 export const useScenariosStore = create<ScenariosState>((set, get) => ({
-  scenarios: scenarioRows,
-  steps: stepsByScenario,
+  scenarios: [],
+  steps: {},
+  versions: {},
+  isLoading: false,
+  error: null,
 
-  runScenario: (id) =>
-    set((state) => ({
-      scenarios: state.scenarios.map((s) =>
-        s.id === id ? { ...s, runState: "Running", lastRun: { at: new Date().toISOString(), outcome: null } } : s,
-      ),
-    })),
-
-  stopScenario: (id) =>
-    set((state) => ({
-      scenarios: state.scenarios.map((s) =>
-        s.id === id
-          ? { ...s, runState: "Stopped", lastRun: { at: s.lastRun.at, outcome: "Stopped" } }
-          : s,
-      ),
-    })),
-
-  duplicateScenario: (id) => {
-    const source = get().scenarios.find((s) => s.id === id);
-    if (!source) return null;
-    const newId = `scn-${++duplicateSeq}`;
-    const copy: ScenarioRow = {
-      ...source,
-      id: newId,
-      name: `${source.name} (copy)`,
-      runState: "Not running",
-      lastRun: { at: null, outcome: null },
-      lockedBy: null,
-      updatedAt: new Date().toISOString(),
-    };
-    const sourceSteps = get().steps[id] ?? [];
-    set((state) => ({
-      scenarios: [...state.scenarios, copy],
-      steps: { ...state.steps, [newId]: sourceSteps.map((s) => ({ ...s })) },
-    }));
-    return newId;
+  loadScenarios: async (projectId: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const page = await apiFetch<Page<ScenarioApiRow>>(
+        `/api/v1/projects/${projectId}/scenarios`,
+      );
+      const scenarios = page.items.map(fromApiScenario);
+      const steps: Record<string, ScenarioStep[]> = {};
+      const versions: Record<string, number> = {};
+      for (const row of page.items) {
+        steps[row.id] = row.steps.map(fromApiStep);
+        versions[row.id] = row.version;
+      }
+      set({ scenarios, steps, versions, isLoading: false });
+    } catch (err) {
+      const message = err instanceof ApiError ? err.title : "Failed to load scenarios";
+      set({ error: message, isLoading: false });
+    }
   },
 
-  createScenario: () => {
-    const newId = `scn-${++duplicateSeq}`;
-    const scenario: ScenarioRow = {
-      id: newId,
-      name: "Untitled scenario",
-      description: "New scenario.",
-      stepCount: 0,
-      runState: "Not running",
-      lastRun: { at: null, outcome: null },
-      owner: "You",
-      lockedBy: null,
-      updatedAt: new Date().toISOString(),
-    };
-    set((state) => ({
-      scenarios: [...state.scenarios, scenario],
-      steps: { ...state.steps, [newId]: [] },
-    }));
-    return newId;
+  createScenario: async (projectId: string) => {
+    try {
+      const data = await apiFetch<ScenarioApiRow>(
+        `/api/v1/projects/${projectId}/scenarios`,
+        {
+          method: "POST",
+          body: JSON.stringify({ name: "Untitled scenario", steps: [] }),
+        },
+      );
+      const row = fromApiScenario(data);
+      set((state) => ({
+        scenarios: [...state.scenarios, row],
+        steps: { ...state.steps, [data.id]: [] },
+        versions: { ...state.versions, [data.id]: data.version },
+      }));
+      return data.id;
+    } catch (err) {
+      const message = err instanceof ApiError ? err.title : "Failed to create scenario";
+      set({ error: message });
+      return null;
+    }
   },
 
-  renameScenario: (id, name) =>
+  renameScenario: async (projectId: string, id: string, name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    // Optimistic local update
     set((state) => ({
       scenarios: state.scenarios.map((s) =>
-        s.id === id ? { ...s, name: name.trim() || s.name } : s,
+        s.id === id ? { ...s, name: trimmed } : s,
       ),
-    })),
+    }));
+    try {
+      const version = get().versions[id] ?? 1;
+      const data = await apiFetch<ScenarioApiRow>(
+        `/api/v1/projects/${projectId}/scenarios/${id}`,
+        {
+          method: "PATCH",
+          headers: { "If-Match": `"${version}"` },
+          body: JSON.stringify({ name: trimmed }),
+        },
+      );
+      set((state) => ({
+        versions: { ...state.versions, [id]: data.version },
+      }));
+    } catch (err) {
+      const message = err instanceof ApiError ? err.title : "Failed to rename scenario";
+      set({ error: message });
+    }
+  },
+
+  duplicateScenario: async (projectId: string, id: string) => {
+    try {
+      const data = await apiFetch<ScenarioApiRow>(
+        `/api/v1/projects/${projectId}/scenarios/${id}/duplicate`,
+        { method: "POST" },
+      );
+      const row = fromApiScenario(data);
+      set((state) => ({
+        scenarios: [...state.scenarios, row],
+        steps: { ...state.steps, [data.id]: data.steps.map(fromApiStep) },
+        versions: { ...state.versions, [data.id]: data.version },
+      }));
+      return data.id;
+    } catch (err) {
+      const message = err instanceof ApiError ? err.title : "Failed to duplicate scenario";
+      set({ error: message });
+      return null;
+    }
+  },
+
+  deleteScenario: async (projectId: string, id: string) => {
+    try {
+      await apiFetch<undefined>(
+        `/api/v1/projects/${projectId}/scenarios/${id}`,
+        { method: "DELETE" },
+      );
+      set((state) => {
+        const steps = { ...state.steps };
+        delete steps[id];
+        const versions = { ...state.versions };
+        delete versions[id];
+        return {
+          scenarios: state.scenarios.filter((s) => s.id !== id),
+          steps,
+          versions,
+        };
+      });
+    } catch (err) {
+      const message = err instanceof ApiError ? err.title : "Failed to delete scenario";
+      set({ error: message });
+    }
+  },
+
+  saveScenarioSteps: async (projectId: string, id: string) => {
+    const localSteps = get().steps[id] ?? [];
+    const version = get().versions[id] ?? 1;
+    const apiSteps = localSteps.map(toApiStep);
+    try {
+      const data = await apiFetch<ScenarioApiRow>(
+        `/api/v1/projects/${projectId}/scenarios/${id}`,
+        {
+          method: "PATCH",
+          headers: { "If-Match": `"${version}"` },
+          body: JSON.stringify({ steps: apiSteps }),
+        },
+      );
+      // Refresh from response to keep versions/stepCount in sync
+      const updatedRow = fromApiScenario(data);
+      set((state) => ({
+        scenarios: state.scenarios.map((s) => (s.id === id ? updatedRow : s)),
+        versions: { ...state.versions, [id]: data.version },
+      }));
+    } catch (err) {
+      const message = err instanceof ApiError ? err.title : "Failed to save scenario";
+      set({ error: message });
+      throw err; // re-throw so the UI can show "Save failed"
+    }
+  },
+
+  // ── Step mutations (synchronous, local only) ─────────────────────────────
 
   addStep: (scenarioId, type) => {
     const stepId = `st-${++stepSeq}`;
-    // Derive from the same source of truth the editor and validateScenario use,
-    // so a freshly-added step with empty config is only "configured" if the type
-    // genuinely has no required fields (not a hard-coded per-type assumption).
     const configured = isStepConfigured(type, {});
     const step: ScenarioStep = {
       id: stepId,
@@ -121,7 +218,10 @@ export const useScenariosStore = create<ScenariosState>((set, get) => ({
       configured,
     };
     set((state) => ({
-      steps: { ...state.steps, [scenarioId]: [...(state.steps[scenarioId] ?? []), step] },
+      steps: {
+        ...state.steps,
+        [scenarioId]: [...(state.steps[scenarioId] ?? []), step],
+      },
     }));
     return stepId;
   },
@@ -162,4 +262,23 @@ export const useScenariosStore = create<ScenariosState>((set, get) => ({
       [next[idx], next[swap]] = [next[swap], next[idx]];
       return { steps: { ...state.steps, [scenarioId]: next } };
     }),
+
+  // ── Run (no-op until IS-141+UI-129) ─────────────────────────────────────
+
+  runScenario: async (projectId: string, id: string) => {
+    try {
+      const data = await apiFetch<{ runId: string; evidenceId: string; status: string }>(
+        `/api/v1/projects/${projectId}/scenarios/${id}/run`,
+        { method: "POST" },
+      );
+      return data.runId;
+    } catch {
+      // Fire-and-forget for now; UI-129 will add live run view
+      return null;
+    }
+  },
+
+  stopScenario: (_id: string) => {
+    // No-op until IS-141+UI-129
+  },
 }));

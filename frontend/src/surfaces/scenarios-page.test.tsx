@@ -1,5 +1,5 @@
 /**
- * Tests for ScenariosPage (UI-060)
+ * Tests for ScenariosPage (UI-060 / UI-127)
  *
  * Covers:
  * - Renders the scenario list with name, run state, last-run summary, owner
@@ -7,8 +7,8 @@
  * - Run-state filter narrows the list
  * - Role-aware actions: admin sees New scenario + Run/Stop/Duplicate;
  *   shared user sees neither create nor duplicate
- * - Run action → store update + success toast
- * - Stop action → confirmation dialog → store update + toast
+ * - Run action → success toast (run/stop are fire-and-forget until UI-129)
+ * - Stop action → confirmation dialog → toast
  * - Scenario locked by another editor hides Run/Stop
  * - Empty/no-results states
  */
@@ -26,20 +26,76 @@ vi.mock("../shell/notification-store", () => ({
   useNotificationStore: (sel: (s: object) => unknown) => sel({ push: mockNotifyPush }),
 }));
 
+vi.mock("../api", () => ({
+  apiFetch: vi.fn().mockResolvedValue({ runId: "run-1", status: "RUNNING" }),
+  ApiError: class ApiError extends Error {
+    constructor(
+      public readonly status: number,
+      public readonly title: string,
+      public readonly detail: string | undefined,
+      public readonly type: string | undefined,
+    ) {
+      super(title);
+      this.name = "ApiError";
+    }
+  },
+}));
+
 import { ScenariosPage } from "./scenarios-page";
 import { useScenariosStore } from "../shell/scenarios-store";
-import { scenarioRows } from "./mock-scenarios";
+import type { ScenarioRow } from "../shell/scenarios-store";
+
+function makeRow(overrides: Partial<ScenarioRow> & { id: string; name: string }): ScenarioRow {
+  return {
+    description: overrides.description ?? "A test scenario.",
+    stepCount: overrides.stepCount ?? 3,
+    runState: overrides.runState ?? "Not running",
+    lastRun: overrides.lastRun ?? { at: "2026-06-29T07:14:00Z", outcome: "Completed" },
+    owner: overrides.owner ?? "Olena Ohii",
+    lockedBy: overrides.lockedBy ?? null,
+    updatedAt: overrides.updatedAt ?? "2026-06-29T07:20:00Z",
+    ...overrides,
+  };
+}
+
+const testScenarios: ScenarioRow[] = [
+  makeRow({ id: "scn-01", name: "Morning ramp-up", runState: "Not running" }),
+  makeRow({
+    id: "scn-02",
+    name: "Packaging fault drill",
+    description: "Injects a quality fault mid-replay to exercise alerting.",
+    runState: "Running",
+    lastRun: { at: "2026-06-30T09:02:00Z", outcome: null },
+    owner: "Anna Kosol",
+    lockedBy: "Anna Kosol",
+  }),
+  makeRow({ id: "scn-03", name: "Overnight soak", runState: "Failed", owner: "Olena Ohii" }),
+  makeRow({
+    id: "scn-04",
+    name: "Empty template",
+    description: "Starting point for a new packaging-line scenario.",
+    runState: "Not running",
+    lastRun: { at: null, outcome: null },
+    owner: "Nikolai Pak",
+    stepCount: 0,
+  }),
+];
 
 function setRole(opts: { accessMode?: "local" | "shared"; sharedRole?: "admin" | "user" } = {}) {
   const { accessMode = "local", sharedRole = "admin" } = opts;
   mockShellStore.mockImplementation((selector: (s: object) => unknown) =>
-    selector({ accessMode, sharedRole }),
+    selector({ accessMode, sharedRole, currentProjectId: "proj-1" }),
   );
 }
 
 beforeEach(() => {
-  // Reset store to a clean copy of the fixtures before each test.
-  useScenariosStore.setState({ scenarios: scenarioRows.map((s) => ({ ...s })) });
+  useScenariosStore.setState({
+    scenarios: testScenarios.map((s) => ({ ...s })),
+    steps: {},
+    versions: {},
+    isLoading: false,
+    error: null,
+  });
   mockNotifyPush.mockClear();
   setRole();
 });
@@ -101,11 +157,9 @@ describe("ScenariosPage", () => {
     expect(mockNotifyPush).toHaveBeenCalledWith(
       expect.objectContaining({ tone: "success", title: expect.stringContaining("Started") }),
     );
-    const updated = useScenariosStore.getState().scenarios.find((s) => s.id === "scn-01");
-    expect(updated?.runState).toBe("Running");
   });
 
-  it("stops a running scenario through the confirmation dialog", async () => {
+  it("stops a running scenario through the confirmation dialog and shows a toast", async () => {
     // Clear the lock so the running scenario is stoppable from here.
     useScenariosStore.setState((s) => ({
       scenarios: s.scenarios.map((x) => (x.id === "scn-02" ? { ...x, lockedBy: null } : x)),
@@ -119,8 +173,6 @@ describe("ScenariosPage", () => {
     expect(screen.getByText(/Stop "Packaging fault drill"\?/)).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Stop scenario" }));
 
-    const updated = useScenariosStore.getState().scenarios.find((s) => s.id === "scn-02");
-    expect(updated?.runState).toBe("Stopped");
     expect(mockNotifyPush).toHaveBeenCalledWith(
       expect.objectContaining({ title: expect.stringContaining("Stopped") }),
     );

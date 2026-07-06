@@ -820,6 +820,13 @@ Parallel execution:
   Depends: IS-140.
   Done when: RUNNING simulation visible in list + detail; Stop ends simulation and clears badge; no stale badge after stop; TypeScript build + vitest pass.
 
+- [x] `UI-127` Wire scenario CRUD + validate to live backend API
+  Goal: replace in-memory mock store with real API calls for scenarios CRUD and validation. Keep run/stop as no-ops (UI-129, blocked on IS-141).
+  Surface: `Scenarios`, `Scenario Builder`
+  Work includes: `scenarios-api.ts` with FE↔BE mappers (type case, sourceId↔targetSourceId, params encoding); async Zustand store with loadScenarios/createScenario/renameScenario/duplicateScenario/deleteScenario/saveScenarioSteps; load-on-mount in scenarios-page and builder; Save button in builder with loading state; loading/error states in scenarios-page.
+  Depends: IS-136 scenarios API.
+  Done when: scenarios page loads from backend; create/rename/duplicate/delete/save call API; FE↔BE step mapper handles all step types; TypeScript build + vitest pass.
+
 - [x] `UI-120` Integrate the regrouped API (9 groups)
   Goal: reflect the backend's 9-group API tags (IS-135) on the frontend. No FE code
   change required — the client (`src/api/client.ts`) calls endpoints by raw path and

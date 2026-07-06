@@ -4,7 +4,7 @@
  * Covers:
  * - Renders run summary, current step, timeline, sources, faults, clients,
  *   events, and evidence state
- * - Stop run → confirmation → stopScenario called + success toast + status flips
+ * - Stop run → confirmation → success toast + Stop button hides (local UI state)
  * - Not-found panel for unknown scenario
  * - Open-in-builder navigation
  */
@@ -21,14 +21,41 @@ vi.mock("../shell/notification-store", () => ({
 
 import { ScenarioRunViewPage } from "./scenario-run-view-page";
 import { useScenariosStore } from "../shell/scenarios-store";
-import { scenarioRows, stepsByScenario } from "./mock-scenarios";
+import type { ScenarioRow } from "../shell/scenarios-store";
+import type { ScenarioStep } from "./scenario-steps";
+
+function makeRow(overrides: Partial<ScenarioRow> & { id: string; name: string }): ScenarioRow {
+  return {
+    description: overrides.description ?? "A test scenario.",
+    stepCount: overrides.stepCount ?? 3,
+    runState: overrides.runState ?? "Not running",
+    lastRun: overrides.lastRun ?? { at: null, outcome: null },
+    owner: overrides.owner ?? "Olena Ohii",
+    lockedBy: overrides.lockedBy ?? null,
+    updatedAt: overrides.updatedAt ?? "2026-07-01T00:00:00Z",
+    ...overrides,
+  };
+}
+
+const testSteps: Record<string, ScenarioStep[]> = {
+  "scn-01": [
+    { id: "st-1", type: "start", label: "Line A telemetry", config: { sourceId: "src-01" }, configured: true },
+    { id: "st-2", type: "replay", label: "Calibration recording", config: { sourceId: "src-01", recordingId: "rec-12" }, configured: true },
+    { id: "st-3", type: "wait", label: "Hold 30s", config: { seconds: 30 }, configured: true },
+  ],
+};
 
 beforeEach(() => {
   useScenariosStore.setState({
-    scenarios: scenarioRows.map((s) => ({ ...s })),
+    scenarios: [
+      makeRow({ id: "scn-01", name: "Morning ramp-up", runState: "Running", stepCount: 3 }),
+    ],
     steps: Object.fromEntries(
-      Object.entries(stepsByScenario).map(([k, v]) => [k, v.map((x) => ({ ...x }))]),
+      Object.entries(testSteps).map(([k, v]) => [k, v.map((x) => ({ ...x }))]),
     ),
+    versions: { "scn-01": 1 },
+    isLoading: false,
+    error: null,
   });
   mockNotifyPush.mockClear();
 });
@@ -76,13 +103,12 @@ describe("ScenarioRunViewPage", () => {
     const dialog = screen.getByRole("dialog");
     await user.click(within(dialog).getByRole("button", { name: "Stop run" }));
 
-    expect(useScenariosStore.getState().scenarios.find((s) => s.id === "scn-01")?.runState).toBe(
-      "Stopped",
-    );
+    // stopScenario is a local-UI no-op until IS-141+UI-129;
+    // the page manages stopped state locally via stoppedLocally flag.
     expect(mockNotifyPush).toHaveBeenCalledWith(
       expect.objectContaining({ title: expect.stringContaining("Stopped") }),
     );
-    // Stop button disappears once stopped.
+    // Stop button disappears once stopped (local UI state).
     expect(screen.queryByRole("button", { name: "Stop run" })).toBeNull();
   });
 

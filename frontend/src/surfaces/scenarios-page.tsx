@@ -4,18 +4,19 @@
  * A landing page for saved scenarios: list with run-state, last-run summary,
  * owner/editor context, and role-aware actions (create/open/duplicate/run/stop).
  * Gives the Scenarios area a clear entry point instead of dropping the user
- * straight into the builder. Runs on the scenarios store (mock-backed for now).
+ * straight into the builder. Runs on the scenarios store (live API from UI-127).
  *
  * Roles (UI-006): User can view + run/stop; Admin can additionally create,
  * open-to-edit, and duplicate. A scenario locked by someone else cannot be
  * run/stopped from here (UI-005 edit-lock convention).
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { resolveAccess } from "../shell/access-policy";
 import { useNotificationStore } from "../shell/notification-store";
 import { useScenariosStore } from "../shell/scenarios-store";
+import type { ScenarioRow, ScenarioRunState } from "../shell/scenarios-store";
 import { useShellStore } from "../shell/shell-store";
 import { ConfirmationDialog } from "../ui/confirmation-dialog";
 import { StatusBadge, type StatusTone } from "../ui/status-badge";
@@ -28,7 +29,6 @@ import {
   type TableRowAction,
   type TableSortState,
 } from "../ui/table-pattern";
-import type { ScenarioRow, ScenarioRunState } from "./mock-scenarios";
 
 function runStateTone(state: ScenarioRunState): StatusTone {
   if (state === "Running") return "accent";
@@ -60,9 +60,13 @@ export function ScenariosPage() {
   const navigate = useNavigate();
   const accessMode = useShellStore((state) => state.accessMode);
   const sharedRole = useShellStore((state) => state.sharedRole);
+  const currentProjectId = useShellStore((state) => state.currentProjectId);
   const access = resolveAccess(accessMode, sharedRole);
 
   const scenarios = useScenariosStore((state) => state.scenarios);
+  const isLoading = useScenariosStore((state) => state.isLoading);
+  const error = useScenariosStore((state) => state.error);
+  const loadScenarios = useScenariosStore((state) => state.loadScenarios);
   const runScenario = useScenariosStore((state) => state.runScenario);
   const stopScenario = useScenariosStore((state) => state.stopScenario);
   const duplicateScenario = useScenariosStore((state) => state.duplicateScenario);
@@ -76,6 +80,13 @@ export function ScenariosPage() {
     columnId: "name",
     direction: "asc",
   });
+
+  // Load on mount when scenarios are empty and not already loading
+  useEffect(() => {
+    if (currentProjectId && !isLoading && scenarios.length === 0) {
+      void loadScenarios(currentProjectId);
+    }
+  }, [currentProjectId, isLoading, scenarios.length, loadScenarios]);
 
   const filtered = useMemo(() => {
     const query = searchValue.trim().toLowerCase();
@@ -169,12 +180,11 @@ export function ScenariosPage() {
   ];
 
   function handleOpen(row: ScenarioRow) {
-    // Open the scenario in the builder shell (UI-061).
     navigate(`/scenarios/${row.id}`);
   }
 
-  function handleRun(row: ScenarioRow) {
-    runScenario(row.id);
+  async function handleRun(row: ScenarioRow) {
+    await runScenario(currentProjectId, row.id);
     pushNotification({ tone: "success", title: `Started "${row.name}".` });
   }
 
@@ -183,8 +193,8 @@ export function ScenariosPage() {
     pushNotification({ tone: "success", title: `Stopped "${row.name}".` });
   }
 
-  function handleDuplicate(row: ScenarioRow) {
-    const newId = duplicateScenario(row.id);
+  async function handleDuplicate(row: ScenarioRow) {
+    const newId = await duplicateScenario(currentProjectId, row.id);
     if (newId) {
       pushNotification({ tone: "success", title: `Duplicated "${row.name}".` });
       navigate(`/scenarios/${newId}`);
@@ -193,25 +203,21 @@ export function ScenariosPage() {
 
   function rowActions(row: ScenarioRow): TableRowAction<ScenarioRow>[] {
     const actions: TableRowAction<ScenarioRow>[] = [];
-    // Mock phase: there is no current-user identity to compare against, so any
-    // lock is treated as held by someone else. When the scenarios API lands,
-    // compare row.lockedBy against the current user's identity (not a role label).
     const lockedByOther = row.lockedBy !== null;
 
     actions.push({ label: "Open", onClick: () => handleOpen(row) });
 
     if (row.runState === "Running") {
-      // A running scenario can be observed in the run view (all users).
       actions.push({ label: "View run", onClick: () => navigate(`/scenarios/${row.id}/run`) });
       if (access.canStopScenario && !lockedByOther) {
         actions.push({ label: "Stop", onClick: () => setConfirmStop(row.id) });
       }
     } else if (access.canRunScenario && !lockedByOther) {
-      actions.push({ label: "Run", onClick: () => handleRun(row) });
+      actions.push({ label: "Run", onClick: () => { void handleRun(row); } });
     }
 
     if (access.canDuplicateScenario) {
-      actions.push({ label: "Duplicate", onClick: () => handleDuplicate(row) });
+      actions.push({ label: "Duplicate", onClick: () => { void handleDuplicate(row); } });
     }
 
     return actions;
@@ -220,6 +226,31 @@ export function ScenariosPage() {
   const confirmTarget = confirmStop
     ? scenarios.find((s) => s.id === confirmStop) ?? null
     : null;
+
+  // Loading state
+  if (isLoading && scenarios.length === 0) {
+    return (
+      <div className="flex h-full items-center justify-center px-4 py-6">
+        <p className="text-sm text-shell-muted">Loading scenarios…</p>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error && scenarios.length === 0) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-3 px-4 py-6">
+        <p className="text-sm text-shell-danger">{error}</p>
+        <button
+          className="shell-action"
+          type="button"
+          onClick={() => void loadScenarios(currentProjectId)}
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full flex-col gap-4 px-4 py-6">
@@ -235,15 +266,21 @@ export function ScenariosPage() {
           <button
             className="shell-action"
             type="button"
-            onClick={() => {
-              const id = createScenario();
-              navigate(`/scenarios/${id}`);
+            onClick={async () => {
+              const id = await createScenario(currentProjectId);
+              if (id) navigate(`/scenarios/${id}`);
             }}
           >
             New scenario
           </button>
         ) : null}
       </header>
+
+      {error ? (
+        <div className="rounded-md border border-shell-danger/30 bg-shell-danger/5 px-4 py-3 text-sm text-shell-ink">
+          {error}
+        </div>
+      ) : null}
 
       <TableToolbar
         searchValue={searchValue}
