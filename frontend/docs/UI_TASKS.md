@@ -820,6 +820,13 @@ Parallel execution:
   Depends: IS-140.
   Done when: RUNNING simulation visible in list + detail; Stop ends simulation and clears badge; no stale badge after stop; TypeScript build + vitest pass.
 
+- [x] `UI-128` Scenario step editor — real source/recording pickers + server-side validation display
+  Goal: replace mock data-source and recording lists in the step editor with live store data; wire server validation issues (fetched after each save) into the builder validation summary; fix FE↔BE field contracts for SYNTHETIC (pattern→seconds/durationMs), REPLAY (compatibilityAck), and MARKER (note→label).
+  Surface: `Scenario Builder`
+  Work includes: `scenario-step-editor.tsx` — use `useDataSourcesStore`/`useArtifactsStore`, filter recordings by selected source, handle checkbox field kind, `projectId` prop; `scenario-steps.ts` — add checkbox to StepFieldKind, fix SYNTHETIC/REPLAY/MARKER field specs; `scenarios-api.ts` — fix toApiStep/fromApiStep for SYNTHETIC, REPLAY, MARKER; `scenarios-store.ts` — add `serverIssues` state, fetch validate after save; `scenario-builder-page.tsx` — pass projectId to editor, merge server issues with client validation.
+  Depends: UI-127, IS-136 (recordings filter by sourceId).
+  Done when: source/recording selects load from API; server issues merged into builder validation summary; field contracts correct; typecheck + vitest pass.
+
 - [x] `UI-127` Wire scenario CRUD + validate to live backend API
   Goal: replace in-memory mock store with real API calls for scenarios CRUD and validation. Keep run/stop as no-ops (UI-129, blocked on IS-141).
   Surface: `Scenarios`, `Scenario Builder`

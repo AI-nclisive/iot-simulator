@@ -56,7 +56,7 @@ export interface ScenarioValidationIssue {
 // by these specs, so every type is edited the same way. Fault gets a minimal
 // target here; its detailed parameters are refined by UI-063.
 
-export type StepFieldKind = "source" | "recording" | "number" | "text" | "select";
+export type StepFieldKind = "source" | "recording" | "number" | "text" | "select" | "checkbox";
 
 export interface StepFieldSpec {
   key: string;
@@ -75,20 +75,22 @@ export const STEP_FIELD_SPECS: Record<ScenarioStepType, StepFieldSpec[]> = {
   replay: [
     { key: "sourceId", label: "Target source", kind: "source", required: true },
     { key: "recordingId", label: "Recording", kind: "recording", required: true },
+    {
+      key: "compatibilityAck",
+      label: "Acknowledge schema mismatch",
+      kind: "checkbox",
+      required: false,
+      hint: "Check to allow replay even when the recording's schema does not exactly match the source.",
+    },
   ],
   synthetic: [
     { key: "sourceId", label: "Target source", kind: "source", required: true },
     {
-      key: "pattern",
-      label: "Generation pattern",
-      kind: "select",
+      key: "seconds",
+      label: "Duration (seconds)",
+      kind: "number",
       required: true,
-      options: [
-        { value: "ramp", label: "Ramp" },
-        { value: "sine", label: "Sine" },
-        { value: "random", label: "Random walk" },
-        { value: "constant", label: "Constant" },
-      ],
+      hint: "How long to generate synthetic values before the next step. Pattern comes from the source's basis.",
     },
   ],
   fault: [
@@ -120,7 +122,7 @@ export const STEP_FIELD_SPECS: Record<ScenarioStepType, StepFieldSpec[]> = {
     },
   ],
   marker: [
-    { key: "note", label: "Marker note", kind: "text", required: true, hint: "Shown on the run timeline." },
+    { key: "label", label: "Marker label", kind: "text", required: true, hint: "Shown on the run timeline." },
   ],
 };
 

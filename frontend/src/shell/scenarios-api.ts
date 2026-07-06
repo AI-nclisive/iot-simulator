@@ -96,18 +96,19 @@ export function toApiStep(step: ScenarioStep): { type: string; targetSourceId: s
       break;
     }
     case "marker": {
-      params = { label: step.config.note ?? "" };
+      params = { label: step.config.label ?? "" };
       break;
     }
     case "replay": {
       params = {
         recordingId: step.config.recordingId ?? null,
-        compatibilityAck: true,
+        compatibilityAck: step.config.compatibilityAck === true,
       };
       break;
     }
     case "synthetic": {
-      params = { pattern: step.config.pattern ?? null };
+      const seconds = typeof step.config.seconds === "number" ? step.config.seconds : 0;
+      params = { durationMs: seconds * 1000 };
       break;
     }
     case "fault": {
@@ -171,15 +172,17 @@ export function fromApiStep(row: ScenarioApiStep): ScenarioStep {
       break;
     }
     case "marker": {
-      config.note = parsedParams.label ?? "";
+      config.label = parsedParams.label ?? "";
       break;
     }
     case "replay": {
       config.recordingId = parsedParams.recordingId ?? null;
+      config.compatibilityAck = parsedParams.compatibilityAck === true;
       break;
     }
     case "synthetic": {
-      config.pattern = parsedParams.pattern ?? null;
+      const durationMs = typeof parsedParams.durationMs === "number" ? parsedParams.durationMs : 0;
+      config.seconds = durationMs / 1000;
       break;
     }
     case "fault": {
