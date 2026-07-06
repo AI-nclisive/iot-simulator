@@ -350,28 +350,23 @@ export const useScenariosStore = create<ScenariosState>((set, get) => ({
   },
 
   onRunFinished: (id: string, state: LiveRunState["state"]) => {
-    const terminalRunState =
-      state === "failed" ? ("Failed" as const)
-      : state === "stopped" ? ("Stopped" as const)
-      : ("Not running" as const);
     set((prev) => ({
       liveRuns: prev.liveRuns[id]
         ? { ...prev.liveRuns, [id]: { ...prev.liveRuns[id], state } }
         : prev.liveRuns,
-      scenarios: prev.scenarios.map((s) =>
-        s.id === id ? { ...s, runState: terminalRunState } : s,
-      ),
     }));
   },
 
   clearLiveRun: (id: string) => {
-    // Only clears the client-side SSE tracking entry. runState is managed by
-    // onRunFinished / stopScenario — clearing it here would reset a still-running
-    // scenario's status whenever the user navigates away from the run view.
     set((state) => {
       const liveRuns = { ...state.liveRuns };
       delete liveRuns[id];
-      return { liveRuns };
+      return {
+        liveRuns,
+        scenarios: state.scenarios.map((s) =>
+          s.id === id ? { ...s, runState: "Not running" as const } : s,
+        ),
+      };
     });
   },
 }));
