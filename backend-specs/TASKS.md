@@ -236,7 +236,7 @@ import/export. Modbus moved to Wave G (deferred) — see the note there.
 - [x] IS-085 [BE] ✅ [gen] Scenario model + steps (start/stop/replay/synthetic/fault/wait/marker) — SPEC: Build Scenarios
 - [x] IS-086 [BE] ✅ [gen] Scenario validation + run execution — SPEC: Run Scenarios
 - [ ] IS-087 [BE] ⬜ [gen] Fault model + injection (neutral & protocol; never auto-healed) — SPEC: Simulate Faults
-- [ ] IS-088 [BE] ⬜ [ipc] InjectFault RPC — 02
+- [x] IS-088 [BE] ✅ [ipc] InjectFault RPC — 02
 - [x] IS-089 [BE] ✅ [api] Runs resource + test-control endpoints (start/state/stop) — 05/SPEC: Control From Tests
 - [x] IS-135 [BE] ✅ [api] Regroup the REST API into 9 logical groups (consolidate per-controller `@Tag`s so Swagger shows 9 sections). FE half: UI-120 — 05
 - [ ] IS-090 [BE] ⬜ [ipc] Shutdown RPC handling — 02

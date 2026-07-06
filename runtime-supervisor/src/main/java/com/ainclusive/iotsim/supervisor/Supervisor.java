@@ -337,6 +337,16 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
         return applied;
     }
 
+    @Override
+    public void injectFault(String dataSourceId, String kind, String layer, boolean active,
+            Map<String, String> params) {
+        ManagedWorker worker = running.get(dataSourceId);
+        if (worker == null) {
+            throw new IllegalStateException("data source is not running: " + dataSourceId);
+        }
+        worker.injectFault(kind, layer, active, params);
+    }
+
     /**
      * Real-source discovery (create-from-scan). Spawns a one-shot worker in client
      * mode, probes the endpoint, and tears the worker down — it is never adopted
@@ -997,6 +1007,17 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
                 throw new IllegalStateException("data source is not running: " + dataSourceId);
             }
             return current.applyValues(protoValues);
+        }
+
+        void injectFault(String kind, String layer, boolean active, Map<String, String> params) {
+            WorkerClient current;
+            synchronized (this) {
+                current = client;
+            }
+            if (current == null) {
+                throw new IllegalStateException("data source is not running: " + dataSourceId);
+            }
+            current.injectFault(kind, layer, active, params);
         }
 
         /**
