@@ -9,7 +9,8 @@ public record StreamKey(Type type, String scopeId) {
     public enum Type {
         RUNTIME,
         CLIENTS,
-        VALUES
+        VALUES,
+        SCENARIO_RUN
     }
 
     public StreamKey {
@@ -30,5 +31,10 @@ public record StreamKey(Type type, String scopeId) {
     /** Live-value stream for a data source: {@code /data-sources/{id}/stream/values}. */
     public static StreamKey values(String dataSourceId) {
         return new StreamKey(Type.VALUES, dataSourceId);
+    }
+
+    /** Scenario run progress stream: {@code /scenarios/{id}/runs/{runId}/events}. */
+    public static StreamKey scenarioRun(String runId) {
+        return new StreamKey(Type.SCENARIO_RUN, runId);
     }
 }

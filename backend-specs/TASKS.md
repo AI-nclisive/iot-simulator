@@ -173,6 +173,7 @@ Make `Scan → Record → Simulate` work against real instruments, not provided 
 - [x] IS-140 [BE] ✅ [runtime] Live-Simulate: time-paced replay + stop — replay run stays RUNNING while values stream at original recording pace (source_time deltas); POST /runs/{id}/stop tears down worker + ends run STOPPED; last-used recording stored in DataSource.runtimeConfig for UI default. FE half: UI-125, UI-126.
 - [x] IS-141 [BE] ✅ Async scenario execution engine — ScenarioLiveRunService runs scenario steps in a background daemon thread pool; POST /scenarios/{id}/run returns {runId, evidenceId} immediately; stop cancels via Future.cancel(true) and integrates with RunService.stop() stopIfLive convention.
 - [x] IS-143 [BE] ✅ Scenario run stop semantics — teardown started sources on cancel/failure; ScenarioLiveRunService tracks started sources per run and calls dataSources.stop() for each on STOPPED/FAILED; COMPLETED runs skip teardown (scenario's own STOP steps own clean state on success).
+- [x] IS-142 [BE] ✅ Scenario run progress SSE stream — ScenarioStepListener port (domain) + ScenarioRunStreamPublisher adapter (api) publishes step-started/step-completed/run-finished events to LiveStreamRegistry; new GET /scenarios/{id}/runs/{runId}/events SSE endpoint (OBSERVE permission); setter injection via volatile field keeps domain free of api dependency.
 
 ## Wave C — Observability & evidence · P0
 
