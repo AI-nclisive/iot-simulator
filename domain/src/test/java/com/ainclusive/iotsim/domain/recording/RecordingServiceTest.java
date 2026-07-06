@@ -66,7 +66,7 @@ class RecordingServiceTest {
 
     @Test
     void createUnderExistingSource() {
-        Recording r = service.create(PROJECT, SOURCE, com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_AND_DATA, "alice");
+        Recording r = service.create(PROJECT, SOURCE, com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_AND_DATA, null, "alice");
         assertThat(r.origin()).isEqualTo("SCAN_RECORD");
         assertThat(r.valueCount()).isZero();
         assertThat(r.dataSourceId()).isEqualTo(SOURCE);
@@ -75,13 +75,13 @@ class RecordingServiceTest {
     @Test
     void createUnderMissingSourceThrowsNotFound() {
         assertThatThrownBy(() -> service.create(PROJECT, "nope",
-                        com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_AND_DATA, "a"))
+                        com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_AND_DATA, null, "a"))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test
     void appendValuesIsNoOpForSchemaOnlyRecording() {
-        Recording r = service.create(PROJECT, SOURCE, com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_ONLY, "a");
+        Recording r = service.create(PROJECT, SOURCE, com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_ONLY, null, "a");
         Instant t = Instant.parse("2026-01-01T00:00:00Z");
         long written = service.appendValues(PROJECT, r.id(), List.of(
                 NeutralValue.good("v1", t, 1.0)));
@@ -92,7 +92,7 @@ class RecordingServiceTest {
 
     @Test
     void appendThenCompleteUpdatesValueCount() {
-        Recording r = service.create(PROJECT, SOURCE, com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_AND_DATA, "a");
+        Recording r = service.create(PROJECT, SOURCE, com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_AND_DATA, null, "a");
         Instant t = Instant.parse("2026-01-01T00:00:00Z");
         long written = service.appendValues(PROJECT, r.id(), List.of(
                 NeutralValue.good("v1", t, 1.0),
@@ -175,9 +175,9 @@ class RecordingServiceTest {
 
     @Test
     void listPagedEmitsCursorWhenResultsExceedLimit() {
-        service.create(PROJECT, SOURCE, com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_AND_DATA, "alice");
-        service.create(PROJECT, SOURCE, com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_AND_DATA, "bob");
-        service.create(PROJECT, SOURCE, com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_AND_DATA, "carol");
+        service.create(PROJECT, SOURCE, com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_AND_DATA, null, "alice");
+        service.create(PROJECT, SOURCE, com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_AND_DATA, null, "bob");
+        service.create(PROJECT, SOURCE, com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_AND_DATA, null, "carol");
 
         // fakeProjects returns empty → requireProject throws; rebuild with a present project repo
         ProjectRepository existingProject = new ProjectRepository() {
@@ -200,9 +200,9 @@ class RecordingServiceTest {
                 new InMemoryValueTimelineRepository(), sources, schemas,
                 new com.ainclusive.iotsim.platform.secret.InMemoryCredentialStore(),
                 capturer, existingProject);
-        svc.create(PROJECT, SOURCE, com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_AND_DATA, "alice");
-        svc.create(PROJECT, SOURCE, com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_AND_DATA, "bob");
-        svc.create(PROJECT, SOURCE, com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_AND_DATA, "carol");
+        svc.create(PROJECT, SOURCE, com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_AND_DATA, null, "alice");
+        svc.create(PROJECT, SOURCE, com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_AND_DATA, null, "bob");
+        svc.create(PROJECT, SOURCE, com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_AND_DATA, null, "carol");
 
         com.ainclusive.iotsim.domain.support.Page<Recording> page = svc.listPaged(PROJECT, null, 2);
         assertThat(page.items()).hasSize(2);
@@ -216,7 +216,7 @@ class RecordingServiceTest {
     @Test
     void listValuesReturnsFirstPage() {
         RecordingService svc = service;
-        String rid = svc.create(PROJECT, SOURCE, com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_AND_DATA, "test").id();
+        String rid = svc.create(PROJECT, SOURCE, com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_AND_DATA, null, "test").id();
         Instant t = Instant.parse("2024-01-01T00:00:00Z");
         List<NeutralValue> vals = List.of(
                 NeutralValue.good("n1", t, 1.0),
@@ -248,7 +248,7 @@ class RecordingServiceTest {
         List<SchemaNode> nodes = List.of(variable("temp", DataType.FLOAT64));
         // schemaVersion = 2 (matches FakeDataSourceRepository default)
         schemas.setByVersion(SOURCE, 2, nodes);
-        Recording r = service.create(PROJECT, SOURCE, com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_AND_DATA, "alice");
+        Recording r = service.create(PROJECT, SOURCE, com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_AND_DATA, null, "alice");
 
         RecordingService.RecordingSchema schema = service.getRecordingSchema(PROJECT, r.id());
         assertThat(schema.nodes()).hasSize(1);
@@ -257,7 +257,7 @@ class RecordingServiceTest {
 
     @Test
     void getRecordingSchemaThrowsWhenSchemaAbsent() {
-        Recording r = service.create(PROJECT, SOURCE, com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_AND_DATA, "alice");
+        Recording r = service.create(PROJECT, SOURCE, com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_AND_DATA, null, "alice");
         assertThatThrownBy(() -> service.getRecordingSchema(PROJECT, r.id()))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
@@ -339,10 +339,10 @@ class RecordingServiceTest {
 
         @Override
         public RecordingRow create(String projectId, String dataSourceId, int schemaVersion,
-                String origin, String scanType, String createdBy) {
+                String origin, String scanType, String name, String createdBy) {
             OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
             RecordingRow row = new RecordingRow("rec-" + (++seq), projectId, dataSourceId,
-                    schemaVersion, origin, scanType, null, null, 0, 0, now, now, createdBy, 0);
+                    schemaVersion, origin, scanType, name, null, null, 0, 0, now, now, createdBy, 0);
             rows.put(row.id(), row);
             return row;
         }
@@ -375,7 +375,7 @@ class RecordingServiceTest {
                 long valueCount, long sizeBytes) {
             RecordingRow r = rows.get(id);
             RecordingRow updated = new RecordingRow(r.id(), r.projectId(), r.dataSourceId(),
-                    r.schemaVersion(), r.origin(), r.scanType(), timeStart, timeEnd, valueCount,
+                    r.schemaVersion(), r.origin(), r.scanType(), r.name(), timeStart, timeEnd, valueCount,
                     sizeBytes, r.createdAt(), OffsetDateTime.now(ZoneOffset.UTC), r.createdBy(),
                     r.version() + 1);
             rows.put(id, updated);

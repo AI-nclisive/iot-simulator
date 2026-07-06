@@ -54,11 +54,14 @@ public class RecordingService {
         this.projects = projects;
     }
 
-    public Recording create(String projectId, String dataSourceId, ScanType scanType, String actor) {
+    public Recording create(String projectId, String dataSourceId, ScanType scanType,
+            String name, String actor) {
         DataSourceRow source = requireSource(projectId, dataSourceId);
         int schemaVersion = source.schemaVersion() == null ? 0 : source.schemaVersion();
         String scanTypeStr = scanType != null ? scanType.name() : ScanType.SCHEMA_AND_DATA.name();
-        return map(recordings.create(projectId, dataSourceId, schemaVersion, "SCAN_RECORD", scanTypeStr, actor));
+        String safeName = (name != null && !name.isBlank()) ? name.trim() : null;
+        return map(recordings.create(projectId, dataSourceId, schemaVersion, "SCAN_RECORD",
+                scanTypeStr, safeName, actor));
     }
 
     /** Appends captured values; skipped entirely when the recording is {@code SCHEMA_ONLY}. */
@@ -102,7 +105,7 @@ public class RecordingService {
             started[0] = true;
             Recording recording = map(recordings.create(
                     projectId, dsId, schema.version(), "SCAN_RECORD",
-                    ScanType.SCHEMA_AND_DATA.name(), actor));
+                    ScanType.SCHEMA_AND_DATA.name(), null, actor));
             CaptureSpec spec = new CaptureSpec(source.protocol(), source.realDeviceEndpoint(),
                     credentials.find(dsId).orElse(null), schema.version(), schema.nodes());
             CaptureSession session = capturer.startCapture(
@@ -245,7 +248,7 @@ public class RecordingService {
     private Recording map(RecordingRow r) {
         return new Recording(
                 r.id(), r.projectId(), r.dataSourceId(), r.schemaVersion(), r.origin(),
-                r.scanType(), r.valueCount(), r.createdAt().toInstant(), r.createdBy(), r.version());
+                r.scanType(), r.name(), r.valueCount(), r.createdAt().toInstant(), r.createdBy(), r.version());
     }
 
     /** A live capture in progress: the recording it feeds and the session to stop. */

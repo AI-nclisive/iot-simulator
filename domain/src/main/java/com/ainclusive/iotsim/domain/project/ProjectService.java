@@ -130,7 +130,7 @@ public class ProjectService {
                         "Recording " + rec.id() + " references unknown data source " + rec.dataSourceId());
             }
             int newSchemaVersion = dsSchemaVersionMap.getOrDefault(rec.dataSourceId(), rec.schemaVersion());
-            recordings.create(copy.id(), newDsId, newSchemaVersion, rec.origin(), "SCHEMA_AND_DATA", rec.createdBy());
+            recordings.create(copy.id(), newDsId, newSchemaVersion, rec.origin(), "SCHEMA_AND_DATA", rec.name(), rec.createdBy());
         }
 
         return toDomain(copy);

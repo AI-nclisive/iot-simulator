@@ -415,11 +415,11 @@ class ReplayServiceTest {
             }
             OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
             return Optional.of(new RecordingRow(id, projectId, "ds1", 1, "SCAN_RECORD",
-                    "SCHEMA_AND_DATA", null, null, 0, 0, now, now, "local", 0));
+                    "SCHEMA_AND_DATA", null, null, null, 0, 0, now, now, "local", 0));
         }
 
         @Override
-        public RecordingRow create(String p, String d, int sv, String o, String st, String c) {
+        public RecordingRow create(String p, String d, int sv, String o, String st, String n, String c) {
             throw new UnsupportedOperationException();
         }
 
@@ -490,11 +490,11 @@ class ReplayServiceTest {
             }
             OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
             return Optional.of(new RecordingRow(id, projectId, "ds1", schemaVersion, "SCAN_RECORD",
-                    "SCHEMA_AND_DATA", null, null, 0, 0, now, now, "local", 0));
+                    "SCHEMA_AND_DATA", null, null, null, 0, 0, now, now, "local", 0));
         }
 
         @Override
-        public RecordingRow create(String p, String d, int sv, String o, String st, String c) {
+        public RecordingRow create(String p, String d, int sv, String o, String st, String n, String c) {
             throw new UnsupportedOperationException();
         }
 

@@ -72,7 +72,7 @@ public class RecordingController {
             throw new IllegalArgumentException("dataSourceId is required");
         }
         ScanType scanType = req.scanType() != null ? req.scanType() : ScanType.SCHEMA_AND_DATA;
-        Recording recording = recordings.create(projectId, req.dataSourceId(), scanType, "local");
+        Recording recording = recordings.create(projectId, req.dataSourceId(), scanType, req.name(), "local");
         return ResponseEntity.created(
                         URI.create("/api/v1/projects/" + projectId + "/recordings/" + recording.id()))
                 .eTag(etag(recording.version()))
@@ -94,16 +94,16 @@ public class RecordingController {
         return "\"" + version + "\"";
     }
 
-    public record CreateRecordingRequest(String dataSourceId, ScanType scanType) {}
+    public record CreateRecordingRequest(String dataSourceId, ScanType scanType, String name) {}
 
     public record RecordingResponse(
             String id, String projectId, String dataSourceId, int schemaVersion, String origin,
-            String scanType, long valueCount, Instant createdAt, String createdBy, long version) {
+            String scanType, String name, long valueCount, Instant createdAt, String createdBy, long version) {
 
         static RecordingResponse from(Recording r) {
             return new RecordingResponse(
                     r.id(), r.projectId(), r.dataSourceId(), r.schemaVersion(), r.origin(),
-                    r.scanType(), r.valueCount(), r.createdAt(), r.createdBy(), r.version());
+                    r.scanType(), r.name(), r.valueCount(), r.createdAt(), r.createdBy(), r.version());
         }
     }
 }
