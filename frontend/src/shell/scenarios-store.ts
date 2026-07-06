@@ -21,9 +21,11 @@ import {
   fromApiScenario,
   stopScenarioRun,
   type ScenarioApiRow,
+  type ScenarioApiValidation,
+  type ScenarioApiValidationIssue,
 } from "./scenarios-api";
 
-export type { ScenarioRow, ScenarioRunState, ScenarioLastRun } from "./scenarios-api";
+export type { ScenarioRow, ScenarioRunState, ScenarioLastRun, ScenarioApiValidationIssue } from "./scenarios-api";
 
 export interface LiveRunState {
   runId: string;
@@ -42,6 +44,8 @@ type ScenariosState = {
   versions: Record<string, number>;
   /** Live run state keyed by scenario id. */
   liveRuns: Record<string, LiveRunState>;
+  /** Server-side validation issues per scenario id (fetched after each save). */
+  serverIssues: Record<string, ScenarioApiValidationIssue[]>;
   isLoading: boolean;
   error: string | null;
 
@@ -77,6 +81,7 @@ export const useScenariosStore = create<ScenariosState>((set, get) => ({
   steps: {},
   versions: {},
   liveRuns: {},
+  serverIssues: {},
   isLoading: false,
   error: null,
 
@@ -220,6 +225,18 @@ export const useScenariosStore = create<ScenariosState>((set, get) => ({
         scenarios: state.scenarios.map((s) => (s.id === id ? updatedRow : s)),
         versions: { ...state.versions, [id]: data.version },
       }));
+      // Fetch server validation so the builder can surface schema-mismatch and
+      // FAULT-not-executable warnings alongside client-side validation.
+      try {
+        const v = await apiFetch<ScenarioApiValidation>(
+          `/api/v1/projects/${projectId}/scenarios/${id}/validate`,
+        );
+        set((state) => ({
+          serverIssues: { ...state.serverIssues, [id]: v.issues },
+        }));
+      } catch {
+        // Validate is best-effort; don't surface a validation-fetch failure as a save error.
+      }
     } catch (err) {
       const message = err instanceof ApiError ? err.title : "Failed to save scenario";
       set({ error: message });

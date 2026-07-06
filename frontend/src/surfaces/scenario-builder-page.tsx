@@ -16,7 +16,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { resolveAccess } from "../shell/access-policy";
 import { useNotificationStore } from "../shell/notification-store";
-import { useScenariosStore } from "../shell/scenarios-store";
+import { useScenariosStore, type ScenarioApiValidationIssue } from "../shell/scenarios-store";
 import { useShellStore } from "../shell/shell-store";
 import { ConfirmationDialog } from "../ui/confirmation-dialog";
 import { SharedStatePanel } from "../ui/shared-state-panel";
@@ -25,6 +25,7 @@ import { ScenarioStepEditor } from "./scenario-step-editor";
 import {
   STEP_TYPE_LABELS,
   validateScenario,
+  type ScenarioValidationIssue,
   type ScenarioStepType,
 } from "./scenario-steps";
 
@@ -55,6 +56,7 @@ function statusLabel(status: BuilderStatus): string {
 }
 
 const EMPTY_STEPS: ReadonlyArray<never> = [];
+const EMPTY_SERVER_ISSUES: ScenarioApiValidationIssue[] = [];
 
 export function ScenarioBuilderPage() {
   const { scenarioId = "" } = useParams();
@@ -79,6 +81,7 @@ export function ScenarioBuilderPage() {
   const renameScenario = useScenariosStore((s) => s.renameScenario);
   const pushNotification = useNotificationStore((s) => s.push);
 
+  const serverIssues = useScenariosStore((s) => s.serverIssues[scenarioId] ?? EMPTY_SERVER_ISSUES);
   const scenarios = useScenariosStore((s) => s.scenarios);
   const [selectedStepId, setSelectedStepId] = useState<string | null>(steps[0]?.id ?? null);
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
@@ -97,9 +100,26 @@ export function ScenarioBuilderPage() {
   }, [scenario, scenarios.length, isLoading, error, currentProjectId, loadScenarios]);
 
   const validation = useMemo(() => validateScenario(steps), [steps]);
+
+  // Merge server-side validation (fetched after each save) with client issues.
+  // Server ordinals map to step ids via the steps array index.
+  const mergedIssues = useMemo<ScenarioValidationIssue[]>(() => {
+    const fromServer = serverIssues
+      .filter((si) => si.severity === "ERROR")
+      .map((si) => ({ stepId: steps[si.ordinal]?.id ?? null, message: si.message }));
+    return [...validation.issues, ...fromServer];
+  }, [validation.issues, serverIssues, steps]);
+
+  const mergedWarnings = useMemo<ScenarioValidationIssue[]>(() => {
+    const fromServer = serverIssues
+      .filter((si) => si.severity === "WARNING")
+      .map((si) => ({ stepId: steps[si.ordinal]?.id ?? null, message: si.message }));
+    return [...validation.warnings, ...fromServer];
+  }, [validation.warnings, serverIssues, steps]);
+
   const stepIssueIds = useMemo(
-    () => new Set(validation.issues.map((i) => i.stepId).filter((id): id is string => id !== null)),
-    [validation],
+    () => new Set(mergedIssues.map((i) => i.stepId).filter((id): id is string => id !== null)),
+    [mergedIssues],
   );
 
   const lockedByOther = scenario?.lockedBy != null;
@@ -243,17 +263,17 @@ export function ScenarioBuilderPage() {
       ) : null}
 
       {/* Validation summary */}
-      {validation.issues.length > 0 ? (
+      {mergedIssues.length > 0 ? (
         <section
           aria-label="Validation summary"
           className="rounded-md border border-shell-warning/30 bg-shell-warning/5 px-4 py-3"
         >
           <p className="text-sm font-medium text-shell-ink">
-            Not runnable yet — {validation.issues.length} issue
-            {validation.issues.length === 1 ? "" : "s"}:
+            Not runnable yet — {mergedIssues.length} issue
+            {mergedIssues.length === 1 ? "" : "s"}:
           </p>
           <ul className="mt-2 space-y-1 pl-0 text-sm">
-            {validation.issues.map((issue, i) => (
+            {mergedIssues.map((issue, i) => (
               <li key={`${issue.stepId ?? "scenario"}-${i}`} className="flex gap-2">
                 <span aria-hidden className="text-shell-warning">•</span>
                 {issue.stepId ? (
@@ -281,13 +301,13 @@ export function ScenarioBuilderPage() {
       )}
 
       {/* Non-blocking warnings — shown whether or not the scenario is runnable. */}
-      {validation.warnings.length > 0 ? (
+      {mergedWarnings.length > 0 ? (
         <section
           aria-label="Validation warnings"
           className="rounded-md border border-shell-warning/20 bg-shell-warning/5 px-4 py-3"
         >
           <ul className="list-disc space-y-1 pl-5 text-sm text-shell-muted">
-            {validation.warnings.map((w, i) => (
+            {mergedWarnings.map((w, i) => (
               <li key={`warn-${w.stepId ?? "scenario"}-${i}`}>{w.message}</li>
             ))}
           </ul>
@@ -404,8 +424,12 @@ export function ScenarioBuilderPage() {
               <ScenarioStepEditor
                 key={selectedStep.id}
                 step={selectedStep}
+                projectId={currentProjectId}
                 canEdit={canEdit}
                 onChange={(patch) => updateStep(scenarioId, selectedStep.id, patch)}
+                serverValidationIssues={mergedIssues
+                  .filter((i) => i.stepId === selectedStep.id)
+                  .map((i) => i.message)}
               />
             ) : (
               <p className="text-sm text-shell-muted">
