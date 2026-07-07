@@ -366,9 +366,9 @@ export function EvidenceDetailPage() {
 
         <section className="shell-panel px-5 py-5">
           <h3 className="text-base font-semibold text-shell-ink">Sources</h3>
-          {item.sourceIds.length > 0 ? (
+          {(item.sourceIds ?? []).length > 0 ? (
             <ul className="mt-5 space-y-3">
-              {item.sourceIds.map((sourceId) => (
+              {(item.sourceIds ?? []).map((sourceId) => (
                 <li
                   key={sourceId}
                   className="rounded-md border border-shell-line bg-white px-4 py-3 text-sm text-shell-ink"
