@@ -3,6 +3,7 @@ package com.ainclusive.iotsim.persistence.schema;
 import static com.ainclusive.iotsim.persistence.jooq.tables.DataSources.DATA_SOURCES;
 import static com.ainclusive.iotsim.persistence.jooq.tables.SchemaNodes.SCHEMA_NODES;
 import static com.ainclusive.iotsim.persistence.jooq.tables.Schemas.SCHEMAS;
+import static org.jooq.impl.DSL.count;
 import static org.jooq.impl.DSL.max;
 
 import com.ainclusive.iotsim.persistence.jooq.tables.records.SchemaNodesRecord;
@@ -15,7 +16,10 @@ import com.ainclusive.iotsim.protocolmodel.SchemaNode;
 import com.ainclusive.iotsim.protocolmodel.ValueRank;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.jooq.DSLContext;
 import org.springframework.stereotype.Repository;
@@ -112,6 +116,29 @@ public class JooqSchemaRepository implements SchemaRepository {
             return new SchemaWithNodes(
                     schemaId, dataSourceId, next, schema.getCreatedAt(), List.copyOf(nodes));
         });
+    }
+
+    @Override
+    public Map<String, Integer> countVariableNodesBySource(Collection<String> dataSourceIds) {
+        if (dataSourceIds == null || dataSourceIds.isEmpty()) {
+            return Map.of();
+        }
+        // Single query: join data_sources -> schema_nodes (via current schema_id) where kind='VARIABLE',
+        // group by data_source_id. Sources with no schema or no VARIABLE nodes are absent from the result.
+        Map<String, Integer> counts = new HashMap<>();
+        dsl.select(DATA_SOURCES.ID, count())
+                .from(DATA_SOURCES)
+                .join(SCHEMA_NODES).on(SCHEMA_NODES.SCHEMA_ID.eq(DATA_SOURCES.SCHEMA_ID))
+                .where(DATA_SOURCES.ID.in(dataSourceIds))
+                .and(SCHEMA_NODES.KIND.eq(NodeKind.VARIABLE.name()))
+                .groupBy(DATA_SOURCES.ID)
+                .fetch()
+                .forEach(r -> counts.put(r.value1(), r.value2()));
+        // Ensure every requested id has an entry (0 if no VARIABLE nodes or no schema).
+        for (String id : dataSourceIds) {
+            counts.putIfAbsent(id, 0);
+        }
+        return counts;
     }
 
     private SchemaNode toNode(SchemaNodesRecord r) {

@@ -22,6 +22,7 @@ import com.ainclusive.iotsim.domain.datasource.SourceBasis;
 import com.ainclusive.iotsim.domain.scan.ScanJob;
 import com.ainclusive.iotsim.domain.scan.ScanService;
 import com.ainclusive.iotsim.domain.scan.TypeResolution;
+import com.ainclusive.iotsim.domain.schema.SchemaService;
 import com.ainclusive.iotsim.platform.scan.ConnectionTestResult;
 import com.ainclusive.iotsim.platform.scan.DiscoveredNode;
 import com.ainclusive.iotsim.platform.scan.ScanResult;
@@ -45,7 +46,9 @@ class ScanControllerTest {
     @BeforeEach
     void setUp() {
         service = mock(ScanService.class);
-        controller = new ScanController(service);
+        SchemaService schemaService = mock(SchemaService.class);
+        given(schemaService.countVariableNodes(any(String.class))).willReturn(0);
+        controller = new ScanController(service, schemaService);
     }
 
     @Test

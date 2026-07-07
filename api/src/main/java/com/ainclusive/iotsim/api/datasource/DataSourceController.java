@@ -7,6 +7,7 @@ import com.ainclusive.iotsim.api.support.CredentialRequests;
 import com.ainclusive.iotsim.domain.datasource.DataSource;
 import com.ainclusive.iotsim.domain.datasource.DataSourceService;
 import com.ainclusive.iotsim.domain.datasource.SecurityConfigRedactor;
+import com.ainclusive.iotsim.domain.schema.SchemaService;
 import com.ainclusive.iotsim.domain.support.Page;
 import com.ainclusive.iotsim.protocolmodel.Access;
 import com.ainclusive.iotsim.protocolmodel.DataType;
@@ -19,6 +20,8 @@ import java.net.URI;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -60,9 +63,11 @@ public class DataSourceController {
             + " T(com.ainclusive.iotsim.api.security.Permission).SOURCE_STOP)";
 
     private final DataSourceService dataSources;
+    private final SchemaService schemas;
 
-    public DataSourceController(DataSourceService dataSources) {
+    public DataSourceController(DataSourceService dataSources, SchemaService schemas) {
         this.dataSources = dataSources;
+        this.schemas = schemas;
     }
 
     @Operation(
@@ -76,8 +81,14 @@ public class DataSourceController {
             @RequestParam(required = false) String protocol,
             @RequestParam(required = false) String cursor,
             @RequestParam(required = false) Integer limit) {
-        return dataSources.listPaged(projectId, protocol, cursor, limit)
-                .map(DataSourceResponse::from);
+        Page<DataSource> page = dataSources.listPaged(projectId, protocol, cursor, limit);
+        List<DataSource> items = page.items();
+        if (items.isEmpty()) {
+            return page.map(ds -> DataSourceResponse.from(ds, 0));
+        }
+        List<String> ids = items.stream().map(DataSource::id).collect(Collectors.toList());
+        Map<String, Integer> counts = schemas.countVariableNodes(ids);
+        return page.map(ds -> DataSourceResponse.from(ds, counts.getOrDefault(ds.id(), 0)));
     }
 
     @Operation(
@@ -98,10 +109,11 @@ public class DataSourceController {
                 projectId, req.name(), req.protocol(), req.basis(),
                 req.simulatorPort(), req.realDeviceEndpoint(), req.runtimeConfig(), req.securityConfig(),
                 CredentialRequests.toCredentials(req.connectionConfig()), initialNodes, "local");
+        int paramCount = schemas.countVariableNodes(ds.id());
         return ResponseEntity.created(
                         URI.create("/api/v1/projects/" + projectId + "/data-sources/" + ds.id()))
                 .eTag(etag(ds.version()))
-                .body(DataSourceResponse.from(ds));
+                .body(DataSourceResponse.from(ds, paramCount));
     }
 
     @Operation(
@@ -111,7 +123,8 @@ public class DataSourceController {
     @PreAuthorize(OBSERVE)
     public ResponseEntity<DataSourceResponse> get(@PathVariable String projectId, @PathVariable String id) {
         DataSource ds = dataSources.get(projectId, id);
-        return ResponseEntity.ok().eTag(etag(ds.version())).body(DataSourceResponse.from(ds));
+        int paramCount = schemas.countVariableNodes(ds.id());
+        return ResponseEntity.ok().eTag(etag(ds.version())).body(DataSourceResponse.from(ds, paramCount));
     }
 
     @Operation(
@@ -131,7 +144,8 @@ public class DataSourceController {
                 projectId, id, req.name(), req.simulatorPort(), req.realDeviceEndpoint(),
                 req.runtimeConfig(), req.securityConfig(), req.enabled(),
                 CredentialRequests.toCredentials(req.connectionConfig()), parseVersion(ifMatch));
-        return ResponseEntity.ok().eTag(etag(ds.version())).body(DataSourceResponse.from(ds));
+        int paramCount = schemas.countVariableNodes(ds.id());
+        return ResponseEntity.ok().eTag(etag(ds.version())).body(DataSourceResponse.from(ds, paramCount));
     }
 
     @Operation(
@@ -154,7 +168,8 @@ public class DataSourceController {
     public ResponseEntity<DataSourceResponse> clearCredentials(
             @PathVariable String projectId, @PathVariable String id) {
         DataSource ds = dataSources.clearCredentials(projectId, id);
-        return ResponseEntity.ok().eTag(etag(ds.version())).body(DataSourceResponse.from(ds));
+        int paramCount = schemas.countVariableNodes(ds.id());
+        return ResponseEntity.ok().eTag(etag(ds.version())).body(DataSourceResponse.from(ds, paramCount));
     }
 
     /**
@@ -170,10 +185,11 @@ public class DataSourceController {
     @PreAuthorize(SOURCE_EDIT)
     public ResponseEntity<DataSourceResponse> duplicate(@PathVariable String projectId, @PathVariable String id) {
         DataSource ds = dataSources.duplicate(projectId, id, "local");
+        int paramCount = schemas.countVariableNodes(ds.id());
         return ResponseEntity.created(
                         URI.create("/api/v1/projects/" + projectId + "/data-sources/" + ds.id()))
                 .eTag(etag(ds.version()))
-                .body(DataSourceResponse.from(ds));
+                .body(DataSourceResponse.from(ds, paramCount));
     }
 
     @Operation(
@@ -184,7 +200,8 @@ public class DataSourceController {
     @PreAuthorize(SOURCE_STOP)
     public ResponseEntity<DataSourceResponse> stop(@PathVariable String projectId, @PathVariable String id) {
         DataSource ds = dataSources.stop(projectId, id);
-        return ResponseEntity.ok().eTag(etag(ds.version())).body(DataSourceResponse.from(ds));
+        int paramCount = schemas.countVariableNodes(ds.id());
+        return ResponseEntity.ok().eTag(etag(ds.version())).body(DataSourceResponse.from(ds, paramCount));
     }
 
     private static List<SchemaNode> toNodes(List<NodeDto> dtos) {
@@ -268,15 +285,16 @@ public class DataSourceController {
             String schemaId, Integer schemaVersion, int simulatorPort, String realDeviceEndpoint,
             String runtimeConfig, String securityConfig, boolean enabled, String runtimeState,
             String credentialState, String serveUrl, Instant createdAt, Instant updatedAt,
-            String createdBy, long version) {
+            String createdBy, long version, int parameterCount) {
 
-        public static DataSourceResponse from(DataSource d) {
+        public static DataSourceResponse from(DataSource d, int parameterCount) {
             return new DataSourceResponse(
                     d.id(), d.projectId(), d.name(), d.protocol().name(), d.basis().name(),
                     d.schemaId(), d.schemaVersion(), d.simulatorPort(), d.realDeviceEndpoint(),
                     d.runtimeConfig(), SecurityConfigRedactor.redact(d.securityConfig()),
                     d.enabled(), d.runtimeState().name(), d.credentialState().name(),
-                    d.serveUrl(), d.createdAt(), d.updatedAt(), d.createdBy(), d.version());
+                    d.serveUrl(), d.createdAt(), d.updatedAt(), d.createdBy(), d.version(),
+                    parameterCount);
         }
     }
 }

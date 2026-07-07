@@ -3,6 +3,7 @@ package com.ainclusive.iotsim.app;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
@@ -22,9 +23,13 @@ import com.ainclusive.iotsim.domain.datasource.DataSourceService;
 import com.ainclusive.iotsim.domain.datasource.Protocol;
 import com.ainclusive.iotsim.domain.datasource.RuntimeState;
 import com.ainclusive.iotsim.domain.datasource.SourceBasis;
+import com.ainclusive.iotsim.domain.schema.SchemaService;
+import com.ainclusive.iotsim.domain.support.Page;
 import com.ainclusive.iotsim.platform.secret.ConnectionCredentials;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -36,12 +41,17 @@ class DataSourceControllerTest {
     private static final String PROJECT = "proj-1";
 
     private DataSourceService service;
+    private SchemaService schemaService;
     private DataSourceController controller;
 
     @BeforeEach
     void setUp() {
         service = mock(DataSourceService.class);
-        controller = new DataSourceController(service);
+        schemaService = mock(SchemaService.class);
+        // Default: countVariableNodes returns 0 for any single id or collection.
+        given(schemaService.countVariableNodes(anyString())).willReturn(0);
+        given(schemaService.countVariableNodes(any(Collection.class))).willReturn(Map.of());
+        controller = new DataSourceController(service, schemaService);
     }
 
     private static DataSource sample(long version, RuntimeState state) {
@@ -67,6 +77,49 @@ class DataSourceControllerTest {
         assertThat(resp.getBody().protocol()).isEqualTo("OPC_UA");
         assertThat(resp.getBody().runtimeState()).isEqualTo("STOPPED");
         assertThat(resp.getBody().credentialState()).isEqualTo("MISSING");
+    }
+
+    @Test
+    void parameterCountIsPopulatedOnGet() {
+        given(service.get(PROJECT, "ds1")).willReturn(sample(1, RuntimeState.STOPPED));
+        given(schemaService.countVariableNodes("ds1")).willReturn(7);
+
+        ResponseEntity<DataSourceResponse> resp = controller.get(PROJECT, "ds1");
+
+        assertThat(resp.getBody()).isNotNull();
+        assertThat(resp.getBody().parameterCount()).isEqualTo(7);
+    }
+
+    @Test
+    void parameterCountIsZeroWhenNoSchema() {
+        given(service.get(PROJECT, "ds1")).willReturn(sample(1, RuntimeState.STOPPED));
+        given(schemaService.countVariableNodes("ds1")).willReturn(0);
+
+        ResponseEntity<DataSourceResponse> resp = controller.get(PROJECT, "ds1");
+
+        assertThat(resp.getBody()).isNotNull();
+        assertThat(resp.getBody().parameterCount()).isEqualTo(0);
+    }
+
+    @Test
+    void listUsedBulkCountToAvoidNPlusOne() {
+        DataSource ds1 = sample(1, RuntimeState.STOPPED);
+        DataSource ds2 = new DataSource("ds2", PROJECT, "Sensor", Protocol.OPC_UA, SourceBasis.MANUAL,
+                null, null, 4840, null, "{}", null, false, RuntimeState.STOPPED, CredentialState.MISSING,
+                "opc.tcp://localhost:4840/iotsim", Instant.now(), Instant.now(), "local", 1);
+        given(service.listPaged(eq(PROJECT), any(), any(), any()))
+                .willReturn(new Page<>(List.of(ds1, ds2), null, 20));
+        given(schemaService.countVariableNodes(any(Collection.class)))
+                .willReturn(Map.of("ds1", 5, "ds2", 3));
+
+        Page<DataSourceResponse> page = controller.list(PROJECT, null, null, null);
+
+        assertThat(page.items()).hasSize(2);
+        assertThat(page.items().get(0).parameterCount()).isEqualTo(5);
+        assertThat(page.items().get(1).parameterCount()).isEqualTo(3);
+        // Verify bulk method was used (not per-source calls).
+        verify(schemaService, times(1)).countVariableNodes(any(Collection.class));
+        verify(schemaService, times(0)).countVariableNodes(anyString());
     }
 
     @Test
