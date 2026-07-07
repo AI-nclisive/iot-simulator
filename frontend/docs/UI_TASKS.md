@@ -888,33 +888,12 @@ Parallel execution:
   Work includes: recording-detail-page.tsx treat 404 on schema fetch as empty state not error; scenario-builder-page.tsx navigate to /scenarios/:id/run after runScenario; data-sources-list-page.tsx guard Record action and relabel Simulate for IMPORT basis.
   Done when: schema-only recording detail shows "No schema captured." empty state; Run navigates to run view; IMPORT sources show only "Replay recording" action.
 
-- [ ] `UI-456` Parameter count — display schema node count in source list and detail header
-  Goal: show the number of VARIABLE schema nodes in the source list table and in the data source detail header, replacing the current hardcoded 0. Use `parameterCount` from `DataSourceResponse` (added by IS-149).
-  Surface: `Data Sources List`, `Data Source Detail`.
-  Work includes: add `parameterCount` to `DataSourceRow` in `data-sources-store.ts`; map it from the API response in `loadDataSources`; show localized count in the list table and in the detail header metadata grid.
-  Depends: IS-149.
-  Done when: source list shows correct VARIABLE node count; detail header shows same; typecheck + vitest green.
-
 - [x] `UI-457` Pin/unpin parameters in Values tab
   Goal: let users pin individual parameters in the live Values tab so they stay visible at the top through SSE snapshots, and the existing "Pinned only / Unpinned only" filter works against real user state.
   Surface: `Data Source Detail — Values tab`.
   Work includes: maintain a `Set<string>` of pinned nodeIds in component state (survives snapshots); add a small pin toggle button (icon-only) to each row in the Values table; apply pinned state when building rows from SSE events; show pinned rows sorted to top or marked distinctly.
   Depends: none.
   Done when: clicking pin on a row marks it Pinned; SSE snapshot preserves pinned state; Pinned-only filter shows only pinned rows; typecheck + vitest green.
-
-- [ ] `UI-458` SCAN schema review step in Create Data Source wizard
-  Goal: wire the SCAN basis wizard to the existing backend ScanController (POST /scan → poll GET /scan/{jobId} → POST /scan/{jobId}/create) so users see discovered nodes and can resolve unknown types before creating the source.
-  Surface: `Create Data Source Wizard`.
-  Work includes: add a "Scan" step to SCAN_STEPS between Setup and Schedule; on entering it call POST /scan, poll GET /scan/{jobId} until complete/error; show discovered node count + unknown type count; let user assign types for unknown nodes; replace the current POST /data-sources call for SCAN basis with POST /scan/{jobId}/create; show truncation warning when result.truncated.
-  Depends: ScanController already implemented in backend.
-  Done when: SCAN wizard polls and shows discovered nodes; unknown-type resolution works; source created via scan endpoint; typecheck + vitest green.
-
-- [ ] `UI-459` Wire edit lock to API — schema editor and scenario builder
-  Goal: when a user opens the schema editor or scenario builder, acquire an edit lease via IS-081 endpoints; show the "locked by other user" banner when another session holds the lease; release on unmount.
-  Surface: `Data Source Detail — Schema tab`, `Scenario Builder`.
-  Work includes: call POST /edit-lease on mount in schema editor and scenario builder; poll or re-acquire on interval (TTL renewal); call DELETE /edit-lease on unmount; map `lockedBy` from GET source/scenario response into the existing lock-state UI (UI-005 pattern); show correct "editing by X" banner.
-  Depends: IS-081.
-  Done when: lease acquired on open; locked banner shown when another user holds lease; lease released on tab close; typecheck + vitest green.
 
 - [x] `UI-139` QA bug fixes — data source loading, null-safe filters, quality param mismatch, evidence crash
   Goal: fix five bugs found during QA pass on master: wizard/list missing loadDataSources call; capturedBy/owner/sourceIds null crashes in filters; quality filter param name mismatch with backend.
