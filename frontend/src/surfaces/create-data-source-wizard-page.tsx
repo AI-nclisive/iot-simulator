@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { resolveAccess } from "../shell/access-policy";
 import { useArtifactsStore } from "../shell/artifacts-store";
@@ -15,6 +15,42 @@ type DataSourceResponse = {
   id: string;
   [key: string]: unknown;
 };
+
+export type DiscoveredNodeResponse = {
+  nodeId: string;
+  parentId: string | null;
+  path: string;
+  name: string;
+  kind: string;
+  dataType: string | null;
+  valueRank: number | null;
+  access: string | null;
+  unit: string | null;
+  description: string | null;
+  unknownType: boolean;
+};
+
+export type TypeResolutionEntry = {
+  nodeId: string;
+  dataType: string;
+  valueRank: number;
+  access: string;
+  exclude: boolean;
+};
+
+type ScanJobStatus = "PENDING" | "RUNNING" | "COMPLETE" | "ERROR" | "PARTIAL";
+
+type ScanJobResult = {
+  jobId: string;
+  status: ScanJobStatus;
+  truncated: boolean;
+  discoveredCount: number;
+  unknownCount: number;
+  message: string | null;
+  nodes: DiscoveredNodeResponse[];
+};
+
+type ScanStepStatus = "idle" | "scanning" | "complete" | "error" | "partial";
 
 type ProtocolOption = {
   id: "OPC UA" | "Modbus TCP";
@@ -92,6 +128,7 @@ export type WizardStepId =
   | "protocol"
   | "basis"
   | "setup"
+  | "scan"
   | "import"
   | "configure"
   | "schedule"
@@ -102,6 +139,7 @@ const SCAN_STEPS: WizardStep[] = [
   { id: "protocol", label: "Protocol" },
   { id: "basis", label: "Source basis" },
   { id: "setup", label: "Setup" },
+  { id: "scan", label: "Scan" },
   { id: "schedule", label: "Schedule" },
   { id: "review", label: "Review" },
 ];
@@ -254,6 +292,29 @@ function credentialValidationMessage(form: WizardFormState) {
   return null;
 }
 
+export function scanStepValidationMessage(
+  scanStatus: ScanStepStatus,
+  typeResolutions: TypeResolutionEntry[],
+  scanResult: { nodes: DiscoveredNodeResponse[]; discoveredCount?: number; unknownCount?: number; truncated?: boolean } | null,
+): string | null {
+  if (scanStatus === "scanning") return "Scanning in progress…";
+  if (scanStatus === "error") return "Scan failed";
+  if (scanStatus === "idle") return "Scan has not started yet";
+  // complete or partial
+  if (scanResult) {
+    const unknownUnresolved = scanResult.nodes.filter((n) => {
+      if (!n.unknownType) return false;
+      const res = typeResolutions.find((r) => r.nodeId === n.nodeId);
+      if (!res) return true;
+      if (res.exclude) return false;
+      if (!res.dataType) return true;
+      return false;
+    });
+    if (unknownUnresolved.length > 0) return "Resolve all unknown node types to continue";
+  }
+  return null;
+}
+
 function configureValidationMessage(form: WizardFormState, synthetic: SyntheticProfileValue) {
   if (!form.name.trim()) {
     return "Enter a source name to continue.";
@@ -356,6 +417,22 @@ export function CreateDataSourceWizardPage() {
   const loadDataSources = useDataSourcesStore((state) => state.loadDataSources);
   const createSyntheticSource = useDataSourcesStore((state) => state.createSyntheticSource);
 
+  const [scanJobId, setScanJobId] = useState<string | null>(null);
+  const [scanStatus, setScanStatus] = useState<ScanStepStatus>("idle");
+  const [scanTrigger, setScanTrigger] = useState(0);
+  const [scanResult, setScanResult] = useState<{
+    discoveredCount: number;
+    unknownCount: number;
+    truncated: boolean;
+    nodes: DiscoveredNodeResponse[];
+  } | null>(null);
+  const [typeResolutions, setTypeResolutions] = useState<TypeResolutionEntry[]>([]);
+  const [scanErrorMessage, setScanErrorMessage] = useState<string | null>(null);
+  const scanPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Persists the completed job ID across step transitions so the create call can
+  // use it even after the scan-step cleanup has reset scanJobId state to null.
+  const scanJobIdForCreateRef = useRef<string | null>(null);
+
   const [synthetic, setSynthetic] = useState<SyntheticProfileValue>({
     schemaFromSourceId: null,
     config: null,
@@ -398,7 +475,9 @@ export function CreateDataSourceWizardPage() {
   const currentValidationMessage =
     activeStepId === "configure"
       ? configureValidationMessage(form, synthetic)
-      : validationMessage(activeStepId, form, accessMode);
+      : activeStepId === "scan"
+        ? scanStepValidationMessage(scanStatus, typeResolutions, scanResult)
+        : validationMessage(activeStepId, form, accessMode);
   const currentProtocol = protocolOptions.find((option) => option.id === form.protocol) ?? null;
   const currentBasis = basisOptions.find((option) => option.id === form.basis) ?? null;
 
@@ -451,6 +530,125 @@ export function CreateDataSourceWizardPage() {
       if (free !== form.simulatorPort) updateForm({ simulatorPort: free });
     }
   }, [form.basis, form.protocol, form.simulatorPort, dataSources]);
+
+  // Auto-start scan when the user enters the "scan" step
+  useEffect(() => {
+    if (activeStepId !== "scan") return;
+    if (scanStatus !== "idle") return;
+    if (!currentProjectId || !form.protocol) return;
+
+    let cancelled = false;
+
+    async function startScan() {
+      setScanStatus("scanning");
+      try {
+        const job = await apiFetch<{ jobId: string; status: string }>(
+          `/api/v1/projects/${currentProjectId}/data-sources/scan`,
+          {
+            method: "POST",
+            body: JSON.stringify({
+              protocol: backendProtocolForForm(form.protocol),
+              endpointUrl: form.realDeviceEndpoint,
+            }),
+          },
+        );
+        if (cancelled) return;
+        setScanJobId(job.jobId);
+        scanJobIdForCreateRef.current = job.jobId;
+
+        // Start polling
+        scanPollRef.current = setInterval(async () => {
+          try {
+            const result = await apiFetch<ScanJobResult>(
+              `/api/v1/projects/${currentProjectId}/data-sources/scan/${job.jobId}`,
+            );
+            if (cancelled) return;
+            if (result.status === "COMPLETE" || result.status === "PARTIAL") {
+              if (scanPollRef.current !== null) {
+                clearInterval(scanPollRef.current);
+                scanPollRef.current = null;
+              }
+              setScanStatus(result.status === "COMPLETE" ? "complete" : "partial");
+              setScanResult({
+                discoveredCount: result.discoveredCount,
+                unknownCount: result.unknownCount,
+                truncated: result.truncated,
+                nodes: result.nodes,
+              });
+              // Pre-populate typeResolutions for unknown nodes
+              const unknownNodes = result.nodes.filter((n) => n.unknownType);
+              setTypeResolutions(
+                unknownNodes.map((n) => ({
+                  nodeId: n.nodeId,
+                  dataType: "",
+                  valueRank: n.valueRank ?? 1,
+                  access: n.access ?? "READ",
+                  exclude: false,
+                })),
+              );
+            } else if (result.status === "ERROR") {
+              if (scanPollRef.current !== null) {
+                clearInterval(scanPollRef.current);
+                scanPollRef.current = null;
+              }
+              setScanStatus("error");
+              setScanErrorMessage(result.message ?? "Scan failed");
+            } else {
+              // PENDING or RUNNING — update live count
+              setScanResult((prev) =>
+                prev
+                  ? { ...prev, discoveredCount: result.discoveredCount }
+                  : {
+                      discoveredCount: result.discoveredCount,
+                      unknownCount: result.unknownCount,
+                      truncated: result.truncated,
+                      nodes: result.nodes,
+                    },
+              );
+            }
+          } catch {
+            if (!cancelled) {
+              if (scanPollRef.current !== null) {
+                clearInterval(scanPollRef.current);
+                scanPollRef.current = null;
+              }
+              setScanStatus("error");
+              setScanErrorMessage("Failed to poll scan status");
+            }
+          }
+        }, 2000);
+      } catch (err) {
+        if (!cancelled) {
+          setScanStatus("error");
+          setScanErrorMessage(err instanceof Error ? err.message : "Failed to start scan");
+        }
+      }
+    }
+
+    void startScan();
+
+    return () => {
+      cancelled = true;
+      if (scanPollRef.current !== null) {
+        clearInterval(scanPollRef.current);
+        scanPollRef.current = null;
+      }
+      setScanStatus("idle");
+      setScanResult(null);
+      setScanJobId(null);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeStepId, scanTrigger]);
+
+  // Cleanup polling interval on unmount
+  useEffect(() => {
+    return () => {
+      if (scanPollRef.current !== null) {
+        clearInterval(scanPollRef.current);
+        scanPollRef.current = null;
+      }
+    };
+  }, []);
 
   if (!access.canCreateSource) {
     return (
@@ -598,6 +796,28 @@ export function CreateDataSourceWizardPage() {
       return;
     }
 
+    if (form.basis === "scan" && scanJobIdForCreateRef.current) {
+      try {
+        const data = await apiFetch<DataSourceResponse>(
+          `/api/v1/projects/${currentProjectId}/data-sources/scan/${scanJobIdForCreateRef.current}/create`,
+          {
+            method: "POST",
+            body: JSON.stringify({
+              name: form.name.trim(),
+              realDeviceEndpoint: form.realDeviceEndpoint,
+              ...(typeResolutions.length > 0 ? { typeResolutions } : {}),
+            }),
+          },
+        );
+        navigate(`/data-sources/${data.id}`);
+      } catch (err) {
+        console.error("[createSource/scan]", err);
+        const title = err instanceof Error ? err.message : "Failed to create source from scan";
+        push({ tone: "error", title });
+      }
+      return;
+    }
+
     try {
       const data = await apiFetch<DataSourceResponse>(
         `/api/v1/projects/${currentProjectId}/data-sources`,
@@ -608,7 +828,6 @@ export function CreateDataSourceWizardPage() {
             simulatorPort: Number(form.simulatorPort),
             protocol: backendProtocolForForm(form.protocol),
             basis: form.basis.toUpperCase(),
-            ...(form.basis === "scan" ? { realDeviceEndpoint: form.realDeviceEndpoint } : {}),
             ...(form.basis === "import" && form.importSelectedRecordingId
               ? { recordingId: form.importSelectedRecordingId }
               : {}),
@@ -985,6 +1204,140 @@ export function CreateDataSourceWizardPage() {
     );
   }
 
+  function handleTypeResolutionChange(nodeId: string, patch: Partial<TypeResolutionEntry>) {
+    setTypeResolutions((prev) =>
+      prev.map((entry) => (entry.nodeId === nodeId ? { ...entry, ...patch } : entry)),
+    );
+  }
+
+  function retryScan() {
+    setScanStatus("idle");
+    setScanJobId(null);
+    setScanResult(null);
+    setTypeResolutions([]);
+    setScanErrorMessage(null);
+    setScanTrigger((t) => t + 1);
+  }
+
+  function renderScanStep() {
+    if (scanStatus === "idle" || scanStatus === "scanning") {
+      return (
+        <div className="space-y-4">
+          <section className="rounded-md border border-shell-line bg-white px-4 py-6 text-center">
+            <p className="text-sm font-medium text-shell-ink">
+              {scanStatus === "idle" ? "Starting scan…" : "Scanning…"}
+            </p>
+            {scanResult ? (
+              <p className="mt-2 text-sm text-shell-muted">
+                Discovered {scanResult.discoveredCount} nodes
+              </p>
+            ) : (
+              <p className="mt-2 text-sm text-shell-muted">Connecting to endpoint</p>
+            )}
+          </section>
+        </div>
+      );
+    }
+
+    if (scanStatus === "error") {
+      return (
+        <div className="space-y-4">
+          <section className="rounded-md border border-shell-danger/40 bg-shell-danger/5 px-4 py-4">
+            <p className="text-sm font-medium text-shell-danger">Scan failed</p>
+            {scanErrorMessage ? (
+              <p className="mt-2 text-sm text-shell-muted">{scanErrorMessage}</p>
+            ) : null}
+          </section>
+          <button className="shell-action" type="button" onClick={retryScan}>
+            Retry
+          </button>
+        </div>
+      );
+    }
+
+    // complete or partial
+    if (!scanResult) return null;
+
+    const unknownNodes = scanResult.nodes.filter((n) => n.unknownType);
+
+    return (
+      <div className="space-y-4">
+        <section className="rounded-md border border-shell-line bg-white px-4 py-4">
+          <p className="text-sm font-medium text-shell-ink">
+            Discovered {scanResult.discoveredCount} nodes
+          </p>
+          {scanResult.unknownCount > 0 ? (
+            <p className="mt-1 text-sm text-shell-muted">
+              {scanResult.unknownCount} unknown types need resolution
+            </p>
+          ) : null}
+          {scanStatus === "partial" ? (
+            <p className="mt-1 text-sm text-shell-muted">
+              Partial results — some nodes may not have been discovered.
+            </p>
+          ) : null}
+        </section>
+
+        {scanResult.truncated ? (
+          <section className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            Scan was truncated — only the first {scanResult.discoveredCount} nodes are shown.
+          </section>
+        ) : null}
+
+        {unknownNodes.length > 0 ? (
+          <div className="space-y-3">
+            <p className="text-sm font-medium text-shell-ink">
+              Resolve unknown node types
+            </p>
+            <p className="text-sm text-shell-muted">
+              The following nodes have unknown types. Choose a data type or exclude them from the source.
+            </p>
+            <ul className="space-y-2">
+              {unknownNodes.map((node) => {
+                const res = typeResolutions.find((r) => r.nodeId === node.nodeId);
+                return (
+                  <li
+                    key={node.nodeId}
+                    className="flex flex-wrap items-center gap-3 rounded-md border border-shell-line bg-white px-4 py-3"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-shell-ink">
+                        {node.name || node.nodeId}
+                      </p>
+                      <p className="truncate text-xs text-shell-muted">{node.path || node.nodeId}</p>
+                    </div>
+                    <select
+                      aria-label={`Data type for ${node.name || node.nodeId}`}
+                      className="shell-field w-40 shrink-0"
+                      value={res?.exclude ? "__exclude__" : (res?.dataType ?? "")}
+                      onChange={(e) => {
+                        if (e.target.value === "__exclude__") {
+                          handleTypeResolutionChange(node.nodeId, { exclude: true, dataType: "" });
+                        } else {
+                          handleTypeResolutionChange(node.nodeId, {
+                            exclude: false,
+                            dataType: e.target.value,
+                          });
+                        }
+                      }}
+                    >
+                      <option value="">Choose type…</option>
+                      <option value="FLOAT64">FLOAT64</option>
+                      <option value="INT32">INT32</option>
+                      <option value="BOOL">BOOL</option>
+                      <option value="STRING">STRING</option>
+                      <option value="__exclude__">Exclude</option>
+                    </select>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
   function renderScheduleStep() {
     return (
       <div className="space-y-4">
@@ -1149,6 +1502,10 @@ export function CreateDataSourceWizardPage() {
 
     if (activeStepId === "setup" || activeStepId === "import") {
       return renderSetupStep();
+    }
+
+    if (activeStepId === "scan") {
+      return renderScanStep();
     }
 
     if (activeStepId === "configure") {
