@@ -416,7 +416,7 @@ describe("RecordingDetailPage — filter panel (UI-122)", () => {
     expect(mockApiFetch.mock.calls.length).toBe(callsBeforeLast);
   });
 
-  it("passes qualities param to API when a quality is unchecked", async () => {
+  it("passes quality param to API when a quality is unchecked", async () => {
     renderWithId("rec-001");
     await userEvent.click(screen.getByRole("button", { name: "Values" }));
     await waitFor(() => expect(screen.getByLabelText("BAD")).toBeTruthy());
@@ -426,10 +426,10 @@ describe("RecordingDetailPage — filter panel (UI-122)", () => {
 
     await waitFor(() => {
       const urls = mockApiFetch.mock.calls.map((c: unknown[]) => c[0] as string);
-      const filtered = urls.filter((u) => u.includes("qualities="));
+      const filtered = urls.filter((u) => u.includes("quality="));
       expect(filtered.length).toBeGreaterThan(0);
       const lastFiltered = filtered[filtered.length - 1];
-      expect(lastFiltered).toContain("qualities=");
+      expect(lastFiltered).toContain("quality=");
       expect(lastFiltered).not.toContain("BAD");
     });
   });

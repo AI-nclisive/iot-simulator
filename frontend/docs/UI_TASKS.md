@@ -869,6 +869,12 @@ Parallel execution:
   Work includes: make `saveChanges` async; `await updateSourceConfiguration(...)` before calling `setSavedMessage("Saved")`; 2 behavioral tests added.
   Done when: "Saved" badge only appears after the update call resolves; typecheck + vitest green.
 
+- [x] `UI-453` Fix real-device-endpoint guard in recording wizard and flow page
+  Goal: `captureBlocked` in the recording wizard and `hasRealEndpoint` in the recording flow page were checking `endpoint` (the simulator serve URL) instead of `realDeviceEndpoint` (the actual OPC UA device address). IMPORT/MANUAL sources without a real device were incorrectly unblocked.
+  Surface: `Create Recording Wizard`, `Recording Flow Page`.
+  Work includes: switch `captureBlocked` and `hasRealEndpoint` to use `realDeviceEndpoint`; update wizard test fixtures to include the field; fix `quality=` assertion in recording-detail test.
+  Done when: wizard blocks SCHEMA_AND_DATA when `realDeviceEndpoint` is null; flow page shows no-endpoint panel correctly; vitest green.
+
 - [x] `UI-455` QA bug fixes — schema-only 404 empty state, scenarios Run navigation, IMPORT source actions
   Goal: fix three bugs found during QA: schema-only recording detail shows error on 404 schema fetch (should show empty state); scenarios Run button does not navigate to run view; data sources list shows "Record"/"Simulate" for IMPORT-basis sources.
   Surface: `Recording Detail`, `Scenario Builder`, `Data Sources List`.

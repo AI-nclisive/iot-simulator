@@ -67,6 +67,7 @@ vi.mock("../shell/data-sources-store", () => ({
           name: "Line A telemetry",
           protocol: "OPC UA",
           endpoint: "opc.tcp://line-a.local:4840",
+          realDeviceEndpoint: "opc.tcp://line-a.local:4840",
           parameterCount: 2480,
         },
       ],
