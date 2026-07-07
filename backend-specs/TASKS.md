@@ -229,7 +229,7 @@ import/export. Modbus moved to Wave G (deferred) — see the note there.
 - [x] IS-078 [BE] ✅ [auth] Local vs shared mode enforcement (flag exists, no enforcement) — 08
 - [x] IS-079 [BE] ✅ [persist] Auth table repositories (users/roles/permissions/leases) — 04
 - [x] IS-080 [BE] ✅ [auth] Advisory edit leases (read-only while editing; stale recovery) — 08
-- [ ] IS-081 [BE] ⬜ [api] Edit-lease endpoints — 05
+- [x] IS-081 [BE] ✅ [api] Edit-lease endpoints — 05
 - [ ] IS-082 [BE] ⬜ [auth] Secrets via env/external store; structural export exclusion — 08
 - [ ] IS-083 [BE] ⬜ [observ] User-activity audit (separate stream from runtime) — SPEC: User Activity History
 - [ ] IS-084 [BE] ⬜ [project] Project + environment settings — 05

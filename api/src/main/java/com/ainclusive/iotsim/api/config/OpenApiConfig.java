@@ -57,6 +57,11 @@ public class OpenApiConfig {
                         new Tag().name("Monitoring")
                                 .description("Read-only \"what's happening now\": source health, connected-client"
                                         + " observations, the historical runtime event log, and Server-Sent"
-                                        + " Events (SSE) push streams.")));
+                                        + " Events (SSE) push streams."),
+                        new Tag().name("Edit Leases")
+                                .description("Advisory time-bounded locks that signal to other users that an"
+                                        + " editor is open. Acquire (or renew) a lease when entering an editor,"
+                                        + " release it on exit; leases expire automatically for crash recovery."
+                                        + " See backend-specs/08_AUTH_AND_MODES.md §Optimistic concurrency.")));
     }
 }

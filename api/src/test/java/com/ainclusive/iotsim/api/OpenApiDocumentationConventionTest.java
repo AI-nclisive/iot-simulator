@@ -42,7 +42,8 @@ class OpenApiDocumentationConventionTest {
             "Scenarios",
             "Runs",
             "Evidence",
-            "Monitoring");
+            "Monitoring",
+            "Edit Leases");
 
     @Test
     void everyRestControllerAndEndpointIsDocumented() throws ClassNotFoundException {

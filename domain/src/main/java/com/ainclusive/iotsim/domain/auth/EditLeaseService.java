@@ -1,4 +1,4 @@
-package com.ainclusive.iotsim.app.auth;
+package com.ainclusive.iotsim.domain.auth;
 
 import com.ainclusive.iotsim.persistence.auth.EditLeaseRepository;
 import com.ainclusive.iotsim.persistence.auth.EditLeaseRow;
@@ -50,8 +50,8 @@ public class EditLeaseService {
      * @param holder     the identity of the requesting user
      * @return the current lease (new, renewed, or conflicting)
      */
-    public EditLeaseRow acquire(String objectType, String objectId, String holder) {
-        return repository.acquireOrRenew(objectType, objectId, holder, ttl);
+    public EditLease acquire(String objectType, String objectId, String holder) {
+        return toDomain(repository.acquireOrRenew(objectType, objectId, holder, ttl));
     }
 
     /**
@@ -70,8 +70,8 @@ public class EditLeaseService {
      *
      * @return an {@link Optional} containing the active lease, or empty if none
      */
-    public Optional<EditLeaseRow> findActive(String objectType, String objectId) {
-        return repository.findActive(objectType, objectId);
+    public Optional<EditLease> findActive(String objectType, String objectId) {
+        return repository.findActive(objectType, objectId).map(EditLeaseService::toDomain);
     }
 
     /**
@@ -102,5 +102,14 @@ public class EditLeaseService {
     @Scheduled(fixedDelay = 60_000)
     public int cleanupExpired() {
         return repository.deleteExpired();
+    }
+
+    private static EditLease toDomain(EditLeaseRow row) {
+        return new EditLease(
+                row.objectType(),
+                row.objectId(),
+                row.holder(),
+                row.acquiredAt(),
+                row.expiresAt());
     }
 }
