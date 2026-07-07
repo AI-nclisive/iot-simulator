@@ -1,4 +1,4 @@
-package com.ainclusive.iotsim.app.auth;
+package com.ainclusive.iotsim.domain.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -38,23 +38,25 @@ class EditLeaseServiceTest {
 
     @Test
     void acquire_delegatesToRepositoryWithConfiguredTtl() {
-        EditLeaseRow lease = lease(HOLDER);
+        EditLeaseRow row = row(HOLDER);
         given(repository.acquireOrRenew(eq(OBJECT_TYPE), eq(OBJECT_ID), eq(HOLDER), any(Duration.class)))
-                .willReturn(lease);
+                .willReturn(row);
 
-        EditLeaseRow result = service.acquire(OBJECT_TYPE, OBJECT_ID, HOLDER);
+        EditLease result = service.acquire(OBJECT_TYPE, OBJECT_ID, HOLDER);
 
-        assertThat(result).isEqualTo(lease);
+        assertThat(result.objectType()).isEqualTo(row.objectType());
+        assertThat(result.objectId()).isEqualTo(row.objectId());
+        assertThat(result.holder()).isEqualTo(row.holder());
         verify(repository).acquireOrRenew(OBJECT_TYPE, OBJECT_ID, HOLDER, Duration.ofSeconds(300));
     }
 
     @Test
     void acquire_returnsConflictingLeaseWhenHeldByOther() {
-        EditLeaseRow conflictingLease = lease(OTHER);
+        EditLeaseRow conflictingRow = row(OTHER);
         given(repository.acquireOrRenew(any(), any(), eq(HOLDER), any(Duration.class)))
-                .willReturn(conflictingLease);
+                .willReturn(conflictingRow);
 
-        EditLeaseRow result = service.acquire(OBJECT_TYPE, OBJECT_ID, HOLDER);
+        EditLease result = service.acquire(OBJECT_TYPE, OBJECT_ID, HOLDER);
 
         // The conflicting lease is returned as-is; caller must check holder
         assertThat(result.holder()).isEqualTo(OTHER);
@@ -85,19 +87,20 @@ class EditLeaseServiceTest {
 
     @Test
     void findActive_returnsLeaseFromRepository() {
-        EditLeaseRow lease = lease(HOLDER);
+        EditLeaseRow lease = row(HOLDER);
         given(repository.findActive(OBJECT_TYPE, OBJECT_ID)).willReturn(Optional.of(lease));
 
-        Optional<EditLeaseRow> result = service.findActive(OBJECT_TYPE, OBJECT_ID);
+        Optional<EditLease> result = service.findActive(OBJECT_TYPE, OBJECT_ID);
 
-        assertThat(result).contains(lease);
+        assertThat(result).isPresent();
+        assertThat(result.get().holder()).isEqualTo(HOLDER);
     }
 
     @Test
     void findActive_returnsEmptyWhenNoActiveLease() {
         given(repository.findActive(OBJECT_TYPE, OBJECT_ID)).willReturn(Optional.empty());
 
-        Optional<EditLeaseRow> result = service.findActive(OBJECT_TYPE, OBJECT_ID);
+        Optional<EditLease> result = service.findActive(OBJECT_TYPE, OBJECT_ID);
 
         assertThat(result).isEmpty();
     }
@@ -113,14 +116,14 @@ class EditLeaseServiceTest {
 
     @Test
     void isHeldByOther_returnsFalseWhenLeaseHeldByRequestingUser() {
-        given(repository.findActive(OBJECT_TYPE, OBJECT_ID)).willReturn(Optional.of(lease(HOLDER)));
+        given(repository.findActive(OBJECT_TYPE, OBJECT_ID)).willReturn(Optional.of(row(HOLDER)));
 
         assertThat(service.isHeldByOther(OBJECT_TYPE, OBJECT_ID, HOLDER)).isFalse();
     }
 
     @Test
     void isHeldByOther_returnsTrueWhenLeaseHeldByDifferentUser() {
-        given(repository.findActive(OBJECT_TYPE, OBJECT_ID)).willReturn(Optional.of(lease(OTHER)));
+        given(repository.findActive(OBJECT_TYPE, OBJECT_ID)).willReturn(Optional.of(row(OTHER)));
 
         assertThat(service.isHeldByOther(OBJECT_TYPE, OBJECT_ID, HOLDER)).isTrue();
     }
@@ -156,7 +159,7 @@ class EditLeaseServiceTest {
 
     // ── helpers ───────────────────────────────────────────────────────────────────
 
-    private static EditLeaseRow lease(String holder) {
+    private static EditLeaseRow row(String holder) {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         return new EditLeaseRow(OBJECT_TYPE, OBJECT_ID, holder, now, now.plusMinutes(5));
     }
