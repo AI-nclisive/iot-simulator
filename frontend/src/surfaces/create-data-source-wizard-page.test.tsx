@@ -196,6 +196,12 @@ describe("scanStepValidationMessage (UI-458)", () => {
     ).toBeNull();
   });
 
+  it("returns null when partial with known nodes (partial is valid like complete)", () => {
+    expect(
+      scanStepValidationMessage("partial", [], { nodes: [knownNode], discoveredCount: 1, unknownCount: 0, truncated: false }),
+    ).toBeNull();
+  });
+
   it("returns unresolved message when unknown node has no type and no exclude", () => {
     const resolutions: TypeResolutionEntry[] = [
       { nodeId: unknownNode.nodeId, dataType: "", valueRank: 1, access: "READ", exclude: false },

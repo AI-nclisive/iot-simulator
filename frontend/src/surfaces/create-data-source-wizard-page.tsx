@@ -429,6 +429,9 @@ export function CreateDataSourceWizardPage() {
   const [typeResolutions, setTypeResolutions] = useState<TypeResolutionEntry[]>([]);
   const [scanErrorMessage, setScanErrorMessage] = useState<string | null>(null);
   const scanPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Persists the completed job ID across step transitions so the create call can
+  // use it even after the scan-step cleanup has reset scanJobId state to null.
+  const scanJobIdForCreateRef = useRef<string | null>(null);
 
   const [synthetic, setSynthetic] = useState<SyntheticProfileValue>({
     schemaFromSourceId: null,
@@ -551,6 +554,7 @@ export function CreateDataSourceWizardPage() {
         );
         if (cancelled) return;
         setScanJobId(job.jobId);
+        scanJobIdForCreateRef.current = job.jobId;
 
         // Start polling
         scanPollRef.current = setInterval(async () => {
@@ -625,6 +629,13 @@ export function CreateDataSourceWizardPage() {
 
     return () => {
       cancelled = true;
+      if (scanPollRef.current !== null) {
+        clearInterval(scanPollRef.current);
+        scanPollRef.current = null;
+      }
+      setScanStatus("idle");
+      setScanResult(null);
+      setScanJobId(null);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeStepId, scanTrigger]);
@@ -785,10 +796,10 @@ export function CreateDataSourceWizardPage() {
       return;
     }
 
-    if (form.basis === "scan" && scanJobId) {
+    if (form.basis === "scan" && scanJobIdForCreateRef.current) {
       try {
         const data = await apiFetch<DataSourceResponse>(
-          `/api/v1/projects/${currentProjectId}/data-sources/scan/${scanJobId}/create`,
+          `/api/v1/projects/${currentProjectId}/data-sources/scan/${scanJobIdForCreateRef.current}/create`,
           {
             method: "POST",
             body: JSON.stringify({
