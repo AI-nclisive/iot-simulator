@@ -888,6 +888,13 @@ Parallel execution:
   Work includes: recording-detail-page.tsx treat 404 on schema fetch as empty state not error; scenario-builder-page.tsx navigate to /scenarios/:id/run after runScenario; data-sources-list-page.tsx guard Record action and relabel Simulate for IMPORT basis.
   Done when: schema-only recording detail shows "No schema captured." empty state; Run navigates to run view; IMPORT sources show only "Replay recording" action.
 
+- [x] `UI-457` Pin/unpin parameters in Values tab
+  Goal: let users pin individual parameters in the live Values tab so they stay visible at the top through SSE snapshots, and the existing "Pinned only / Unpinned only" filter works against real user state.
+  Surface: `Data Source Detail — Values tab`.
+  Work includes: maintain a `Set<string>` of pinned nodeIds in component state (survives snapshots); add a small pin toggle button (icon-only) to each row in the Values table; apply pinned state when building rows from SSE events; show pinned rows sorted to top or marked distinctly.
+  Depends: none.
+  Done when: clicking pin on a row marks it Pinned; SSE snapshot preserves pinned state; Pinned-only filter shows only pinned rows; typecheck + vitest green.
+
 - [x] `UI-139` QA bug fixes — data source loading, null-safe filters, quality param mismatch, evidence crash
   Goal: fix five bugs found during QA pass on master: wizard/list missing loadDataSources call; capturedBy/owner/sourceIds null crashes in filters; quality filter param name mismatch with backend.
   Surface: `Create Recording Wizard`, `Recordings List`, `Evidence List`, `Recording Detail`, `Scenarios List`.
