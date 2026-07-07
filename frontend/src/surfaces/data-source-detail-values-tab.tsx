@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../api";
 import { useLiveValues } from "../shell/use-live-values";
 import { useNotificationStore } from "../shell/notification-store";
@@ -29,6 +29,69 @@ export function neutralToUiType(dataType: string | null): SourceValueRow["dataTy
   return "string";
 }
 
+/**
+ * Extract the nodeId from a row id (which is `${sourceId}:${nodeId}`).
+ * Exported for unit testing.
+ */
+export function nodeIdFromRowId(rowId: string, sourceId: string): string {
+  return rowId.slice(sourceId.length + 1);
+}
+
+/**
+ * Apply a Set of pinned nodeIds to a list of rows, returning new rows with
+ * `pinned` set correctly. Pinned rows sort to the top (stable within each group).
+ * Exported for unit testing.
+ */
+export function applyPinnedIds(
+  rows: SourceValueRow[],
+  pinnedIds: Set<string>,
+): SourceValueRow[] {
+  const withPin = rows.map((row) => {
+    const nodeId = nodeIdFromRowId(row.id, row.sourceId);
+    const pinned = pinnedIds.has(nodeId);
+    return pinned === row.pinned ? row : { ...row, pinned };
+  });
+  // Stable sort: pinned first, then unpinned — preserving original order within each group.
+  const pinned = withPin.filter((r) => r.pinned);
+  const unpinned = withPin.filter((r) => !r.pinned);
+  return [...pinned, ...unpinned];
+}
+
+/** Inline SVG pin icon. Filled variant used when pinned, outlined when not. */
+function PinIcon({ filled }: { filled: boolean }) {
+  if (filled) {
+    return (
+      <svg
+        aria-hidden="true"
+        className="h-3.5 w-3.5"
+        fill="currentColor"
+        viewBox="0 0 16 16"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        {/* Filled pin */}
+        <path d="M4.146 1.146a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1-.708.708L9.5 7.207V11.5a.5.5 0 0 1-.854.354L7 10.207l-3.854 3.854a.5.5 0 0 1-.707-.707L6.293 9.5 4.854 8.061A.5.5 0 0 1 4.5 7.707V3.5a.5.5 0 0 1-.354-.854z" />
+        <path d="M9.5 1.5a1 1 0 0 1 1.414 0l3.586 3.586a1 1 0 0 1 0 1.414l-1.293 1.293a1 1 0 0 1-1.414 0L8.5 4.5l1-3z" />
+      </svg>
+    );
+  }
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-3.5 w-3.5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      viewBox="0 0 16 16"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      {/* Outlined pin — a simple thumbtack outline */}
+      <line x1="8" x2="8" y1="11" y2="15" />
+      <path d="M5 2h6l1 5H4z" />
+      <path d="M3 7h10" />
+    </svg>
+  );
+}
+
 function currentModeLabel(source: DataSourceRow) {
   return source.status === "Active" ? "Run" : "Off";
 }
@@ -42,6 +105,23 @@ export function DataSourceDetailValuesTab({
   const { rows: liveRows, status: liveStatus } = useLiveValues(source.id, isLive);
   const pushNotification = useNotificationStore((state) => state.push);
   const projectId = useShellStore((state) => state.currentProjectId);
+
+  // pinnedIds survives SSE snapshots — it's keyed by nodeId (the part of row.id after
+  // `${sourceId}:`), NOT the full row id. Snapshots replace rows wholesale but this Set
+  // is only mutated by the user clicking the pin button.
+  const [pinnedIds, setPinnedIds] = useState<Set<string>>(new Set());
+
+  const togglePin = useCallback((nodeId: string) => {
+    setPinnedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(nodeId)) {
+        next.delete(nodeId);
+      } else {
+        next.add(nodeId);
+      }
+      return next;
+    });
+  }, []);
 
   // The live SSE stream carries only nodeId + value (no data type / name / unit), so join
   // against the source schema to show the real type, display name, and unit. Without this the
@@ -117,21 +197,21 @@ export function DataSourceDetailValuesTab({
 
   // Enrich each live row with its schema metadata (join on nodeId, which the row id encodes
   // as `${sourceId}:${nodeId}`). Falls back to the raw stream values when no schema is loaded.
-  const values = useMemo(
-    () =>
-      liveRows.map((row) => {
-        const nodeId = row.id.slice(row.sourceId.length + 1);
-        const meta = schemaMeta[nodeId];
-        if (!meta) return row;
-        return {
-          ...row,
-          path: meta.path || meta.name || row.path,
-          dataType: meta.dataType,
-          currentValue: meta.unit ? `${row.currentValue} ${meta.unit}` : row.currentValue,
-        };
-      }),
-    [liveRows, schemaMeta],
-  );
+  // Then apply pinned state from pinnedIds (which survives snapshots) and sort pinned rows first.
+  const values = useMemo(() => {
+    const enriched = liveRows.map((row) => {
+      const nodeId = nodeIdFromRowId(row.id, row.sourceId);
+      const meta = schemaMeta[nodeId];
+      if (!meta) return row;
+      return {
+        ...row,
+        path: meta.path || meta.name || row.path,
+        dataType: meta.dataType,
+        currentValue: meta.unit ? `${row.currentValue} ${meta.unit}` : row.currentValue,
+      };
+    });
+    return applyPinnedIds(enriched, pinnedIds);
+  }, [liveRows, schemaMeta, pinnedIds]);
 
   const filteredRows = useMemo(() => {
     return values.filter((row) => {
@@ -216,16 +296,38 @@ export function DataSourceDetailValuesTab({
       header: "Parameter",
       sortable: true,
       sortValue: (row) => row.path,
-      cell: (row) => (
-        <div className="min-w-0">
-          <p className="text-sm font-medium text-shell-ink">{row.path}</p>
-          {row.pinned ? (
-            <div className="mt-2">
-              <StatusBadge label="Pinned" tone="accent" />
+      cell: (row) => {
+        const nodeId = nodeIdFromRowId(row.id, row.sourceId);
+        return (
+          <div className="flex min-w-0 items-start gap-2">
+            <button
+              aria-label={row.pinned ? `Unpin ${row.path}` : `Pin ${row.path}`}
+              className={[
+                "mt-0.5 shrink-0 rounded p-0.5 transition-colors",
+                row.pinned
+                  ? "text-shell-accent hover:text-shell-accent/70"
+                  : "text-shell-muted hover:text-shell-ink",
+              ].join(" ")}
+              onClick={(e) => {
+                // Prevent row selection / navigation bubbling.
+                e.stopPropagation();
+                togglePin(nodeId);
+              }}
+              type="button"
+            >
+              <PinIcon filled={row.pinned} />
+            </button>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-shell-ink">{row.path}</p>
+              {row.pinned ? (
+                <div className="mt-2">
+                  <StatusBadge label="Pinned" tone="accent" />
+                </div>
+              ) : null}
             </div>
-          ) : null}
-        </div>
-      ),
+          </div>
+        );
+      },
     },
     {
       id: "type",
