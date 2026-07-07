@@ -110,6 +110,36 @@ function toPattern(d: NodeDraft): SyntheticPatternSpec | null {
   }
 }
 
+/** Map a derived pattern (from POST /recordings/{id}/derive-synthetic) back onto editable draft fields. */
+function draftFromPattern(pattern: SyntheticPatternSpec, updateRateMs: number): Partial<NodeDraft> {
+  const rate = { updateRateMs: String(updateRateMs) };
+  switch (pattern.type) {
+    case "CONSTANT":
+      return { ...rate, pattern: "CONSTANT", value: String(pattern.value ?? 0) };
+    case "RANDOM_WALK":
+      return {
+        ...rate,
+        pattern: "RANDOM_WALK",
+        min: String(pattern.min ?? 0),
+        max: String(pattern.max ?? 0),
+        volatility: String(pattern.volatility ?? 1),
+      };
+    case "RANDOM_UNIFORM":
+      return { ...rate, pattern: "RANDOM_UNIFORM", min: String(pattern.min ?? 0), max: String(pattern.max ?? 0) };
+    default:
+      // SINE / RAMP / SQUARE
+      return {
+        ...rate,
+        pattern: pattern.type,
+        min: String(pattern.min ?? 0),
+        max: String(pattern.max ?? 0),
+        periodMs: String(pattern.periodMs ?? 10000),
+      };
+  }
+}
+
+type RecordingOption = { id: string; name: string | null; valueCount: number };
+
 export function SyntheticProfileStep({
   projectId,
   sources,
@@ -129,8 +159,35 @@ export function SyntheticProfileStep({
   const [drafts, setDrafts] = useState<Record<string, NodeDraft>>({});
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [recordings, setRecordings] = useState<RecordingOption[]>([]);
+  const [selectedRecordingId, setSelectedRecordingId] = useState("");
+  const [prefilling, setPrefilling] = useState(false);
+  // Per-node pattern suggestions from the last recording profile, so switching a measurement's
+  // pattern type re-applies that type's stats-derived params (IS-146).
+  const [suggestions, setSuggestions] = useState<
+    Record<string, { updateRateMs: number; byType: Record<string, SyntheticPatternSpec> }>
+  >({});
 
   const variableNodes = useMemo(() => nodes.filter((n) => n.kind === "VARIABLE"), [nodes]);
+
+  // Load recordings that carry captured values, for the "Prefill from recording" control.
+  useEffect(() => {
+    if (!projectId) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await apiFetch<{ items: RecordingOption[] }>(
+          `/api/v1/projects/${projectId}/recordings`,
+        );
+        if (!cancelled) setRecordings((res.items ?? []).filter((r) => r.valueCount > 0));
+      } catch {
+        if (!cancelled) setRecordings([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId]);
 
   async function pickSource(id: string) {
     setSourceId(id);
@@ -160,15 +217,77 @@ export function SyntheticProfileStep({
     setDrafts((cur) => ({ ...cur, [nodeId]: { ...cur[nodeId], ...patch } }));
   }
 
-  // Mock: fill every measurement with a default sine pattern. No backend call (real
-  // statistics-derived profiles are a follow-up); we just reset the drafts and tell the user.
-  function prefillFromRecordingMock() {
-    setDrafts(Object.fromEntries(variableNodes.map((n) => [n.nodeId, defaultDraft()])));
-    push({
-      tone: "success",
-      title: "Prefilled with placeholder patterns (mock).",
-      message: "Deriving a profile from a recording's statistics is coming soon.",
-    });
+  // Changing a measurement's pattern re-applies that pattern's suggested params when we have a
+  // recording profile for it, so the ranges stay stats-derived across pattern types.
+  function changePattern(nodeId: string, type: PatternType) {
+    const sug = suggestions[nodeId];
+    if (sug && sug.byType[type]) {
+      patchDraft(nodeId, { pattern: type, ...draftFromPattern(sug.byType[type], sug.updateRateMs) });
+    } else {
+      patchDraft(nodeId, { pattern: type });
+    }
+  }
+
+  // Derive patterns from a recording's captured values (POST /recordings/{id}/derive-synthetic)
+  // and map them onto the matching measurement rows by nodeId. Rows whose nodeId isn't in the
+  // recording are left untouched (the recording must share this source's schema to match).
+  async function prefillFromRecording() {
+    if (!selectedRecordingId) return;
+    setPrefilling(true);
+    try {
+      const profile = await apiFetch<{
+        measurements: {
+          nodeId: string;
+          dataType: string;
+          updateRateMs: number;
+          recommended: string;
+          suggestions: Record<string, SyntheticPatternSpec>;
+        }[];
+      }>(`/api/v1/projects/${projectId}/recordings/${selectedRecordingId}/derive-synthetic`, {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      const matched = profile.measurements.filter((m) => drafts[m.nodeId]).length;
+      // Remember every measurement's per-type suggestions so changePattern can reuse them.
+      setSuggestions((prev) => {
+        const next = { ...prev };
+        for (const m of profile.measurements) {
+          next[m.nodeId] = { updateRateMs: m.updateRateMs, byType: m.suggestions };
+        }
+        return next;
+      });
+      setDrafts((cur) => {
+        const next = { ...cur };
+        for (const m of profile.measurements) {
+          if (!next[m.nodeId]) continue;
+          const recommended = m.suggestions[m.recommended];
+          if (!recommended) continue;
+          next[m.nodeId] = {
+            ...next[m.nodeId],
+            enabled: true,
+            ...draftFromPattern(recommended, m.updateRateMs),
+          };
+        }
+        return next;
+      });
+      push(
+        matched > 0
+          ? {
+              tone: "success",
+              title: `Prefilled ${matched} measurement${matched === 1 ? "" : "s"} from the recording.`,
+              message: "Switch a measurement's pattern to see that type's suggested ranges.",
+            }
+          : {
+              tone: "warning",
+              title: "No measurements matched this recording.",
+              message: "Reuse the schema of the source this recording was captured from.",
+            },
+      );
+    } catch {
+      push({ tone: "error", title: "Could not derive a profile from that recording." });
+    } finally {
+      setPrefilling(false);
+    }
   }
 
   // Assemble the config and report validity up whenever anything changes.
@@ -253,9 +372,31 @@ export function SyntheticProfileStep({
             <p className="text-sm font-medium text-shell-ink">
               {variableNodes.length} measurement{variableNodes.length === 1 ? "" : "s"}
             </p>
-            <button className="shell-text-action" type="button" onClick={prefillFromRecordingMock}>
-              Prefill from recording (mock)
-            </button>
+            <div className="flex items-center gap-2">
+              <select
+                className="shell-field"
+                value={selectedRecordingId}
+                onChange={(e) => setSelectedRecordingId(e.target.value)}
+                disabled={recordings.length === 0}
+              >
+                <option value="">
+                  {recordings.length === 0 ? "No recordings with data" : "Prefill from recording…"}
+                </option>
+                {recordings.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {(r.name && r.name.trim()) || r.id.slice(0, 8)} · {r.valueCount} values
+                  </option>
+                ))}
+              </select>
+              <button
+                className="shell-action"
+                type="button"
+                disabled={!selectedRecordingId || prefilling}
+                onClick={() => void prefillFromRecording()}
+              >
+                {prefilling ? "Prefilling…" : "Prefill"}
+              </button>
+            </div>
           </div>
 
           <ul className="space-y-2">
@@ -290,9 +431,7 @@ export function SyntheticProfileStep({
                         <select
                           className="shell-field"
                           value={d.pattern}
-                          onChange={(e) =>
-                            patchDraft(node.nodeId, { pattern: e.target.value as PatternType })
-                          }
+                          onChange={(e) => changePattern(node.nodeId, e.target.value as PatternType)}
                         >
                           {PATTERN_TYPES.map((p) => (
                             <option key={p.value} value={p.value}>
