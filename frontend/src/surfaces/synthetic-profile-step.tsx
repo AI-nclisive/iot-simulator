@@ -7,8 +7,10 @@
  * by the backend via `schemaFromSourceId`), so the synthetic twin mirrors a real device.
  * Emits an assembled `SyntheticConfig` + `schemaFromSourceId` + validity to the parent.
  *
- * The "Prefill from recording" button is a deliberate mock for now (fills placeholder
- * patterns, no backend call) — real statistics-derived profiles are a follow-up.
+ * "Prefill from recording" (IS-146) calls `POST /recordings/{id}/derive-synthetic` for the
+ * chosen recording, applies each measurement's recommended stats-derived pattern (matched to
+ * the picked schema by nodeId), and remembers every pattern type's suggestion so switching a
+ * measurement's pattern re-applies that type's ranges.
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
