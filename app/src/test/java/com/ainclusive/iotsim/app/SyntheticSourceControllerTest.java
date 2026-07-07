@@ -15,6 +15,7 @@ import com.ainclusive.iotsim.domain.datasource.DataSource;
 import com.ainclusive.iotsim.domain.datasource.Protocol;
 import com.ainclusive.iotsim.domain.datasource.RuntimeState;
 import com.ainclusive.iotsim.domain.datasource.SourceBasis;
+import com.ainclusive.iotsim.domain.schema.SchemaService;
 import com.ainclusive.iotsim.domain.synthetic.PatternSpec;
 import com.ainclusive.iotsim.domain.synthetic.SyntheticConfig;
 import com.ainclusive.iotsim.domain.synthetic.SyntheticSourceService;
@@ -36,7 +37,9 @@ class SyntheticSourceControllerTest {
     @BeforeEach
     void setUp() {
         service = mock(SyntheticSourceService.class);
-        controller = new SyntheticSourceController(service);
+        SchemaService schemaService = mock(SchemaService.class);
+        given(schemaService.countVariableNodes(any(String.class))).willReturn(0);
+        controller = new SyntheticSourceController(service, schemaService);
     }
 
     private static SyntheticConfig config() {

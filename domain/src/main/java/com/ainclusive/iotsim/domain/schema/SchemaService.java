@@ -5,8 +5,10 @@ import com.ainclusive.iotsim.persistence.datasource.DataSourceRepository;
 import com.ainclusive.iotsim.persistence.schema.SchemaRepository;
 import com.ainclusive.iotsim.persistence.schema.SchemaWithNodes;
 import com.ainclusive.iotsim.protocolmodel.SchemaNode;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.springframework.stereotype.Service;
 
@@ -26,6 +28,22 @@ public class SchemaService {
         requireSource(projectId, dataSourceId);
         return schemas.findCurrent(dataSourceId).map(this::map)
                 .orElseThrow(() -> new ResourceNotFoundException("Schema", dataSourceId));
+    }
+
+    /**
+     * Returns VARIABLE node counts for the given set of data-source ids (IS-149).
+     * No-schema sources map to 0. Single bulk query — safe to call on the list endpoint.
+     */
+    public Map<String, Integer> countVariableNodes(Collection<String> dataSourceIds) {
+        return schemas.countVariableNodesBySource(dataSourceIds);
+    }
+
+    /**
+     * Returns the VARIABLE node count for a single data-source (IS-149).
+     */
+    public int countVariableNodes(String dataSourceId) {
+        return schemas.countVariableNodesBySource(List.of(dataSourceId))
+                .getOrDefault(dataSourceId, 0);
     }
 
     public Schema save(String projectId, String dataSourceId, List<SchemaNode> nodes) {

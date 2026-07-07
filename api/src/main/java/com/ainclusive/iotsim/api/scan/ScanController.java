@@ -8,6 +8,7 @@ import com.ainclusive.iotsim.domain.datasource.DataSource;
 import com.ainclusive.iotsim.domain.scan.ScanJob;
 import com.ainclusive.iotsim.domain.scan.ScanService;
 import com.ainclusive.iotsim.domain.scan.TypeResolution;
+import com.ainclusive.iotsim.domain.schema.SchemaService;
 import com.ainclusive.iotsim.platform.scan.ConnectionTestResult;
 import com.ainclusive.iotsim.platform.scan.DiscoveredNode;
 import com.ainclusive.iotsim.platform.scan.ScanResult;
@@ -46,9 +47,11 @@ public class ScanController {
             + " T(com.ainclusive.iotsim.api.security.Permission).SOURCE_EDIT)";
 
     private final ScanService scans;
+    private final SchemaService schemas;
 
-    public ScanController(ScanService scans) {
+    public ScanController(ScanService scans, SchemaService schemas) {
         this.scans = scans;
+        this.schemas = schemas;
     }
 
     /** Reachability/auth probe (synchronous). */
@@ -120,10 +123,11 @@ public class ScanController {
         require(req != null && notBlank(req.name()), "name is required");
         DataSource ds = scans.createFromScan(projectId, jobId, req.name(), req.realDeviceEndpoint(),
                 toResolutions(req.typeResolutions()), "local");
+        int paramCount = schemas.countVariableNodes(ds.id());
         return ResponseEntity.created(
                         URI.create("/api/v1/projects/" + projectId + "/data-sources/" + ds.id()))
                 .eTag("\"" + ds.version() + "\"")
-                .body(DataSourceResponse.from(ds));
+                .body(DataSourceResponse.from(ds, paramCount));
     }
 
     private static List<TypeResolution> toResolutions(List<TypeResolutionRequest> reqs) {

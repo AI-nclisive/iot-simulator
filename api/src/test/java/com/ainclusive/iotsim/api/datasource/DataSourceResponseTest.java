@@ -33,7 +33,7 @@ class DataSourceResponseTest {
                 "opc.tcp://localhost:4840/iotsim",
                 Instant.EPOCH, Instant.EPOCH, "test-user", 0L);
 
-        DataSourceController.DataSourceResponse response = DataSourceController.DataSourceResponse.from(ds);
+        DataSourceController.DataSourceResponse response = DataSourceController.DataSourceResponse.from(ds, 0);
 
         assertThat(response.securityConfig())
                 .contains("op")

@@ -3,6 +3,7 @@ package com.ainclusive.iotsim.api.synthetic;
 import com.ainclusive.iotsim.api.datasource.DataSourceController.DataSourceResponse;
 import com.ainclusive.iotsim.api.security.Permission;
 import com.ainclusive.iotsim.domain.datasource.DataSource;
+import com.ainclusive.iotsim.domain.schema.SchemaService;
 import com.ainclusive.iotsim.domain.synthetic.SyntheticConfig;
 import com.ainclusive.iotsim.domain.synthetic.SyntheticSourceService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -32,9 +33,11 @@ public class SyntheticSourceController {
             + " T(com.ainclusive.iotsim.api.security.Permission).SOURCE_EDIT)";
 
     private final SyntheticSourceService syntheticSources;
+    private final SchemaService schemas;
 
-    public SyntheticSourceController(SyntheticSourceService syntheticSources) {
+    public SyntheticSourceController(SyntheticSourceService syntheticSources, SchemaService schemas) {
         this.syntheticSources = syntheticSources;
+        this.schemas = schemas;
     }
 
     @Operation(
@@ -57,10 +60,11 @@ public class SyntheticSourceController {
         DataSource ds = syntheticSources.create(
                 projectId, req.name(), req.protocol(), req.simulatorPort(), req.config(),
                 req.schemaFromSourceId(), "local");
+        int paramCount = schemas.countVariableNodes(ds.id());
         return ResponseEntity.created(
                         URI.create("/api/v1/projects/" + projectId + "/data-sources/" + ds.id()))
                 .eTag("\"" + ds.version() + "\"")
-                .body(DataSourceResponse.from(ds));
+                .body(DataSourceResponse.from(ds, paramCount));
     }
 
     /**
