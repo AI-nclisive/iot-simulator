@@ -247,15 +247,18 @@ export function EvidenceListPage() {
       id: "sources",
       header: "Sources",
       sortable: false,
-      cell: (row) => (
-        <span className="text-sm text-shell-ink">
-          {row.sourceIds.length > 0
-            ? row.sourceIds.length === 1
-              ? row.sourceIds[0]
-              : `${row.sourceIds.length} sources`
-            : "—"}
-        </span>
-      ),
+      cell: (row) => {
+        const ids = row.sourceIds ?? [];
+        return (
+          <span className="text-sm text-shell-ink">
+            {ids.length > 0
+              ? ids.length === 1
+                ? ids[0]
+                : `${ids.length} sources`
+              : "—"}
+          </span>
+        );
+      },
       className: "w-[11rem]",
     },
   ];

@@ -49,11 +49,11 @@ function formatDate(iso: string | null | undefined): string {
   });
 }
 
-function buildValuesQs(filters: ValueFilters, cursor?: string): string {
+export function buildValuesQs(filters: ValueFilters, cursor?: string): string {
   const params = new URLSearchParams();
   if (cursor) params.set("cursor", cursor);
   if (filters.qualities.size < ALL_QUALITIES.length) {
-    params.set("qualities", [...filters.qualities].join(","));
+    params.set("quality", [...filters.qualities].join(","));
   }
   if (filters.search.trim()) params.set("search", filters.search.trim());
   if (filters.from) params.set("from", filters.from);

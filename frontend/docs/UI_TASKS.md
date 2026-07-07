@@ -869,6 +869,12 @@ Parallel execution:
   Work includes: make `saveChanges` async; `await updateSourceConfiguration(...)` before calling `setSavedMessage("Saved")`; 2 behavioral tests added.
   Done when: "Saved" badge only appears after the update call resolves; typecheck + vitest green.
 
+- [x] `UI-139` QA bug fixes — data source loading, null-safe filters, quality param mismatch, evidence crash
+  Goal: fix five bugs found during QA pass on master: wizard/list missing loadDataSources call; capturedBy/owner/sourceIds null crashes in filters; quality filter param name mismatch with backend.
+  Surface: `Create Recording Wizard`, `Recordings List`, `Evidence List`, `Recording Detail`, `Scenarios List`.
+  Work includes: add `loadDataSources` on mount in wizard and recordings-page; null-guard `capturedBy`, `sourceIds`, `owner`; fix query param `qualities` → `quality` in `buildValuesQs`; fix type declarations to reflect nullable API fields.
+  Done when: vitest green; quality checkbox filter excludes correct values; source names appear in recordings list; evidence page renders without crash.
+
 - [x] `UI-138` Fix recording/replay UX bugs — schema field names, idle label, 409 compat ack, no-endpoint guard
   Goal: address several UX regressions in the recording and replay flows.
   Surface: `Recording Detail`, `Recording Flow`, `Replay Flow`.
