@@ -47,6 +47,39 @@ type CreateDataSourceInput = {
   protocol: DataSourceRow["protocol"];
 };
 
+// ── Synthetic authoring (IS-145) — FE mirror of the backend SyntheticConfig ──────────────
+// Serialized shape of domain/synthetic/PatternSpec.java (only fields relevant to `type` are set).
+export type SyntheticPatternSpec = {
+  type: "CONSTANT" | "RAMP" | "SINE" | "SQUARE" | "RANDOM_UNIFORM" | "RANDOM_WALK";
+  value?: number;
+  min?: number;
+  max?: number;
+  periodMs?: number;
+  volatility?: number;
+};
+
+export type SyntheticVariableConfig = {
+  nodeId: string;
+  dataType: string;
+  pattern: SyntheticPatternSpec;
+  updateRateMs: number;
+};
+
+export type SyntheticConfig = {
+  seed: number | null;
+  variables: SyntheticVariableConfig[];
+};
+
+type CreateSyntheticInput = {
+  projectId: string;
+  name: string;
+  protocol: DataSourceRow["protocol"];
+  simulatorPort: number;
+  config: SyntheticConfig;
+  /** Reuse an existing source's schema verbatim (IS-145); omit to derive from the config. */
+  schemaFromSourceId?: string | null;
+};
+
 type UpdateSourceConfigInput = {
   name: string;
   simulatorPort?: number;
@@ -59,6 +92,9 @@ type DataSourcesState = {
   error: string | null;
   loadDataSources: (projectId: string) => Promise<void>;
   createDataSource: (input: CreateDataSourceInput & { projectId: string }) => Promise<string>;
+  createSyntheticSource: (input: CreateSyntheticInput) => Promise<string>;
+  runSynthetic: (rowId: string, projectId?: string) => Promise<void>;
+  stopSynthetic: (rowId: string, projectId?: string) => Promise<void>;
   deleteDataSource: (rowId: string, projectId?: string) => Promise<void>;
   duplicateDataSource: (rowId: string, projectId?: string) => Promise<void>;
   stopDataSource: (rowId: string, projectId?: string) => Promise<void>;
@@ -67,6 +103,8 @@ type DataSourcesState = {
     input: UpdateSourceConfigInput,
     projectId?: string,
   ) => Promise<void>;
+  /** Live synthetic run id per source (IS-145), used to stop via POST /runs/{id}/stop. */
+  syntheticRunIds: Record<string, string>;
   currentProjectId: string;
 };
 
@@ -78,6 +116,7 @@ export const useDataSourcesStore = create<DataSourcesState>((set, get) => ({
   dataSources: [],
   isLoading: false,
   error: null,
+  syntheticRunIds: {},
   currentProjectId: "",
 
   loadDataSources: async (projectId: string) => {
@@ -109,6 +148,55 @@ export const useDataSourcesStore = create<DataSourcesState>((set, get) => ({
     const row = mapDataSource(data);
     set((state) => ({ dataSources: [...state.dataSources, row] }));
     return row.id;
+  },
+
+  createSyntheticSource: async ({ projectId, name, protocol, simulatorPort, config, schemaFromSourceId }) => {
+    const data = await apiFetch<DataSourceResponse>(
+      `/api/v1/projects/${projectId}/data-sources/synthetic`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          name,
+          protocol: backendProtocol(protocol),
+          simulatorPort,
+          config,
+          ...(schemaFromSourceId ? { schemaFromSourceId } : {}),
+        }),
+      },
+    );
+    const row = mapDataSource(data);
+    set((state) => ({ dataSources: [...state.dataSources, row] }));
+    return row.id;
+  },
+
+  runSynthetic: async (rowId, projectId) => {
+    const pid = projectId ?? get().currentProjectId;
+    const run = await apiFetch<{ runId: string; state: string }>(
+      `/api/v1/projects/${pid}/data-sources/${rowId}/run-synthetic`,
+      { method: "POST", body: JSON.stringify({}) },
+    );
+    set((state) => ({
+      syntheticRunIds: { ...state.syntheticRunIds, [rowId]: run.runId },
+    }));
+    // Reload so the row's status reflects the now-RUNNING source (drives the live values tab).
+    await get().loadDataSources(pid);
+  },
+
+  stopSynthetic: async (rowId, projectId) => {
+    const pid = projectId ?? get().currentProjectId;
+    const runId = get().syntheticRunIds[rowId];
+    if (runId) {
+      await apiFetch<unknown>(`/api/v1/projects/${pid}/runs/${runId}/stop`, { method: "POST" });
+    } else {
+      // No tracked run id (e.g. after a reload) — fall back to tearing down the source.
+      await apiFetch<unknown>(`/api/v1/projects/${pid}/data-sources/${rowId}/stop`, { method: "POST" });
+    }
+    set((state) => {
+      const next = { ...state.syntheticRunIds };
+      delete next[rowId];
+      return { syntheticRunIds: next };
+    });
+    await get().loadDataSources(pid);
   },
 
   deleteDataSource: async (rowId, projectId) => {

@@ -55,13 +55,20 @@ public class SyntheticSourceController {
             throw new IllegalArgumentException("config is required");
         }
         DataSource ds = syntheticSources.create(
-                projectId, req.name(), req.protocol(), req.simulatorPort(), req.config(), "local");
+                projectId, req.name(), req.protocol(), req.simulatorPort(), req.config(),
+                req.schemaFromSourceId(), "local");
         return ResponseEntity.created(
                         URI.create("/api/v1/projects/" + projectId + "/data-sources/" + ds.id()))
                 .eTag("\"" + ds.version() + "\"")
                 .body(DataSourceResponse.from(ds));
     }
 
+    /**
+     * {@code schemaFromSourceId} (optional, IS-145): reuse an existing source's schema verbatim
+     * (names/paths/units) and drive the nodes named in {@code config}; when null the schema is
+     * derived from the config variables.
+     */
     public record CreateSyntheticSourceRequest(
-            String name, String protocol, Integer simulatorPort, SyntheticConfig config) {}
+            String name, String protocol, Integer simulatorPort, SyntheticConfig config,
+            String schemaFromSourceId) {}
 }
