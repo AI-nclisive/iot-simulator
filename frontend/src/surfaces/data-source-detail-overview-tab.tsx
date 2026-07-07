@@ -65,15 +65,30 @@ export function DataSourceDetailOverviewTab({
         <div>
           <p className="text-sm font-medium text-shell-ink">Source</p>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-shell-muted">
-            {source.status === "Active"
-              ? "The source is running. Open Schema to review parameters, or Values to see current readings."
-              : "The source is stopped. Start it to enable recording, replay, and live values."}
+            {source.basis === "IMPORT"
+              ? source.status === "Active"
+                ? "Replaying from recording — clients can connect to the replay endpoint below."
+                : "Start this source to begin replaying from the imported recording."
+              : source.status === "Active"
+                ? "The source is running. Open Schema to review parameters, or Values to see current readings."
+                : "The source is stopped. Start it to enable recording, replay, and live values."}
           </p>
+
+          {source.basis === "IMPORT" ? (
+            <div className="mt-4 rounded-md border border-shell-line bg-shell-base/40 px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
+                Data basis
+              </p>
+              <p className="mt-2 text-sm text-shell-ink">
+                This simulator replays data from an imported recording. The schema and parameter set are determined by that recording.
+              </p>
+            </div>
+          ) : null}
 
           <dl className="mt-5 grid gap-3 text-sm text-shell-muted sm:grid-cols-2">
             <div>
               <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
-                Simulator serve URL
+                {source.basis === "IMPORT" ? "Replay serve URL" : "Simulator serve URL"}
               </dt>
               <dd className="mt-2 font-mono text-sm text-shell-ink">{source.endpoint || "—"}</dd>
             </div>

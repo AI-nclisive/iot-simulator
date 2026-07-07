@@ -171,6 +171,7 @@ export function ScenarioBuilderPage() {
     if (!validation.ready) return;
     await runScenario(currentProjectId, scenarioId);
     pushNotification({ tone: "success", title: `Started "${scenario!.name}".` });
+    navigate(`/scenarios/${scenarioId}/run`);
   }
 
   async function handleSave() {
