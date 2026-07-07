@@ -20,6 +20,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const { mockShellStore } = vi.hoisted(() => ({ mockShellStore: vi.fn() }));
 vi.mock("../shell/shell-store", () => ({ useShellStore: mockShellStore }));
 
+const { mockNavigate } = vi.hoisted(() => ({ mockNavigate: vi.fn() }));
+vi.mock("react-router-dom", async () => {
+  const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
+  return { ...actual, useNavigate: () => mockNavigate };
+});
+
 const mockNotifyPush = vi.fn();
 vi.mock("../shell/notification-store", () => ({
   useNotificationStore: (sel: (s: object) => unknown) => sel({ push: mockNotifyPush }),
@@ -101,6 +107,7 @@ beforeEach(() => {
     error: null,
   });
   mockNotifyPush.mockClear();
+  mockNavigate.mockClear();
   setRole();
 });
 
@@ -155,6 +162,13 @@ describe("ScenarioBuilderPage", () => {
     expect(mockNotifyPush).toHaveBeenCalledWith(
       expect.objectContaining({ tone: "success", title: expect.stringContaining("Started") }),
     );
+  });
+
+  it("navigates to /scenarios/:id/run after clicking Run (UI-455)", async () => {
+    const user = userEvent.setup();
+    renderBuilder("scn-01");
+    await user.click(screen.getByRole("button", { name: "Run" }));
+    expect(mockNavigate).toHaveBeenCalledWith("/scenarios/scn-01/run");
   });
 
   it("admin can add a step", async () => {

@@ -228,6 +228,19 @@ describe("RecordingDetailPage — schema tab (UI-123)", () => {
     await waitFor(() => expect(screen.getByText("Failed to load schema.")).toBeTruthy());
   });
 
+  it("shows empty state (not error) when schema API returns 404 — new shell recording (UI-455)", async () => {
+    const { ApiError } = await import("../api");
+    mockApiFetch.mockImplementation((url: string) => {
+      if ((url as string).endsWith("/schema")) {
+        return Promise.reject(new ApiError(404, "Not Found", undefined, undefined));
+      }
+      return Promise.resolve({ items: [], nextCursor: null, total: 0 });
+    });
+    renderWithId("rec-001");
+    await waitFor(() => expect(screen.getByText("No schema captured.")).toBeTruthy());
+    expect(screen.queryByText("Failed to load schema.")).toBeNull();
+  });
+
   it("collapses folder nodes when toggle clicked", async () => {
     mockApiFetch.mockImplementation((url: string) => {
       if ((url as string).endsWith("/schema")) {

@@ -148,7 +148,11 @@ export function RecordingDetailPage() {
       );
       setSchemaNodes(data.nodes ?? []);
     } catch (err) {
-      setSchemaError(err instanceof ApiError ? err.title : "Failed to load schema.");
+      if (err instanceof ApiError && err.status === 404) {
+        setSchemaNodes([]);
+      } else {
+        setSchemaError(err instanceof ApiError ? err.title : "Failed to load schema.");
+      }
     } finally {
       setSchemaLoading(false);
     }

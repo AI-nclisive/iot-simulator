@@ -383,7 +383,7 @@ export function DataSourcesListPage() {
                 },
               ];
 
-              if (access.canRecordSource) {
+              if (access.canRecordSource && row.basis !== "IMPORT") {
                 actions.push({
                   label: "Record",
                   onClick: () => navigate(`/data-sources/${row.id}/record`),
@@ -392,7 +392,7 @@ export function DataSourcesListPage() {
 
               if (access.canConfigureReplay) {
                 actions.push({
-                  label: "Simulate",
+                  label: row.basis === "IMPORT" ? "Replay recording" : "Simulate",
                   onClick: () => navigate(`/data-sources/${row.id}/replay`),
                 });
               }

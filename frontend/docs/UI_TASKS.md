@@ -869,6 +869,12 @@ Parallel execution:
   Work includes: make `saveChanges` async; `await updateSourceConfiguration(...)` before calling `setSavedMessage("Saved")`; 2 behavioral tests added.
   Done when: "Saved" badge only appears after the update call resolves; typecheck + vitest green.
 
+- [x] `UI-455` QA bug fixes — schema-only 404 empty state, scenarios Run navigation, IMPORT source actions
+  Goal: fix three bugs found during QA: schema-only recording detail shows error on 404 schema fetch (should show empty state); scenarios Run button does not navigate to run view; data sources list shows "Record"/"Simulate" for IMPORT-basis sources.
+  Surface: `Recording Detail`, `Scenario Builder`, `Data Sources List`.
+  Work includes: recording-detail-page.tsx treat 404 on schema fetch as empty state not error; scenario-builder-page.tsx navigate to /scenarios/:id/run after runScenario; data-sources-list-page.tsx guard Record action and relabel Simulate for IMPORT basis.
+  Done when: schema-only recording detail shows "No schema captured." empty state; Run navigates to run view; IMPORT sources show only "Replay recording" action.
+
 - [x] `UI-139` QA bug fixes — data source loading, null-safe filters, quality param mismatch, evidence crash
   Goal: fix five bugs found during QA pass on master: wizard/list missing loadDataSources call; capturedBy/owner/sourceIds null crashes in filters; quality filter param name mismatch with backend.
   Surface: `Create Recording Wizard`, `Recordings List`, `Evidence List`, `Recording Detail`, `Scenarios List`.
