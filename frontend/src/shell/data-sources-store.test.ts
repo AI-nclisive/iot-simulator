@@ -55,6 +55,7 @@ function makeDataSourceResponse(overrides: Partial<{
   simulatorPort: number;
   realDeviceEndpoint: string | null;
   serveUrl: string;
+  parameterCount: number;
 }> = {}) {
   return {
     id: overrides.id ?? "src-01",
@@ -75,6 +76,7 @@ function makeDataSourceResponse(overrides: Partial<{
     updatedAt: "2026-06-01T00:00:00Z",
     createdBy: "testuser",
     version: 1,
+    ...(overrides.parameterCount !== undefined ? { parameterCount: overrides.parameterCount } : {}),
   };
 }
 
@@ -292,5 +294,25 @@ describe("mapDataSource (IS-127 field mapping)", () => {
     });
     await useDataSourcesStore.getState().loadDataSources("proj-1");
     expect(useDataSourcesStore.getState().dataSources[0].simulatorPort).toBe(44818);
+  });
+
+  it("maps parameterCount from the response (IS-149)", async () => {
+    mockApiFetch.mockResolvedValueOnce({
+      items: [makeDataSourceResponse({ parameterCount: 2480 })],
+      nextCursor: null,
+      limit: 50,
+    });
+    await useDataSourcesStore.getState().loadDataSources("proj-1");
+    expect(useDataSourcesStore.getState().dataSources[0].parameterCount).toBe(2480);
+  });
+
+  it("defaults parameterCount to 0 when missing from the response", async () => {
+    mockApiFetch.mockResolvedValueOnce({
+      items: [makeDataSourceResponse()],
+      nextCursor: null,
+      limit: 50,
+    });
+    await useDataSourcesStore.getState().loadDataSources("proj-1");
+    expect(useDataSourcesStore.getState().dataSources[0].parameterCount).toBe(0);
   });
 });

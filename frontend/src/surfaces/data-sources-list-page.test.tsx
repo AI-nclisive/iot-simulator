@@ -1,10 +1,11 @@
 /**
- * Tests for DataSourcesListPage row actions (UI-455)
+ * Tests for DataSourcesListPage row actions (UI-455) and parameter count display (UI-456)
  *
  * Covers:
  * - IMPORT-basis source must not show the "Record" row action
  * - IMPORT-basis source must label the replay action "Replay recording" (not "Simulate")
  * - SCAN-basis source shows both "Record" and "Simulate"
+ * - parameterCount from store is rendered in the list row
  */
 
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
@@ -101,5 +102,21 @@ describe("DataSourcesListPage — row actions for IMPORT basis (UI-455)", () => 
     renderPage();
     await waitFor(() => expect(screen.getByRole("button", { name: "Simulate" })).toBeTruthy());
     expect(screen.queryByRole("button", { name: "Replay recording" })).toBeNull();
+  });
+});
+
+describe("DataSourcesListPage — parameter count display (UI-456)", () => {
+  it("renders parameterCount from store in the list row", async () => {
+    setupStore([{ ...baseSource, parameterCount: 2480 }]);
+    renderPage();
+    await waitFor(() => expect(screen.getByText("Test Source")).toBeTruthy());
+    expect(screen.getByText(/2,480 parameters/)).toBeTruthy();
+  });
+
+  it("renders parameterCount of 0 when store value is 0", async () => {
+    setupStore([{ ...baseSource, parameterCount: 0 }]);
+    renderPage();
+    await waitFor(() => expect(screen.getByText("Test Source")).toBeTruthy());
+    expect(screen.getByText(/0 parameters/)).toBeTruthy();
   });
 });
