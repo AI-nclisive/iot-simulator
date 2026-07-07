@@ -23,6 +23,8 @@ type DataSourceResponse = {
   updatedAt: string;
   createdBy: string;
   version: number;
+  /** IS-149: count of VARIABLE schema nodes */
+  parameterCount?: number;
 };
 
 
@@ -35,7 +37,7 @@ function mapDataSource(d: DataSourceResponse): DataSourceRow {
     simulatorPort: d.simulatorPort,
     realDeviceEndpoint: d.realDeviceEndpoint ?? null,
     endpoint: d.serveUrl ?? "",
-    parameterCount: 0, // TODO(UI-097): no backend field — will come from schema node count
+    parameterCount: d.parameterCount ?? 0, // IS-149: VARIABLE node count from backend
     status: mapRuntimeStateToStatus(d.runtimeState),
     health: mapRuntimeStateToHealth(d.runtimeState) ?? "Healthy",
   };
