@@ -96,7 +96,7 @@ export function RecordingFlowPage() {
   const push = useNotificationStore((state) => state.push);
   const access = resolveAccess(accessMode, sharedRole);
   const captureAllowed = access.canRecordSource;
-  const hasRealEndpoint = Boolean(source?.endpoint);
+  const hasRealEndpoint = Boolean(source?.realDeviceEndpoint);
   const [recordingState, setRecordingState] = useState<RecordingUiState>("ready");
   const [durationSeconds, setDurationSeconds] = useState(0);
   const [valueCount, setValueCount] = useState(0);

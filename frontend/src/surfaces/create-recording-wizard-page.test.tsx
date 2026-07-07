@@ -55,8 +55,8 @@ vi.mock("../shell/data-sources-store", () => ({
 }));
 
 const defaultSources = [
-  { id: "src-1", name: "Plant OPC UA", protocol: "OPC UA", status: "Active", endpoint: "opc.tcp://plant:4840" },
-  { id: "src-2", name: "Modbus Line B", protocol: "Modbus TCP", status: "Stopped", endpoint: "" },
+  { id: "src-1", name: "Plant OPC UA", protocol: "OPC UA", status: "Active", endpoint: "opc.tcp://plant:4840", realDeviceEndpoint: "opc.tcp://plant:4840" },
+  { id: "src-2", name: "Modbus Line B", protocol: "Modbus TCP", status: "Stopped", endpoint: "", realDeviceEndpoint: null },
 ];
 
 afterEach(() => {
@@ -240,7 +240,7 @@ describe("CreateRecordingWizardPage — UI-132 routing", () => {
 
   it("Start capture is disabled when source has no real device endpoint (SCHEMA_AND_DATA blocked)", async () => {
     setupSources([
-      { id: "src-empty", name: "No Endpoint Source", protocol: "OPC UA", status: "Stopped", endpoint: "" },
+      { id: "src-empty", name: "No Endpoint Source", protocol: "OPC UA", status: "Stopped", endpoint: "", realDeviceEndpoint: null },
     ]);
     render(
       <MemoryRouter>

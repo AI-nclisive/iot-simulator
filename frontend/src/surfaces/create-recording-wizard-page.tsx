@@ -72,7 +72,7 @@ export function CreateRecordingWizardPage() {
   const activeStepId = STEPS[safeStep].id;
   const currentValidationMessage = stepValidation(form, activeStepId);
   const selectedSource = dataSources.find((ds) => ds.id === form.dataSourceId) ?? null;
-  const captureBlocked = form.scanType === "SCHEMA_AND_DATA" && !selectedSource?.endpoint;
+  const captureBlocked = form.scanType === "SCHEMA_AND_DATA" && !selectedSource?.realDeviceEndpoint;
 
   if (!access.canCreateSource) {
     return (
