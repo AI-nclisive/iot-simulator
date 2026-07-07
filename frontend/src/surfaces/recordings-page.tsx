@@ -16,7 +16,7 @@ export type RecordingRow = {
   origin: "captured" | "imported";
   valueCount: number;
   capturedAt: string;
-  capturedBy: string;
+  capturedBy: string | undefined;
 };
 
 type OriginFilter = "all" | "captured" | "imported";
@@ -52,6 +52,7 @@ export function RecordingsPage() {
   const loadRecordings = useArtifactsStore((s) => s.loadRecordings);
 
   const dataSources = useDataSourcesStore((s) => s.dataSources);
+  const loadDataSources = useDataSourcesStore((s) => s.loadDataSources);
   const sourceNameById = new Map(dataSources.map((ds) => [ds.id, ds.name]));
 
   const [originFilter, setOriginFilter] = useState<OriginFilter>("all");
@@ -63,8 +64,9 @@ export function RecordingsPage() {
   useEffect(() => {
     if (currentProjectId) {
       void loadRecordings(currentProjectId);
+      void loadDataSources(currentProjectId);
     }
-  }, [currentProjectId, loadRecordings]);
+  }, [currentProjectId, loadRecordings, loadDataSources]);
 
   const storeRows: RecordingRow[] = storeArtifacts.map((a) => ({
     id: a.id,
@@ -92,7 +94,7 @@ export function RecordingsPage() {
     if (sourceFilter !== "all" && row.sourceId !== sourceFilter) return false;
     if (searchQuery.trim() !== "") {
       const q = searchQuery.toLowerCase();
-      const capturedByMatch = row.capturedBy.toLowerCase().includes(q);
+      const capturedByMatch = (row.capturedBy ?? "").toLowerCase().includes(q);
       const sourceMatch = (row.sourceName || row.sourceId).toLowerCase().includes(q);
       const recordingNameMatch = (row.name ?? "").toLowerCase().includes(q);
       if (!capturedByMatch && !sourceMatch && !recordingNameMatch) return false;

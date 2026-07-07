@@ -1,5 +1,5 @@
 /**
- * Tests for CreateRecordingWizardPage (UI-115, UI-118, UI-124)
+ * Tests for CreateRecordingWizardPage (UI-115, UI-118, UI-124, UI-139)
  *
  * Covers:
  * - Step 1 (Data source): empty state, source list, Next enabled/disabled
@@ -45,7 +45,10 @@ vi.mock("../shell/notification-store", () => ({
     selector({ push: vi.fn() }),
 }));
 
-const { mockDataSourcesStore } = vi.hoisted(() => ({ mockDataSourcesStore: vi.fn() }));
+const { mockDataSourcesStore, mockLoadDataSources } = vi.hoisted(() => ({
+  mockDataSourcesStore: vi.fn(),
+  mockLoadDataSources: vi.fn().mockResolvedValue(undefined),
+}));
 
 vi.mock("../shell/data-sources-store", () => ({
   useDataSourcesStore: mockDataSourcesStore,
@@ -63,7 +66,7 @@ afterEach(() => {
 
 function setupSources(sources: typeof defaultSources) {
   mockDataSourcesStore.mockImplementation((selector: (s: Record<string, unknown>) => unknown) =>
-    selector({ dataSources: sources }),
+    selector({ dataSources: sources, loadDataSources: mockLoadDataSources }),
   );
 }
 
@@ -250,5 +253,19 @@ describe("CreateRecordingWizardPage — UI-132 routing", () => {
     await userEvent.click(screen.getByRole("button", { name: "Next" }));
     const startBtn = screen.getByRole("button", { name: "Start capture" }) as HTMLButtonElement;
     expect(startBtn.disabled).toBe(true);
+  });
+});
+
+// ── UI-139 loadDataSources on mount ───────────────────────────────────────────
+
+describe("CreateRecordingWizardPage — loadDataSources on mount (UI-139)", () => {
+  it("calls loadDataSources with currentProjectId on mount", () => {
+    renderPage();
+    expect(mockLoadDataSources).toHaveBeenCalledWith("proj-1");
+  });
+
+  it("calls loadDataSources exactly once on mount", () => {
+    renderPage();
+    expect(mockLoadDataSources).toHaveBeenCalledTimes(1);
   });
 });

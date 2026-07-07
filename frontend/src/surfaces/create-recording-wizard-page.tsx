@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { resolveAccess } from "../shell/access-policy";
 import { useShellStore } from "../shell/shell-store";
@@ -54,6 +54,11 @@ export function CreateRecordingWizardPage() {
   const push = useNotificationStore((s) => s.push);
   const access = resolveAccess(accessMode, sharedRole);
   const dataSources = useDataSourcesStore((s) => s.dataSources);
+  const loadDataSources = useDataSourcesStore((s) => s.loadDataSources);
+
+  useEffect(() => {
+    if (currentProjectId) void loadDataSources(currentProjectId);
+  }, [currentProjectId, loadDataSources]);
 
   const [currentStep, setCurrentStep] = useState(0);
   const [showValidation, setShowValidation] = useState(false);

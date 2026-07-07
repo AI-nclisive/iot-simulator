@@ -32,7 +32,7 @@ export interface ScenarioApiRow {
   steps: ScenarioApiStep[];
   createdAt: string;
   updatedAt: string;
-  createdBy: string;
+  createdBy: string | undefined;
   version: number;
 }
 
@@ -222,7 +222,7 @@ export function fromApiScenario(row: ScenarioApiRow): ScenarioRow {
     stepCount: row.steps.length,
     runState: "Not running",
     lastRun: { at: null, outcome: null },
-    owner: row.createdBy,
+    owner: row.createdBy ?? "",
     lockedBy: null,
     updatedAt: row.updatedAt,
   };
