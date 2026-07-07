@@ -2,7 +2,6 @@ package com.ainclusive.iotsim.persistence.schema;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.ainclusive.iotsim.persistence.datasource.DataSourceRow;
 import com.ainclusive.iotsim.persistence.datasource.JooqDataSourceRepository;
 import com.ainclusive.iotsim.persistence.project.JooqProjectRepository;
 import com.ainclusive.iotsim.protocolmodel.Access;
@@ -11,6 +10,7 @@ import com.ainclusive.iotsim.protocolmodel.NodeKind;
 import com.ainclusive.iotsim.protocolmodel.SchemaNode;
 import com.ainclusive.iotsim.protocolmodel.ValueRank;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.flywaydb.core.Flyway;
 import org.jooq.DSLContext;
@@ -29,7 +29,9 @@ class SchemaRepositoryIT {
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17");
 
     static SchemaRepository schemas;
+    static JooqDataSourceRepository dataSources;
     static String dataSourceId;
+    static String projectId;
 
     @BeforeAll
     static void migrateAndWire() {
@@ -39,10 +41,9 @@ class SchemaRepositoryIT {
                 .load()
                 .migrate();
         DSLContext dsl = DSL.using(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
-        String projectId = new JooqProjectRepository(dsl).insert("Plant", null, "it").id();
-        DataSourceRow source = new JooqDataSourceRepository(dsl)
-                .insert(projectId, "Pump", "OPC_UA", "MANUAL", 4840, null, null, null, "it");
-        dataSourceId = source.id();
+        projectId = new JooqProjectRepository(dsl).insert("Plant", null, "it").id();
+        dataSources = new JooqDataSourceRepository(dsl);
+        dataSourceId = dataSources.insert(projectId, "Pump", "OPC_UA", "MANUAL", 4840, null, null, null, "it").id();
         schemas = new JooqSchemaRepository(dsl);
     }
 
@@ -84,5 +85,47 @@ class SchemaRepositoryIT {
     @Test
     void findByVersionReturnsEmptyForMissingVersion() {
         assertThat(schemas.findByVersion(dataSourceId, 99999)).isEmpty();
+    }
+
+    /**
+     * IT cases for countVariableNodesBySource (IS-149):
+     * (a) a source with VARIABLE nodes returns the correct count (non-VARIABLE FOLDER nodes excluded),
+     * (b) a source with no schema returns 0.
+     */
+    @Test
+    void countVariableNodesBySource_returnsOnlyVariableNodeCount() {
+        // Create dedicated sources so this test is independent of other test state.
+        String sourceWithSchema = dataSources
+                .insert(projectId, "Motor", "OPC_UA", "MANUAL", 4840, null, null, null, "it")
+                .id();
+        String sourceWithoutSchema = dataSources
+                .insert(projectId, "Valve", "OPC_UA", "MANUAL", 4840, null, null, null, "it")
+                .id();
+
+        // Save a schema with 3 VARIABLE nodes + 2 non-VARIABLE (FOLDER) nodes.
+        List<SchemaNode> mixed = List.of(
+                new SchemaNode("fld1", null, "Root", "Root",
+                        NodeKind.FOLDER, null, null, null, null, null),
+                new SchemaNode("fld2", "fld1", "Root/Sub", "Sub",
+                        NodeKind.FOLDER, null, null, null, null, null),
+                new SchemaNode("var1", "fld1", "Root/Temp", "Temp",
+                        NodeKind.VARIABLE, DataType.FLOAT64, ValueRank.SCALAR, Access.READ, "degC", null),
+                new SchemaNode("var2", "fld1", "Root/Pressure", "Pressure",
+                        NodeKind.VARIABLE, DataType.FLOAT64, ValueRank.SCALAR, Access.READ, "bar", null),
+                new SchemaNode("var3", "fld1", "Root/Speed", "Speed",
+                        NodeKind.VARIABLE, DataType.INT32, ValueRank.SCALAR, Access.READ, "rpm", null));
+        schemas.saveNewVersion(sourceWithSchema, mixed);
+
+        Map<String, Integer> counts = schemas.countVariableNodesBySource(
+                List.of(sourceWithSchema, sourceWithoutSchema));
+
+        // (a) source with 3 VARIABLE + 2 FOLDER nodes => count = 3 (non-VARIABLE excluded)
+        assertThat(counts.get(sourceWithSchema)).isEqualTo(3);
+
+        // (b) source with no schema => count = 0 (not absent, not an exception)
+        assertThat(counts.get(sourceWithoutSchema)).isEqualTo(0);
+
+        // Both ids present in the result map
+        assertThat(counts).containsKeys(sourceWithSchema, sourceWithoutSchema);
     }
 }
