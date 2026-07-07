@@ -895,6 +895,12 @@ Parallel execution:
   Depends: none.
   Done when: clicking pin on a row marks it Pinned; SSE snapshot preserves pinned state; Pinned-only filter shows only pinned rows; typecheck + vitest green.
 
+- [x] `UI-458` Add SCAN schema review step to Create Data Source wizard
+  Goal: insert a new "Scan" wizard step (between Setup and Schedule) that auto-starts a schema scan via the backend scan API, polls until complete, shows discovered node count, surfaces unknown-type resolution selects, and blocks Next until scan is complete and all unknowns resolved.
+  Surface: `Create Data Source Wizard`.
+  Work includes: add `DiscoveredNodeResponse`, `TypeResolutionEntry` exported types; add `scanStepValidationMessage` exported function; insert `{ id: "scan", label: "Scan" }` into `SCAN_STEPS`; add scan state vars (`scanJobId`, `scanStatus`, `scanTrigger`, `scanResult`, `typeResolutions`, `scanErrorMessage`); auto-start `useEffect` with `setInterval` polling (deps: `[activeStepId, scanTrigger]`); `renderScanStep()` with scanning/complete/error/partial views; unknown-type resolution selects with `handleTypeResolutionChange`; `retryScan()` incrementing `scanTrigger`; on Review Create call `scan/{jobId}/create` for scan basis; 8 integration tests + 6 unit tests for validation function.
+  Done when: scan step appears in wizard; auto-scan starts on entry; polling updates UI; unknown types can be resolved; Next blocked until ready; Create calls scan create endpoint; typecheck + vitest green.
+
 - [x] `UI-139` QA bug fixes — data source loading, null-safe filters, quality param mismatch, evidence crash
   Goal: fix five bugs found during QA pass on master: wizard/list missing loadDataSources call; capturedBy/owner/sourceIds null crashes in filters; quality filter param name mismatch with backend.
   Surface: `Create Recording Wizard`, `Recordings List`, `Evidence List`, `Recording Detail`, `Scenarios List`.
