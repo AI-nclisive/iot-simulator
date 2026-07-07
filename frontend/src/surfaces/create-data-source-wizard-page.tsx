@@ -135,6 +135,13 @@ function getActiveSteps(basis: SourceBasis | null): WizardStep[] {
   return DEFAULT_STEPS;
 }
 
+/** Lowest port >= base not already used by an existing source, so a new source doesn't collide. */
+function nextFreePort(base: number, used: Set<number>): number {
+  let port = base;
+  while (used.has(port)) port++;
+  return port;
+}
+
 function optionButtonClass(selected: boolean) {
   return `w-full rounded-md border px-4 py-4 text-left transition ${
     selected
@@ -423,6 +430,27 @@ export function CreateDataSourceWizardPage() {
       void loadDataSources(currentProjectId);
     }
   }, [form.basis, currentProjectId, loadRecordings, loadDataSources]);
+
+  // Synthetic sources serve their own OPC UA/Modbus port; the per-protocol default (4840/502)
+  // collides with any source already using it. Once sources load, bump an empty/default port to
+  // the next free one so a new synthetic source can actually start. A user-entered non-default
+  // port is left untouched.
+  useEffect(() => {
+    if (form.basis !== "synthetic") return;
+    const used = new Set(
+      (dataSources ?? [])
+        .map((s) => s.simulatorPort)
+        .filter((p): p is number => typeof p === "number"),
+    );
+    if (used.size === 0) return;
+    const base = form.protocol === "OPC UA" ? 4840 : 502;
+    const current = Number(form.simulatorPort);
+    const isEmptyOrDefault = form.simulatorPort.trim() === "" || current === base;
+    if (isEmptyOrDefault) {
+      const free = String(nextFreePort(base, used));
+      if (free !== form.simulatorPort) updateForm({ simulatorPort: free });
+    }
+  }, [form.basis, form.protocol, form.simulatorPort, dataSources]);
 
   if (!access.canCreateSource) {
     return (
