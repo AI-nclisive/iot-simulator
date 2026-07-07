@@ -3,6 +3,7 @@ import { EditLockBanner, EditLockState } from "../ui/edit-lock-banner";
 import { StatusBadge } from "../ui/status-badge";
 import { ConfirmationDialog } from "../ui/confirmation-dialog";
 import { apiFetch, ApiError, mapDataType } from "../api";
+import { useEditLease } from "../shell/use-edit-lease";
 import type { DataSourceRow } from "./mock-data-sources";
 import type { ParameterType, SchemaParameter } from "./mock-schema-parameters";
 
@@ -246,9 +247,18 @@ export function DataSourceSchemaEditor({
     onUnsavedChanges?.(hasUnsavedChanges);
   }, [hasUnsavedChanges, onUnsavedChanges]);
 
-  // TODO(UI-097): no backend lock field — lock state is not yet exposed by the API
-  const lockState: EditLockState = { kind: "unlocked" };
-  const isLockedByOther = false;
+  // UI-459: wire edit lock to the backend lease API (IS-081).
+  const { leaseState, lockedByHolder } = useEditLease(
+    "data-sources",
+    source.id,
+    projectId ?? "",
+  );
+
+  const isLockedByOther = leaseState === "locked-by-other";
+
+  const lockState: EditLockState = isLockedByOther
+    ? { kind: "locked-by-other", owner: lockedByHolder ?? "another user", since: "" }
+    : { kind: "unlocked" };
 
   const filteredParams = allParams.filter(
     (p) =>
