@@ -46,6 +46,13 @@ vi.mock("../api", () => ({
   },
 }));
 
+// Default: lease is held by the current user so existing tests are unaffected.
+// Individual tests override this via mockUseEditLease.
+const { mockUseEditLease } = vi.hoisted(() => ({
+  mockUseEditLease: vi.fn().mockReturnValue({ leaseState: "held", lockedByHolder: null }),
+}));
+vi.mock("../shell/use-edit-lease", () => ({ useEditLease: mockUseEditLease }));
+
 import { ScenarioBuilderPage } from "./scenario-builder-page";
 import { useScenariosStore } from "../shell/scenarios-store";
 import type { ScenarioRow } from "../shell/scenarios-store";
@@ -230,7 +237,9 @@ describe("ScenarioBuilderPage", () => {
     setRole({ accessMode: "shared", sharedRole: "admin" });
     renderBuilder("scn-02");
     expect(screen.getByText("Locked")).toBeTruthy();
-    expect(screen.getByText(/being edited by Anna Kosol/)).toBeTruthy();
+    // EditLockBanner renders "Anna Kosol is currently editing."
+    expect(screen.getByText(/Anna Kosol/)).toBeTruthy();
+    expect(screen.getByText(/read-only/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
   });
 
@@ -302,5 +311,21 @@ describe("ScenarioBuilderPage", () => {
     await user.click(issueButton);
     // The step list marks it with an Issue badge (configured but semantically bad).
     expect(screen.getByText("Issue")).toBeTruthy();
+  });
+
+  it("shows EditLockBanner and disables editing when useEditLease returns locked-by-other", () => {
+    // Override the default lease mock for this test only.
+    mockUseEditLease.mockReturnValueOnce({
+      leaseState: "locked-by-other",
+      lockedByHolder: "carol",
+    });
+    setRole({ accessMode: "local", sharedRole: "admin" });
+    // Use scn-01 which has lockedBy:null in the store — lock comes from the API lease only.
+    renderBuilder("scn-01");
+    // EditLockBanner renders "carol is currently editing."
+    expect(screen.getByText(/carol/)).toBeTruthy();
+    expect(screen.getByText(/read-only/)).toBeTruthy();
+    // Save button should be absent because canEdit === false
+    expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
   });
 });

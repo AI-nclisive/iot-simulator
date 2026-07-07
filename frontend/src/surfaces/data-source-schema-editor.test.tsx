@@ -42,6 +42,12 @@ vi.mock("../api", () => ({
   }),
 }));
 
+// Default: lease held by current user — keeps existing tests unaffected.
+const { mockUseEditLease } = vi.hoisted(() => ({
+  mockUseEditLease: vi.fn().mockReturnValue({ leaseState: "held", lockedByHolder: null }),
+}));
+vi.mock("../shell/use-edit-lease", () => ({ useEditLease: mockUseEditLease }));
+
 const mockApiFetch = apiFetch as MockedFunction<typeof apiFetch>;
 
 // Mock schema response matching some parameters expected by the tests
@@ -85,6 +91,8 @@ afterEach(() => {
 beforeEach(() => {
   // Return schema by default; individual tests can override
   mockApiFetch.mockResolvedValue(mockSchemaResponse);
+  // Reset lease mock to "held" (default) so clearAllMocks doesn't break it
+  mockUseEditLease.mockReturnValue({ leaseState: "held", lockedByHolder: null });
 });
 
 // ---------------------------------------------------------------------------
@@ -615,5 +623,59 @@ describe("buildTree", () => {
     ];
     const tree = buildTree(nodes);
     expect(tree).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Edit-lock banner integration (UI-459)
+// ---------------------------------------------------------------------------
+
+describe("DataSourceSchemaEditor — edit-lock banner (UI-459)", () => {
+  it("shows EditLockBanner when useEditLease returns locked-by-other", async () => {
+    mockApiFetch.mockResolvedValueOnce(mockSchemaResponse);
+    mockUseEditLease.mockReturnValueOnce({
+      leaseState: "locked-by-other",
+      lockedByHolder: "david",
+    });
+
+    render(<DataSourceSchemaEditor source={mockSource} projectId={PROJECT_ID} />);
+
+    await screen.findByText("oven/zone[1]/temp");
+
+    expect(screen.getByText(/david/)).toBeTruthy();
+    expect(screen.getByText(/read-only/)).toBeTruthy();
+    expect(screen.getByRole("status")).toBeTruthy();
+  });
+
+  it("disables edit controls when locked-by-other", async () => {
+    mockApiFetch.mockResolvedValueOnce(mockSchemaResponse);
+    mockUseEditLease.mockReturnValueOnce({
+      leaseState: "locked-by-other",
+      lockedByHolder: "david",
+    });
+
+    render(<DataSourceSchemaEditor source={mockSource} projectId={PROJECT_ID} />);
+
+    await screen.findByText("oven/zone[1]/temp");
+    await userEvent.click(screen.getByText("oven/zone[1]/temp"));
+
+    const saveButton = screen.getByRole("button", { name: "Save schema" }) as HTMLButtonElement;
+    // Save should be disabled (no unsaved changes AND locked)
+    expect(saveButton.disabled).toBe(true);
+  });
+
+  it("does NOT show EditLockBanner when lease is held", async () => {
+    mockApiFetch.mockResolvedValueOnce(mockSchemaResponse);
+    // Default mock already returns held, but be explicit:
+    mockUseEditLease.mockReturnValueOnce({
+      leaseState: "held",
+      lockedByHolder: null,
+    });
+
+    render(<DataSourceSchemaEditor source={mockSource} projectId={PROJECT_ID} />);
+
+    await screen.findByText("oven/zone[1]/temp");
+
+    expect(screen.queryByText(/read-only/)).toBeNull();
   });
 });

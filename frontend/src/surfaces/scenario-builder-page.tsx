@@ -18,7 +18,9 @@ import { resolveAccess } from "../shell/access-policy";
 import { useNotificationStore } from "../shell/notification-store";
 import { useScenariosStore, type ScenarioApiValidationIssue } from "../shell/scenarios-store";
 import { useShellStore } from "../shell/shell-store";
+import { useEditLease } from "../shell/use-edit-lease";
 import { ConfirmationDialog } from "../ui/confirmation-dialog";
+import { EditLockBanner } from "../ui/edit-lock-banner";
 import { SharedStatePanel } from "../ui/shared-state-panel";
 import { StatusBadge, type StatusTone } from "../ui/status-badge";
 import { ScenarioStepEditor } from "./scenario-step-editor";
@@ -122,7 +124,18 @@ export function ScenarioBuilderPage() {
     [mergedIssues],
   );
 
-  const lockedByOther = scenario?.lockedBy != null;
+  // UI-459: acquire an edit lease via the backend API (IS-081).
+  const { leaseState, lockedByHolder } = useEditLease(
+    "scenarios",
+    scenarioId,
+    currentProjectId,
+  );
+
+  // lockedByOther: true when the store's lockedBy field is set (optimistic, from
+  // the scenario list payload) OR when the live lease says another user holds it.
+  const leaseLockedByOther = leaseState === "locked-by-other";
+  const lockedByOther = scenario?.lockedBy != null || leaseLockedByOther;
+  const effectiveLockedBy = scenario?.lockedBy ?? lockedByHolder ?? null;
   const canEdit = access.canEditScenario && !lockedByOther;
 
   const status: BuilderStatus = lockedByOther
@@ -257,10 +270,13 @@ export function ScenarioBuilderPage() {
       </header>
 
       {lockedByOther ? (
-        <div className="rounded-md border border-shell-danger/30 bg-shell-danger/5 px-4 py-3 text-sm text-shell-ink">
-          This scenario is being edited by {scenario.lockedBy}. You can inspect and run it, but
-          not change it.
-        </div>
+        <EditLockBanner
+          lock={{
+            kind: "locked-by-other",
+            owner: effectiveLockedBy ?? "another user",
+            since: "",
+          }}
+        />
       ) : null}
 
       {/* Validation summary */}

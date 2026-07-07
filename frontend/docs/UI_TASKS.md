@@ -869,6 +869,13 @@ Parallel execution:
   Work includes: make `saveChanges` async; `await updateSourceConfiguration(...)` before calling `setSavedMessage("Saved")`; 2 behavioral tests added.
   Done when: "Saved" badge only appears after the update call resolves; typecheck + vitest green.
 
+- [x] `UI-459` Wire edit lock to API — schema editor and scenario builder
+  Goal: replace the stub `lockedBy` check in the schema editor and the store-only `lockedBy` check in the scenario builder with live advisory edit leases backed by the IS-081 API (POST/DELETE/GET `/edit-lease`).
+  Surface: `Data Source Schema Editor`, `Scenario Builder`.
+  Work includes: `useEditLease` hook (`frontend/src/shell/use-edit-lease.ts`) — acquires lease on mount, renews every 60 s, releases on unmount (fire-and-forget); lock is ADVISORY (errors fall through to editable mode); schema editor wired to `"data-sources"` lease; scenario builder wired to `"scenarios"` lease; `EditLockBanner` shown when `leaseState === "locked-by-other"`; tests for hook (acquire, renew, release, locked-by-other, error, no-op for empty ids) and for banner integration in both surfaces.
+  Depends: IS-081.
+  Done when: schema editor acquires lease on open, shows lock banner when locked, releases on close; scenario builder same; typecheck + vitest green.
+
 - [x] `UI-453` Fix real-device-endpoint guard in recording wizard and flow page
   Goal: `captureBlocked` in the recording wizard and `hasRealEndpoint` in the recording flow page were checking `endpoint` (the simulator serve URL) instead of `realDeviceEndpoint` (the actual OPC UA device address). IMPORT/MANUAL sources without a real device were incorrectly unblocked.
   Surface: `Create Recording Wizard`, `Recording Flow Page`.
