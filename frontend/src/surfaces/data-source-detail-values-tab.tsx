@@ -21,7 +21,7 @@ function freshnessTone(freshness: SourceValueRow["freshness"]) {
 }
 
 /** Map a protocol-neutral schema data type (FLOAT64, INT32, BOOL, …) to the tab's type category. */
-function neutralToUiType(dataType: string | null): SourceValueRow["dataType"] {
+export function neutralToUiType(dataType: string | null): SourceValueRow["dataType"] {
   if (dataType == null) return "string";
   if (dataType.startsWith("FLOAT")) return "float";
   if (dataType.startsWith("INT") || dataType.startsWith("UINT")) return "int";

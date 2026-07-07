@@ -44,7 +44,7 @@ const PATTERN_TYPES: { value: PatternType; label: string }[] = [
   { value: "CONSTANT", label: "Constant" },
 ];
 
-type NodeDraft = {
+export type NodeDraft = {
   enabled: boolean;
   pattern: PatternType;
   min: string;
@@ -62,7 +62,7 @@ export type SyntheticProfileValue = {
   measurementCount: number;
 };
 
-function defaultDraft(): NodeDraft {
+export function defaultDraft(): NodeDraft {
   return {
     enabled: true,
     pattern: "SINE",
@@ -81,7 +81,7 @@ function num(s: string): number | null {
 }
 
 /** Build a serialized pattern from a draft, or null when the draft is incomplete/invalid. */
-function toPattern(d: NodeDraft): SyntheticPatternSpec | null {
+export function toPattern(d: NodeDraft): SyntheticPatternSpec | null {
   switch (d.pattern) {
     case "CONSTANT": {
       const v = num(d.value);
@@ -113,7 +113,7 @@ function toPattern(d: NodeDraft): SyntheticPatternSpec | null {
 }
 
 /** Map a derived pattern (from POST /recordings/{id}/derive-synthetic) back onto editable draft fields. */
-function draftFromPattern(pattern: SyntheticPatternSpec, updateRateMs: number): Partial<NodeDraft> {
+export function draftFromPattern(pattern: SyntheticPatternSpec, updateRateMs: number): Partial<NodeDraft> {
   const rate = { updateRateMs: String(updateRateMs) };
   switch (pattern.type) {
     case "CONSTANT":
