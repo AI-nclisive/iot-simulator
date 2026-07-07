@@ -1,6 +1,8 @@
 package com.ainclusive.iotsim.domain.synthetic;
 
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
+import com.ainclusive.iotsim.domain.synthetic.RecordingProfile.MeasurementProfile;
+import com.ainclusive.iotsim.domain.synthetic.RecordingProfile.ProfileStats;
 import com.ainclusive.iotsim.persistence.recording.RecordingRepository;
 import com.ainclusive.iotsim.persistence.recording.RecordingRow;
 import com.ainclusive.iotsim.persistence.schema.SchemaRepository;
@@ -8,8 +10,6 @@ import com.ainclusive.iotsim.persistence.schema.SchemaWithNodes;
 import com.ainclusive.iotsim.persistence.timeline.ValueTimelineRepository;
 import com.ainclusive.iotsim.protocolmodel.NeutralValue;
 import com.ainclusive.iotsim.protocolmodel.NodeKind;
-import com.ainclusive.iotsim.domain.synthetic.RecordingProfile.MeasurementProfile;
-import com.ainclusive.iotsim.domain.synthetic.RecordingProfile.ProfileStats;
 import com.ainclusive.iotsim.protocolmodel.SchemaNode;
 import java.time.Instant;
 import java.util.ArrayList;
