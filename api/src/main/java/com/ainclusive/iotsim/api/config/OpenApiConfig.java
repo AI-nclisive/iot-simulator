@@ -66,6 +66,10 @@ public class OpenApiConfig {
                         new Tag().name("Admin — Users")
                                 .description("Admin-only user management: list all registered users, change"
                                         + " roles (admin ↔ user), and activate/suspend accounts."
-                                        + " Requires the admin.access permission (IS-118).")));
+                                        + " Requires the admin.access permission (IS-118)."),
+                        new Tag().name("Activity")
+                                .description("Append-only audit log of user actions: data source start/stop,"
+                                        + " recording capture, scenario runs, admin role/status changes."
+                                        + " Paginated with a keyset cursor. Project-scoped or admin-wide.")));
     }
 }

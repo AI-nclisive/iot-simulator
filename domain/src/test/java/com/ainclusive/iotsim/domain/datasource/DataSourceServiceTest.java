@@ -3,6 +3,8 @@ package com.ainclusive.iotsim.domain.datasource;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.ainclusive.iotsim.domain.activityevent.ActivityEventService;
+import com.ainclusive.iotsim.domain.activityevent.NoOpActivityEventRepository;
 import com.ainclusive.iotsim.domain.common.ConcurrencyConflictException;
 import com.ainclusive.iotsim.domain.common.PortInUseException;
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
@@ -46,7 +48,8 @@ class DataSourceServiceTest {
                 new InMemoryRuntimeController(),
                 credentials,
                 new ObjectMapper(),
-                "localhost");
+                "localhost",
+                new ActivityEventService(new NoOpActivityEventRepository()));
     }
 
     @Test
@@ -123,8 +126,8 @@ class DataSourceServiceTest {
     @Test
     void startThenStopTogglesRuntimeState() {
         DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null, null, null, null, "a");
-        assertThat(service.start(PROJECT, ds.id()).runtimeState()).isEqualTo(RuntimeState.RUNNING);
-        assertThat(service.stop(PROJECT, ds.id()).runtimeState()).isEqualTo(RuntimeState.STOPPED);
+        assertThat(service.start(PROJECT, ds.id(), "test").runtimeState()).isEqualTo(RuntimeState.RUNNING);
+        assertThat(service.stop(PROJECT, ds.id(), "test").runtimeState()).isEqualTo(RuntimeState.STOPPED);
     }
 
     @Test
@@ -137,7 +140,7 @@ class DataSourceServiceTest {
     @Test
     void deleteRemovesSource() {
         DataSource ds = service.create(PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null, null, null, null, "a");
-        service.delete(PROJECT, ds.id());
+        service.delete(PROJECT, ds.id(), "test");
         assertThatThrownBy(() -> service.get(PROJECT, ds.id()))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
@@ -210,7 +213,7 @@ class DataSourceServiceTest {
         DataSource ds = service.create(
                 PROJECT, "Pump", "OPC_UA", "MANUAL", null, null, null, null,
                 ConnectionCredentials.password("u", "pw"), null, "a");
-        service.delete(PROJECT, ds.id());
+        service.delete(PROJECT, ds.id(), "test");
         assertThat(credentials.has(ds.id())).isFalse();
     }
 
@@ -299,7 +302,8 @@ class DataSourceServiceTest {
                 new InMemoryRuntimeController(),
                 credentials,
                 new ObjectMapper(),
-                "localhost");
+                "localhost",
+                new ActivityEventService(new NoOpActivityEventRepository()));
 
         DataSource original = svc.create(PROJECT, "Sensor", "OPC_UA", "SCAN", null, null, null, null, null, null, "a");
         SchemaNode node = new SchemaNode("n1", null, "/root/temp", "Temperature",
@@ -328,7 +332,8 @@ class DataSourceServiceTest {
                 new InMemoryRuntimeController(),
                 credentials,
                 new ObjectMapper(),
-                "localhost");
+                "localhost",
+                new ActivityEventService(new NoOpActivityEventRepository()));
 
         SchemaNode node = new SchemaNode("n1", null, "/root/temp", "Temperature",
                 com.ainclusive.iotsim.protocolmodel.NodeKind.VARIABLE,
@@ -375,9 +380,9 @@ class DataSourceServiceTest {
     void startRejectsPortHeldByAnotherRunningSource() {
         DataSource a = service.create(PROJECT, "A", "OPC_UA", "MANUAL", 4840, null, null, null, null, null, "it");
         DataSource b = service.create(PROJECT, "B", "OPC_UA", "MANUAL", 4840, null, null, null, null, null, "it");
-        service.start(PROJECT, a.id());   // A now RUNNING on 4840
+        service.start(PROJECT, a.id(), "test");   // A now RUNNING on 4840
 
-        assertThatThrownBy(() -> service.start(PROJECT, b.id()))
+        assertThatThrownBy(() -> service.start(PROJECT, b.id(), "test"))
                 .isInstanceOf(PortInUseException.class);
     }
 
@@ -385,10 +390,10 @@ class DataSourceServiceTest {
     void startAllowsSamePortWhenOtherSourceIsStopped() {
         DataSource a = service.create(PROJECT, "A", "OPC_UA", "MANUAL", 4840, null, null, null, null, null, "it");
         DataSource b = service.create(PROJECT, "B", "OPC_UA", "MANUAL", 4840, null, null, null, null, null, "it");
-        service.start(PROJECT, a.id());
-        service.stop(PROJECT, a.id());    // A STOPPED → 4840 free
+        service.start(PROJECT, a.id(), "test");
+        service.stop(PROJECT, a.id(), "test");    // A STOPPED → 4840 free
 
-        service.start(PROJECT, b.id());   // no throw
+        service.start(PROJECT, b.id(), "test");   // no throw
         assertThat(service.get(PROJECT, b.id()).runtimeState()).isEqualTo(RuntimeState.RUNNING);
     }
 
@@ -397,8 +402,8 @@ class DataSourceServiceTest {
         // No explicit port → both default to 4840 → second start conflicts.
         DataSource a = service.create(PROJECT, "A", "OPC_UA", "MANUAL", null, null, null, null, null, null, "it");
         DataSource b = service.create(PROJECT, "B", "OPC_UA", "MANUAL", null, null, null, null, null, null, "it");
-        service.start(PROJECT, a.id());
-        assertThatThrownBy(() -> service.start(PROJECT, b.id()))
+        service.start(PROJECT, a.id(), "test");
+        assertThatThrownBy(() -> service.start(PROJECT, b.id(), "test"))
                 .isInstanceOf(PortInUseException.class);
     }
 
@@ -406,16 +411,16 @@ class DataSourceServiceTest {
     void startAllowsDifferentPorts() {
         DataSource a = service.create(PROJECT, "A", "OPC_UA", "MANUAL", 4840, null, null, null, null, null, "it");
         DataSource b = service.create(PROJECT, "B", "OPC_UA", "MANUAL", 4841, null, null, null, null, null, "it");
-        service.start(PROJECT, a.id());
-        service.start(PROJECT, b.id());
+        service.start(PROJECT, a.id(), "test");
+        service.start(PROJECT, b.id(), "test");
         assertThat(service.get(PROJECT, b.id()).runtimeState()).isEqualTo(RuntimeState.RUNNING);
     }
 
     @Test
     void restartingSameSourceIsNotSelfConflict() {
         DataSource a = service.create(PROJECT, "A", "OPC_UA", "MANUAL", 4840, null, null, null, null, null, "it");
-        service.start(PROJECT, a.id());
-        service.start(PROJECT, a.id());   // same id re-start → no throw
+        service.start(PROJECT, a.id(), "test");
+        service.start(PROJECT, a.id(), "test");   // same id re-start → no throw
         assertThat(service.get(PROJECT, a.id()).runtimeState()).isEqualTo(RuntimeState.RUNNING);
     }
 

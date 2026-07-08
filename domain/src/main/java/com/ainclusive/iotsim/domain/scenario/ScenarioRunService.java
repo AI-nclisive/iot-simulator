@@ -86,7 +86,7 @@ public class ScenarioRunService {
             for (ScenarioStepRow step : scenario.steps()) {
                 events.append(projectId, step.targetSourceId(), run.id(), "SCENARIO_STEP", now(),
                         stepPayload(step));
-                outcomes.add(execute(projectId, step, run.id(), settings));
+                outcomes.add(execute(projectId, step, run.id(), settings, actor));
             }
             RunRow ended = runs.end(run.id(), "COMPLETED", now());
             return new ScenarioRunSummary(run.id(), ev.id(), ended.state(), outcomes);
@@ -97,15 +97,15 @@ public class ScenarioRunService {
     }
 
     private StepOutcome execute(String projectId, ScenarioStepRow step, String parentRunId,
-            DeterministicSettings settings) {
+            DeterministicSettings settings, String actor) {
         int at = step.ordinal();
         switch (step.type()) {
             case "START" -> {
-                dataSources.start(projectId, step.targetSourceId());
+                dataSources.start(projectId, step.targetSourceId(), actor);
                 return new StepOutcome(at, "START", null, 0, "OK");
             }
             case "STOP" -> {
-                dataSources.stop(projectId, step.targetSourceId());
+                dataSources.stop(projectId, step.targetSourceId(), actor);
                 return new StepOutcome(at, "STOP", null, 0, "OK");
             }
             case "REPLAY" -> {

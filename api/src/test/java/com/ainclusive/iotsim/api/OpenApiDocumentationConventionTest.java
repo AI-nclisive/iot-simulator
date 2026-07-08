@@ -32,7 +32,7 @@ class OpenApiDocumentationConventionTest {
 
     private static final String BASE_PACKAGE = "com.ainclusive.iotsim.api";
 
-    /** The nine Swagger groups the API is organised into. See OpenApiConfig. */
+    /** The Swagger groups the API is organised into. See OpenApiConfig. */
     private static final Set<String> ALLOWED_GROUPS = Set.of(
             "Platform",
             "Projects",
@@ -44,7 +44,8 @@ class OpenApiDocumentationConventionTest {
             "Evidence",
             "Monitoring",
             "Edit Leases",
-            "Admin — Users");
+            "Admin — Users",
+            "Activity");
 
     @Test
     void everyRestControllerAndEndpointIsDocumented() throws ClassNotFoundException {

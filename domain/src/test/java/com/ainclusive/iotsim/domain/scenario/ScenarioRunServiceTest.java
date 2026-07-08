@@ -153,8 +153,8 @@ class ScenarioRunServiceTest {
         assertThat(summary.runId()).isEqualTo("run-parent");
         assertThat(summary.status()).isEqualTo("COMPLETED"); // ended.state() from COMPLETED-state RunRow stub
         assertThat(summary.steps()).extracting(StepOutcome::type).containsExactly("START", "REPLAY", "STOP");
-        verify(dataSources).start(PROJECT, SOURCE);
-        verify(dataSources).stop(PROJECT, SOURCE);
+        verify(dataSources).start(eq(PROJECT), eq(SOURCE), anyString());
+        verify(dataSources).stop(eq(PROJECT), eq(SOURCE), anyString());
         verify(replay).replay(eq(PROJECT), eq(SOURCE), eq(RECORDING), any(), eq(false), eq("run-parent"));
         verify(runs).end(eq("run-parent"), eq("COMPLETED"), any());
     }
@@ -220,11 +220,11 @@ class ScenarioRunServiceTest {
         when(runs.start(anyString(), any())).thenReturn(parent);
         when(evidence.create(anyString(), anyString(), anyString()))
                 .thenReturn(new EvidenceRow("ev-1", PROJECT, "run-parent", "CAPTURING", "{}", null, null, "local"));
-        org.mockito.Mockito.doThrow(new RuntimeException("boom")).when(dataSources).start(PROJECT, SOURCE);
+        org.mockito.Mockito.doThrow(new RuntimeException("boom")).when(dataSources).start(eq(PROJECT), eq(SOURCE), anyString());
 
         assertThatThrownBy(() -> service.run(PROJECT, SCENARIO, "MANUAL", "local"))
                 .isInstanceOf(RuntimeException.class);
         verify(runs).end(eq("run-parent"), eq("FAILED"), any());
-        verify(dataSources, never()).stop(PROJECT, SOURCE);
+        verify(dataSources, never()).stop(eq(PROJECT), eq(SOURCE), anyString());
     }
 }
