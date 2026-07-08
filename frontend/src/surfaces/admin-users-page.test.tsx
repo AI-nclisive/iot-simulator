@@ -128,6 +128,25 @@ async function waitForTable() {
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
+describe("AdminUsersPage — loading and error states", () => {
+  it("shows loading panel while GET is in flight", () => {
+    mockApiFetch.mockImplementation(() => new Promise(() => {})); // never resolves
+    setupStore();
+    renderPage();
+    expect(screen.getByText("Loading users…")).toBeTruthy();
+    expect(screen.queryByRole("table")).toBeNull();
+  });
+
+  it("shows error panel when GET /api/v1/admin/users fails", async () => {
+    mockApiFetch.mockRejectedValue(new Error("Network error"));
+    setupStore();
+    renderPage();
+    await waitFor(() => expect(screen.queryByText("Loading users…")).toBeNull());
+    expect(screen.getByText("Failed to load users.")).toBeTruthy();
+    expect(screen.queryByRole("table")).toBeNull();
+  });
+});
+
 describe("AdminUsersPage — access gates", () => {
   it("shows the users table in Local mode (trusted admin)", async () => {
     setupStore({ accessMode: "local" });
