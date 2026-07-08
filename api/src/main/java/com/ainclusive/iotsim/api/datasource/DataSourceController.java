@@ -154,7 +154,7 @@ public class DataSourceController {
     @DeleteMapping("/{id}")
     @PreAuthorize(SOURCE_EDIT)
     public ResponseEntity<Void> delete(@PathVariable String projectId, @PathVariable String id) {
-        dataSources.delete(projectId, id);
+        dataSources.delete(projectId, id, "local");
         return ResponseEntity.noContent().build();
     }
 
@@ -199,7 +199,7 @@ public class DataSourceController {
     @PostMapping("/{id}/stop")
     @PreAuthorize(SOURCE_STOP)
     public ResponseEntity<DataSourceResponse> stop(@PathVariable String projectId, @PathVariable String id) {
-        DataSource ds = dataSources.stop(projectId, id);
+        DataSource ds = dataSources.stop(projectId, id, "local");
         int paramCount = schemas.countVariableNodes(ds.id());
         return ResponseEntity.ok().eTag(etag(ds.version())).body(DataSourceResponse.from(ds, paramCount));
     }

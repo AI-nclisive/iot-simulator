@@ -3,6 +3,8 @@ package com.ainclusive.iotsim.domain.recording;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.ainclusive.iotsim.domain.activityevent.ActivityEventService;
+import com.ainclusive.iotsim.domain.activityevent.NoOpActivityEventRepository;
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRepository;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRow;
@@ -61,7 +63,8 @@ class RecordingServiceTest {
                 schemas,
                 new InMemoryCredentialStore(),
                 capturer,
-                fakeProjects());
+                fakeProjects(),
+                new ActivityEventService(new NoOpActivityEventRepository()));
     }
 
     @Test
@@ -199,7 +202,8 @@ class RecordingServiceTest {
         RecordingService svc = new RecordingService(recRepo,
                 new InMemoryValueTimelineRepository(), sources, schemas,
                 new com.ainclusive.iotsim.platform.secret.InMemoryCredentialStore(),
-                capturer, existingProject);
+                capturer, existingProject,
+                new ActivityEventService(new NoOpActivityEventRepository()));
         svc.create(PROJECT, SOURCE, com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_AND_DATA, null, "alice");
         svc.create(PROJECT, SOURCE, com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_AND_DATA, null, "bob");
         svc.create(PROJECT, SOURCE, com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_AND_DATA, null, "carol");
