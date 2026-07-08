@@ -234,7 +234,7 @@ import/export. Modbus moved to Wave G (deferred) — see the note there.
 - [ ] IS-082 [BE] ⬜ [auth] Secrets via env/external store; structural export exclusion — 08
 - [ ] IS-083 [BE] ⬜ [observ] User-activity audit (separate stream from runtime) — SPEC: User Activity History
 - [ ] IS-084 [BE] ⬜ [project] Project + environment settings — 05
-- [ ] IS-118 [BE] ⬜ [api] Admin/user-management endpoints (list users, role assignment, status; admin-only) — 05/08 · SPEC: Manage Access
+- [x] IS-118 [BE] ✅ [api] Admin/user-management endpoints (list users, role assignment, status; admin-only) — 05/08 · SPEC: Manage Access
 
 ## Wave F — Advanced workflows & hardening · P2
 

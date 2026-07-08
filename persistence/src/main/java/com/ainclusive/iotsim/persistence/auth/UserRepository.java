@@ -1,6 +1,7 @@
 package com.ainclusive.iotsim.persistence.auth;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -40,6 +41,9 @@ public interface UserRepository {
 
     /** Returns the role names assigned to the given user. */
     List<String> findRoles(String userId);
+
+    /** Returns all user-id → role-name mappings in a single query. */
+    Map<String, List<String>> findAllRoles();
 
     boolean deleteById(String id);
 }

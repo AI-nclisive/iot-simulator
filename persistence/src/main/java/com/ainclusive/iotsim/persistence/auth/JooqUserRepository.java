@@ -8,6 +8,7 @@ import com.ainclusive.iotsim.platform.Ids;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.jooq.DSLContext;
 import org.springframework.stereotype.Repository;
@@ -95,6 +96,13 @@ public class JooqUserRepository implements UserRepository {
                 .from(USER_ROLES)
                 .where(USER_ROLES.USER_ID.eq(userId))
                 .fetch(USER_ROLES.ROLE_NAME);
+    }
+
+    @Override
+    public Map<String, List<String>> findAllRoles() {
+        return dsl.select(USER_ROLES.USER_ID, USER_ROLES.ROLE_NAME)
+                .from(USER_ROLES)
+                .fetchGroups(USER_ROLES.USER_ID, USER_ROLES.ROLE_NAME);
     }
 
     @Override

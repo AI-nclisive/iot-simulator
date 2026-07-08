@@ -62,6 +62,10 @@ public class OpenApiConfig {
                                 .description("Advisory time-bounded locks that signal to other users that an"
                                         + " editor is open. Acquire (or renew) a lease when entering an editor,"
                                         + " release it on exit; leases expire automatically for crash recovery."
-                                        + " See backend-specs/08_AUTH_AND_MODES.md §Optimistic concurrency.")));
+                                        + " See backend-specs/08_AUTH_AND_MODES.md §Optimistic concurrency."),
+                        new Tag().name("Admin — Users")
+                                .description("Admin-only user management: list all registered users, change"
+                                        + " roles (admin ↔ user), and activate/suspend accounts."
+                                        + " Requires the admin.access permission (IS-118).")));
     }
 }
