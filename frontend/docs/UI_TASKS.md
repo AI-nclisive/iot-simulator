@@ -583,7 +583,7 @@ Parallel execution:
   Done when: actor, action, object, time, and drill-in target are visible in a
   compact team activity surface.
 
-- [ ] `UI-024` Activity history view
+- [x] `UI-024` Activity history view
   Surface: `Activity View`
   Depends: `UI-003`, `UI-023`
   Done when: users can filter history by actor, action, object, project, and

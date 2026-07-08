@@ -20,6 +20,7 @@ import { ScenarioBuilderPage } from "./surfaces/scenario-builder-page";
 import { ScenarioRunViewPage } from "./surfaces/scenario-run-view-page";
 import { ScenariosPage } from "./surfaces/scenarios-page";
 import { SettingsPage } from "./surfaces/settings-page";
+import { ActivityPage } from "./surfaces/activity-page";
 import { SurfaceStubPage } from "./surfaces/surface-stub-page";
 
 const surfaceContent = {
@@ -145,7 +146,7 @@ export const router = createBrowserRouter([
       },
       {
         path: "activity",
-        element: <SurfaceStubPage {...surfaceContent.activity} />,
+        element: <ActivityPage />,
       },
       {
         path: "settings",
