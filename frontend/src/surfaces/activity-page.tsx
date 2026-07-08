@@ -9,11 +9,7 @@ import { type ActivityEventDto } from "../types/activity";
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function formatTime(at: string): string {
-  try {
-    return new Date(at).toLocaleString();
-  } catch {
-    return at;
-  }
+  return new Date(at).toLocaleString();
 }
 
 function actionLabel(event: ActivityEventDto): string {
@@ -83,7 +79,6 @@ function FilterSelect({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className="rounded border border-shell-line bg-white px-2 py-1 text-sm text-shell-ink focus:outline-none focus:ring-2 focus:ring-shell-accent"
-        aria-label={label}
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>
