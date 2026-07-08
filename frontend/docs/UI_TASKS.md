@@ -577,13 +577,13 @@ Parallel execution:
    parallel.
 2. After `UI-023`, run `UI-024`.
 
-- [ ] `UI-023` Team activity feed
+- [x] `UI-023` Team activity feed
   Surface: `Project Overview`
   Depends: `UI-001`
   Done when: actor, action, object, time, and drill-in target are visible in a
   compact team activity surface.
 
-- [ ] `UI-024` Activity history view
+- [x] `UI-024` Activity history view
   Surface: `Activity View`
   Depends: `UI-003`, `UI-023`
   Done when: users can filter history by actor, action, object, project, and

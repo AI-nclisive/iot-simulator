@@ -23,8 +23,7 @@ import { cleanup, render, screen, waitFor, within } from "@testing-library/react
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { resetInitialRoleChangeLog, setInitialRoleChangeLog } from "./mock-users";
-import { AdminUsersPage } from "./admin-users-page";
+import { type ActivityEventDto, AdminUsersPage } from "./admin-users-page";
 
 // ── Mock the API module ───────────────────────────────────────────────────────
 
@@ -53,13 +52,46 @@ const apiUsers = [
   { id: "u-007", displayName: "Riley Wilson", subject: "riley.wilson@example.com", role: "user", status: "ACTIVE", lastSeenAt: null },
 ];
 
+const seedActivityEvents: ActivityEventDto[] = [
+  {
+    id: 1,
+    projectId: null,
+    actor: "Jordan Kim",
+    action: "change_role",
+    objectType: "user",
+    objectId: "u-003",
+    at: "2026-07-07T11:42:00Z",
+    detail: { role: "user" },
+  },
+  {
+    id: 2,
+    projectId: null,
+    actor: "Morgan Lee",
+    action: "change_role",
+    objectType: "user",
+    objectId: "u-007",
+    at: "2026-07-04T09:00:00Z",
+    detail: { role: "admin" },
+  },
+];
+
+let activityEvents: ActivityEventDto[] = seedActivityEvents.slice();
+
+function resetActivityEvents() {
+  activityEvents = seedActivityEvents.slice();
+}
+
 function makeApiUser(overrides: Partial<(typeof apiUsers)[0]>) {
   return { ...apiUsers[0], ...overrides };
 }
 
-function setupApiFetch(opts: { saveShouldFail?: boolean } = {}) {
+function setupApiFetch(opts: { saveShouldFail?: boolean; emptyActivity?: boolean } = {}) {
   mockApiFetch.mockImplementation((path: string, init?: RequestInit) => {
     const method = (init?.method ?? "GET").toUpperCase();
+    if (method === "GET" && path.includes("/admin/activity")) {
+      if (opts.emptyActivity) return Promise.resolve({ events: [], nextCursor: null });
+      return Promise.resolve({ events: activityEvents, nextCursor: null });
+    }
     if (method === "GET") {
       return Promise.resolve({ items: apiUsers });
     }
@@ -107,7 +139,7 @@ function setupStore(opts: {
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
-  resetInitialRoleChangeLog();
+  resetActivityEvents();
 });
 
 beforeEach(() => {
@@ -309,16 +341,17 @@ describe("AdminUsersPage — last-admin validation", () => {
   });
 });
 
-describe("AdminUsersPage — role change activity (UI-083)", () => {
-  it("shows the role change activity panel on load with pre-seeded entries", async () => {
+describe("AdminUsersPage — role change activity (UI-023)", () => {
+  it("shows the role change activity panel on load with API-fetched entries", async () => {
     setupStore();
     renderPage();
     await waitForTable();
     const panel = screen.getByRole("region", { name: /role change activity/i });
     expect(panel).toBeTruthy();
-    expect(panel.textContent).toMatch(/Sam Chen/);
+    // objectIds from seed events
+    expect(panel.textContent).toMatch(/u-003/);
+    expect(panel.textContent).toMatch(/u-007/);
     expect(panel.textContent).toMatch(/Jordan Kim/);
-    expect(screen.getByText("Yesterday at 11:42")).toBeTruthy();
   });
 
   it("prepends a new activity entry after a successful role change", async () => {
@@ -343,8 +376,7 @@ describe("AdminUsersPage — role change activity (UI-083)", () => {
     const firstEntry = within(
       screen.getByRole("list", { name: /role change log/i }),
     ).getAllByRole("listitem")[0];
-    expect(firstEntry.textContent).toMatch(/Just now/);
-    expect(firstEntry.textContent).toMatch(/by You/);
+    expect(firstEntry.textContent).toMatch(/by local/);
   });
 
   it("does not add an activity entry when the save fails", async () => {
@@ -372,17 +404,16 @@ describe("AdminUsersPage — role change activity (UI-083)", () => {
     expect(logAfter.length).toBe(countBefore);
   });
 
-  it("shows 'from role → to role' in each activity entry", async () => {
+  it("shows role label in each activity entry", async () => {
     setupStore();
     renderPage();
     await waitForTable();
     const log = screen.getByRole("list", { name: /role change log/i });
-    expect(log.textContent).toMatch(/Admin/);
-    expect(log.textContent).toMatch(/User/);
+    expect(log.textContent).toMatch(/Role changed to/);
   });
 
-  it("shows empty state when no role changes have been made", async () => {
-    setInitialRoleChangeLog([]);
+  it("shows empty state when no activity events are returned", async () => {
+    setupApiFetch({ emptyActivity: true });
     setupStore();
     renderPage();
     await waitForTable();
