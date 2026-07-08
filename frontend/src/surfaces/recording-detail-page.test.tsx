@@ -30,8 +30,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useArtifactsStore } from "../shell/artifacts-store";
 import { RecordingDetailPage } from "./recording-detail-page";
 
-const { mockNavigate } = vi.hoisted(() => ({ mockNavigate: vi.fn() }));
-const { mockApiFetch } = vi.hoisted(() => ({ mockApiFetch: vi.fn() }));
+const { mockNavigate, mockApiFetch, mockPush } = vi.hoisted(() => ({
+  mockNavigate: vi.fn(),
+  mockApiFetch: vi.fn(),
+  mockPush: vi.fn(),
+}));
 
 vi.mock("react-router-dom", async () => {
   const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
@@ -52,6 +55,11 @@ vi.mock("../shell/artifacts-store", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../shell/artifacts-store")>();
   return { ...actual, useArtifactsStore: actual.useArtifactsStore };
 });
+
+vi.mock("../shell/notification-store", () => ({
+  useNotificationStore: (selector: (s: Record<string, unknown>) => unknown) =>
+    selector({ push: mockPush }),
+}));
 
 afterEach(() => {
   cleanup();
@@ -474,6 +482,59 @@ describe("RecordingDetailPage — filter panel (UI-122)", () => {
     await waitFor(() => {
       const urls = mockApiFetch.mock.calls.map((c: unknown[]) => c[0] as string);
       expect(urls.some((u) => u.includes("from="))).toBe(true);
+    });
+  });
+});
+
+describe("RecordingDetailPage — export (UI-461)", () => {
+  beforeEach(() => {
+    useArtifactsStore.setState({ artifacts: [baseArtifact] });
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:fake-export-url");
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("creates a download anchor with correct filename on successful export", async () => {
+    const mockBlob = new Blob(["export data"]);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: true, blob: () => Promise.resolve(mockBlob) }),
+    );
+
+    renderWithId("rec-001");
+    const appendChildSpy = vi.spyOn(document.body, "appendChild");
+
+    await userEvent.click(screen.getByRole("button", { name: "Export" }));
+
+    await waitFor(() => {
+      expect(
+        appendChildSpy.mock.calls.some((c) => (c[0] as HTMLElement).tagName === "A"),
+      ).toBe(true);
+    });
+
+    const anchorEl = appendChildSpy.mock.calls.find(
+      (c) => (c[0] as HTMLElement).tagName === "A",
+    )![0] as HTMLAnchorElement;
+    expect(anchorEl.download).toBe("recording-rec-001.iotsim");
+  });
+
+  it("shows error notification when export response is not ok", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: false, statusText: "Internal Server Error" }),
+    );
+
+    renderWithId("rec-001");
+    await userEvent.click(screen.getByRole("button", { name: "Export" }));
+
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith(
+        expect.objectContaining({ tone: "error", title: "Export failed. Try again." }),
+      );
     });
   });
 });

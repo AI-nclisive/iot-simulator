@@ -270,8 +270,9 @@ export function RecordingDetailPage() {
       const a = document.createElement("a");
       a.href = url;
       a.download = `recording-${recordingId.slice(0, 8)}.iotsim`;
+      document.body.appendChild(a);
       a.click();
-      URL.revokeObjectURL(url);
+      setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
     } catch {
       notify({ tone: "error", title: "Export failed. Try again." });
     } finally {
