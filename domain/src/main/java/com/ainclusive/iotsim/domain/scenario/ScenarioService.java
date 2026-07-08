@@ -13,6 +13,7 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Set;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -39,6 +40,7 @@ public class ScenarioService {
         this.activity = activity;
     }
 
+    @Transactional
     public Scenario create(String projectId, String name, String deterministicSettings,
             List<ScenarioStep> steps, String actor) {
         requireProject(projectId);
@@ -96,6 +98,7 @@ public class ScenarioService {
                 src.deterministicSettings(), copied, actor));
     }
 
+    @Transactional
     public void delete(String projectId, String id, String actor) {
         requireScenario(projectId, id);
         scenarios.deleteById(id);
