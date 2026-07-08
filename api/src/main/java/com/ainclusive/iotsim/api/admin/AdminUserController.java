@@ -5,6 +5,7 @@ import com.ainclusive.iotsim.domain.auth.AdminUserView;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import java.util.List;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -87,7 +88,7 @@ public class AdminUserController {
         }
     }
 
-    public record ChangeRoleRequest(@Pattern(regexp = "admin|user") String role) {}
+    public record ChangeRoleRequest(@NotNull @Pattern(regexp = "admin|user") String role) {}
 
-    public record ChangeStatusRequest(@Pattern(regexp = "ACTIVE|SUSPENDED") String status) {}
+    public record ChangeStatusRequest(@NotNull @Pattern(regexp = "ACTIVE|SUSPENDED") String status) {}
 }
