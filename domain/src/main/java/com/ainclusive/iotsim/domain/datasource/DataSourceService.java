@@ -1,5 +1,6 @@
 package com.ainclusive.iotsim.domain.datasource;
 
+import com.ainclusive.iotsim.domain.activityevent.ActivityEventService;
 import com.ainclusive.iotsim.domain.common.ConcurrencyConflictException;
 import com.ainclusive.iotsim.domain.common.PortInUseException;
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
@@ -34,12 +35,14 @@ public class DataSourceService {
     private final CredentialStore credentials;
     private final ObjectMapper json;
     private final String advertisedHost;
+    private final ActivityEventService activity;
 
     public DataSourceService(DataSourceRepository dataSources, ProjectRepository projects,
             SchemaRepository schemas, RuntimeController runtime, CredentialStore credentials,
             ObjectMapper json,
             @org.springframework.beans.factory.annotation.Value(
-                    "${iotsim.simulator.advertised-host:localhost}") String advertisedHost) {
+                    "${iotsim.simulator.advertised-host:localhost}") String advertisedHost,
+            ActivityEventService activity) {
         this.dataSources = dataSources;
         this.projects = projects;
         this.schemas = schemas;
@@ -47,6 +50,7 @@ public class DataSourceService {
         this.credentials = credentials;
         this.json = json;
         this.advertisedHost = advertisedHost;
+        this.activity = activity;
     }
 
     /**
@@ -71,12 +75,16 @@ public class DataSourceService {
                 projectId, name, protocol, basis, port, realDeviceEndpoint, runtimeConfig,
                 storedSecurity, actor);
         applyCredentials(row.id(), connectionCredentials);
+        DataSource result;
         if (initialNodes != null && !initialNodes.isEmpty()) {
             schemas.saveNewVersion(row.id(), initialNodes);
-            return map(dataSources.findById(row.id())
+            result = map(dataSources.findById(row.id())
                     .orElseThrow(() -> new ResourceNotFoundException("DataSource", row.id())));
+        } else {
+            result = map(row);
         }
-        return map(row);
+        activity.emit(projectId, actor, "create", "data_source", row.id());
+        return result;
     }
 
     public List<DataSource> list(String projectId) {
@@ -134,14 +142,16 @@ public class DataSourceService {
         return map(row);
     }
 
-    public void delete(String projectId, String id) {
+    @Transactional
+    public void delete(String projectId, String id, String actor) {
         requireRow(projectId, id);
         runtime.stop(id);
         dataSources.deleteById(id);
         credentials.clear(id);
+        activity.emit(projectId, actor, "delete", "data_source", id);
     }
 
-    public DataSource start(String projectId, String id) {
+    public DataSource start(String projectId, String id, String actor) {
         DataSourceRow row = requireRow(projectId, id);
         int port = row.simulatorPort();
         for (DataSourceRow other : dataSources.findAll()) {
@@ -152,12 +162,14 @@ public class DataSourceService {
             }
         }
         runtime.start(id, RuntimeStartSpecs.of(schemas, row));
+        activity.emit(projectId, actor, "start", "data_source", id);
         return map(row);
     }
 
-    public DataSource stop(String projectId, String id) {
+    public DataSource stop(String projectId, String id, String actor) {
         DataSourceRow row = requireRow(projectId, id);
         runtime.stop(id);
+        activity.emit(projectId, actor, "stop", "data_source", id);
         return map(row);
     }
 

@@ -133,7 +133,7 @@ public class ScenarioController {
     @DeleteMapping("/{id}")
     @PreAuthorize(SCENARIO_EDIT)
     public ResponseEntity<Void> delete(@PathVariable String projectId, @PathVariable String id) {
-        scenarios.delete(projectId, id);
+        scenarios.delete(projectId, id, "local");
         return ResponseEntity.noContent().build();
     }
 

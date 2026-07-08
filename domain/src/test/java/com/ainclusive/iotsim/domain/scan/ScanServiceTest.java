@@ -3,6 +3,8 @@ package com.ainclusive.iotsim.domain.scan;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.ainclusive.iotsim.domain.activityevent.ActivityEventService;
+import com.ainclusive.iotsim.domain.activityevent.NoOpActivityEventRepository;
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.domain.datasource.DataSource;
 import com.ainclusive.iotsim.domain.datasource.DataSourceService;
@@ -57,7 +59,8 @@ class ScanServiceTest {
         ProjectRepository projects = new FakeProjectRepository();
         DataSourceService dataSources = new DataSourceService(
                 dataSourceRepo, projects, schemaRepo, new InMemoryRuntimeController(), credentials,
-                new ObjectMapper(), "localhost");
+                new ObjectMapper(), "localhost",
+                new ActivityEventService(new NoOpActivityEventRepository()));
         SchemaService schemas = new SchemaService(schemaRepo, dataSourceRepo);
         // Synchronous executor so the async scan completes inline for deterministic asserts.
         service = new ScanService(scanner, projects, dataSources, schemas, Runnable::run);
@@ -200,7 +203,8 @@ class ScanServiceTest {
                 new FakeProjectRepository(),
                 new DataSourceService(dataSourceRepo, new FakeProjectRepository(),
                         new InMemorySchemaRepository(dataSourceRepo), new InMemoryRuntimeController(), credentials,
-                        new ObjectMapper(), "localhost"),
+                        new ObjectMapper(), "localhost",
+                        new ActivityEventService(new NoOpActivityEventRepository())),
                 new SchemaService(new InMemorySchemaRepository(dataSourceRepo), dataSourceRepo),
                 task -> { /* never executes */ });
         ScanJob job = pending.startScan(PROJECT, "OPC_UA", "opc.tcp://h", ConnectionCredentials.anonymous(), 0);

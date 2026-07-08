@@ -1,5 +1,6 @@
 package com.ainclusive.iotsim.domain.scenario;
 
+import com.ainclusive.iotsim.domain.activityevent.ActivityEventService;
 import com.ainclusive.iotsim.domain.common.ConcurrencyConflictException;
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.domain.support.Page;
@@ -12,6 +13,7 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Set;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -28,20 +30,26 @@ public class ScenarioService {
     private final ScenarioRepository scenarios;
     private final ProjectRepository projects;
     private final ObjectMapper json;
+    private final ActivityEventService activity;
 
-    public ScenarioService(ScenarioRepository scenarios, ProjectRepository projects, ObjectMapper json) {
+    public ScenarioService(ScenarioRepository scenarios, ProjectRepository projects, ObjectMapper json,
+            ActivityEventService activity) {
         this.scenarios = scenarios;
         this.projects = projects;
         this.json = json;
+        this.activity = activity;
     }
 
+    @Transactional
     public Scenario create(String projectId, String name, String deterministicSettings,
             List<ScenarioStep> steps, String actor) {
         requireProject(projectId);
         requireName(name);
         String det = normalizeJsonObject(deterministicSettings, "deterministicSettings");
         List<ScenarioStepInput> inputs = validateAndMap(steps);
-        return map(scenarios.create(projectId, name, det, inputs, actor));
+        ScenarioRow row = scenarios.create(projectId, name, det, inputs, actor);
+        activity.emit(projectId, actor, "create", "scenario", row.id());
+        return map(row);
     }
 
     public Page<Scenario> listPaged(String projectId, String cursor, Integer limit) {
@@ -90,9 +98,11 @@ public class ScenarioService {
                 src.deterministicSettings(), copied, actor));
     }
 
-    public void delete(String projectId, String id) {
+    @Transactional
+    public void delete(String projectId, String id, String actor) {
         requireScenario(projectId, id);
         scenarios.deleteById(id);
+        activity.emit(projectId, actor, "delete", "scenario", id);
     }
 
     // ---- helpers ----
