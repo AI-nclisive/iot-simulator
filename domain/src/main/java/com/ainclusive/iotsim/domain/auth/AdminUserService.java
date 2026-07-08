@@ -4,6 +4,7 @@ import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.persistence.auth.UserRepository;
 import com.ainclusive.iotsim.persistence.auth.UserRow;
 import java.util.List;
+import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,8 +26,10 @@ public class AdminUserService {
 
     /** Returns all registered users with their current role and status. */
     public List<AdminUserView> listUsers() {
-        return users.findAll().stream()
-                .map(this::toView)
+        List<UserRow> all = users.findAll();
+        Map<String, List<String>> rolesByUser = users.findAllRoles();
+        return all.stream()
+                .map(u -> toView(u, rolesByUser.getOrDefault(u.id(), List.of())))
                 .toList();
     }
 
@@ -60,7 +63,10 @@ public class AdminUserService {
     }
 
     private AdminUserView toView(UserRow user) {
-        List<String> roles = users.findRoles(user.id());
+        return toView(user, users.findRoles(user.id()));
+    }
+
+    private AdminUserView toView(UserRow user, List<String> roles) {
         String role = roles.contains(PermissionService.ADMIN_ROLE_NAME)
                 ? PermissionService.ADMIN_ROLE_NAME
                 : roles.stream().findFirst().orElse("user");
