@@ -823,6 +823,21 @@ Parallel execution:
   Work includes: move `useMemo(stopConfirmationModel)` before the early return; add `useEffect` to call `loadDataSources` when store is empty on mount; use `fetchedForProjectRef` (tracks project id, not a bare boolean) to prevent infinite re-fetch; show loading spinner while fetch is in flight; 8 tests covering all states.
   Done when: direct navigation to `/data-sources/<id>` loads correctly; invalid id shows error panel (no infinite spinner); all 8 tests pass.
 
+- [x] `UI-456` Parameter count in data source list and detail header
+  Goal: display the real VARIABLE node count (delivered by IS-149) in the data sources list row and the detail header metadata band.
+  Surface: `Data Sources List`, `Data Source Detail` — header.
+  Work includes: add `parameterCount?: number` to `DataSourceResponse` in `data-sources-store.ts`; map `d.parameterCount ?? 0` in `mapDataSource`; list row and detail header already call `parameterCount.toLocaleString()`; add tests: store maps the field; list renders the value.
+  Depends: IS-149.
+  Done when: list row shows real VARIABLE node count from API; detail header shows same value; typecheck + vitest green.
+
+- [x] `UI-460` Wire admin users page to IS-118 API
+  Goal: replace mock data and save stubs in AdminUsersPage with real API calls to IS-118 endpoints.
+  Surface: `Admin Users`
+  Work includes: `useEffect` fetching `GET /api/v1/admin/users` on mount with loading/error states; `handleRoleChange` → `PATCH .../roles`; `handleDeactivate/handleActivate` → `PATCH .../status`; map `AdminUserApiResponse` → `UserRow` (displayName→name, subject→email, ACTIVE/SUSPENDED→active/inactive); remove mock imports; add tests for loading panel, GET-failure error panel.
+  Depends: IS-118.
+  Done when: admin users page loads from API; role and status changes call API; loading and error states render correctly; typecheck + vitest green.
+
+
 ## Recommended Sequence
 
 1. Complete the P0 shell and shared-pattern tasks first.
