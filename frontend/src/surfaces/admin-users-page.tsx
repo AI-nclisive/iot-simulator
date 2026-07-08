@@ -71,14 +71,16 @@ function statusLabel(status: "active" | "inactive") {
 // ── Role change activity panel ────────────────────────────────────────────────
 
 function formatEventTime(at: string): string {
-  try {
-    return new Date(at).toLocaleString();
-  } catch {
-    return at;
-  }
+  return new Date(at).toLocaleString();
 }
 
-function RoleChangeActivityPanel({ entries }: { entries: ActivityEventDto[] }) {
+function RoleChangeActivityPanel({
+  entries,
+  userMap,
+}: {
+  entries: ActivityEventDto[];
+  userMap: Map<string, UserRow>;
+}) {
   if (entries.length === 0) {
     return (
       <section className="shell-panel px-5 py-5" aria-label="Role change activity">
@@ -104,13 +106,19 @@ function RoleChangeActivityPanel({ entries }: { entries: ActivityEventDto[] }) {
               : newStatus != null
                 ? `Status changed to ${newStatus.toLowerCase()}`
                 : entry.action;
+          const affectedUser = entry.objectId != null ? userMap.get(entry.objectId) : null;
           return (
             <li
               key={entry.id}
               className="flex flex-col gap-1 rounded-md border border-shell-line bg-white px-4 py-3 text-sm sm:flex-row sm:items-start sm:justify-between"
             >
               <div className="min-w-0">
-                <p className="font-medium text-shell-ink">{entry.objectId ?? "—"}</p>
+                <p className="font-medium text-shell-ink">
+                  {affectedUser?.name ?? entry.objectId ?? "—"}
+                </p>
+                {affectedUser && (
+                  <p className="text-xs text-shell-muted">{affectedUser.email}</p>
+                )}
                 <p className="mt-1 text-shell-muted">
                   {actionLabel}{" "}
                   {newRole != null && (
@@ -183,6 +191,8 @@ export function AdminUsersPage() {
 
   const hasQueryState =
     searchValue.trim() !== "" || roleFilter !== "all" || statusFilter !== "all";
+
+  const userMap = useMemo(() => new Map(users.map((u) => [u.id, u])), [users]);
 
   const filtered = useMemo(() => {
     const q = searchValue.trim().toLowerCase();
@@ -469,7 +479,7 @@ export function AdminUsersPage() {
         )}
       </section>
 
-      <RoleChangeActivityPanel entries={activityLog} />
+      <RoleChangeActivityPanel entries={activityLog} userMap={userMap} />
 
       {confirmRequest?.kind === "role-change" && confirmingUser ? (
         <ConfirmationDialog
