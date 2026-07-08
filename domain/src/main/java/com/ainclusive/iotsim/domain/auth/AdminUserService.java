@@ -5,6 +5,7 @@ import com.ainclusive.iotsim.persistence.auth.UserRepository;
 import com.ainclusive.iotsim.persistence.auth.UserRow;
 import java.util.List;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Admin-facing user management service (IS-118).
@@ -36,6 +37,7 @@ public class AdminUserService {
      * @param newRole bare role name, e.g. {@code "admin"} or {@code "user"}
      * @throws ResourceNotFoundException if the user does not exist
      */
+    @Transactional
     public AdminUserView changeRole(String userId, String newRole) {
         UserRow user = users.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", userId));

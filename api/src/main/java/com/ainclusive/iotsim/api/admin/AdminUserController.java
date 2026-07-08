@@ -4,9 +4,10 @@ import com.ainclusive.iotsim.domain.auth.AdminUserService;
 import com.ainclusive.iotsim.domain.auth.AdminUserView;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Pattern;
 import java.util.List;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -38,7 +39,7 @@ public class AdminUserController {
     @GetMapping
     @PreAuthorize(ADMIN_ACCESS)
     @Operation(summary = "List all users", description = "Returns all registered users with their current role and status. Admin-only.")
-    public AdminUserListResponse listUsers(Authentication auth) {
+    public AdminUserListResponse listUsers() {
         List<AdminUserResponse> items = service.listUsers().stream()
                 .map(AdminUserResponse::from)
                 .toList();
@@ -50,8 +51,7 @@ public class AdminUserController {
     @Operation(summary = "Change a user's role", description = "Replaces the user's role with the given value. Admin-only.")
     public AdminUserResponse changeRole(
             @PathVariable String id,
-            @RequestBody ChangeRoleRequest body,
-            Authentication auth) {
+            @Valid @RequestBody ChangeRoleRequest body) {
         return AdminUserResponse.from(service.changeRole(id, body.role()));
     }
 
@@ -60,8 +60,7 @@ public class AdminUserController {
     @Operation(summary = "Change a user's status", description = "Updates the user's status (e.g. ACTIVE, SUSPENDED). Admin-only.")
     public AdminUserResponse changeStatus(
             @PathVariable String id,
-            @RequestBody ChangeStatusRequest body,
-            Authentication auth) {
+            @Valid @RequestBody ChangeStatusRequest body) {
         return AdminUserResponse.from(service.changeStatus(id, body.status()));
     }
 
@@ -88,7 +87,7 @@ public class AdminUserController {
         }
     }
 
-    public record ChangeRoleRequest(String role) {}
+    public record ChangeRoleRequest(@Pattern(regexp = "admin|user") String role) {}
 
-    public record ChangeStatusRequest(String status) {}
+    public record ChangeStatusRequest(@Pattern(regexp = "ACTIVE|SUSPENDED") String status) {}
 }
