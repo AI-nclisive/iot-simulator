@@ -802,6 +802,12 @@ Parallel execution:
   Goal: hide the «Manual» source-basis option — not needed in current scope; SCAN / IMPORT / SYNTHETIC remain.
   Work includes: remove Manual card from basis step; remove dead conditional branches that handle manual-only flows (e.g. schema-editor auto-open); update tests.
   Done when: Manual is not selectable; SCAN / IMPORT / SYNTHETIC paths unchanged; TS build + tests pass.
+- [x] `UI-122` Wire admin users page to IS-118 API
+  Goal: replace mock fixtures in `admin-users-page.tsx` with real `apiFetch` calls to the IS-118 endpoints.
+  Surface: `Admin UI` — Users tab.
+  Work includes: `GET /api/v1/admin/users` on mount (loading/error states); `PATCH …/{id}/roles` on role change; `PATCH …/{id}/status` on deactivate/activate; map `displayName`→`name`, `subject`→`email`, uppercase status→lowercase; remove `mockUsers`/`mockSaveUser` imports; update tests to mock `apiFetch`.
+  Depends: IS-118.
+  Done when: admin page loads real users from backend; role/status changes persist; mock-users.ts no longer imported for live data; tests mock `apiFetch`; typecheck + vitest pass.
 - [ ] `UI-120` Integrate the regrouped API (6 groups)
   Goal: reflect the backend's 6-group API tags (IS-135) on the frontend API client.
   Depends: IS-135.
