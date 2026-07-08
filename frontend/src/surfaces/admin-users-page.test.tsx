@@ -349,9 +349,9 @@ describe("AdminUsersPage — role change activity (UI-023)", () => {
     await waitForTable();
     const panel = screen.getByRole("region", { name: /role change activity/i });
     expect(panel).toBeTruthy();
-    // objectIds from seed events
-    expect(panel.textContent).toMatch(/u-003/);
-    expect(panel.textContent).toMatch(/u-007/);
+    // display names resolved from userMap (objectIds u-003 → Sam Chen, u-007 → Riley Wilson)
+    expect(panel.textContent).toMatch(/Sam Chen/);
+    expect(panel.textContent).toMatch(/Riley Wilson/);
     expect(panel.textContent).toMatch(/Jordan Kim/);
   });
 
