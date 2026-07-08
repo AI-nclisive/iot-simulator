@@ -59,7 +59,6 @@ export function RecordingsPage() {
   const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [importDialogOpen, setImportDialogOpen] = useState<boolean>(false);
-  const [importedRows, setImportedRows] = useState<RecordingRow[]>([]);
 
   useEffect(() => {
     if (currentProjectId) {
@@ -79,11 +78,7 @@ export function RecordingsPage() {
     capturedBy: a.createdBy,
   }));
 
-  const storeIds = new Set(storeRows.map((r) => r.id));
-  const allRows: RecordingRow[] = [
-    ...storeRows,
-    ...importedRows.filter((r) => !storeIds.has(r.id)),
-  ];
+  const allRows: RecordingRow[] = storeRows;
 
   const uniqueSources = Array.from(
     new Map(allRows.map((r) => [r.sourceId, r.sourceName || r.sourceId])).entries(),
@@ -248,9 +243,10 @@ export function RecordingsPage() {
       <RecordingImportDialog
         canImport={access.canCreateSource}
         open={importDialogOpen}
+        projectId={currentProjectId ?? ""}
         onClose={() => setImportDialogOpen(false)}
-        onImported={(artifact) => {
-          setImportedRows((prev) => [artifact, ...prev]);
+        onImported={() => {
+          if (currentProjectId) void loadRecordings(currentProjectId);
           setImportDialogOpen(false);
         }}
       />

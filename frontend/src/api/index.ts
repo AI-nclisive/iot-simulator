@@ -1,4 +1,4 @@
-export { apiFetch, ApiError } from "./client";
+export { apiFetch, ApiError, authHeaders } from "./client";
 export type { Page } from "./client";
 export {
   mapProtocol,

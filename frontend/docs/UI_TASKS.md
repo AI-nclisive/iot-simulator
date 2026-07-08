@@ -972,6 +972,13 @@ Parallel execution:
   Depends: IS-118.
   Done when: admin users page loads from API; role and status changes call API; loading and error states render correctly; typecheck + vitest green.
 
+- [x] `UI-461` Wire recording import/export to IS-070 API
+  Goal: replace mock RecordingImportDialog with real multipart upload; add Export button to recording detail page.
+  Surface: `Recordings`, `Recording Detail`
+  Work includes: `RecordingImportDialog` → `POST .../recordings/import` (FormData); on success reload artifacts store; Export button → `POST .../export` streams ZIP download; fix `apiFetch` to not set Content-Type for FormData bodies.
+  Depends: IS-070.
+  Done when: import uploads real ZIP and reloads list; error state shown on API failure; export button downloads `.iotsim` bundle; typecheck + vitest green.
+
 - [x] `UI-462` Simplify recording wizard + add capture step to data source scan flow
   Goal: recordings are always live capture — remove scan-type step from Create Recording wizard; add a Recording step to the Create Data Source wizard (scan basis) so users can choose to start live capture immediately after creation.
   Surface: `Create Recording`, `Create Data Source`
