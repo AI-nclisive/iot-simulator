@@ -3,6 +3,8 @@ package com.ainclusive.iotsim.domain.scenario;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.ainclusive.iotsim.domain.activityevent.ActivityEventService;
+import com.ainclusive.iotsim.domain.activityevent.NoOpActivityEventRepository;
 import com.ainclusive.iotsim.domain.common.ConcurrencyConflictException;
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.persistence.project.ProjectRepository;
@@ -34,7 +36,8 @@ class ScenarioServiceTest {
         service = new ScenarioService(
                 new InMemoryScenarioRepository(),
                 new FakeProjectRepository(Set.of(PROJECT)),
-                new ObjectMapper());
+                new ObjectMapper(),
+                new ActivityEventService(new NoOpActivityEventRepository()));
     }
 
     private static ScenarioStep step(String type, String target, String params) {
@@ -133,7 +136,7 @@ class ScenarioServiceTest {
     @Test
     void deleteRemovesScenario() {
         Scenario s = service.create(PROJECT, "D", "{}", List.of(), "a");
-        service.delete(PROJECT, s.id());
+        service.delete(PROJECT, s.id(), "test");
         assertThatThrownBy(() -> service.get(PROJECT, s.id()))
                 .isInstanceOf(ResourceNotFoundException.class);
     }

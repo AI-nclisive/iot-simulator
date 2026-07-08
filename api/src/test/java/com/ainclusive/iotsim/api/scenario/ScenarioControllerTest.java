@@ -14,10 +14,16 @@ import com.ainclusive.iotsim.api.scenario.ScenarioController.StepDto;
 import com.ainclusive.iotsim.api.scenario.ScenarioController.UpdateScenarioRequest;
 import com.ainclusive.iotsim.api.stream.LiveStreamSubscriptions;
 import com.ainclusive.iotsim.api.stream.StreamKey;
+import com.ainclusive.iotsim.domain.activityevent.ActivityEventService;
 import com.ainclusive.iotsim.domain.scenario.Scenario;
 import com.ainclusive.iotsim.domain.scenario.ScenarioService;
 import com.ainclusive.iotsim.domain.scenario.ScenarioStep;
+import com.ainclusive.iotsim.persistence.activityevent.ActivityEventQuery;
+import com.ainclusive.iotsim.persistence.activityevent.ActivityEventRepository;
+import com.ainclusive.iotsim.persistence.activityevent.ActivityEventRow;
 import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -41,7 +47,7 @@ class ScenarioControllerTest {
         boolean deleted;
 
         FakeService() {
-            super(null, null, null);
+            super(null, null, null, new ActivityEventService(new NoOpActivityEventRepository()));
         }
 
         @Override
@@ -67,7 +73,7 @@ class ScenarioControllerTest {
         }
 
         @Override
-        public void delete(String p, String id) {
+        public void delete(String p, String id, String actor) {
             this.deleted = true;
         }
     }
@@ -148,5 +154,19 @@ class ScenarioControllerTest {
         SseEmitter result = c.streamRunEvents("p1", "scn-1", "run-1", null);
 
         assertThat(result).isSameAs(emitter);
+    }
+
+    private static final class NoOpActivityEventRepository implements ActivityEventRepository {
+        @Override
+        public ActivityEventRow append(String projectId, String actor, String action,
+                String objectType, String objectId, String detailJson) {
+            return new ActivityEventRow(0, projectId, actor, action, objectType, objectId,
+                    OffsetDateTime.now(ZoneOffset.UTC), "{}");
+        }
+
+        @Override
+        public List<ActivityEventRow> query(ActivityEventQuery filter) {
+            return List.of();
+        }
     }
 }

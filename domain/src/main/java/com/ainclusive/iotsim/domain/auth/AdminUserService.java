@@ -1,5 +1,6 @@
 package com.ainclusive.iotsim.domain.auth;
 
+import com.ainclusive.iotsim.domain.activityevent.ActivityEventService;
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.persistence.auth.UserRepository;
 import com.ainclusive.iotsim.persistence.auth.UserRow;
@@ -19,9 +20,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class AdminUserService {
 
     private final UserRepository users;
+    private final ActivityEventService activity;
 
-    public AdminUserService(UserRepository users) {
+    public AdminUserService(UserRepository users, ActivityEventService activity) {
         this.users = users;
+        this.activity = activity;
     }
 
     /** Returns all registered users with their current role and status. */
@@ -41,13 +44,15 @@ public class AdminUserService {
      * @throws ResourceNotFoundException if the user does not exist
      */
     @Transactional
-    public AdminUserView changeRole(String userId, String newRole) {
+    public AdminUserView changeRole(String userId, String newRole, String actor) {
         UserRow user = users.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", userId));
         for (String existing : users.findRoles(userId)) {
             users.removeRole(userId, existing);
         }
         users.assignRole(userId, newRole);
+        activity.emit(null, actor, "role_change", "user", userId,
+                "{\"role\":\"" + newRole + "\"}");
         return toView(user, newRole);
     }
 
@@ -56,9 +61,11 @@ public class AdminUserService {
      *
      * @throws ResourceNotFoundException if the user does not exist
      */
-    public AdminUserView changeStatus(String userId, String newStatus) {
+    public AdminUserView changeStatus(String userId, String newStatus, String actor) {
         UserRow updated = users.updateStatus(userId, newStatus)
                 .orElseThrow(() -> new ResourceNotFoundException("User", userId));
+        activity.emit(null, actor, "status_change", "user", userId,
+                "{\"status\":\"" + newStatus + "\"}");
         return toView(updated);
     }
 

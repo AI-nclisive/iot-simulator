@@ -179,8 +179,8 @@ class ScenarioLiveRunServiceTest {
 
         // With DIRECT executor, executeSteps ran synchronously — verify terminal state.
         verify(runs).end(eq("run-1"), eq("COMPLETED"), any());
-        verify(dataSources).start(PROJECT, SOURCE);
-        verify(dataSources).stop(PROJECT, SOURCE);
+        verify(dataSources).start(eq(PROJECT), eq(SOURCE), anyString());
+        verify(dataSources).stop(eq(PROJECT), eq(SOURCE), anyString());
     }
 
     @Test
@@ -192,7 +192,7 @@ class ScenarioLiveRunServiceTest {
         when(runs.start(eq("run-1"), any())).thenReturn(parent);
         when(evidence.create(any(), eq("run-1"), any()))
                 .thenReturn(new EvidenceRow("ev-1", PROJECT, "run-1", "CAPTURING", "{}", null, null, "local"));
-        org.mockito.Mockito.doThrow(new RuntimeException("boom")).when(dataSources).start(PROJECT, SOURCE);
+        org.mockito.Mockito.doThrow(new RuntimeException("boom")).when(dataSources).start(eq(PROJECT), eq(SOURCE), anyString());
 
         // start() itself should not throw (the exception is caught inside executeSteps)
         ScenarioLiveRunSummary summary = service.start(PROJECT, SCENARIO, "MANUAL", "local");
@@ -279,8 +279,8 @@ class ScenarioLiveRunServiceTest {
 
         verify(runs).end(eq("run-5"), eq("FAILED"), any());
         // Teardown must have stopped src-A (once via teardown, not once via STOP step)
-        verify(dataSources).start(PROJECT, SOURCE);
-        verify(dataSources).stop(PROJECT, SOURCE);
+        verify(dataSources).start(eq(PROJECT), eq(SOURCE), anyString());
+        verify(dataSources).stop(eq(PROJECT), eq(SOURCE), anyString());
     }
 
     @Test
@@ -297,9 +297,9 @@ class ScenarioLiveRunServiceTest {
         service.start(PROJECT, SCENARIO, "MANUAL", "local");
 
         verify(runs).end(eq("run-6"), eq("COMPLETED"), any());
-        verify(dataSources).start(PROJECT, SOURCE);
+        verify(dataSources).start(eq(PROJECT), eq(SOURCE), anyString());
         // stop() called exactly once — by the explicit STOP step, not by teardown
-        verify(dataSources, times(1)).stop(PROJECT, SOURCE);
+        verify(dataSources, times(1)).stop(eq(PROJECT), eq(SOURCE), anyString());
     }
 
     @Test
@@ -322,9 +322,9 @@ class ScenarioLiveRunServiceTest {
         service.start(PROJECT, SCENARIO, "MANUAL", "local");
 
         verify(runs).end(eq("run-7"), eq("COMPLETED"), any());
-        verify(dataSources).start(PROJECT, SOURCE);
+        verify(dataSources).start(eq(PROJECT), eq(SOURCE), anyString());
         // No stop() call at all — COMPLETED path skips teardown
-        verify(dataSources, never()).stop(any(), any());
+        verify(dataSources, never()).stop(any(), any(), any());
     }
 
     @Test
@@ -342,13 +342,13 @@ class ScenarioLiveRunServiceTest {
                 .thenReturn(new EvidenceRow("ev-9", PROJECT, "run-9", "CAPTURING", "{}", null, null, "local"));
         // Interrupt the thread after the START step so WAIT's loop-top check detects it.
         org.mockito.Mockito.doAnswer(inv -> { Thread.currentThread().interrupt(); return null; })
-                .when(dataSources).start(PROJECT, SOURCE);
+                .when(dataSources).start(eq(PROJECT), eq(SOURCE), anyString());
 
         service.start(PROJECT, SCENARIO, "MANUAL", "local");
 
         verify(runs).end(eq("run-9"), eq("STOPPED"), any());
         // src-A was added to startedSources before the interrupt; teardown must stop it.
-        verify(dataSources).stop(PROJECT, SOURCE);
+        verify(dataSources).stop(eq(PROJECT), eq(SOURCE), anyString());
         verify(stepListener).onRunFinished(PROJECT, "run-9", "STOPPED");
     }
 
@@ -371,14 +371,14 @@ class ScenarioLiveRunServiceTest {
                 .when(synthetic).run(eq(PROJECT), eq(SOURCE), any(Long.class), anyString());
         // stop(src-A) throws during teardown
         org.mockito.Mockito.doThrow(new RuntimeException("stop failed"))
-                .when(dataSources).stop(PROJECT, SOURCE);
+                .when(dataSources).stop(eq(PROJECT), eq(SOURCE), anyString());
 
         service.start(PROJECT, SCENARIO, "MANUAL", "local");
 
         verify(runs).end(eq("run-8"), eq("FAILED"), any());
         // src-A stop was attempted (even though it threw)
-        verify(dataSources).stop(PROJECT, SOURCE);
+        verify(dataSources).stop(eq(PROJECT), eq(SOURCE), anyString());
         // src-B stop was also attempted despite src-A's failure
-        verify(dataSources).stop(PROJECT, sourceB);
+        verify(dataSources).stop(eq(PROJECT), eq(sourceB), anyString());
     }
 }
