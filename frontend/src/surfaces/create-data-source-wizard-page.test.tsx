@@ -137,6 +137,7 @@ const baseScanForm: WizardFormState = {
   scheduleStart: "",
   simulatorPort: "4840",
   schemaReviewNote: "",
+  startCapture: true,
 };
 
 describe("validationMessage — local-mode credential skip", () => {
@@ -518,5 +519,39 @@ describe("CreateDataSourceWizardPage — scan step (UI-458)", () => {
 
     // Default startCapture=true → redirects to live capture page
     expect(mockNavigate).toHaveBeenCalledWith("/data-sources/ds-created/recording");
+  });
+
+  it("navigates to /data-sources/:id when Skip is chosen on recording step (startCapture=false)", async () => {
+    mockApiFetch
+      .mockImplementationOnce(() => Promise.resolve({ jobId: "job-3", status: "RUNNING" }))
+      .mockImplementationOnce(() =>
+        Promise.resolve({
+          jobId: "job-3",
+          status: "COMPLETE",
+          truncated: false,
+          discoveredCount: 1,
+          unknownCount: 0,
+          message: null,
+          nodes: [knownNode],
+        }),
+      )
+      .mockImplementationOnce(() => Promise.resolve({ id: "ds-skip" }));
+
+    await navigateToScanStep();
+    await advanceIntervalAndFlush(2000);
+
+    // On recording step, click "Skip — just create the source"
+    await userEvent.click(screen.getByRole("button", { name: "Next" }));
+    await userEvent.click(screen.getByText(/Skip — just create the source/));
+
+    // Continue through schedule and review
+    await userEvent.click(screen.getByRole("button", { name: "Next" }));
+    await userEvent.click(screen.getByRole("button", { name: "Next" }));
+
+    await userEvent.click(screen.getByRole("button", { name: "Create source" }));
+
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith("/data-sources/ds-skip");
+    });
   });
 });

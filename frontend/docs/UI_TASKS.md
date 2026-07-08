@@ -797,13 +797,148 @@ Parallel execution:
   Depends: IS-051 (values SSE stream).
   Done when: no fake timer in `RecordingFlowPage`; value count and state reflect real SSE; TypeScript errors pass.
 
-- [x] `UI-119` Recording value browser — paginated table (Timestamp, Parameter path, Value, Quality) in Recording detail Values tab; wired to IS-134 `GET .../values` endpoint; cursor pagination "Load more"; replaces "will be available in a future release" placeholder.
-- [ ] `UI-121` Remove manual basis from Create Data Source wizard
+- [x] `UI-124` Recording wizard — scan type step (schema only vs schema + data): new step between Data source and Review; two options (Schema + data default, Schema only); selected value sent as `scanType` in `POST /recordings` body; review step shows chosen type. BE half: IS-138.
+- [x] `UI-123` Recording schema tab — default Schema tab in RecordingDetailPage; calls `GET .../schema`; renders collapsible folder/variable tree; loading, error, and empty states.
+- [x] `UI-122` Recording value browser — filter panel (search, quality, time range): quality checkboxes (GOOD/UNCERTAIN/BAD, all checked by default); debounced search input (300 ms); from/to datetime range; passes params to `GET .../values`; empty-state when no quality selected (no API call). BE half: IS-136.
+- [x] `UI-121` Remove manual basis from Create Data Source wizard
   Goal: hide the «Manual» source-basis option — not needed in current scope; SCAN / IMPORT / SYNTHETIC remain.
   Work includes: remove Manual card from basis step; remove dead conditional branches that handle manual-only flows (e.g. schema-editor auto-open); update tests.
   Done when: Manual is not selectable; SCAN / IMPORT / SYNTHETIC paths unchanged; TS build + tests pass.
-- [ ] `UI-120` Integrate the regrouped API (6 groups)
-  Goal: reflect the backend's 6-group API tags (IS-135) on the frontend API client.
+- [x] `UI-123` Recording schema tab — default Schema tab in RecordingDetailPage; calls `GET .../schema`; renders collapsible folder/variable tree; loading, error, and empty states.
+- [x] `UI-119` Recording value browser — paginated table (Timestamp, Parameter path, Value, Quality) in Recording detail Values tab; wired to IS-134 `GET .../values` endpoint; cursor pagination "Load more"; replaces "will be available in a future release" placeholder.
+- [x] `UI-125` Replace Start button with Record / Simulate actions
+  Goal: remove the bare Start action from the data-sources list and detail; replace with two explicit runtime actions: Record (opens recording flow) and Simulate (opens recording picker → starts live replay).
+  Surface: `Data Sources List`, `Data Source Detail`
+  Work includes: remove `startDataSource` store action + `POST .../start` call; add Record action → navigate to existing recording-flow route; add Simulate action → modal picker listing recordings for this DS (pre-select last-used from `runtimeConfig`); on confirm POST .../replay; remove Start button from `data-source-detail-preview-page.tsx` and `data-sources-list-page.tsx`; remove auto-start from `create-data-source-wizard-page.tsx`.
+  Depends: IS-139, IS-140, UI-126.
+  Done when: no bare Start button anywhere; Record leads to recording flow; Simulate opens picker and starts live replay; TypeScript build + vitest pass.
+
+- [x] `UI-126` Live simulation controls: RUNNING indicator + Stop
+  Goal: when a data source is actively simulating (run RUNNING), show a live indicator and Stop action that ends the run.
+  Surface: `Data Sources List`, `Data Source Detail`
+  Work includes: detect RUNNING replay run for this source from active-runs SSE/poll; show "Simulating" badge with recording name in list row and detail header; Stop button → POST /api/v1/runs/{runId}/stop; SSE state update removes badge on completion.
+  Depends: IS-140.
+  Done when: RUNNING simulation visible in list + detail; Stop ends simulation and clears badge; no stale badge after stop; TypeScript build + vitest pass.
+
+- [x] `UI-128` Scenario step editor — real source/recording pickers + server-side validation display
+  Goal: replace mock data-source and recording lists in the step editor with live store data; wire server validation issues (fetched after each save) into the builder validation summary; fix FE↔BE field contracts for SYNTHETIC (pattern→seconds/durationMs), REPLAY (compatibilityAck), and MARKER (note→label).
+  Surface: `Scenario Builder`
+  Work includes: `scenario-step-editor.tsx` — use `useDataSourcesStore`/`useArtifactsStore`, filter recordings by selected source, handle checkbox field kind, `projectId` prop; `scenario-steps.ts` — add checkbox to StepFieldKind, fix SYNTHETIC/REPLAY/MARKER field specs; `scenarios-api.ts` — fix toApiStep/fromApiStep for SYNTHETIC, REPLAY, MARKER; `scenarios-store.ts` — add `serverIssues` state, fetch validate after save; `scenario-builder-page.tsx` — pass projectId to editor, merge server issues with client validation.
+  Depends: UI-127, IS-136 (recordings filter by sourceId).
+  Done when: source/recording selects load from API; server issues merged into builder validation summary; field contracts correct; typecheck + vitest pass.
+
+- [x] `UI-127` Wire scenario CRUD + validate to live backend API
+  Goal: replace in-memory mock store with real API calls for scenarios CRUD and validation. Keep run/stop as no-ops (UI-129, blocked on IS-141).
+  Surface: `Scenarios`, `Scenario Builder`
+  Work includes: `scenarios-api.ts` with FE↔BE mappers (type case, sourceId↔targetSourceId, params encoding); async Zustand store with loadScenarios/createScenario/renameScenario/duplicateScenario/deleteScenario/saveScenarioSteps; load-on-mount in scenarios-page and builder; Save button in builder with loading state; loading/error states in scenarios-page.
+  Depends: IS-136 scenarios API.
+  Done when: scenarios page loads from backend; create/rename/duplicate/delete/save call API; FE↔BE step mapper handles all step types; TypeScript build + vitest pass.
+
+- [x] `UI-136` Data source values tab — stopped-state panel when source is not running
+  Goal: values tab showed zero rows and a misleading "no visible runtime rows" message for stopped sources, because it filtered mock data by real backend source IDs that never matched.
+  Fix: when source is stopped, render a clear "Source is not running" info panel instead of the empty table. Remove dependency on mock static store for the stopped path. Live values still stream from SSE when source is active.
+  Done when: stopped source shows informative panel with start instructions; running source shows live SSE values; typecheck passes.
+
+- [x] `UI-134` Fix scenario status reset — preserve runState when navigating away from run view
+  Goal: scenario list showed "Not running" immediately after the user navigated away from the run view, even when the scenario was still running on the backend. Root cause: `clearLiveRun` unconditionally reset `runState` to "Not running" on SSE cleanup.
+  Fix: `onRunFinished` now updates `scenarios[].runState` to the terminal state ("Stopped" / "Failed" / "Not running"); `clearLiveRun` only removes the `liveRuns` SSE entry without touching `runState`.
+  Done when: navigating away from run view while a scenario is running keeps its runState; run-finished SSE event updates runState correctly; typecheck + vitest pass.
+
+- [x] `UI-135` Overview dashboard clarity — separate live sources from active runs; remove Activity nav stub
+  Goal: Overview showed "5 sources" badge but an empty list, confusing users. The badge counted SSE-connected data sources while the list showed active run processes (recordings/replays/scenarios) — two unrelated concepts. Activity nav link opened an empty stub page.
+  Fix: wrapped sources badge in a clearly-labeled "Live data sources" card with a link to the data sources list; added "Active runs" section header above the run list; improved empty-state copy; removed Activity from top-level nav (route kept).
+  Done when: overview clearly distinguishes connected sources from active runs; Activity no longer shows in nav; typecheck passes.
+
+- [x] `UI-130` Align FAULT step params to backend fault model
+  Goal: replace the 4 placeholder FE fault kinds (drop/delay/corrupt/quality) with the IS-087 backend contract: BAD_VALUE, MISSING_VALUE, DELAY, CONNECTION_DROP, TIMEOUT, PROTOCOL_ERROR, SOURCE_UNAVAILABLE. Only DELAY has a required param (delayMs); all others are param-free.
+  Surface: `Scenario Builder` — fault step editor and config panel.
+  Work includes: rewrite `scenario-faults.ts` (FaultKind, FAULT_KIND_LABELS, FAULT_PARAM_SPECS, describeFault); update STEP_FIELD_SPECS.fault kind options in `scenario-steps.ts`; update scenario-faults.test.ts and fault-config-panel.test.tsx.
+  Depends: IS-087, IS-088, UI-127.
+  Done when: FAULT step kind options match IS-087 contract; params round-trip to backend; typecheck + vitest green.
+
+- [x] `UI-133` Fix data-source frontend shape mismatch — align to IS-127 backend payload
+  Goal: the frontend DataSourceResponse still used the old endpoint field removed in IS-127. Fix all layers so the UI shows the simulator serve URL, real device endpoint, source type (basis), and sends the right fields in settings PUT.
+  Surface: Data Source Detail — header, overview tab, settings tab, action buttons.
+  Work includes: update DataSourceResponse type (simulatorPort/realDeviceEndpoint/serveUrl/basis); update DataSourceRow; update mapDataSource(); update updateSourceConfiguration PUT body; update settings tab to edit realDeviceEndpoint (SCAN only) + async save; update detail header; update overview tab; hide Record button for IMPORT; rename Simulate to Replay recording for IMPORT.
+  Depends: IS-127.
+  Done when: detail header shows serveUrl; overview shows real device endpoint; source type shown; IMPORT sources show Replay recording; settings save correct; typecheck + vitest green.
+
+- [x] `UI-137` Fix data source settings — Saved badge shown before async save completes
+  Goal: `saveChanges` in `DataSourceDetailSettingsTab` was synchronous, so the "Saved" badge appeared before the API call resolved; also the "Unsaved changes" and "Saved" badges could both be visible simultaneously.
+  Surface: `Data Source Detail` — Settings tab.
+  Work includes: make `saveChanges` async; `await updateSourceConfiguration(...)` before calling `setSavedMessage("Saved")`; 2 behavioral tests added.
+  Done when: "Saved" badge only appears after the update call resolves; typecheck + vitest green.
+
+- [x] `UI-459` Wire edit lock to API — schema editor and scenario builder
+  Goal: replace the stub `lockedBy` check in the schema editor and the store-only `lockedBy` check in the scenario builder with live advisory edit leases backed by the IS-081 API (POST/DELETE/GET `/edit-lease`).
+  Surface: `Data Source Schema Editor`, `Scenario Builder`.
+  Work includes: `useEditLease` hook (`frontend/src/shell/use-edit-lease.ts`) — acquires lease on mount, renews every 60 s, releases on unmount (fire-and-forget); lock is ADVISORY (errors fall through to editable mode); schema editor wired to `"data-sources"` lease; scenario builder wired to `"scenarios"` lease; `EditLockBanner` shown when `leaseState === "locked-by-other"`; tests for hook (acquire, renew, release, locked-by-other, error, no-op for empty ids) and for banner integration in both surfaces.
+  Depends: IS-081.
+  Done when: schema editor acquires lease on open, shows lock banner when locked, releases on close; scenario builder same; typecheck + vitest green.
+
+- [x] `UI-453` Fix real-device-endpoint guard in recording wizard and flow page
+  Goal: `captureBlocked` in the recording wizard and `hasRealEndpoint` in the recording flow page were checking `endpoint` (the simulator serve URL) instead of `realDeviceEndpoint` (the actual OPC UA device address). IMPORT/MANUAL sources without a real device were incorrectly unblocked.
+  Surface: `Create Recording Wizard`, `Recording Flow Page`.
+  Work includes: switch `captureBlocked` and `hasRealEndpoint` to use `realDeviceEndpoint`; update wizard test fixtures to include the field; fix `quality=` assertion in recording-detail test.
+  Done when: wizard blocks SCHEMA_AND_DATA when `realDeviceEndpoint` is null; flow page shows no-endpoint panel correctly; vitest green.
+
+- [x] `UI-455` QA bug fixes — schema-only 404 empty state, scenarios Run navigation, IMPORT source actions
+  Goal: fix three bugs found during QA: schema-only recording detail shows error on 404 schema fetch (should show empty state); scenarios Run button does not navigate to run view; data sources list shows "Record"/"Simulate" for IMPORT-basis sources.
+  Surface: `Recording Detail`, `Scenario Builder`, `Data Sources List`.
+  Work includes: recording-detail-page.tsx treat 404 on schema fetch as empty state not error; scenario-builder-page.tsx navigate to /scenarios/:id/run after runScenario; data-sources-list-page.tsx guard Record action and relabel Simulate for IMPORT basis.
+  Done when: schema-only recording detail shows "No schema captured." empty state; Run navigates to run view; IMPORT sources show only "Replay recording" action.
+
+- [x] `UI-457` Pin/unpin parameters in Values tab
+  Goal: let users pin individual parameters in the live Values tab so they stay visible at the top through SSE snapshots, and the existing "Pinned only / Unpinned only" filter works against real user state.
+  Surface: `Data Source Detail — Values tab`.
+  Work includes: maintain a `Set<string>` of pinned nodeIds in component state (survives snapshots); add a small pin toggle button (icon-only) to each row in the Values table; apply pinned state when building rows from SSE events; show pinned rows sorted to top or marked distinctly.
+  Depends: none.
+  Done when: clicking pin on a row marks it Pinned; SSE snapshot preserves pinned state; Pinned-only filter shows only pinned rows; typecheck + vitest green.
+
+- [x] `UI-458` Add SCAN schema review step to Create Data Source wizard
+  Goal: insert a new "Scan" wizard step (between Setup and Schedule) that auto-starts a schema scan via the backend scan API, polls until complete, shows discovered node count, surfaces unknown-type resolution selects, and blocks Next until scan is complete and all unknowns resolved.
+  Surface: `Create Data Source Wizard`.
+  Work includes: add `DiscoveredNodeResponse`, `TypeResolutionEntry` exported types; add `scanStepValidationMessage` exported function; insert `{ id: "scan", label: "Scan" }` into `SCAN_STEPS`; add scan state vars (`scanJobId`, `scanStatus`, `scanTrigger`, `scanResult`, `typeResolutions`, `scanErrorMessage`); auto-start `useEffect` with `setInterval` polling (deps: `[activeStepId, scanTrigger]`); `renderScanStep()` with scanning/complete/error/partial views; unknown-type resolution selects with `handleTypeResolutionChange`; `retryScan()` incrementing `scanTrigger`; on Review Create call `scan/{jobId}/create` for scan basis; 8 integration tests + 6 unit tests for validation function.
+  Done when: scan step appears in wizard; auto-scan starts on entry; polling updates UI; unknown types can be resolved; Next blocked until ready; Create calls scan create endpoint; typecheck + vitest green.
+
+- [x] `UI-139` QA bug fixes — data source loading, null-safe filters, quality param mismatch, evidence crash
+  Goal: fix five bugs found during QA pass on master: wizard/list missing loadDataSources call; capturedBy/owner/sourceIds null crashes in filters; quality filter param name mismatch with backend.
+  Surface: `Create Recording Wizard`, `Recordings List`, `Evidence List`, `Recording Detail`, `Scenarios List`.
+  Work includes: add `loadDataSources` on mount in wizard and recordings-page; null-guard `capturedBy`, `sourceIds`, `owner`; fix query param `qualities` → `quality` in `buildValuesQs`; fix type declarations to reflect nullable API fields.
+  Done when: vitest green; quality checkbox filter excludes correct values; source names appear in recordings list; evidence page renders without crash.
+
+- [x] `UI-138` Fix recording/replay UX bugs — schema field names, idle label, 409 compat ack, no-endpoint guard
+  Goal: address several UX regressions in the recording and replay flows.
+  Surface: `Recording Detail`, `Recording Flow`, `Replay Flow`.
+  Work includes: fix field name display in recording detail (schema-based names); fix "Idle" label on replay when source has no real endpoint; handle 409 schema-mismatch response in replay — show "Run anyway" confirmation panel with `compatibilityAck=true` retry; disable "Start recording" button and show panel when source has no real device endpoint.
+  Done when: 409 → schema-mismatch → "Run anyway" retry flow tested; `!hasRealEndpoint` disabled path tested; typecheck + vitest green.
+
+- [x] `UI-132` Recording wizard — redirect SCHEMA_AND_DATA to live capture flow
+  Goal: when user selects "Schema + data" scan type in the recording wizard and clicks "Start capture", navigate to RecordingFlowPage (live capture flow) instead of calling POST /recordings. SCHEMA_ONLY keeps the existing shell-creation path. Adds endpoint guard and contextual explanation panels.
+  Surface: `Create Recording Wizard`.
+  Work includes: `createRecording()` in `create-recording-wizard-page.tsx` branches on scanType; live-capture warning added to scan-type step; capture-blocked warning added to review step; button label changes to "Start capture" for SCHEMA_AND_DATA.
+  Depends: UI-115 (recording flow page exists), IS-045 (POST .../recording/start).
+  Done when: SCHEMA_AND_DATA → navigates to /data-sources/:id/recording; SCHEMA_ONLY → POST /recordings as before; typecheck + vitest green.
+
+- [x] `UI-131` Recording name field — wizard input, store mapping, list + detail display
+  Goal: surface the optional `name` field (from IS-144) end-to-end in the frontend.
+  Surface: `Create Recording Wizard`, `Recordings list`, `Recording Detail`
+  Work includes: add `name?: string` to `ReusableArtifact`; add `name` to `RecordingResponse` and `mapRecording()` in `artifacts-store.ts`; add name text input to wizard review step; pass trimmed name in POST body; show name as primary label in recordings list (with source as subtitle when both present); include name in list search; show name in detail page header (with id as secondary).
+  Depends: IS-144.
+  Done when: wizard sends name; list shows name as primary label; detail page header shows name; typecheck + vitest green.
+
+- [x] `UI-129` Wire scenario run/stop to backend API + live SSE run view
+  Goal: replace mock-backed run view with live SSE data; wire run/stop actions to real backend.
+  Surface: `Scenarios`, `Scenario Run View`
+  Work includes: `stopScenarioRun` in scenarios-api; `LiveRunState` + `liveRuns` + `clearLiveRun` in scenarios-store; `runScenario` stores runId/evidenceId; `stopScenario` calls stop API; run view subscribes to SSE step-started/step-completed/run-finished events via EventSource; scenario-run.ts mock removed.
+  Depends: IS-141.
+  Done when: Run navigates to live SSE view; stop calls API; step timeline updates from SSE; TypeScript build + vitest pass.
+
+- [x] `UI-120` Integrate the regrouped API (9 groups)
+  Goal: reflect the backend's 9-group API tags (IS-135) on the frontend. No FE code
+  change required — the client (`src/api/client.ts`) calls endpoints by raw path and
+  does not consume OpenAPI tags, which are documentation-only metadata (no path,
+  schema, or behavior change in IS-135). Closed as documentation alignment.
   Depends: IS-135.
 - [x] `UI-118` Fix data source detail, schema editor, and create recording wizard bugs
 - [x] `UI-117` Fix project selection persistence — lost on refresh, not shown on direct URL
@@ -836,7 +971,6 @@ Parallel execution:
   Work includes: `useEffect` fetching `GET /api/v1/admin/users` on mount with loading/error states; `handleRoleChange` → `PATCH .../roles`; `handleDeactivate/handleActivate` → `PATCH .../status`; map `AdminUserApiResponse` → `UserRow` (displayName→name, subject→email, ACTIVE/SUSPENDED→active/inactive); remove mock imports; add tests for loading panel, GET-failure error panel.
   Depends: IS-118.
   Done when: admin users page loads from API; role and status changes call API; loading and error states render correctly; typecheck + vitest green.
-
 
 - [x] `UI-462` Simplify recording wizard + add capture step to data source scan flow
   Goal: recordings are always live capture — remove scan-type step from Create Recording wizard; add a Recording step to the Create Data Source wizard (scan basis) so users can choose to start live capture immediately after creation.
