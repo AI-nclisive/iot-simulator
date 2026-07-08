@@ -823,6 +823,13 @@ Parallel execution:
   Work includes: move `useMemo(stopConfirmationModel)` before the early return; add `useEffect` to call `loadDataSources` when store is empty on mount; use `fetchedForProjectRef` (tracks project id, not a bare boolean) to prevent infinite re-fetch; show loading spinner while fetch is in flight; 8 tests covering all states.
   Done when: direct navigation to `/data-sources/<id>` loads correctly; invalid id shows error panel (no infinite spinner); all 8 tests pass.
 
+- [x] `UI-461` Wire recording import/export to IS-070 API
+  Goal: replace mock RecordingImportDialog with real multipart upload; add Export button to recording detail page.
+  Surface: `Recordings`, `Recording Detail`
+  Work includes: `RecordingImportDialog` → `POST .../recordings/import` (FormData); on success reload artifacts store; Export button → `POST .../export` streams ZIP download; fix `apiFetch` to not set Content-Type for FormData bodies.
+  Depends: IS-070.
+  Done when: import uploads real ZIP and reloads list; error state shown on API failure; export button downloads `.iotsim` bundle; typecheck + vitest green.
+
 ## Recommended Sequence
 
 1. Complete the P0 shell and shared-pattern tasks first.

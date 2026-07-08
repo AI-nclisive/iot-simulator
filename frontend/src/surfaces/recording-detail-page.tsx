@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { apiFetch, ApiError } from "../api";
+import { apiFetch, ApiError, authHeaders } from "../api";
 import { useArtifactsStore } from "../shell/artifacts-store";
+import { useNotificationStore } from "../shell/notification-store";
 import { useShellStore } from "../shell/shell-store";
 import { SharedStatePanel } from "../ui/shared-state-panel";
 import { StatusBadge } from "../ui/status-badge";
@@ -70,8 +71,10 @@ export function RecordingDetailPage() {
   const isLoading = useArtifactsStore((s) => s.isLoading);
   const error = useArtifactsStore((s) => s.error);
   const loadRecordingById = useArtifactsStore((s) => s.loadRecordingById);
+  const notify = useNotificationStore((s) => s.push);
 
   const [activeTab, setActiveTab] = useState<TabId>("schema");
+  const [isExporting, setIsExporting] = useState(false);
 
   // Schema tab state
   const [schemaNodes, setSchemaNodes] = useState<SchemaNode[] | null>(null);
@@ -252,6 +255,29 @@ export function RecordingDetailPage() {
     void loadValues(undefined, gen);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtersKey, valuesLoaded]);
+
+  async function handleExport() {
+    if (!currentProjectId || !recordingId) return;
+    setIsExporting(true);
+    try {
+      const response = await fetch(
+        `/api/v1/projects/${currentProjectId}/recordings/${recordingId}/export`,
+        { method: "POST", headers: authHeaders() },
+      );
+      if (!response.ok) throw new Error(response.statusText);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `recording-${recordingId.slice(0, 8)}.iotsim`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      notify({ tone: "error", title: "Export failed. Try again." });
+    } finally {
+      setIsExporting(false);
+    }
+  }
 
   function tabClass(tab: TabId) {
     return `border-b-2 px-4 py-2 text-sm font-medium transition ${
@@ -584,10 +610,20 @@ export function RecordingDetailPage() {
               )}
             </h2>
           </div>
-          <StatusBadge
-            label={recording.origin === "captured" ? "Recorded" : "Imported"}
-            tone="neutral"
-          />
+          <div className="flex items-center gap-2">
+            <StatusBadge
+              label={recording.origin === "captured" ? "Recorded" : "Imported"}
+              tone="neutral"
+            />
+            <button
+              className="shell-action"
+              disabled={isExporting}
+              type="button"
+              onClick={() => void handleExport()}
+            >
+              {isExporting ? "Exporting…" : "Export"}
+            </button>
+          </div>
         </div>
       </section>
 

@@ -37,7 +37,9 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   const etag = etagStore.get(path);
 
   const headers: Record<string, string> = {
-    ...(init.body !== undefined ? { "Content-Type": "application/json" } : {}),
+    ...(init.body !== undefined && !(init.body instanceof FormData)
+      ? { "Content-Type": "application/json" }
+      : {}),
     Accept: "application/json",
     ...authHeaders(),
     ...(init.headers as Record<string, string>),
