@@ -15,7 +15,8 @@ import {
   type TableRowAction,
   type TableSortState,
 } from "../ui/table-pattern";
-import { initialRoleChangeLog, type RoleChangeEntry, type UserRow } from "./mock-users";
+import { type ActivityEventDto, type ActivityHistoryApiResponse } from "../types/activity";
+import { type UserRow } from "./mock-users";
 
 // ── Backend API shape (IS-118) ───────────────────────────────────────────────
 
@@ -67,15 +68,19 @@ function statusLabel(status: "active" | "inactive") {
   return status === "active" ? "Active" : "Inactive";
 }
 
-let roleChangeIdCounter = initialRoleChangeLog.length + 1;
-
-function nextRoleChangeId(): string {
-  return `rcl-${String(roleChangeIdCounter++).padStart(3, "0")}`;
-}
-
 // ── Role change activity panel ────────────────────────────────────────────────
 
-function RoleChangeActivityPanel({ entries }: { entries: RoleChangeEntry[] }) {
+function formatEventTime(at: string): string {
+  return new Date(at).toLocaleString();
+}
+
+function RoleChangeActivityPanel({
+  entries,
+  userMap,
+}: {
+  entries: ActivityEventDto[];
+  userMap: Map<string, UserRow>;
+}) {
   if (entries.length === 0) {
     return (
       <section className="shell-panel px-5 py-5" aria-label="Role change activity">
@@ -92,31 +97,45 @@ function RoleChangeActivityPanel({ entries }: { entries: RoleChangeEntry[] }) {
     <section className="shell-panel px-5 py-5" aria-label="Role change activity">
       <h2 className="mb-4 text-base font-semibold text-shell-ink">Role change activity</h2>
       <ol className="space-y-3" aria-label="Role change log">
-        {entries.map((entry) => (
-          <li
-            key={entry.id}
-            className="flex flex-col gap-1 rounded-md border border-shell-line bg-white px-4 py-3 text-sm sm:flex-row sm:items-start sm:justify-between"
-          >
-            <div className="min-w-0">
-              <p className="font-medium text-shell-ink">
-                {entry.affectedUserName}
-                <span className="ml-1 text-shell-muted font-normal">
-                  &lt;{entry.affectedUserEmail}&gt;
-                </span>
-              </p>
-              <p className="mt-1 text-shell-muted">
-                Role changed from{" "}
-                <StatusBadge label={roleLabel(entry.fromRole)} tone={roleBadgeTone(entry.fromRole)} />{" "}
-                to{" "}
-                <StatusBadge label={roleLabel(entry.toRole)} tone={roleBadgeTone(entry.toRole)} />
-              </p>
-            </div>
-            <div className="shrink-0 text-right text-shell-muted">
-              <p>by {entry.changedByName}</p>
-              <p className="text-xs">{entry.changedAt}</p>
-            </div>
-          </li>
-        ))}
+        {entries.map((entry) => {
+          const newRole = typeof entry.detail.role === "string" ? entry.detail.role : null;
+          const newStatus = typeof entry.detail.status === "string" ? entry.detail.status : null;
+          const actionLabel =
+            newRole != null
+              ? `Role changed to ${roleLabel(newRole === "admin" ? "admin" : "user")}`
+              : newStatus != null
+                ? `Status changed to ${newStatus.toLowerCase()}`
+                : entry.action;
+          const affectedUser = entry.objectId != null ? userMap.get(entry.objectId) : null;
+          return (
+            <li
+              key={entry.id}
+              className="flex flex-col gap-1 rounded-md border border-shell-line bg-white px-4 py-3 text-sm sm:flex-row sm:items-start sm:justify-between"
+            >
+              <div className="min-w-0">
+                <p className="font-medium text-shell-ink">
+                  {affectedUser?.name ?? entry.objectId ?? "—"}
+                </p>
+                {affectedUser && (
+                  <p className="text-xs text-shell-muted">{affectedUser.email}</p>
+                )}
+                <p className="mt-1 text-shell-muted">
+                  {actionLabel}{" "}
+                  {newRole != null && (
+                    <StatusBadge
+                      label={roleLabel(newRole === "admin" ? "admin" : "user")}
+                      tone={roleBadgeTone(newRole === "admin" ? "admin" : "user")}
+                    />
+                  )}
+                </p>
+              </div>
+              <div className="shrink-0 text-right text-shell-muted">
+                <p>by {entry.actor}</p>
+                <p className="text-xs">{formatEventTime(entry.at)}</p>
+              </div>
+            </li>
+          );
+        })}
       </ol>
     </section>
   );
@@ -133,7 +152,7 @@ export function AdminUsersPage() {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [roleChangeLog, setRoleChangeLog] = useState<RoleChangeEntry[]>(initialRoleChangeLog);
+  const [activityLog, setActivityLog] = useState<ActivityEventDto[]>([]);
   const [searchValue, setSearchValue] = useState("");
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -149,9 +168,15 @@ export function AdminUsersPage() {
     let cancelled = false;
     setIsLoading(true);
     setLoadError(null);
-    apiFetch<AdminUserListApiResponse>("/api/v1/admin/users")
-      .then((data) => {
-        if (!cancelled) setUsers(data.items.map(mapApiUser));
+    Promise.all([
+      apiFetch<AdminUserListApiResponse>("/api/v1/admin/users"),
+      apiFetch<ActivityHistoryApiResponse>("/api/v1/admin/activity?objectType=user&limit=20").catch(() => null),
+    ])
+      .then(([usersData, activityData]) => {
+        if (!cancelled) {
+          setUsers(usersData.items.map(mapApiUser));
+          if (activityData) setActivityLog(activityData.events);
+        }
       })
       .catch((err) => {
         if (!cancelled) {
@@ -166,6 +191,8 @@ export function AdminUsersPage() {
 
   const hasQueryState =
     searchValue.trim() !== "" || roleFilter !== "all" || statusFilter !== "all";
+
+  const userMap = useMemo(() => new Map(users.map((u) => [u.id, u])), [users]);
 
   const filtered = useMemo(() => {
     const q = searchValue.trim().toLowerCase();
@@ -188,7 +215,6 @@ export function AdminUsersPage() {
   async function handleRoleChange(userId: string, newRole: "admin" | "user") {
     const affectedUser = users.find((u) => u.id === userId);
     if (!affectedUser) return;
-    const fromRole = affectedUser.role;
     setIsSaving(true);
     try {
       const updated = await apiFetch<AdminUserApiResponse>(
@@ -198,17 +224,17 @@ export function AdminUsersPage() {
       setUsers((prev) =>
         prev.map((u) => (u.id === userId ? mapApiUser(updated) : u)),
       );
-      const entry: RoleChangeEntry = {
-        id: nextRoleChangeId(),
-        affectedUserId: userId,
-        affectedUserName: affectedUser.name,
-        affectedUserEmail: affectedUser.email,
-        fromRole,
-        toRole: newRole,
-        changedByName: "You",
-        changedAt: "Just now",
+      const optimisticEntry: ActivityEventDto = {
+        id: Date.now(),
+        projectId: null,
+        actor: "local",
+        action: "change_role",
+        objectType: "user",
+        objectId: userId,
+        at: new Date().toISOString(),
+        detail: { role: newRole },
       };
-      setRoleChangeLog((prev) => [entry, ...prev]);
+      setActivityLog((prev) => [optimisticEntry, ...prev]);
       setConfirmRequest(null);
       notify({ tone: "success", title: `Role changed to ${roleLabel(newRole)}.` });
     } catch {
@@ -453,7 +479,7 @@ export function AdminUsersPage() {
         )}
       </section>
 
-      <RoleChangeActivityPanel entries={roleChangeLog} />
+      <RoleChangeActivityPanel entries={activityLog} userMap={userMap} />
 
       {confirmRequest?.kind === "role-change" && confirmingUser ? (
         <ConfirmationDialog
