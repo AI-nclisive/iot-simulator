@@ -105,6 +105,18 @@ describe("DataSourcesListPage — row actions for IMPORT basis (UI-455)", () => 
   });
 });
 
+describe("DataSourcesListPage — protocol filter options (UI-463)", () => {
+  it("protocol filter shows OPC UA but not Modbus TCP", async () => {
+    setupStore([{ ...baseSource }]);
+    renderPage();
+    await waitFor(() => expect(screen.getByText("Test Source")).toBeTruthy());
+    const select = screen.getByRole("combobox", { name: "Protocol" });
+    const options = Array.from((select as HTMLSelectElement).options).map((o) => o.text);
+    expect(options).toContain("OPC UA");
+    expect(options).not.toContain("Modbus TCP");
+  });
+});
+
 describe("DataSourcesListPage — parameter count display (UI-456)", () => {
   it("renders parameterCount from store in the list row", async () => {
     setupStore([{ ...baseSource, parameterCount: 2480 }]);

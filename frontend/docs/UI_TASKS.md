@@ -985,6 +985,13 @@ Parallel execution:
   Work includes: `create-recording-wizard-page.tsx` — remove scan-type step, always navigate to live capture, sources without realDeviceEndpoint shown as disabled; `create-data-source-wizard-page.tsx` — add `recording` step to SCAN_STEPS (scan→recording→schedule→review), two options: Start live capture / Skip; on submit with startCapture=true, redirect to `/data-sources/{id}/recording`.
   Done when: recording wizard has 2 steps (source + review); data source scan flow has 7 steps with recording choice; startCapture=true redirects to live capture; typecheck + vitest green.
 
+- [x] `UI-463` Hide Modbus TCP from UI until IS-059 is implemented
+  Goal: remove Modbus TCP from the Create Data Source wizard protocol step and from the Data Sources list page protocol filter — IS-059 (Modbus TCP worker) is not yet implemented, so showing the option lets users create sources that will never work.
+  Surface: `Create Data Source`, `Data Sources`
+  Work includes: remove `{ label: "Modbus TCP", value: "Modbus TCP" }` from `protocolOptions` in `create-data-source-wizard-page.tsx` and from the protocol filter in `data-sources-list-page.tsx`; all Modbus-specific form logic preserved — re-enable by restoring entries when IS-059 lands.
+  Depends: IS-059 (to re-enable).
+  Done when: protocol step shows only OPC UA; list filter shows only All protocols / OPC UA; typecheck + vitest green.
+
 ## Recommended Sequence
 
 1. Complete the P0 shell and shared-pattern tasks first.
