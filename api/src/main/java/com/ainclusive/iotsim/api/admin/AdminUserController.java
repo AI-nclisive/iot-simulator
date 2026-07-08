@@ -53,7 +53,7 @@ public class AdminUserController {
     public AdminUserResponse changeRole(
             @PathVariable String id,
             @Valid @RequestBody ChangeRoleRequest body) {
-        return AdminUserResponse.from(service.changeRole(id, body.role()));
+        return AdminUserResponse.from(service.changeRole(id, body.role(), "local"));
     }
 
     @PatchMapping("/{id}/status")
@@ -62,7 +62,7 @@ public class AdminUserController {
     public AdminUserResponse changeStatus(
             @PathVariable String id,
             @Valid @RequestBody ChangeStatusRequest body) {
-        return AdminUserResponse.from(service.changeStatus(id, body.status()));
+        return AdminUserResponse.from(service.changeStatus(id, body.status(), "local"));
     }
 
     // ── DTOs ─────────────────────────────────────────────────────────────────

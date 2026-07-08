@@ -2,6 +2,8 @@ package com.ainclusive.iotsim.domain.project;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.ainclusive.iotsim.domain.activityevent.ActivityEventService;
+import com.ainclusive.iotsim.domain.activityevent.NoOpActivityEventRepository;
 import com.ainclusive.iotsim.domain.datasource.CredentialState;
 import com.ainclusive.iotsim.domain.datasource.DataSource;
 import com.ainclusive.iotsim.domain.datasource.DataSourceService;
@@ -79,13 +81,13 @@ class ProjectOverviewServiceTest {
                 return projects;
             }
         };
-        DataSourceService dataSourceService = new DataSourceService(null, null, null, null, null, null, "localhost") {
+        DataSourceService dataSourceService = new DataSourceService(null, null, null, null, null, null, "localhost", new ActivityEventService(new NoOpActivityEventRepository())) {
             @Override
             public List<DataSource> list(String projectId) {
                 return sourcesByProject.getOrDefault(projectId, List.of());
             }
         };
-        RecordingService recordingService = new RecordingService(null, null, null, null, null, null, null) {
+        RecordingService recordingService = new RecordingService(null, null, null, null, null, null, null, new ActivityEventService(new NoOpActivityEventRepository())) {
             @Override
             public List<Recording> list(String projectId) {
                 return recordingsByProject.getOrDefault(projectId, List.of());

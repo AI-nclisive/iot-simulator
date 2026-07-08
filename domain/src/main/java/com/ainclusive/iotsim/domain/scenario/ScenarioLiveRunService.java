@@ -129,6 +129,7 @@ public class ScenarioLiveRunService {
             final String runId = run.id();
             final String evidenceId = ev.id();
             final DeterministicSettings finalSettings = settings;
+            final String finalActor = actor;
 
             // Register a placeholder before submitting so the registry entry exists before the
             // task can run (important for synchronous test executors and stop-before-start races).
@@ -136,7 +137,7 @@ public class ScenarioLiveRunService {
             registry.put(runId, new ScenarioExecution(runId, evidenceId, null));
 
             Future<?> future = executor.submit(() ->
-                    executeSteps(projectId, runId, scenario, finalSettings));
+                    executeSteps(projectId, runId, scenario, finalSettings, finalActor));
 
             // Replace the placeholder with the real future. If stopIfLive() removed the
             // placeholder between registry.put and here, cancel the just-submitted task.
@@ -178,7 +179,7 @@ public class ScenarioLiveRunService {
     // ---- background step execution ----
 
     private void executeSteps(String projectId, String runId, ScenarioRow scenario,
-            DeterministicSettings settings) {
+            DeterministicSettings settings, String actor) {
         List<String> startedSources = new ArrayList<>();
         List<ActiveFault> startedFaults = new ArrayList<>();
         boolean completed = false;
@@ -198,7 +199,7 @@ public class ScenarioLiveRunService {
                             stepPayload(step));
                 }
                 stepListener.onStepStarted(projectId, runId, step.ordinal(), step.type());
-                execute(projectId, step, runId, settings, startedSources, startedFaults);
+                execute(projectId, step, runId, settings, startedSources, startedFaults, actor);
                 stepListener.onStepCompleted(projectId, runId, step.ordinal(), step.type());
             }
             completed = true;
@@ -248,7 +249,7 @@ public class ScenarioLiveRunService {
     private void teardown(String projectId, List<String> startedSources) {
         for (String sourceId : startedSources) {
             try {
-                dataSources.stop(projectId, sourceId);
+                dataSources.stop(projectId, sourceId, "automation");
             } catch (RuntimeException ignored) {
                 // best-effort teardown; individual stop failures must not block the rest
             }
@@ -267,14 +268,15 @@ public class ScenarioLiveRunService {
     }
 
     private void execute(String projectId, ScenarioStepRow step, String parentRunId,
-            DeterministicSettings settings, List<String> startedSources, List<ActiveFault> startedFaults) {
+            DeterministicSettings settings, List<String> startedSources, List<ActiveFault> startedFaults,
+            String actor) {
         switch (step.type()) {
             case "START" -> {
-                dataSources.start(projectId, step.targetSourceId());
+                dataSources.start(projectId, step.targetSourceId(), actor);
                 startedSources.add(step.targetSourceId());
             }
             case "STOP" -> {
-                dataSources.stop(projectId, step.targetSourceId());
+                dataSources.stop(projectId, step.targetSourceId(), actor);
                 startedSources.remove(step.targetSourceId());
             }
             case "REPLAY" -> replay.replay(projectId, step.targetSourceId(),

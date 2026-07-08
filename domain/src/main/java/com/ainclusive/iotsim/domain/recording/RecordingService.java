@@ -1,5 +1,6 @@
 package com.ainclusive.iotsim.domain.recording;
 
+import com.ainclusive.iotsim.domain.activityevent.ActivityEventService;
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.domain.support.Page;
 import com.ainclusive.iotsim.domain.support.PageCursor;
@@ -26,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /** Recording lifecycle: create, capture values, finalize (backend-specs/03). */
 @Service
@@ -38,13 +40,14 @@ public class RecordingService {
     private final CredentialStore credentials;
     private final SourceCapturer capturer;
     private final ProjectRepository projects;
+    private final ActivityEventService activity;
 
     // Live captures in progress, keyed by data-source id (one capture per source).
     private final Map<String, ActiveCapture> active = new ConcurrentHashMap<>();
 
     public RecordingService(RecordingRepository recordings, ValueTimelineRepository timeline,
             DataSourceRepository dataSources, SchemaRepository schemas, CredentialStore credentials,
-            SourceCapturer capturer, ProjectRepository projects) {
+            SourceCapturer capturer, ProjectRepository projects, ActivityEventService activity) {
         this.recordings = recordings;
         this.timeline = timeline;
         this.dataSources = dataSources;
@@ -52,8 +55,10 @@ public class RecordingService {
         this.credentials = credentials;
         this.capturer = capturer;
         this.projects = projects;
+        this.activity = activity;
     }
 
+    @Transactional
     public Recording create(String projectId, String dataSourceId, ScanType scanType,
             String name, String actor) {
         DataSourceRow source = requireSource(projectId, dataSourceId);
@@ -64,8 +69,10 @@ public class RecordingService {
             throw new IllegalArgumentException("Recording name must not exceed 255 characters");
         }
         String safeName = trimmedName;
-        return map(recordings.create(projectId, dataSourceId, schemaVersion, "SCAN_RECORD",
-                scanTypeStr, safeName, actor));
+        RecordingRow row = recordings.create(projectId, dataSourceId, schemaVersion, "SCAN_RECORD",
+                scanTypeStr, safeName, actor);
+        activity.emit(projectId, actor, "create", "recording", row.id());
+        return map(row);
     }
 
     /** Appends captured values; skipped entirely when the recording is {@code SCHEMA_ONLY}. */
@@ -120,6 +127,7 @@ public class RecordingService {
             throw new CaptureException(
                     CaptureException.Kind.CONFLICT, "a capture is already running for this data source");
         }
+        activity.emit(projectId, actor, "start_capture", "recording", capture.recordingId());
         return get(projectId, capture.recordingId());
     }
 
