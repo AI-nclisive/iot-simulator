@@ -499,7 +499,8 @@ describe("CreateDataSourceWizardPage — scan step (UI-458)", () => {
     // Scan complete — Next should be enabled
     expect((screen.getByRole("button", { name: "Next" }) as HTMLButtonElement).disabled).toBe(false);
 
-    // Navigate through schedule and review steps
+    // Navigate through recording, schedule, and review steps
+    await userEvent.click(screen.getByRole("button", { name: "Next" }));
     await userEvent.click(screen.getByRole("button", { name: "Next" }));
     await userEvent.click(screen.getByRole("button", { name: "Next" }));
 
@@ -515,6 +516,7 @@ describe("CreateDataSourceWizardPage — scan step (UI-458)", () => {
       expect(createCallArgs).toBeTruthy();
     });
 
-    expect(mockNavigate).toHaveBeenCalledWith("/data-sources/ds-created");
+    // Default startCapture=true → redirects to live capture page
+    expect(mockNavigate).toHaveBeenCalledWith("/data-sources/ds-created/recording");
   });
 });
