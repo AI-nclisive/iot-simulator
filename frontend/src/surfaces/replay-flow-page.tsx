@@ -92,6 +92,7 @@ export function ReplayFlowPage() {
   const [runId, setRunId] = useState<string | null>(null);
   const runSeenRef = useRef(false);
   const [progress, setProgress] = useState(0);
+  const [evidenceId, setEvidenceId] = useState<string | null>(null);
   const [evidenceState, setEvidenceState] = useState<"Ready" | "Assembling" | "Retry needed">(
     "Ready",
   );
@@ -234,6 +235,7 @@ export function ReplayFlowPage() {
         },
       );
       setRunId(response.runId);
+      setEvidenceId(response.evidenceId);
       runSeenRef.current = true;
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
@@ -281,7 +283,9 @@ export function ReplayFlowPage() {
             <StatusBadge label="Replay" tone="accent" />
             <StatusBadge label={source.protocol} tone="neutral" />
             <StatusBadge label={replayLabel(replayState)} tone={replayTone(replayState)} />
-            <StatusBadge label={`Evidence: ${evidenceState}`} tone={evidenceTone(evidenceState)} />
+            {replayState !== "idle" ? (
+              <StatusBadge label={`Evidence: ${evidenceState}`} tone={evidenceTone(evidenceState)} />
+            ) : null}
           </div>
         </div>
 
@@ -480,7 +484,9 @@ export function ReplayFlowPage() {
               impact and evidence visible before and after launch.
             </p>
           </div>
-          <StatusBadge label={`Evidence: ${evidenceState}`} tone={evidenceTone(evidenceState)} />
+          {replayState !== "idle" ? (
+            <StatusBadge label={`Evidence: ${evidenceState}`} tone={evidenceTone(evidenceState)} />
+          ) : null}
         </div>
 
         <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
@@ -502,16 +508,29 @@ export function ReplayFlowPage() {
               Evidence result
             </p>
             <p className="mt-3 text-sm font-medium text-shell-ink">
-              {evidenceState === "Ready"
-                ? "Evidence can be reviewed after completion."
-                : evidenceState === "Assembling"
-                  ? "Evidence is assembling while replay runs."
-                  : "Evidence needs another pass after failure."}
+              {evidenceState === "Ready" && replayState === "completed"
+                ? "Evidence is ready."
+                : evidenceState === "Ready"
+                  ? "Evidence will be available after replay completes."
+                  : evidenceState === "Assembling"
+                    ? "Evidence is assembling while replay runs."
+                    : "Evidence needs another pass after failure."}
             </p>
-            <p className="mt-2 text-sm leading-6 text-shell-muted">
-              Evidence keeps replay authorship tied to the initiating run and target
-              source.
-            </p>
+            {replayState === "completed" && evidenceId ? (
+              <div className="mt-3">
+                <Link
+                  className="shell-text-action text-sm"
+                  to={`/evidence/${evidenceId}`}
+                >
+                  View evidence →
+                </Link>
+              </div>
+            ) : (
+              <p className="mt-2 text-sm leading-6 text-shell-muted">
+                Evidence keeps replay authorship tied to the initiating run and target
+                source.
+              </p>
+            )}
           </div>
         </div>
       </section>

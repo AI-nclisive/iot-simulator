@@ -992,6 +992,13 @@ Parallel execution:
   Depends: IS-059 (to re-enable).
   Done when: protocol step shows only OPC UA; list filter shows only All protocols / OPC UA; typecheck + vitest green.
 
+- [x] `UI-464` Evidence UX — hide idle badge, add navigation links
+  Goal: fix two UX gaps in evidence surfaces: (1) replay-flow-page shows "EVIDENCE: READY" badge before any replay starts; (2) evidence-detail-page displays sourceIds, recordingId, scenarioId as raw text with no navigation.
+  Surface: `Replay Flow`, `Evidence Detail`
+  Work includes: hide evidence StatusBadge when replayState is idle in replay-flow-page.tsx; add DetailLinkRow component to evidence-detail-page.tsx; sourceIds link to /data-sources/:id; recordingId links to /recordings/:id; scenarioId links to /scenarios/:id.
+  Depends: none.
+  Done when: badge absent on initial replay page load; tapping an ID navigates to the correct surface; typecheck green.
+
 ## Recommended Sequence
 
 1. Complete the P0 shell and shared-pattern tasks first.
