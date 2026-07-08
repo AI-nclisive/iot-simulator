@@ -90,6 +90,7 @@ export type WizardFormState = {
   scheduleStart: string;
   simulatorPort: string;
   schemaReviewNote: string;
+  startCapture: boolean;
 };
 
 const protocolOptions: ProtocolOption[] = [
@@ -129,6 +130,7 @@ export type WizardStepId =
   | "basis"
   | "setup"
   | "scan"
+  | "recording"
   | "import"
   | "configure"
   | "schedule"
@@ -140,6 +142,7 @@ const SCAN_STEPS: WizardStep[] = [
   { id: "basis", label: "Source basis" },
   { id: "setup", label: "Setup" },
   { id: "scan", label: "Scan" },
+  { id: "recording", label: "Recording" },
   { id: "schedule", label: "Schedule" },
   { id: "review", label: "Review" },
 ];
@@ -252,6 +255,10 @@ export function validationMessage(stepId: WizardStepId, form: WizardFormState, a
         return "Select a recording to continue.";
       }
     }
+  }
+
+  if (stepId === "recording") {
+    return null;
   }
 
   if (stepId === "schedule") {
@@ -382,6 +389,9 @@ function reviewLines(
     ...(form.basis === "scan"
       ? [{ label: "Credentials", value: credentialReviewValue(form) }]
       : []),
+    ...(form.basis === "scan"
+      ? [{ label: "After creation", value: form.startCapture ? "Start live capture" : "Open data source" }]
+      : []),
     ...(form.basis === "import"
       ? [{ label: "Recording", value: selectedRecordingLabel ?? "-" }]
       : []),
@@ -467,6 +477,7 @@ export function CreateDataSourceWizardPage() {
     scheduleStart: "",
     simulatorPort: "",
     schemaReviewNote: "",
+    startCapture: true,
   });
 
   const activeSteps = getActiveSteps(form.basis);
@@ -809,7 +820,11 @@ export function CreateDataSourceWizardPage() {
             }),
           },
         );
-        navigate(`/data-sources/${data.id}`);
+        if (form.startCapture) {
+          navigate(`/data-sources/${data.id}/recording`);
+        } else {
+          navigate(`/data-sources/${data.id}`);
+        }
       } catch (err) {
         console.error("[createSource/scan]", err);
         const title = err instanceof Error ? err.message : "Failed to create source from scan";
@@ -1439,6 +1454,33 @@ export function CreateDataSourceWizardPage() {
     );
   }
 
+  function renderRecordingStep() {
+    return (
+      <div className="space-y-3">
+        <button
+          className={optionButtonClass(form.startCapture)}
+          type="button"
+          onClick={() => updateForm({ startCapture: true })}
+        >
+          <p className="text-sm font-medium text-shell-ink">Start live capture</p>
+          <p className="mt-1 text-sm text-shell-muted">
+            After the source is created, immediately open the live recording flow to capture data from the device.
+          </p>
+        </button>
+        <button
+          className={optionButtonClass(!form.startCapture)}
+          type="button"
+          onClick={() => updateForm({ startCapture: false })}
+        >
+          <p className="text-sm font-medium text-shell-ink">Skip — just create the source</p>
+          <p className="mt-1 text-sm text-shell-muted">
+            Create the data source only. You can start a recording from the Recordings page at any time.
+          </p>
+        </button>
+      </div>
+    );
+  }
+
   function renderReviewStep() {
     return (
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -1506,6 +1548,10 @@ export function CreateDataSourceWizardPage() {
 
     if (activeStepId === "scan") {
       return renderScanStep();
+    }
+
+    if (activeStepId === "recording") {
+      return renderRecordingStep();
     }
 
     if (activeStepId === "configure") {
