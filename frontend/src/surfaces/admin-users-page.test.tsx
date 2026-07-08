@@ -23,8 +23,68 @@ import { cleanup, render, screen, waitFor, within } from "@testing-library/react
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { resetInitialRoleChangeLog, setInitialRoleChangeLog, setMockUserSaveShouldFail } from "./mock-users";
+import { resetInitialRoleChangeLog, setInitialRoleChangeLog } from "./mock-users";
 import { AdminUsersPage } from "./admin-users-page";
+
+// ── Mock the API module ───────────────────────────────────────────────────────
+
+const mockApiFetch = vi.fn();
+
+vi.mock("../api", () => ({
+  apiFetch: (...args: unknown[]) => mockApiFetch(...args),
+  ApiError: class ApiError extends Error {
+    status: number;
+    constructor(status: number, title: string) {
+      super(title);
+      this.status = status;
+    }
+  },
+}));
+
+// ── Seed data (API response shape) ───────────────────────────────────────────
+
+const apiUsers = [
+  { id: "u-001", displayName: "Jordan Kim", subject: "jordan.kim@example.com", role: "admin", status: "ACTIVE", lastSeenAt: null },
+  { id: "u-002", displayName: "Alex Rivera", subject: "alex.rivera@example.com", role: "user", status: "ACTIVE", lastSeenAt: null },
+  { id: "u-003", displayName: "Sam Chen", subject: "sam.chen@example.com", role: "user", status: "ACTIVE", lastSeenAt: null },
+  { id: "u-004", displayName: "Taylor Brooks", subject: "taylor.brooks@example.com", role: "user", status: "SUSPENDED", lastSeenAt: null },
+  { id: "u-005", displayName: "Morgan Lee", subject: "morgan.lee@example.com", role: "admin", status: "ACTIVE", lastSeenAt: null },
+  { id: "u-006", displayName: "Casey Davis", subject: "casey.davis@example.com", role: "user", status: "SUSPENDED", lastSeenAt: null },
+  { id: "u-007", displayName: "Riley Wilson", subject: "riley.wilson@example.com", role: "user", status: "ACTIVE", lastSeenAt: null },
+];
+
+function makeApiUser(overrides: Partial<(typeof apiUsers)[0]>) {
+  return { ...apiUsers[0], ...overrides };
+}
+
+function setupApiFetch(opts: { saveShouldFail?: boolean } = {}) {
+  mockApiFetch.mockImplementation((path: string, init?: RequestInit) => {
+    const method = (init?.method ?? "GET").toUpperCase();
+    if (method === "GET") {
+      return Promise.resolve({ items: apiUsers });
+    }
+    if (opts.saveShouldFail) {
+      return Promise.reject(new Error("Service unavailable"));
+    }
+    // PATCH /roles → return user with new role
+    if (path.includes("/roles")) {
+      const userId = path.split("/")[5];
+      const body = JSON.parse(init?.body as string) as { role: string };
+      const user = apiUsers.find((u) => u.id === userId) ?? apiUsers[0];
+      return Promise.resolve(makeApiUser({ ...user, role: body.role }));
+    }
+    // PATCH /status → return user with new status
+    if (path.includes("/status")) {
+      const userId = path.split("/")[5];
+      const body = JSON.parse(init?.body as string) as { status: string };
+      const user = apiUsers.find((u) => u.id === userId) ?? apiUsers[0];
+      return Promise.resolve(makeApiUser({ ...user, status: body.status }));
+    }
+    return Promise.resolve({});
+  });
+}
+
+// ── Shell store mock ──────────────────────────────────────────────────────────
 
 const { mockShellStore } = vi.hoisted(() => ({ mockShellStore: vi.fn() }));
 
@@ -49,12 +109,11 @@ function setupStore(opts: {
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
-  setMockUserSaveShouldFail(false);
   resetInitialRoleChangeLog();
 });
 
 beforeEach(() => {
-  setMockUserSaveShouldFail(false);
+  setupApiFetch();
 });
 
 function renderPage() {
@@ -65,10 +124,18 @@ function renderPage() {
   );
 }
 
+/** Wait for the async users load to complete. */
+async function waitForTable() {
+  return waitFor(() => screen.getByRole("table"));
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
 describe("AdminUsersPage — access gates", () => {
-  it("shows the users table in Local mode (trusted admin)", () => {
+  it("shows the users table in Local mode (trusted admin)", async () => {
     setupStore({ accessMode: "local" });
     renderPage();
+    await waitForTable();
     expect(screen.getByRole("table")).toBeTruthy();
   });
 
@@ -81,9 +148,10 @@ describe("AdminUsersPage — access gates", () => {
 });
 
 describe("AdminUsersPage — table", () => {
-  it("renders user rows with role and status badges", () => {
+  it("renders user rows with role and status badges", async () => {
     setupStore();
     renderPage();
+    await waitForTable();
     const table = screen.getByRole("table");
     expect(screen.getByText("Jordan Kim")).toBeTruthy();
     expect(within(table).getAllByText("Admin").length).toBeGreaterThan(0);
@@ -93,6 +161,7 @@ describe("AdminUsersPage — table", () => {
   it("filters rows by name", async () => {
     setupStore();
     renderPage();
+    await waitForTable();
     await userEvent.type(screen.getByPlaceholderText(/search by name/i), "Jordan");
     expect(screen.getByText("Jordan Kim")).toBeTruthy();
     expect(screen.queryByText("Alex Rivera")).toBeNull();
@@ -101,6 +170,7 @@ describe("AdminUsersPage — table", () => {
   it("filters rows by email", async () => {
     setupStore();
     renderPage();
+    await waitForTable();
     await userEvent.type(screen.getByPlaceholderText(/search by name/i), "sam.chen");
     expect(screen.getAllByText("Sam Chen").length).toBeGreaterThan(0);
     expect(screen.queryByText("Jordan Kim")).toBeNull();
@@ -109,6 +179,7 @@ describe("AdminUsersPage — table", () => {
   it("filters to admin users only", async () => {
     setupStore();
     renderPage();
+    await waitForTable();
     await userEvent.selectOptions(screen.getByRole("combobox", { name: /role/i }), "admin");
     expect(screen.getByText("Jordan Kim")).toBeTruthy();
     expect(screen.queryByText("Alex Rivera")).toBeNull();
@@ -117,6 +188,7 @@ describe("AdminUsersPage — table", () => {
   it("filters to inactive users only", async () => {
     setupStore();
     renderPage();
+    await waitForTable();
     await userEvent.selectOptions(screen.getByRole("combobox", { name: /status/i }), "inactive");
     expect(screen.getByText("Taylor Brooks")).toBeTruthy();
     expect(screen.queryByText("Jordan Kim")).toBeNull();
@@ -127,6 +199,7 @@ describe("AdminUsersPage — role change (save states)", () => {
   it("shows isProcessing state and resolves with success toast + badge update", async () => {
     setupStore();
     renderPage();
+    await waitForTable();
     const table = screen.getByRole("table");
     const adminCountBefore = within(table).getAllByText("Admin").length;
     await userEvent.click(screen.getAllByRole("button", { name: /make admin/i })[0]);
@@ -140,9 +213,10 @@ describe("AdminUsersPage — role change (save states)", () => {
   });
 
   it("shows error toast when save fails", async () => {
-    setMockUserSaveShouldFail(true);
+    setupApiFetch({ saveShouldFail: true });
     setupStore();
     renderPage();
+    await waitForTable();
     await userEvent.click(screen.getAllByRole("button", { name: /make admin/i })[0]);
     await userEvent.click(screen.getByRole("button", { name: /change role/i }));
     await waitFor(() =>
@@ -155,6 +229,7 @@ describe("AdminUsersPage — role change (save states)", () => {
   it("cancel closes dialog without mutation", async () => {
     setupStore();
     renderPage();
+    await waitForTable();
     const table = screen.getByRole("table");
     const adminCountBefore = within(table).getAllByText("Admin").length;
     await userEvent.click(screen.getAllByRole("button", { name: /make admin/i })[0]);
@@ -168,6 +243,7 @@ describe("AdminUsersPage — deactivate (save states)", () => {
   it("deactivates user and shows success toast", async () => {
     setupStore();
     renderPage();
+    await waitForTable();
     await userEvent.click(screen.getAllByRole("button", { name: /deactivate/i })[0]);
     const dialog = screen.getByRole("dialog");
     await userEvent.click(within(dialog).getByRole("button", { name: /deactivate/i }));
@@ -183,6 +259,7 @@ describe("AdminUsersPage — activate (save states)", () => {
   it("activates inactive user with success toast, no dialog", async () => {
     setupStore();
     renderPage();
+    await waitForTable();
     await userEvent.selectOptions(screen.getByRole("combobox", { name: /status/i }), "inactive");
     await userEvent.click(screen.getAllByRole("button", { name: /^activate$/i })[0]);
     await waitFor(() =>
@@ -198,6 +275,7 @@ describe("AdminUsersPage — last-admin validation", () => {
   it("shows warning toast when trying to Make User the only remaining active admin", async () => {
     setupStore();
     renderPage();
+    await waitForTable();
     // Filter to only admins; Jordan Kim and Morgan Lee are admins.
     // Deactivate one admin first so only one active admin remains.
     await userEvent.selectOptions(screen.getByRole("combobox", { name: /role/i }), "admin");
@@ -220,9 +298,10 @@ describe("AdminUsersPage — last-admin validation", () => {
 });
 
 describe("AdminUsersPage — role change activity (UI-083)", () => {
-  it("shows the role change activity panel on load with pre-seeded entries", () => {
+  it("shows the role change activity panel on load with pre-seeded entries", async () => {
     setupStore();
     renderPage();
+    await waitForTable();
     const panel = screen.getByRole("region", { name: /role change activity/i });
     expect(panel).toBeTruthy();
     expect(panel.textContent).toMatch(/Sam Chen/);
@@ -233,6 +312,7 @@ describe("AdminUsersPage — role change activity (UI-083)", () => {
   it("prepends a new activity entry after a successful role change", async () => {
     setupStore();
     renderPage();
+    await waitForTable();
     const logBefore = within(
       screen.getByRole("list", { name: /role change log/i }),
     ).getAllByRole("listitem");
@@ -256,9 +336,10 @@ describe("AdminUsersPage — role change activity (UI-083)", () => {
   });
 
   it("does not add an activity entry when the save fails", async () => {
-    setMockUserSaveShouldFail(true);
+    setupApiFetch({ saveShouldFail: true });
     setupStore();
     renderPage();
+    await waitForTable();
     const logBefore = within(
       screen.getByRole("list", { name: /role change log/i }),
     ).getAllByRole("listitem");
@@ -279,18 +360,20 @@ describe("AdminUsersPage — role change activity (UI-083)", () => {
     expect(logAfter.length).toBe(countBefore);
   });
 
-  it("shows 'from role → to role' in each activity entry", () => {
+  it("shows 'from role → to role' in each activity entry", async () => {
     setupStore();
     renderPage();
+    await waitForTable();
     const log = screen.getByRole("list", { name: /role change log/i });
     expect(log.textContent).toMatch(/Admin/);
     expect(log.textContent).toMatch(/User/);
   });
 
-  it("shows empty state when no role changes have been made", () => {
+  it("shows empty state when no role changes have been made", async () => {
     setInitialRoleChangeLog([]);
     setupStore();
     renderPage();
+    await waitForTable();
     const panel = screen.getByRole("region", { name: /role change activity/i });
     expect(panel).toBeTruthy();
     expect(panel.textContent).toMatch(/Role changes made by admins will appear here/);
@@ -300,6 +383,7 @@ describe("AdminUsersPage — role change activity (UI-083)", () => {
   it("cancel does not mutate the activity log", async () => {
     setupStore();
     renderPage();
+    await waitForTable();
     const logBefore = within(
       screen.getByRole("list", { name: /role change log/i }),
     ).getAllByRole("listitem");
