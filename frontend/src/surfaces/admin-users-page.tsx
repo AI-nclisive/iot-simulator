@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { apiFetch, ApiError } from "../api";
 import { resolveAccess } from "../shell/access-policy";
 import { useNotificationStore } from "../shell/notification-store";
 import { useShellStore } from "../shell/shell-store";
@@ -14,13 +15,33 @@ import {
   type TableRowAction,
   type TableSortState,
 } from "../ui/table-pattern";
-import {
-  initialRoleChangeLog,
-  mockUserSaveShouldFail,
-  mockUsers,
-  type RoleChangeEntry,
-  type UserRow,
-} from "./mock-users";
+import { initialRoleChangeLog, type RoleChangeEntry, type UserRow } from "./mock-users";
+
+// ── Backend API shape (IS-118) ───────────────────────────────────────────────
+
+type AdminUserApiResponse = {
+  id: string;
+  displayName: string;
+  subject: string;
+  status: string;
+  role: string;
+  lastSeenAt: string | null;
+};
+
+type AdminUserListApiResponse = { items: AdminUserApiResponse[] };
+
+function mapApiUser(u: AdminUserApiResponse): UserRow {
+  return {
+    id: u.id,
+    name: u.displayName,
+    email: u.subject,
+    role: (u.role === "admin" ? "admin" : "user") as UserRow["role"],
+    status: (u.status.toLowerCase() === "active" ? "active" : "inactive") as UserRow["status"],
+    lastActive: u.lastSeenAt ? new Date(u.lastSeenAt).toLocaleString() : "Never",
+  };
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
 type RoleFilter = "all" | "admin" | "user";
 type StatusFilter = "all" | "active" | "inactive";
@@ -46,20 +67,13 @@ function statusLabel(status: "active" | "inactive") {
   return status === "active" ? "Active" : "Inactive";
 }
 
-function mockSaveUser(): Promise<void> {
-  return new Promise((resolve, reject) =>
-    setTimeout(() => {
-      if (mockUserSaveShouldFail) reject(new Error("Service unavailable"));
-      else resolve();
-    }, 700),
-  );
-}
-
 let roleChangeIdCounter = initialRoleChangeLog.length + 1;
 
 function nextRoleChangeId(): string {
   return `rcl-${String(roleChangeIdCounter++).padStart(3, "0")}`;
 }
+
+// ── Role change activity panel ────────────────────────────────────────────────
 
 function RoleChangeActivityPanel({ entries }: { entries: RoleChangeEntry[] }) {
   if (entries.length === 0) {
@@ -108,13 +122,17 @@ function RoleChangeActivityPanel({ entries }: { entries: RoleChangeEntry[] }) {
   );
 }
 
+// ── Main page ─────────────────────────────────────────────────────────────────
+
 export function AdminUsersPage() {
   const accessMode = useShellStore((state) => state.accessMode);
   const sharedRole = useShellStore((state) => state.sharedRole);
   const access = resolveAccess(accessMode, sharedRole);
   const notify = useNotificationStore((s) => s.push);
 
-  const [users, setUsers] = useState<UserRow[]>(mockUsers);
+  const [users, setUsers] = useState<UserRow[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [roleChangeLog, setRoleChangeLog] = useState<RoleChangeEntry[]>(initialRoleChangeLog);
   const [searchValue, setSearchValue] = useState("");
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
@@ -126,6 +144,25 @@ export function AdminUsersPage() {
   const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [savingUserId, setSavingUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setIsLoading(true);
+    setLoadError(null);
+    apiFetch<AdminUserListApiResponse>("/api/v1/admin/users")
+      .then((data) => {
+        if (!cancelled) setUsers(data.items.map(mapApiUser));
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setLoadError(err instanceof ApiError ? err.title : "Failed to load users.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   const hasQueryState =
     searchValue.trim() !== "" || roleFilter !== "all" || statusFilter !== "all";
@@ -154,9 +191,12 @@ export function AdminUsersPage() {
     const fromRole = affectedUser.role;
     setIsSaving(true);
     try {
-      await mockSaveUser();
+      const updated = await apiFetch<AdminUserApiResponse>(
+        `/api/v1/admin/users/${userId}/roles`,
+        { method: "PATCH", body: JSON.stringify({ role: newRole }) },
+      );
       setUsers((prev) =>
-        prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u)),
+        prev.map((u) => (u.id === userId ? mapApiUser(updated) : u)),
       );
       const entry: RoleChangeEntry = {
         id: nextRoleChangeId(),
@@ -182,9 +222,12 @@ export function AdminUsersPage() {
   async function handleDeactivate(userId: string) {
     setIsSaving(true);
     try {
-      await mockSaveUser();
+      const updated = await apiFetch<AdminUserApiResponse>(
+        `/api/v1/admin/users/${userId}/status`,
+        { method: "PATCH", body: JSON.stringify({ status: "SUSPENDED" }) },
+      );
       setUsers((prev) =>
-        prev.map((u) => (u.id === userId ? { ...u, status: "inactive" } : u)),
+        prev.map((u) => (u.id === userId ? mapApiUser(updated) : u)),
       );
       setConfirmRequest(null);
       notify({ tone: "success", title: "User deactivated." });
@@ -199,9 +242,12 @@ export function AdminUsersPage() {
   async function handleActivate(userId: string) {
     setSavingUserId(userId);
     try {
-      await mockSaveUser();
+      const updated = await apiFetch<AdminUserApiResponse>(
+        `/api/v1/admin/users/${userId}/status`,
+        { method: "PATCH", body: JSON.stringify({ status: "ACTIVE" }) },
+      );
       setUsers((prev) =>
-        prev.map((u) => (u.id === userId ? { ...u, status: "active" } : u)),
+        prev.map((u) => (u.id === userId ? mapApiUser(updated) : u)),
       );
       notify({ tone: "success", title: "User activated." });
     } catch {
@@ -368,35 +414,43 @@ export function AdminUsersPage() {
           </p>
         </div>
 
-        <TableToolbar
-          searchValue={searchValue}
-          searchPlaceholder="Search by name or email"
-          onSearchChange={setSearchValue}
-          filters={filters}
-          activeFilters={activeFilters}
-          onClearAll={() => {
-            setSearchValue("");
-            setRoleFilter("all");
-            setStatusFilter("all");
-          }}
-          resultLabel={`${filtered.length} result${filtered.length !== 1 ? "s" : ""}`}
-        />
+        {loadError ? (
+          <SharedStatePanel state="error" message={loadError} />
+        ) : isLoading ? (
+          <SharedStatePanel state="loading" message="Loading users…" />
+        ) : (
+          <>
+            <TableToolbar
+              searchValue={searchValue}
+              searchPlaceholder="Search by name or email"
+              onSearchChange={setSearchValue}
+              filters={filters}
+              activeFilters={activeFilters}
+              onClearAll={() => {
+                setSearchValue("");
+                setRoleFilter("all");
+                setStatusFilter("all");
+              }}
+              resultLabel={`${filtered.length} result${filtered.length !== 1 ? "s" : ""}`}
+            />
 
-        <div className="mt-5">
-          <OperationalTable
-            columns={columns}
-            rows={filtered}
-            rowKey={(u) => u.id}
-            rowActions={rowActions}
-            sortState={sortState}
-            onSortChange={setSortState}
-            hasQueryState={hasQueryState}
-            emptyTitle="No users yet."
-            emptyMessage="Users will appear here once they are added to this project."
-            noResultsTitle="No users match the active filters."
-            noResultsMessage="Try adjusting the search or filters to find who you're looking for."
-          />
-        </div>
+            <div className="mt-5">
+              <OperationalTable
+                columns={columns}
+                rows={filtered}
+                rowKey={(u) => u.id}
+                rowActions={rowActions}
+                sortState={sortState}
+                onSortChange={setSortState}
+                hasQueryState={hasQueryState}
+                emptyTitle="No users yet."
+                emptyMessage="Users will appear here once they log in for the first time."
+                noResultsTitle="No users match the active filters."
+                noResultsMessage="Try adjusting the search or filters to find who you're looking for."
+              />
+            </div>
+          </>
+        )}
       </section>
 
       <RoleChangeActivityPanel entries={roleChangeLog} />

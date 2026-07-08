@@ -965,6 +965,19 @@ Parallel execution:
   Depends: IS-149.
   Done when: list row shows real VARIABLE node count from API; detail header shows same value; typecheck + vitest green.
 
+- [x] `UI-460` Wire admin users page to IS-118 API
+  Goal: replace mock data and save stubs in AdminUsersPage with real API calls to IS-118 endpoints.
+  Surface: `Admin Users`
+  Work includes: `useEffect` fetching `GET /api/v1/admin/users` on mount with loading/error states; `handleRoleChange` → `PATCH .../roles`; `handleDeactivate/handleActivate` → `PATCH .../status`; map `AdminUserApiResponse` → `UserRow` (displayName→name, subject→email, ACTIVE/SUSPENDED→active/inactive); remove mock imports; add tests for loading panel, GET-failure error panel.
+  Depends: IS-118.
+  Done when: admin users page loads from API; role and status changes call API; loading and error states render correctly; typecheck + vitest green.
+
+- [x] `UI-462` Simplify recording wizard + add capture step to data source scan flow
+  Goal: recordings are always live capture — remove scan-type step from Create Recording wizard; add a Recording step to the Create Data Source wizard (scan basis) so users can choose to start live capture immediately after creation.
+  Surface: `Create Recording`, `Create Data Source`
+  Work includes: `create-recording-wizard-page.tsx` — remove scan-type step, always navigate to live capture, sources without realDeviceEndpoint shown as disabled; `create-data-source-wizard-page.tsx` — add `recording` step to SCAN_STEPS (scan→recording→schedule→review), two options: Start live capture / Skip; on submit with startCapture=true, redirect to `/data-sources/{id}/recording`.
+  Done when: recording wizard has 2 steps (source + review); data source scan flow has 7 steps with recording choice; startCapture=true redirects to live capture; typecheck + vitest green.
+
 ## Recommended Sequence
 
 1. Complete the P0 shell and shared-pattern tasks first.
