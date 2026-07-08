@@ -3,26 +3,19 @@ import { useNavigate } from "react-router-dom";
 import { resolveAccess } from "../shell/access-policy";
 import { useShellStore } from "../shell/shell-store";
 import { useDataSourcesStore } from "../shell/data-sources-store";
-import { useNotificationStore } from "../shell/notification-store";
-import { apiFetch, ApiError } from "../api";
 import { SharedStatePanel } from "../ui/shared-state-panel";
 import { StatusBadge } from "../ui/status-badge";
 
-type RecordingStepId = "source" | "scan-type" | "review";
+type RecordingStepId = "source" | "review";
 type RecordingStep = { id: RecordingStepId; label: string };
 
 const STEPS: RecordingStep[] = [
   { id: "source", label: "Data source" },
-  { id: "scan-type", label: "Scan type" },
   { id: "review", label: "Review" },
 ];
 
-type ScanType = "SCHEMA_AND_DATA" | "SCHEMA_ONLY";
-
 type RecordingWizardForm = {
   dataSourceId: string | null;
-  scanType: ScanType;
-  name: string;
 };
 
 function stepChipClass(current: boolean, completed: boolean) {
@@ -51,7 +44,6 @@ export function CreateRecordingWizardPage() {
   const accessMode = useShellStore((s) => s.accessMode);
   const sharedRole = useShellStore((s) => s.sharedRole);
   const currentProjectId = useShellStore((s) => s.currentProjectId);
-  const push = useNotificationStore((s) => s.push);
   const access = resolveAccess(accessMode, sharedRole);
   const dataSources = useDataSourcesStore((s) => s.dataSources);
   const loadDataSources = useDataSourcesStore((s) => s.loadDataSources);
@@ -62,17 +54,12 @@ export function CreateRecordingWizardPage() {
 
   const [currentStep, setCurrentStep] = useState(0);
   const [showValidation, setShowValidation] = useState(false);
-  const [form, setForm] = useState<RecordingWizardForm>({
-    dataSourceId: null,
-    scanType: "SCHEMA_AND_DATA",
-    name: "",
-  });
+  const [form, setForm] = useState<RecordingWizardForm>({ dataSourceId: null });
 
   const safeStep = Math.min(currentStep, STEPS.length - 1);
   const activeStepId = STEPS[safeStep].id;
   const currentValidationMessage = stepValidation(form, activeStepId);
   const selectedSource = dataSources.find((ds) => ds.id === form.dataSourceId) ?? null;
-  const captureBlocked = form.scanType === "SCHEMA_AND_DATA" && !selectedSource?.realDeviceEndpoint;
 
   if (!access.canCreateSource) {
     return (
@@ -102,41 +89,13 @@ export function CreateRecordingWizardPage() {
     setCurrentStep((s) => Math.max(s - 1, 0));
   }
 
-  async function createRecording() {
-    if (!form.dataSourceId || !currentProjectId) return;
-
-    // SCHEMA_AND_DATA: real live capture — navigate to RecordingFlowPage which
-    // handles POST .../recording/start + stop and saves the recording.
-    if (form.scanType === "SCHEMA_AND_DATA") {
-      navigate(`/data-sources/${form.dataSourceId}/recording`);
-      return;
-    }
-
-    // SCHEMA_ONLY: create a shell row — no live capture needed.
-    try {
-      const trimmedName = form.name.trim();
-      const result = await apiFetch<{ id: string }>(
-        `/api/v1/projects/${currentProjectId}/recordings`,
-        {
-          method: "POST",
-          body: JSON.stringify({
-            dataSourceId: form.dataSourceId,
-            scanType: form.scanType,
-            ...(trimmedName ? { name: trimmedName } : {}),
-          }),
-        },
-      );
-      push({ tone: "success", title: "Recording created." });
-      navigate(`/recordings/${result.id}`);
-    } catch (err) {
-      const title = err instanceof ApiError ? err.title : (err instanceof Error ? err.message : "Failed to create recording");
-      push({ tone: "error", title });
-    }
+  function startCapture() {
+    if (!form.dataSourceId) return;
+    navigate(`/data-sources/${form.dataSourceId}/recording`);
   }
 
   function renderSourceStep() {
-    const allSources = dataSources;
-    if (allSources.length === 0) {
+    if (dataSources.length === 0) {
       return (
         <SharedStatePanel
           message="No data sources found in this project. Create a data source first, then return here to create a recording."
@@ -150,24 +109,32 @@ export function CreateRecordingWizardPage() {
         <section className="rounded-md border border-shell-line bg-white px-4 py-4">
           <p className="text-sm font-medium text-shell-ink">Select a data source</p>
           <p className="mt-2 text-sm leading-6 text-shell-muted">
-            The recording will capture data from the selected source.
+            The recording will capture live data from the selected source. Only sources with a real device endpoint can be recorded.
           </p>
         </section>
         <div className="space-y-2">
-          {allSources.map((ds) => {
+          {dataSources.map((ds) => {
             const isSelected = form.dataSourceId === ds.id;
+            const canCapture = !!ds.realDeviceEndpoint;
             return (
               <button
                 key={ds.id}
-                className={optionButtonClass(isSelected)}
+                className={canCapture
+                  ? optionButtonClass(isSelected)
+                  : "w-full cursor-not-allowed rounded-md border border-shell-line bg-shell-base/30 px-4 py-4 text-left opacity-50"
+                }
+                disabled={!canCapture}
                 type="button"
-                onClick={() => setForm((f) => ({ ...f, dataSourceId: ds.id }))}
+                onClick={() => canCapture && setForm((f) => ({ ...f, dataSourceId: ds.id }))}
               >
                 <div className="flex flex-wrap items-center gap-3">
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-shell-ink">{ds.name}</p>
                     {ds.endpoint ? (
                       <p className="mt-1 text-xs text-shell-muted font-mono">{ds.endpoint}</p>
+                    ) : null}
+                    {!canCapture ? (
+                      <p className="mt-1 text-xs text-shell-muted">No real device endpoint — live capture unavailable</p>
                     ) : null}
                   </div>
                   <div className="flex flex-wrap gap-1 shrink-0">
@@ -186,70 +153,16 @@ export function CreateRecordingWizardPage() {
     );
   }
 
-  function renderScanTypeStep() {
-    return (
-      <div className="space-y-3">
-        <button
-          className={optionButtonClass(form.scanType === "SCHEMA_AND_DATA")}
-          type="button"
-          onClick={() => setForm((f) => ({ ...f, scanType: "SCHEMA_AND_DATA" }))}
-        >
-          <p className="text-sm font-medium text-shell-ink">Schema + data</p>
-          <p className="mt-1 text-sm text-shell-muted">
-            Opens the live capture flow — connects to the device, streams values, and saves the
-            recording when you stop. Use this for replay and analysis.
-          </p>
-        </button>
-        <button
-          className={optionButtonClass(form.scanType === "SCHEMA_ONLY")}
-          type="button"
-          onClick={() => setForm((f) => ({ ...f, scanType: "SCHEMA_ONLY" }))}
-        >
-          <p className="text-sm font-medium text-shell-ink">Schema only</p>
-          <p className="mt-1 text-sm text-shell-muted">
-            Creates a schema-only recording shell — no value capture. Use this to inspect the device
-            structure without live data.
-          </p>
-        </button>
-        {captureBlocked ? (
-          <SharedStatePanel
-            message="The selected source has no real device endpoint. Schema + data capture requires a source configured with a real OPC UA or Modbus TCP address. Switch to Schema only, or go back and select a different source."
-            state="warning"
-            title="Live capture not available for this source."
-          />
-        ) : null}
-      </div>
-    );
-  }
-
   function renderReviewStep() {
     if (!selectedSource) return null;
-    const scanTypeLabel = form.scanType === "SCHEMA_ONLY" ? "Schema only" : "Schema + data";
-    const liveCapture = form.scanType === "SCHEMA_AND_DATA";
     const items = [
       { label: "Data source", value: selectedSource.name },
       { label: "Protocol", value: selectedSource.protocol },
       { label: "Status", value: selectedSource.status },
-      { label: "Scan type", value: scanTypeLabel },
       ...(selectedSource.endpoint ? [{ label: "Endpoint", value: selectedSource.endpoint }] : []),
     ];
     return (
       <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-shell-ink" htmlFor="recording-name">
-            Recording name
-            <span className="ml-1 text-xs text-shell-muted">(optional)</span>
-          </label>
-          <input
-            className="shell-field mt-2 w-full max-w-sm"
-            id="recording-name"
-            maxLength={255}
-            placeholder="e.g. Pump A baseline scan"
-            type="text"
-            value={form.name}
-            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-          />
-        </div>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {items.map((item) => (
             <div key={item.label} className="rounded-md border border-shell-line bg-white px-4 py-4">
@@ -260,19 +173,11 @@ export function CreateRecordingWizardPage() {
             </div>
           ))}
         </div>
-        {captureBlocked ? (
-          <SharedStatePanel
-            message="Schema + data capture requires a real device endpoint. Go back and select Schema only, or choose a source with a real endpoint."
-            state="warning"
-            title="Live capture not available for this source."
-          />
-        ) : liveCapture ? (
-          <SharedStatePanel
-            message="Clicking 'Start capture' will open the live recording page where you connect to the device, stream values, and save the result when done."
-            state="empty"
-            title="This will open the live capture flow."
-          />
-        ) : null}
+        <SharedStatePanel
+          message="Clicking 'Start capture' will open the live recording page where you connect to the device, stream values, and save the result when done."
+          state="empty"
+          title="This will open the live capture flow."
+        />
       </div>
     );
   }
@@ -330,7 +235,6 @@ export function CreateRecordingWizardPage() {
           ) : null}
 
           {activeStepId === "source" ? renderSourceStep() : null}
-          {activeStepId === "scan-type" ? renderScanTypeStep() : null}
           {activeStepId === "review" ? renderReviewStep() : null}
         </div>
       </section>
@@ -352,11 +256,10 @@ export function CreateRecordingWizardPage() {
             {safeStep === STEPS.length - 1 ? (
               <button
                 className="shell-action"
-                disabled={activeStepId === "review" && captureBlocked}
                 type="button"
-                onClick={() => { void createRecording(); }}
+                onClick={startCapture}
               >
-                {form.scanType === "SCHEMA_AND_DATA" ? "Start capture" : "Create recording"}
+                Start capture
               </button>
             ) : (
               <button
