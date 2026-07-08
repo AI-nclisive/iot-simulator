@@ -47,29 +47,20 @@ public class ActivityEventService {
 
     public ActivityEventHistoryPage history(ActivityEventHistoryRequest request) {
         int pageSize = clamp(request.limit());
-        ActivityEventQuery query = ActivityEventQuery.builder()
+        ActivityEventQuery.Builder qb = ActivityEventQuery.builder()
                 .projectId(request.projectId())
                 .actor(request.actor())
                 .action(request.action())
                 .objectType(request.objectType())
                 .from(toOffset(request.from()))
                 .to(toOffset(request.to()))
-                .limit(pageSize + 1) // over-fetch one to detect a further page
-                .build();
+                .limit(pageSize + 1);
 
         Cursor cursor = decode(request.cursor());
         if (cursor != null) {
-            query = ActivityEventQuery.builder()
-                    .projectId(request.projectId())
-                    .actor(request.actor())
-                    .action(request.action())
-                    .objectType(request.objectType())
-                    .from(toOffset(request.from()))
-                    .to(toOffset(request.to()))
-                    .before(cursor.at(), cursor.id())
-                    .limit(pageSize + 1)
-                    .build();
+            qb.before(cursor.at(), cursor.id());
         }
+        ActivityEventQuery query = qb.build();
 
         List<ActivityEventRow> rows = events.query(query);
         boolean hasMore = rows.size() > pageSize;

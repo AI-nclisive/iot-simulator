@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Admin-facing user management service (IS-118).
@@ -21,10 +22,12 @@ public class AdminUserService {
 
     private final UserRepository users;
     private final ActivityEventService activity;
+    private final ObjectMapper mapper;
 
-    public AdminUserService(UserRepository users, ActivityEventService activity) {
+    public AdminUserService(UserRepository users, ActivityEventService activity, ObjectMapper mapper) {
         this.users = users;
         this.activity = activity;
+        this.mapper = mapper;
     }
 
     /** Returns all registered users with their current role and status. */
@@ -52,7 +55,7 @@ public class AdminUserService {
         }
         users.assignRole(userId, newRole);
         activity.emit(null, actor, "role_change", "user", userId,
-                "{\"role\":\"" + newRole + "\"}");
+                mapper.createObjectNode().put("role", newRole).toString());
         return toView(user, newRole);
     }
 
@@ -61,11 +64,12 @@ public class AdminUserService {
      *
      * @throws ResourceNotFoundException if the user does not exist
      */
+    @Transactional
     public AdminUserView changeStatus(String userId, String newStatus, String actor) {
         UserRow updated = users.updateStatus(userId, newStatus)
                 .orElseThrow(() -> new ResourceNotFoundException("User", userId));
         activity.emit(null, actor, "status_change", "user", userId,
-                "{\"status\":\"" + newStatus + "\"}");
+                mapper.createObjectNode().put("status", newStatus).toString());
         return toView(updated);
     }
 
