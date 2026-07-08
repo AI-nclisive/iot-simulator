@@ -142,6 +142,7 @@ public class DataSourceService {
         return map(row);
     }
 
+    @Transactional
     public void delete(String projectId, String id, String actor) {
         requireRow(projectId, id);
         runtime.stop(id);
