@@ -5,7 +5,7 @@ import { useArtifactsStore } from "../shell/artifacts-store";
 import { useDataSourcesStore } from "../shell/data-sources-store";
 import { useShellStore } from "../shell/shell-store";
 import { useNotificationStore } from "../shell/notification-store";
-import { apiFetch } from "../api";
+import { ApiError, apiFetch } from "../api";
 import { useLiveValues } from "../shell/use-live-values";
 import { SharedStatePanel } from "../ui/shared-state-panel";
 import { StatusBadge, type StatusTone } from "../ui/status-badge";
@@ -97,6 +97,7 @@ export function RecordingFlowPage() {
   const access = resolveAccess(accessMode, sharedRole);
   const captureAllowed = access.canRecordSource;
   const hasRealEndpoint = Boolean(source?.realDeviceEndpoint);
+  const hasSchema = (source?.parameterCount ?? 0) > 0;
   const [recordingState, setRecordingState] = useState<RecordingUiState>("ready");
   const [durationSeconds, setDurationSeconds] = useState(0);
   const [valueCount, setValueCount] = useState(0);
@@ -208,8 +209,8 @@ export function RecordingFlowPage() {
       setRecordingState("no-values-yet");
       setSavedArtifactId(null);
     } catch (err) {
-      const title = err instanceof Error ? err.message : "Failed to start recording";
-      push({ tone: "error", title });
+      const message = err instanceof ApiError ? (err.detail ?? err.message) : (err instanceof Error ? err.message : undefined);
+      push({ tone: "error", title: "Could not start recording", message });
     }
   }
 
@@ -300,8 +301,14 @@ export function RecordingFlowPage() {
           {!captureActive ? (
             <button
               className="shell-action"
-              disabled={!captureAllowed || !hasRealEndpoint}
-              title={!hasRealEndpoint ? "This source has no real device endpoint to capture from" : undefined}
+              disabled={!captureAllowed || !hasRealEndpoint || !hasSchema}
+              title={
+                !hasRealEndpoint
+                  ? "This source has no real device endpoint to capture from"
+                  : !hasSchema
+                    ? "Add variables to the source schema before recording"
+                    : undefined
+              }
               type="button"
               onClick={handleStartRecording}
             >
@@ -343,6 +350,14 @@ export function RecordingFlowPage() {
               message="This source was created without a real device endpoint (synthetic or import). Live capture requires a source configured with a real OPC UA or Modbus TCP address."
               state="empty"
               title="No real device endpoint configured."
+            />
+          </div>
+        ) : !hasSchema ? (
+          <div className="mt-6">
+            <SharedStatePanel
+              message="The source schema has no variables. Open the Schema tab, add at least one variable node, and return here to start recording."
+              state="empty"
+              title="No variables in schema."
             />
           </div>
         ) : null}
