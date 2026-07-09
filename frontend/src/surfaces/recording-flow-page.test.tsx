@@ -41,6 +41,12 @@ vi.mock("../shell/use-live-values", () => ({
 
 vi.mock("../api", () => ({
   apiFetch: mockApiFetch,
+  ApiError: class ApiError extends Error {
+    constructor(message: string, public readonly status: number, public readonly detail?: string) {
+      super(message);
+      this.name = "ApiError";
+    }
+  },
 }));
 
 vi.mock("react-router-dom", async () => {
