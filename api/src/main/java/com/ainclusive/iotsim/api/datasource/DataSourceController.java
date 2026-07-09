@@ -105,9 +105,13 @@ public class DataSourceController {
         List<SchemaNode> initialNodes = req.initialSchema() != null && !req.initialSchema().isEmpty()
                 ? toNodes(req.initialSchema())
                 : null;
+        String runtimeConfig = req.runtimeConfig();
+        if ("IMPORT".equals(req.basis()) && req.recordingId() != null && !req.recordingId().isBlank()) {
+            runtimeConfig = "{\"importRecordingId\":\"" + req.recordingId() + "\"}";
+        }
         DataSource ds = dataSources.create(
                 projectId, req.name(), req.protocol(), req.basis(),
-                req.simulatorPort(), req.realDeviceEndpoint(), req.runtimeConfig(), req.securityConfig(),
+                req.simulatorPort(), req.realDeviceEndpoint(), runtimeConfig, req.securityConfig(),
                 CredentialRequests.toCredentials(req.connectionConfig()), initialNodes, "local");
         int paramCount = schemas.countVariableNodes(ds.id());
         return ResponseEntity.created(
@@ -274,7 +278,8 @@ public class DataSourceController {
     public record CreateDataSourceRequest(
             String name, String protocol, String basis, Integer simulatorPort,
             String realDeviceEndpoint, String runtimeConfig, String securityConfig,
-            ConnectionConfigRequest connectionConfig, List<NodeDto> initialSchema) {}
+            ConnectionConfigRequest connectionConfig, List<NodeDto> initialSchema,
+            String recordingId) {}
 
     public record UpdateDataSourceRequest(
             String name, Integer simulatorPort, String realDeviceEndpoint, String runtimeConfig,
