@@ -87,7 +87,7 @@ function setupShellStore() {
 }
 
 type StoreState = {
-  dataSources: { id: string; name: string; protocol: string; endpoint: string; parameterCount: number; status: string; health: string }[];
+  dataSources: { id: string; name: string; protocol: string; endpoint: string; parameterCount: number; status: string; health: string; basis?: string; runtimeConfig?: string | null; realDeviceEndpoint?: string | null }[];
   isLoading: boolean;
   loadDataSources: typeof mockLoadDataSources;
   stopDataSource: typeof mockStopDataSource;

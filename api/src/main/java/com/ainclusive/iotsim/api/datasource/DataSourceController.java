@@ -34,8 +34,6 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import tools.jackson.core.JacksonException;
-import tools.jackson.databind.ObjectMapper;
 
 /**
  * Data-sources under a project. Mirrors the Projects resource conventions:
@@ -66,12 +64,10 @@ public class DataSourceController {
 
     private final DataSourceService dataSources;
     private final SchemaService schemas;
-    private final ObjectMapper objectMapper;
 
-    public DataSourceController(DataSourceService dataSources, SchemaService schemas, ObjectMapper objectMapper) {
+    public DataSourceController(DataSourceService dataSources, SchemaService schemas) {
         this.dataSources = dataSources;
         this.schemas = schemas;
-        this.objectMapper = objectMapper;
     }
 
     @Operation(
@@ -110,13 +106,6 @@ public class DataSourceController {
                 ? toNodes(req.initialSchema())
                 : null;
         String runtimeConfig = req.runtimeConfig();
-        if ("IMPORT".equals(req.basis()) && req.recordingId() != null && !req.recordingId().isBlank()) {
-            try {
-                runtimeConfig = objectMapper.writeValueAsString(Map.of("importRecordingId", req.recordingId()));
-            } catch (JacksonException e) {
-                throw new IllegalArgumentException("invalid recordingId", e);
-            }
-        }
         DataSource ds = dataSources.create(
                 projectId, req.name(), req.protocol(), req.basis(),
                 req.simulatorPort(), req.realDeviceEndpoint(), runtimeConfig, req.securityConfig(),
@@ -286,8 +275,7 @@ public class DataSourceController {
     public record CreateDataSourceRequest(
             String name, String protocol, String basis, Integer simulatorPort,
             String realDeviceEndpoint, String runtimeConfig, String securityConfig,
-            ConnectionConfigRequest connectionConfig, List<NodeDto> initialSchema,
-            String recordingId) {}
+            ConnectionConfigRequest connectionConfig, List<NodeDto> initialSchema) {}
 
     public record UpdateDataSourceRequest(
             String name, Integer simulatorPort, String realDeviceEndpoint, String runtimeConfig,

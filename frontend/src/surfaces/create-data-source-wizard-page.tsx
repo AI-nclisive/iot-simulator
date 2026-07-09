@@ -840,7 +840,7 @@ export function CreateDataSourceWizardPage() {
             protocol: backendProtocolForForm(form.protocol),
             basis: form.basis.toUpperCase(),
             ...(form.basis === "import" && form.importSelectedRecordingId
-              ? { recordingId: form.importSelectedRecordingId }
+              ? { runtimeConfig: JSON.stringify({ importRecordingId: form.importSelectedRecordingId }) }
               : {}),
             ...(form.scheduleStartEnabled && form.scheduleStart
               ? { scheduleStart: form.scheduleStart }
