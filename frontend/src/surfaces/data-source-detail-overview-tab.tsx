@@ -69,9 +69,13 @@ export function DataSourceDetailOverviewTab({
               ? source.status === "Active"
                 ? "Replaying from recording — clients can connect to the replay endpoint below."
                 : "Start this source to begin replaying from the imported recording."
-              : source.status === "Active"
-                ? "The source is running. Open Schema to review parameters, or Values to see current readings."
-                : "The source is stopped. Start it to enable recording, replay, and live values."}
+              : source.basis === "SYNTHETIC"
+                ? source.status === "Active"
+                  ? "The synthetic generator is running and producing values from the variable definitions set at creation. Open Values to see live readings."
+                  : "Click Run to start the synthetic generator. Variable definitions and signal patterns are visible in the Schema tab."
+                : source.status === "Active"
+                  ? "The source is running. Open Schema to review parameters, or Values to see current readings."
+                  : "The source is stopped. Start it to enable recording and live values."}
           </p>
 
           {source.basis === "IMPORT" ? (
@@ -129,14 +133,16 @@ export function DataSourceDetailOverviewTab({
             Next action
           </p>
           <div className="mt-3 flex flex-col items-start gap-2">
-            {source.basis !== "IMPORT" ? (
+            {source.basis !== "IMPORT" && source.basis !== "SYNTHETIC" ? (
               <Link className="shell-text-action" to={`/data-sources/${source.id}/record`}>
                 Record
               </Link>
             ) : null}
-            <Link className="shell-text-action" to={`/data-sources/${source.id}/replay`}>
-              {source.basis === "IMPORT" ? "Replay recording" : "Simulate"}
-            </Link>
+            {source.basis === "IMPORT" ? (
+              <Link className="shell-text-action" to={`/data-sources/${source.id}/replay`}>
+                Replay recording
+              </Link>
+            ) : null}
             <Link className="shell-text-action" to="?tab=values">
               Open Values
             </Link>

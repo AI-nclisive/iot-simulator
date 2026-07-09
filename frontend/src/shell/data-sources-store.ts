@@ -36,6 +36,7 @@ function mapDataSource(d: DataSourceResponse): DataSourceRow {
     basis: d.basis,
     simulatorPort: d.simulatorPort,
     realDeviceEndpoint: d.realDeviceEndpoint ?? null,
+    runtimeConfig: d.runtimeConfig ?? null,
     endpoint: d.serveUrl ?? "",
     parameterCount: d.parameterCount ?? 0, // IS-149: VARIABLE node count from backend
     status: mapRuntimeStateToStatus(d.runtimeState),

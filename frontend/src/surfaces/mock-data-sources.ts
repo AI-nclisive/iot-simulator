@@ -10,6 +10,8 @@ export type DataSourceRow = {
   simulatorPort?: number;
   /** IS-127: real device endpoint — only set for SCAN basis */
   realDeviceEndpoint?: string | null;
+  /** Raw runtime config JSON — may contain importRecordingId for IMPORT sources */
+  runtimeConfig?: string | null;
   parameterCount: number;
   status: "Active" | "Stopped";
   health: "Healthy" | "Warning" | "Error";

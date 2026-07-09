@@ -105,9 +105,10 @@ public class DataSourceController {
         List<SchemaNode> initialNodes = req.initialSchema() != null && !req.initialSchema().isEmpty()
                 ? toNodes(req.initialSchema())
                 : null;
+        String runtimeConfig = req.runtimeConfig();
         DataSource ds = dataSources.create(
                 projectId, req.name(), req.protocol(), req.basis(),
-                req.simulatorPort(), req.realDeviceEndpoint(), req.runtimeConfig(), req.securityConfig(),
+                req.simulatorPort(), req.realDeviceEndpoint(), runtimeConfig, req.securityConfig(),
                 CredentialRequests.toCredentials(req.connectionConfig()), initialNodes, "local");
         int paramCount = schemas.countVariableNodes(ds.id());
         return ResponseEntity.created(

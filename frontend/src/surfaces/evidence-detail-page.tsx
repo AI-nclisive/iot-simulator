@@ -45,6 +45,19 @@ function DetailRow({ label, value }: { label: string; value: string | null }) {
   );
 }
 
+function DetailLinkRow({ label, href, value }: { label: string; href: string; value: string }) {
+  return (
+    <div className="rounded-md border border-shell-line bg-white px-4 py-3">
+      <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
+        {label}
+      </dt>
+      <dd className="mt-2 text-sm">
+        <Link className="shell-text-action" to={href}>{value}</Link>
+      </dd>
+    </div>
+  );
+}
+
 function deriveDuration(startedAt: string, endedAt: string | null): string {
   if (!endedAt) return "Still running";
   const start = new Date(startedAt).getTime();
@@ -356,10 +369,10 @@ export function EvidenceDetailPage() {
             <DetailRow label="Completeness" value={evidenceCompletenessLabel(item.completeness)} />
             <DetailRow label="Run ID" value={item.runId} />
             {item.scenarioId ? (
-              <DetailRow label="Scenario ID" value={item.scenarioId} />
+              <DetailLinkRow label="Scenario" href={`/scenarios/${item.scenarioId}`} value={item.scenarioId} />
             ) : null}
             {item.recordingId ? (
-              <DetailRow label="Recording ID" value={item.recordingId} />
+              <DetailLinkRow label="Recording" href={`/recordings/${item.recordingId}`} value={item.recordingId} />
             ) : null}
           </dl>
         </section>
@@ -373,7 +386,7 @@ export function EvidenceDetailPage() {
                   key={sourceId}
                   className="rounded-md border border-shell-line bg-white px-4 py-3 text-sm text-shell-ink"
                 >
-                  {sourceId}
+                  <Link className="shell-text-action" to={`/data-sources/${sourceId}`}>{sourceId}</Link>
                 </li>
               ))}
             </ul>

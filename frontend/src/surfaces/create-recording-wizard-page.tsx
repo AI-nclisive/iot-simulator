@@ -91,7 +91,7 @@ export function CreateRecordingWizardPage() {
 
   function startCapture() {
     if (!form.dataSourceId) return;
-    navigate(`/data-sources/${form.dataSourceId}/recording`);
+    navigate(`/data-sources/${form.dataSourceId}/record`);
   }
 
   function renderSourceStep() {

@@ -87,11 +87,11 @@ export function ReplayFlowPage() {
   const [selectedArtifactId, setSelectedArtifactId] = useState(
     searchParams.get("artifactId") ?? artifacts[0]?.id ?? "",
   );
-  const [speed, setSpeed] = useState("1x");
   const [replayState, setReplayState] = useState<ReplayUiState>("idle");
   const [runId, setRunId] = useState<string | null>(null);
   const runSeenRef = useRef(false);
   const [progress, setProgress] = useState(0);
+  const [evidenceId, setEvidenceId] = useState<string | null>(null);
   const [evidenceState, setEvidenceState] = useState<"Ready" | "Assembling" | "Retry needed">(
     "Ready",
   );
@@ -140,14 +140,13 @@ export function ReplayFlowPage() {
     }
 
     const events = [
-      `Artifact ${selectedArtifact.id} selected`,
+      `${selectedArtifact.name || `Recording ${selectedArtifact.id.slice(0, 8)}`} selected`,
       compatibleArtifact
         ? `Protocol matches ${source?.protocol}.`
         : "Protocol mismatch blocks replay on this source.",
     ];
 
     if (replayState === "running") {
-      events.push(`Replay is running at ${speed}.`);
       events.push(`Progress is ${progress}%.`);
     }
 
@@ -166,7 +165,6 @@ export function ReplayFlowPage() {
     replayState,
     selectedArtifact,
     source?.protocol,
-    speed,
   ]);
 
   if (!source) {
@@ -234,6 +232,7 @@ export function ReplayFlowPage() {
         },
       );
       setRunId(response.runId);
+      setEvidenceId(response.evidenceId);
       runSeenRef.current = true;
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
@@ -281,7 +280,9 @@ export function ReplayFlowPage() {
             <StatusBadge label="Replay" tone="accent" />
             <StatusBadge label={source.protocol} tone="neutral" />
             <StatusBadge label={replayLabel(replayState)} tone={replayTone(replayState)} />
-            <StatusBadge label={`Evidence: ${evidenceState}`} tone={evidenceTone(evidenceState)} />
+            {replayState !== "idle" ? (
+              <StatusBadge label={`Evidence: ${evidenceState}`} tone={evidenceTone(evidenceState)} />
+            ) : null}
           </div>
         </div>
 
@@ -297,27 +298,13 @@ export function ReplayFlowPage() {
               >
                 {artifacts.map((artifact) => (
                   <option key={artifact.id} value={artifact.id}>
-                    Artifact {artifact.id}
+                    {artifact.name || `Recording ${artifact.id.slice(0, 8)}`}
                   </option>
                 ))}
               </select>
             </label>
 
-            <div className="grid gap-3 md:grid-cols-2">
-              <label className="flex flex-col gap-2 text-sm text-shell-muted">
-                Replay speed
-                <select
-                  className="shell-field"
-                  disabled={!canConfigureReplay || replayState === "running"}
-                  value={speed}
-                  onChange={(event) => setSpeed(event.target.value)}
-                >
-                  <option value="0.5x">0.5x</option>
-                  <option value="1x">1x</option>
-                  <option value="2x">2x</option>
-                </select>
-              </label>
-
+            <div className="grid gap-3">
               <div className="rounded-md border border-shell-line bg-white px-4 py-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
                   Compatibility
@@ -332,7 +319,7 @@ export function ReplayFlowPage() {
                 <p className="mt-2 text-sm leading-6 text-shell-muted">
                   {selectedArtifact
                     ? compatibleArtifact
-                      ? `Artifact ${selectedArtifact.id} can replay through ${source.protocol}.`
+                      ? `${selectedArtifact.name || `Recording ${selectedArtifact.id.slice(0, 8)}`} can replay through ${source.protocol}.`
                       : `Source protocol does not match. Cannot replay through ${source.protocol}.`
                     : "Select a recording to review impact before starting."}
                 </p>
@@ -346,6 +333,12 @@ export function ReplayFlowPage() {
             </p>
             {selectedArtifact ? (
               <dl className="mt-3 space-y-3 text-sm text-shell-muted">
+                <div className="flex items-center justify-between gap-3">
+                  <dt>Name</dt>
+                  <dd className="font-medium text-shell-ink truncate max-w-[60%] text-right">
+                    {selectedArtifact.name || `Recording ${selectedArtifact.id.slice(0, 8)}`}
+                  </dd>
+                </div>
                 <div className="flex items-center justify-between gap-3">
                   <dt>Author</dt>
                   <dd className="font-medium text-shell-ink">{selectedArtifact.createdBy}</dd>
@@ -480,7 +473,9 @@ export function ReplayFlowPage() {
               impact and evidence visible before and after launch.
             </p>
           </div>
-          <StatusBadge label={`Evidence: ${evidenceState}`} tone={evidenceTone(evidenceState)} />
+          {replayState !== "idle" ? (
+            <StatusBadge label={`Evidence: ${evidenceState}`} tone={evidenceTone(evidenceState)} />
+          ) : null}
         </div>
 
         <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
@@ -502,16 +497,29 @@ export function ReplayFlowPage() {
               Evidence result
             </p>
             <p className="mt-3 text-sm font-medium text-shell-ink">
-              {evidenceState === "Ready"
-                ? "Evidence can be reviewed after completion."
-                : evidenceState === "Assembling"
-                  ? "Evidence is assembling while replay runs."
-                  : "Evidence needs another pass after failure."}
+              {evidenceState === "Ready" && replayState === "completed"
+                ? "Evidence is ready."
+                : evidenceState === "Ready"
+                  ? "Evidence will be available after replay completes."
+                  : evidenceState === "Assembling"
+                    ? "Evidence is assembling while replay runs."
+                    : "Evidence needs another pass after failure."}
             </p>
-            <p className="mt-2 text-sm leading-6 text-shell-muted">
-              Evidence keeps replay authorship tied to the initiating run and target
-              source.
-            </p>
+            {replayState === "completed" && evidenceId ? (
+              <div className="mt-3">
+                <Link
+                  className="shell-text-action text-sm"
+                  to={`/evidence/${evidenceId}`}
+                >
+                  View evidence →
+                </Link>
+              </div>
+            ) : (
+              <p className="mt-2 text-sm leading-6 text-shell-muted">
+                Evidence keeps replay authorship tied to the initiating run and target
+                source.
+              </p>
+            )}
           </div>
         </div>
       </section>

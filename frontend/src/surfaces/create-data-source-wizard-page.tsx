@@ -817,7 +817,7 @@ export function CreateDataSourceWizardPage() {
           },
         );
         if (form.startCapture) {
-          navigate(`/data-sources/${data.id}/recording`);
+          navigate(`/data-sources/${data.id}/record`);
         } else {
           navigate(`/data-sources/${data.id}`);
         }
@@ -840,7 +840,7 @@ export function CreateDataSourceWizardPage() {
             protocol: backendProtocolForForm(form.protocol),
             basis: form.basis.toUpperCase(),
             ...(form.basis === "import" && form.importSelectedRecordingId
-              ? { recordingId: form.importSelectedRecordingId }
+              ? { runtimeConfig: JSON.stringify({ importRecordingId: form.importSelectedRecordingId }) }
               : {}),
             ...(form.scheduleStartEnabled && form.scheduleStart
               ? { scheduleStart: form.scheduleStart }
@@ -1162,7 +1162,7 @@ export function CreateDataSourceWizardPage() {
                           onClick={() => updateForm({ importSelectedRecordingId: artifact.id })}
                         >
                           <p className="text-sm font-medium text-shell-ink">
-                            Recording {artifact.id.slice(0, 8)}
+                            {artifact.name || `Recording ${artifact.id.slice(0, 8)}`}
                           </p>
                           <div className="mt-1 flex flex-wrap items-center gap-2">
                             <span className="text-xs text-shell-muted">

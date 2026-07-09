@@ -139,6 +139,36 @@ describe("ReplayFlowPage — completion detection via active-runs poll", () => {
   });
 });
 
+// ── UI-464: idle badge hidden + "View evidence →" link on completion ─────────
+
+describe("ReplayFlowPage — evidence badge and evidence link (UI-464)", () => {
+  it("does not render the evidence badge in idle state", () => {
+    renderPage();
+    expect(screen.queryByText(/Evidence:/)).toBeNull();
+  });
+
+  it("shows View evidence link pointing to evidenceId after replay completes", async () => {
+    mockApiFetch.mockResolvedValue({
+      recordingId: ARTIFACT_ID,
+      dataSourceId: SOURCE_ID,
+      valueCount: 3,
+      runId: RUN_ID,
+      evidenceId: "ev-1",
+    });
+
+    renderPage();
+
+    await act(async () => {
+      await userEvent.click(screen.getByRole("button", { name: /start replay/i }));
+    });
+
+    await waitFor(() => {
+      const link = screen.getByRole("link", { name: /view evidence/i });
+      expect(link.getAttribute("href")).toBe("/evidence/ev-1");
+    });
+  });
+});
+
 // ── 409 schema-mismatch → "Run anyway" retry (UI-138) ────────────────────────
 
 describe("ReplayFlowPage — 409 schema-mismatch → Run anyway (UI-138)", () => {

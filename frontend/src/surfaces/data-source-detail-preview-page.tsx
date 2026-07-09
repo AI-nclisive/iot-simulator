@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { resolveAccess } from "../shell/access-policy";
+import { useArtifactsStore } from "../shell/artifacts-store";
 import { useDataSourcesStore } from "../shell/data-sources-store";
 import { useShellStore } from "../shell/shell-store";
 import { useNotificationStore } from "../shell/notification-store";
@@ -107,6 +108,8 @@ export function DataSourceDetailPreviewPage() {
   const { runs: activeRuns } = useActiveRuns(currentProjectId);
   const push = useNotificationStore((state) => state.push);
   const access = resolveAccess(accessMode, sharedRole);
+  const artifacts = useArtifactsStore((state) => state.artifacts);
+  const loadRecordings = useArtifactsStore((state) => state.loadRecordings);
   const fetchedForProjectRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -115,6 +118,12 @@ export function DataSourceDetailPreviewPage() {
       loadDataSources(currentProjectId);
     }
   }, [currentProjectId, source, isLoading, loadDataSources]);
+
+  useEffect(() => {
+    if (currentProjectId && source?.basis === "IMPORT") {
+      void loadRecordings(currentProjectId);
+    }
+  }, [currentProjectId, source?.basis, loadRecordings]);
 
   const activeTab = currentTabId(searchParams.get("tab"));
   const [stopConfirmationOpen, setStopConfirmationOpen] = useState(false);
@@ -170,6 +179,19 @@ export function DataSourceDetailPreviewPage() {
   const activeSource = source;
   const healthDiagnostic = healthDiagnosticCopy(activeSource);
   const activeState = stateMeta(activeSource);
+
+  const importRecordingId: string | null = (() => {
+    if (activeSource.basis !== "IMPORT" || !activeSource.runtimeConfig) return null;
+    try {
+      const cfg = JSON.parse(activeSource.runtimeConfig) as Record<string, unknown>;
+      return typeof cfg.importRecordingId === "string" ? cfg.importRecordingId : null;
+    } catch {
+      return null;
+    }
+  })();
+  const importRecording = importRecordingId
+    ? artifacts.find((a) => a.id === importRecordingId) ?? null
+    : null;
   const sourceControlAction =
     sourceStarted && access.canStopSource && activeSource.basis !== "SYNTHETIC"
       ? {
@@ -267,16 +289,26 @@ export function DataSourceDetailPreviewPage() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 max-w-3xl">
             <h2 className="text-2xl font-semibold text-shell-ink">{activeSource.name}</h2>
-            {activeSource.endpoint ? (
-              <p className="mt-2 font-mono text-sm text-shell-muted">{activeSource.endpoint}</p>
-            ) : null}
             {activeSource.basis === "SCAN" && activeSource.realDeviceEndpoint ? (
               <p className="mt-1 text-xs text-shell-muted">
                 Real device: <span className="font-mono">{activeSource.realDeviceEndpoint}</span>
               </p>
             ) : null}
             {activeSource.basis === "IMPORT" ? (
-              <p className="mt-1 text-xs text-shell-muted">Prepared data source (replay from recording)</p>
+              <p className="mt-1 text-xs text-shell-muted">
+                Imported recording
+                {importRecordingId ? (
+                  <>
+                    {" — "}
+                    <Link
+                      className="shell-text-action"
+                      to={`/recordings/${importRecordingId}`}
+                    >
+                      {importRecording?.name ?? `Recording ${importRecordingId.slice(0, 8)}`}
+                    </Link>
+                  </>
+                ) : null}
+              </p>
             ) : null}
           </div>
 
@@ -323,9 +355,9 @@ export function DataSourceDetailPreviewPage() {
               Record
             </Link>
           ) : null}
-          {access.canConfigureReplay ? (
+          {access.canConfigureReplay && activeSource.basis === "IMPORT" ? (
             <Link className="shell-action" to={`/data-sources/${activeSource.id}/replay`}>
-              {activeSource.basis === "IMPORT" ? "Replay recording" : "Simulate"}
+              Replay recording
             </Link>
           ) : null}
           {activeReplayRun && access.canConfigureReplay ? (
