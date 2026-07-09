@@ -355,7 +355,11 @@ export function RecordingFlowPage() {
         ) : !hasSchema ? (
           <div className="mt-6">
             <SharedStatePanel
-              message="The source schema has no variables. Open the Schema tab, add at least one variable node, and return here to start recording."
+              message={
+                source.basis === "SCAN"
+                  ? "The source has no schema yet. Open the Schema tab to import the node tree from the real device, then return here to start recording."
+                  : "The source schema has no variables. Open the Schema tab, add at least one variable node, and return here to start recording."
+              }
               state="empty"
               title="No variables in schema."
             />
