@@ -314,9 +314,7 @@ export function DataSourcesListPage() {
         );
         return (
           <div className="flex flex-col gap-1">
-            {row.status === "Active" ? (
-              <StatusBadge label="Run" tone="accent" />
-            ) : null}
+            <StatusBadge label={stateMeta(row).label} tone={stateMeta(row).tone} />
             {replayRun ? <StatusBadge label="Simulating" tone="accent" /> : null}
           </div>
         );
