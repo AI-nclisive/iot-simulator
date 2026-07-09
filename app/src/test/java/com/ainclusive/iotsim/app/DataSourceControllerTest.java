@@ -26,7 +26,6 @@ import com.ainclusive.iotsim.domain.datasource.SourceBasis;
 import com.ainclusive.iotsim.domain.schema.SchemaService;
 import com.ainclusive.iotsim.domain.support.Page;
 import com.ainclusive.iotsim.platform.secret.ConnectionCredentials;
-import tools.jackson.databind.ObjectMapper;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -35,6 +34,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.http.ResponseEntity;
+import tools.jackson.databind.ObjectMapper;
 
 /** Unit test for {@link DataSourceController}. */
 class DataSourceControllerTest {
