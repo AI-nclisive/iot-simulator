@@ -141,7 +141,7 @@ export function ReplayFlowPage() {
     }
 
     const events = [
-      `Artifact ${selectedArtifact.id} selected`,
+      `${selectedArtifact.name || `Recording ${selectedArtifact.id.slice(0, 8)}`} selected`,
       compatibleArtifact
         ? `Protocol matches ${source?.protocol}.`
         : "Protocol mismatch blocks replay on this source.",
@@ -301,7 +301,7 @@ export function ReplayFlowPage() {
               >
                 {artifacts.map((artifact) => (
                   <option key={artifact.id} value={artifact.id}>
-                    Artifact {artifact.id}
+                    {artifact.name || `Recording ${artifact.id.slice(0, 8)}`}
                   </option>
                 ))}
               </select>
@@ -336,7 +336,7 @@ export function ReplayFlowPage() {
                 <p className="mt-2 text-sm leading-6 text-shell-muted">
                   {selectedArtifact
                     ? compatibleArtifact
-                      ? `Artifact ${selectedArtifact.id} can replay through ${source.protocol}.`
+                      ? `${selectedArtifact.name || `Recording ${selectedArtifact.id.slice(0, 8)}`} can replay through ${source.protocol}.`
                       : `Source protocol does not match. Cannot replay through ${source.protocol}.`
                     : "Select a recording to review impact before starting."}
                 </p>
@@ -350,6 +350,12 @@ export function ReplayFlowPage() {
             </p>
             {selectedArtifact ? (
               <dl className="mt-3 space-y-3 text-sm text-shell-muted">
+                <div className="flex items-center justify-between gap-3">
+                  <dt>Name</dt>
+                  <dd className="font-medium text-shell-ink truncate max-w-[60%] text-right">
+                    {selectedArtifact.name || `Recording ${selectedArtifact.id.slice(0, 8)}`}
+                  </dd>
+                </div>
                 <div className="flex items-center justify-between gap-3">
                   <dt>Author</dt>
                   <dd className="font-medium text-shell-ink">{selectedArtifact.createdBy}</dd>

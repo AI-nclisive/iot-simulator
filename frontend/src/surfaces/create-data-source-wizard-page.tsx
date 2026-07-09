@@ -1162,7 +1162,7 @@ export function CreateDataSourceWizardPage() {
                           onClick={() => updateForm({ importSelectedRecordingId: artifact.id })}
                         >
                           <p className="text-sm font-medium text-shell-ink">
-                            Recording {artifact.id.slice(0, 8)}
+                            {artifact.name || `Recording ${artifact.id.slice(0, 8)}`}
                           </p>
                           <div className="mt-1 flex flex-wrap items-center gap-2">
                             <span className="text-xs text-shell-muted">
