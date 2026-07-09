@@ -140,9 +140,6 @@ export function RuntimeDashboardPanel() {
                   <p className="mt-1 text-sm text-shell-muted">
                     {run.initiator} · {new Date(run.startedAt).toLocaleString()}
                   </p>
-                  {run.relatedLabel ? (
-                    <p className="mt-0.5 text-xs text-shell-muted">{run.relatedLabel}</p>
-                  ) : null}
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
