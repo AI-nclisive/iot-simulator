@@ -112,7 +112,7 @@ public class ReplayLiveRunService {
             EvidenceRow evidenceRow = evidence.create(projectId, run.id(), initiator);
             runs.linkEvidence(run.id(), evidenceRow.id());
             evidence.updateManifest(evidenceRow.id(),
-                    manifest(run.id(), trigger, initiator, dataSourceId, startedAt, recordingId, settings, 0));
+                    manifest(run.id(), trigger, initiator, dataSourceId, startedAt, null, recordingId, settings, 0));
 
             RuntimeStartSpec startSpec = RuntimeStartSpecs.of(schemas, source, settings);
             runtime.start(dataSourceId, startSpec);
@@ -208,7 +208,7 @@ public class ReplayLiveRunService {
         try {
             evidence.updateManifest(live.evidenceId,
                     manifest(live.runId, live.trigger, live.initiator, live.dataSourceId,
-                            live.startedAt, live.recordingId, live.settings, live.cursor));
+                            live.startedAt, null, live.recordingId, live.settings, live.cursor));
         } catch (RuntimeException ignored) {
             // advisory count only
         }
@@ -228,7 +228,8 @@ public class ReplayLiveRunService {
             DeterministicSettings settings, long valueCount, String terminalState) {
         try {
             evidence.updateManifest(evidenceId,
-                    manifest(runId, trigger, initiator, dataSourceId, startedAt, recordingId, settings, valueCount));
+                    manifest(runId, trigger, initiator, dataSourceId, startedAt, wallClock.instant(),
+                            recordingId, settings, valueCount));
         } catch (RuntimeException ignored) {
             // advisory
         }
@@ -236,14 +237,15 @@ public class ReplayLiveRunService {
     }
 
     private String manifest(String runId, String trigger, String initiator, String dataSourceId,
-            Instant startedAt, String recordingId, DeterministicSettings settings, long valueCount) {
+            Instant startedAt, Instant endedAt, String recordingId,
+            DeterministicSettings settings, long valueCount) {
         LinkedHashMap<String, Object> m = new LinkedHashMap<>();
         m.put("kind", "REPLAY");
         m.put("runId", runId);
         m.put("trigger", trigger);
         m.put("initiator", initiator);
         m.put("startedAt", startedAt.toString());
-        m.put("endedAt", null);
+        m.put("endedAt", endedAt != null ? endedAt.toString() : null);
         m.put("sourceIds", List.of(dataSourceId));
         m.put("scenarioId", null);
         m.put("recordingId", recordingId);
