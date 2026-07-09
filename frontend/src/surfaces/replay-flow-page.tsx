@@ -87,7 +87,6 @@ export function ReplayFlowPage() {
   const [selectedArtifactId, setSelectedArtifactId] = useState(
     searchParams.get("artifactId") ?? artifacts[0]?.id ?? "",
   );
-  const [speed, setSpeed] = useState("1x");
   const [replayState, setReplayState] = useState<ReplayUiState>("idle");
   const [runId, setRunId] = useState<string | null>(null);
   const runSeenRef = useRef(false);
@@ -148,7 +147,6 @@ export function ReplayFlowPage() {
     ];
 
     if (replayState === "running") {
-      events.push(`Replay is running at ${speed}.`);
       events.push(`Progress is ${progress}%.`);
     }
 
@@ -167,7 +165,6 @@ export function ReplayFlowPage() {
     replayState,
     selectedArtifact,
     source?.protocol,
-    speed,
   ]);
 
   if (!source) {
@@ -307,21 +304,7 @@ export function ReplayFlowPage() {
               </select>
             </label>
 
-            <div className="grid gap-3 md:grid-cols-2">
-              <label className="flex flex-col gap-2 text-sm text-shell-muted">
-                Replay speed
-                <select
-                  className="shell-field"
-                  disabled={!canConfigureReplay || replayState === "running"}
-                  value={speed}
-                  onChange={(event) => setSpeed(event.target.value)}
-                >
-                  <option value="0.5x">0.5x</option>
-                  <option value="1x">1x</option>
-                  <option value="2x">2x</option>
-                </select>
-              </label>
-
+            <div className="grid gap-3">
               <div className="rounded-md border border-shell-line bg-white px-4 py-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
                   Compatibility
