@@ -357,7 +357,7 @@ export function RecordingFlowPage() {
             <SharedStatePanel
               message={
                 source.basis === "SCAN"
-                  ? "The source has no schema yet. Open the Schema tab to import the node tree from the real device, then return here to start recording."
+                  ? "The source has no schema. The schema is populated during source creation when the device is scanned. If the scan did not complete, recreate the source while the device is reachable."
                   : "The source schema has no variables. Open the Schema tab, add at least one variable node, and return here to start recording."
               }
               state="empty"
