@@ -70,7 +70,7 @@ class DataSourceControllerTest {
         given(service.create(eq(PROJECT), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .willReturn(sample(0, RuntimeState.STOPPED));
         ResponseEntity<DataSourceResponse> resp = controller.create(
-                PROJECT, new CreateDataSourceRequest("Pump", "OPC_UA", "MANUAL", null, null, null, null, null, null));
+                PROJECT, new CreateDataSourceRequest("Pump", "OPC_UA", "MANUAL", null, null, null, null, null, null, null));
         assertThat(resp.getStatusCode().value()).isEqualTo(201);
         assertThat(resp.getHeaders().getETag()).isEqualTo("\"0\"");
         assertThat(resp.getBody()).isNotNull();
@@ -125,14 +125,14 @@ class DataSourceControllerTest {
     @Test
     void createWithBlankNameThrowsBadRequest() {
         assertThatThrownBy(() -> controller.create(
-                PROJECT, new CreateDataSourceRequest(" ", "OPC_UA", "MANUAL", null, null, null, null, null, null)))
+                PROJECT, new CreateDataSourceRequest(" ", "OPC_UA", "MANUAL", null, null, null, null, null, null, null)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void createWithMissingProtocolThrowsBadRequest() {
         assertThatThrownBy(() -> controller.create(
-                PROJECT, new CreateDataSourceRequest("Pump", null, "MANUAL", null, null, null, null, null, null)))
+                PROJECT, new CreateDataSourceRequest("Pump", null, "MANUAL", null, null, null, null, null, null, null)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -143,7 +143,7 @@ class DataSourceControllerTest {
         ConnectionConfigRequest cfg = new ConnectionConfigRequest("password", "operator", "s3cr3t", null);
 
         ResponseEntity<DataSourceResponse> resp = controller.create(
-                PROJECT, new CreateDataSourceRequest("Pump", "OPC_UA", "MANUAL", null, null, null, null, cfg, null));
+                PROJECT, new CreateDataSourceRequest("Pump", "OPC_UA", "MANUAL", null, null, null, null, cfg, null, null));
 
         ArgumentCaptor<ConnectionCredentials> creds = ArgumentCaptor.forClass(ConnectionCredentials.class);
         verify(service).create(eq(PROJECT), any(), any(), any(), any(), any(), any(), any(), creds.capture(), any(), any());
@@ -160,7 +160,7 @@ class DataSourceControllerTest {
     void createWithUnknownCredentialModeThrowsBadRequest() {
         ConnectionConfigRequest cfg = new ConnectionConfigRequest("totally-bogus", null, null, null);
         assertThatThrownBy(() -> controller.create(
-                PROJECT, new CreateDataSourceRequest("Pump", "OPC_UA", "MANUAL", null, null, null, null, cfg, null)))
+                PROJECT, new CreateDataSourceRequest("Pump", "OPC_UA", "MANUAL", null, null, null, null, cfg, null, null)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -202,7 +202,7 @@ class DataSourceControllerTest {
     @Test
     void createWithMissingBasisThrowsBadRequest() {
         assertThatThrownBy(() -> controller.create(
-                PROJECT, new CreateDataSourceRequest("Pump", "OPC_UA", null, null, null, null, null, null, null)))
+                PROJECT, new CreateDataSourceRequest("Pump", "OPC_UA", null, null, null, null, null, null, null, null)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -213,7 +213,7 @@ class DataSourceControllerTest {
         // The UI sends "external-ref" (hyphen); the controller normalizes it to EXTERNAL_REF.
         ConnectionConfigRequest cfg = new ConnectionConfigRequest("external-ref", null, null, "vault://pump");
 
-        controller.create(PROJECT, new CreateDataSourceRequest("Pump", "OPC_UA", "MANUAL", null, null, null, null, cfg, null));
+        controller.create(PROJECT, new CreateDataSourceRequest("Pump", "OPC_UA", "MANUAL", null, null, null, null, cfg, null, null));
 
         ArgumentCaptor<ConnectionCredentials> creds = ArgumentCaptor.forClass(ConnectionCredentials.class);
         verify(service).create(eq(PROJECT), any(), any(), any(), any(), any(), any(), any(), creds.capture(), any(), any());
@@ -229,10 +229,10 @@ class DataSourceControllerTest {
         // Empty mode and mixed-case "Anonymous" both resolve to anonymous credentials
         // ("Anonymous" only matches the lowercase switch case via the controller's toLowerCase).
         controller.create(PROJECT, new CreateDataSourceRequest(
-                "Pump", "OPC_UA", "MANUAL", null, null, null, null, new ConnectionConfigRequest("", null, null, null), null));
+                "Pump", "OPC_UA", "MANUAL", null, null, null, null, new ConnectionConfigRequest("", null, null, null), null, null));
         controller.create(PROJECT, new CreateDataSourceRequest(
                 "Pump", "OPC_UA", "MANUAL", null, null, null,
-                null, new ConnectionConfigRequest("Anonymous", null, null, null), null));
+                null, new ConnectionConfigRequest("Anonymous", null, null, null), null, null));
 
         ArgumentCaptor<ConnectionCredentials> creds = ArgumentCaptor.forClass(ConnectionCredentials.class);
         verify(service, times(2)).create(eq(PROJECT), any(), any(), any(), any(), any(), any(), any(), creds.capture(), any(), any());
@@ -246,7 +246,7 @@ class DataSourceControllerTest {
                 .willReturn(sample(0, RuntimeState.STOPPED, CredentialState.SESSION_ONLY));
         ConnectionConfigRequest cfg = new ConnectionConfigRequest("Password", "operator", "s3cr3t", null);
 
-        controller.create(PROJECT, new CreateDataSourceRequest("Pump", "OPC_UA", "MANUAL", null, null, null, null, cfg, null));
+        controller.create(PROJECT, new CreateDataSourceRequest("Pump", "OPC_UA", "MANUAL", null, null, null, null, cfg, null, null));
 
         ArgumentCaptor<ConnectionCredentials> creds = ArgumentCaptor.forClass(ConnectionCredentials.class);
         verify(service).create(eq(PROJECT), any(), any(), any(), any(), any(), any(), any(), creds.capture(), any(), any());
@@ -312,7 +312,7 @@ class DataSourceControllerTest {
         NodeDto node = new NodeDto("n1", null, "/root/temp", "Temperature", "VARIABLE",
                 "FLOAT32", "SCALAR", "READ", "°C", null);
         ResponseEntity<DataSourceResponse> resp = controller.create(
-                PROJECT, new CreateDataSourceRequest("Sensor", "OPC_UA", "IMPORT", null, null, null, null, null, List.of(node)));
+                PROJECT, new CreateDataSourceRequest("Sensor", "OPC_UA", "IMPORT", null, null, null, null, null, List.of(node), null));
 
         assertThat(resp.getStatusCode().value()).isEqualTo(201);
         assertThat(resp.getBody()).isNotNull();
@@ -325,7 +325,7 @@ class DataSourceControllerTest {
         NodeDto bad = new NodeDto("", null, "/root/temp", "Temperature", "VARIABLE",
                 "FLOAT32", "SCALAR", "READ", null, null);
         assertThatThrownBy(() -> controller.create(
-                PROJECT, new CreateDataSourceRequest("Sensor", "OPC_UA", "IMPORT", null, null, null, null, null, List.of(bad))))
+                PROJECT, new CreateDataSourceRequest("Sensor", "OPC_UA", "IMPORT", null, null, null, null, null, List.of(bad), null)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("nodeId");
     }
@@ -335,7 +335,7 @@ class DataSourceControllerTest {
         NodeDto bad = new NodeDto("n1", null, "/root/temp", "  ", "VARIABLE",
                 "FLOAT32", "SCALAR", "READ", null, null);
         assertThatThrownBy(() -> controller.create(
-                PROJECT, new CreateDataSourceRequest("Sensor", "OPC_UA", "IMPORT", null, null, null, null, null, List.of(bad))))
+                PROJECT, new CreateDataSourceRequest("Sensor", "OPC_UA", "IMPORT", null, null, null, null, null, List.of(bad), null)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("name");
     }
@@ -345,7 +345,7 @@ class DataSourceControllerTest {
         NodeDto bad = new NodeDto("n1", null, "  ", "Temperature", "VARIABLE",
                 "FLOAT32", "SCALAR", "READ", null, null);
         assertThatThrownBy(() -> controller.create(
-                PROJECT, new CreateDataSourceRequest("Sensor", "OPC_UA", "IMPORT", null, null, null, null, null, List.of(bad))))
+                PROJECT, new CreateDataSourceRequest("Sensor", "OPC_UA", "IMPORT", null, null, null, null, null, List.of(bad), null)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("path");
     }
@@ -355,7 +355,7 @@ class DataSourceControllerTest {
         NodeDto bad = new NodeDto("n1", null, "/root/temp", "Temperature", "BOGUS_KIND",
                 null, null, null, null, null);
         assertThatThrownBy(() -> controller.create(
-                PROJECT, new CreateDataSourceRequest("Sensor", "OPC_UA", "IMPORT", null, null, null, null, null, List.of(bad))))
+                PROJECT, new CreateDataSourceRequest("Sensor", "OPC_UA", "IMPORT", null, null, null, null, null, List.of(bad), null)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("kind");
     }
@@ -365,7 +365,7 @@ class DataSourceControllerTest {
         NodeDto bad = new NodeDto("n1", null, "/root/temp", "Temperature", "VARIABLE",
                 null, "SCALAR", "READ", null, null);
         assertThatThrownBy(() -> controller.create(
-                PROJECT, new CreateDataSourceRequest("Sensor", "OPC_UA", "IMPORT", null, null, null, null, null, List.of(bad))))
+                PROJECT, new CreateDataSourceRequest("Sensor", "OPC_UA", "IMPORT", null, null, null, null, null, List.of(bad), null)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("dataType");
     }
