@@ -165,6 +165,20 @@ class RecordingImportExportServiceTest {
     }
 
     @Test
+    void importForwardsNameFromManifestToCreate() throws Exception {
+        given(projects.findById(PROJECT)).willReturn(Optional.of(projectRow()));
+        RecordingRow created = row();
+        given(recordings.create(any(), any(), any(Integer.class), any(), any(), any(), any())).willReturn(created);
+        given(recordings.finalizeStats(any(), any(), any(), any(Long.class), any(Long.class))).willReturn(created);
+
+        byte[] zipContent = buildExportZipWithName("My Named Recording");
+        service.importRecording(PROJECT, zipContent, "local");
+
+        verify(recordings).create(eq(PROJECT), any(), any(Integer.class), eq("IMPORTED"),
+                eq("SCHEMA_AND_DATA"), eq("My Named Recording"), eq("local"));
+    }
+
+    @Test
     void importThrows404ForMissingProject() {
         given(projects.findById("nope")).willReturn(Optional.empty());
         byte[] zipContent = "invalid".getBytes();
@@ -283,6 +297,21 @@ class RecordingImportExportServiceTest {
         RecordingExportManifest manifest = new RecordingExportManifest(
                 version, REC_ID, PROJECT, "ds-1", 1, "SCAN_RECORD",
                 null, Instant.now(), null, null, 0, List.of());
+        byte[] manifestBytes = mapper.writeValueAsBytes(manifest);
+        ByteArrayOutputStream buf = new ByteArrayOutputStream();
+        try (ZipOutputStream zip = new ZipOutputStream(buf)) {
+            zip.putNextEntry(new ZipEntry("manifest.json"));
+            zip.write(manifestBytes);
+            zip.closeEntry();
+        }
+        return buf.toByteArray();
+    }
+
+    private byte[] buildExportZipWithName(String name) throws Exception {
+        ObjectMapper mapper = new ObjectMapper();
+        RecordingExportManifest manifest = new RecordingExportManifest(
+                "1.0.0", REC_ID, PROJECT, "ds-1", 1, "SCAN_RECORD",
+                name, Instant.now(), null, null, 0, List.of());
         byte[] manifestBytes = mapper.writeValueAsBytes(manifest);
         ByteArrayOutputStream buf = new ByteArrayOutputStream();
         try (ZipOutputStream zip = new ZipOutputStream(buf)) {
