@@ -32,6 +32,14 @@ type ConfirmationRequest =
     }
   | null;
 
+function sourceBasisLabel(basis: DataSourceRow["basis"]): string {
+  if (basis === "SCAN") return "Live device";
+  if (basis === "SYNTHETIC") return "Synthetic";
+  if (basis === "IMPORT") return "Imported recording";
+  if (basis === "MANUAL") return "Manual";
+  return "";
+}
+
 function healthTone(health: DataSourceRow["health"]) {
   if (health === "Error") {
     return "danger";
@@ -285,7 +293,7 @@ export function DataSourcesListPage() {
       cell: (row) => (
         <div className="min-w-0">
           <p className="text-sm font-medium text-shell-ink">{row.name}</p>
-          <p className="mt-1 text-sm text-shell-muted">{row.endpoint}</p>
+          <p className="mt-1 text-sm text-shell-muted">{sourceBasisLabel(row.basis)}</p>
           <p className="mt-1 text-xs text-shell-muted">
             {row.protocol} · {row.parameterCount.toLocaleString()} parameters
           </p>
