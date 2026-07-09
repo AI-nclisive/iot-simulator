@@ -24,12 +24,18 @@ import {
   type WizardFormState,
 } from "./create-data-source-wizard-page";
 
-const { mockNavigate, shellStoreState } = vi.hoisted(() => ({
+const { mockNavigate, shellStoreState, artifactsStoreState } = vi.hoisted(() => ({
   mockNavigate: vi.fn(),
   shellStoreState: {
     accessMode: "local" as "local" | "shared",
     sharedRole: "admin",
     currentProjectId: "proj-test",
+  },
+  artifactsStoreState: {
+    artifacts: [] as Array<{ id: string; name?: string; createdAt: string }>,
+    isLoading: false,
+    error: null as string | null,
+    loadRecordings: vi.fn(),
   },
 }));
 
@@ -51,6 +57,11 @@ vi.mock("../shell/data-sources-store", () => ({
       loadDataSources: vi.fn(),
       dataSources: [],
     }),
+}));
+
+vi.mock("../shell/artifacts-store", () => ({
+  useArtifactsStore: (selector: (s: Record<string, unknown>) => unknown) =>
+    selector(artifactsStoreState as unknown as Record<string, unknown>),
 }));
 
 afterEach(() => {
@@ -518,7 +529,7 @@ describe("CreateDataSourceWizardPage — scan step (UI-458)", () => {
     });
 
     // Default startCapture=true → redirects to live capture page
-    expect(mockNavigate).toHaveBeenCalledWith("/data-sources/ds-created/recording");
+    expect(mockNavigate).toHaveBeenCalledWith("/data-sources/ds-created/record");
   });
 
   it("navigates to /data-sources/:id when Skip is chosen on recording step (startCapture=false)", async () => {
@@ -552,6 +563,92 @@ describe("CreateDataSourceWizardPage — scan step (UI-458)", () => {
 
     await waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith("/data-sources/ds-skip");
+    });
+  });
+});
+
+// ─── IMPORT path — schema copy (UI-466) ──────────────────────────────────────
+
+const fakeRecording = {
+  id: "rec-abc123",
+  name: "Hydraulic Press Run 1",
+  createdAt: new Date("2026-01-01T00:00:00Z").toISOString(),
+};
+
+async function navigateToImportReview() {
+  artifactsStoreState.artifacts = [fakeRecording];
+
+  render(
+    <MemoryRouter>
+      <CreateDataSourceWizardPage />
+    </MemoryRouter>,
+  );
+
+  // Protocol
+  await userEvent.click(screen.getByText("OPC UA"));
+  await userEvent.click(screen.getByRole("button", { name: "Next" }));
+
+  // Basis — "Prepared data"
+  await userEvent.click(screen.getByText("Prepared data"));
+  await userEvent.click(screen.getByRole("button", { name: "Next" }));
+
+  // Import step — fill name and select the recording
+  await userEvent.type(screen.getByLabelText("Source name"), "Hydraulic Press Sim");
+  await userEvent.click(screen.getByText(fakeRecording.name));
+
+  // Next is now enabled (name + recording selected)
+  await userEvent.click(screen.getByRole("button", { name: "Next" }));
+}
+
+describe("CreateDataSourceWizardPage — IMPORT schema copy (UI-466)", () => {
+  afterEach(() => {
+    artifactsStoreState.artifacts = [];
+  });
+
+  it("fetches recording schema and passes it as initialSchema in POST body (happy path)", async () => {
+    const schemaNodes = [{ nodeId: "ns=2;s=Force", kind: "VARIABLE" }];
+    mockApiFetch
+      .mockImplementationOnce(() => Promise.resolve({ nodes: schemaNodes })) // GET schema
+      .mockImplementationOnce(() => Promise.resolve({ id: "ds-import-1" })); // POST /data-sources
+
+    await navigateToImportReview();
+    await userEvent.click(screen.getByRole("button", { name: "Create source" }));
+
+    await waitFor(() => {
+      const schemaCall = mockApiFetch.mock.calls.find(
+        (c: unknown[]) =>
+          typeof c[0] === "string" && (c[0] as string).includes(`/recordings/${fakeRecording.id}/schema`),
+      );
+      expect(schemaCall).toBeTruthy();
+
+      const createCall = mockApiFetch.mock.calls.find(
+        (c: unknown[]) =>
+          typeof c[0] === "string" && (c[0] as string).includes("/data-sources") && !((c[0] as string).includes("/schema")),
+      );
+      expect(createCall).toBeTruthy();
+      const body = JSON.parse((createCall![1] as RequestInit).body as string);
+      expect(body.initialSchema).toEqual(schemaNodes);
+    });
+  });
+
+  it("creates source without initialSchema when schema fetch fails (non-fatal path)", async () => {
+    mockApiFetch
+      .mockImplementationOnce(() => Promise.reject(new Error("Network error"))) // GET schema fails
+      .mockImplementationOnce(() => Promise.resolve({ id: "ds-import-2" })); // POST /data-sources
+
+    await navigateToImportReview();
+    await userEvent.click(screen.getByRole("button", { name: "Create source" }));
+
+    await waitFor(() => {
+      const createCall = mockApiFetch.mock.calls.find(
+        (c: unknown[]) =>
+          typeof c[0] === "string" &&
+          (c[0] as string).includes("/data-sources") &&
+          !((c[0] as string).includes("/schema")),
+      );
+      expect(createCall).toBeTruthy();
+      const body = JSON.parse((createCall![1] as RequestInit).body as string);
+      expect(body.initialSchema).toBeUndefined();
     });
   });
 });
