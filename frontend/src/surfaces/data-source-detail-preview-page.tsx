@@ -289,9 +289,6 @@ export function DataSourceDetailPreviewPage() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 max-w-3xl">
             <h2 className="text-2xl font-semibold text-shell-ink">{activeSource.name}</h2>
-            {activeSource.endpoint ? (
-              <p className="mt-2 font-mono text-sm text-shell-muted">{activeSource.endpoint}</p>
-            ) : null}
             {activeSource.basis === "SCAN" && activeSource.realDeviceEndpoint ? (
               <p className="mt-1 text-xs text-shell-muted">
                 Real device: <span className="font-mono">{activeSource.realDeviceEndpoint}</span>
