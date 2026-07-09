@@ -25,6 +25,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -105,11 +106,13 @@ public class ReplayLiveRunService {
         values.sort(Comparator.comparing(NeutralValue::sourceTime));
 
         RunRow run = runs.create(projectId, "REPLAY", trigger, initiator, List.of(dataSourceId), null, null);
+        Instant startedAt = wallClock.instant();
         try {
             runs.start(run.id(), now());
             EvidenceRow evidenceRow = evidence.create(projectId, run.id(), initiator);
             runs.linkEvidence(run.id(), evidenceRow.id());
-            evidence.updateManifest(evidenceRow.id(), manifest(recordingId, settings, 0));
+            evidence.updateManifest(evidenceRow.id(),
+                    manifest(run.id(), trigger, initiator, dataSourceId, startedAt, recordingId, settings, 0));
 
             RuntimeStartSpec startSpec = RuntimeStartSpecs.of(schemas, source, settings);
             runtime.start(dataSourceId, startSpec);
@@ -118,13 +121,14 @@ public class ReplayLiveRunService {
             if (values.isEmpty()) {
                 // Nothing to replay — complete immediately.
                 runtime.stop(dataSourceId);
-                stampAndEnd(run.id(), evidenceRow.id(), recordingId, settings, 0, "COMPLETED");
+                stampAndEnd(run.id(), evidenceRow.id(), trigger, initiator, dataSourceId, startedAt,
+                        recordingId, settings, 0, "COMPLETED");
                 return new ReplaySummary(recordingId, dataSourceId, 0, run.id(), evidenceRow.id(), settings);
             }
 
             Instant originSourceTime = values.get(0).sourceTime();
             registry.put(run.id(), new LiveReplay(run.id(), evidenceRow.id(), dataSourceId,
-                    recordingId, settings, wallClock.instant(), originSourceTime, values));
+                    recordingId, trigger, initiator, startedAt, settings, startedAt, originSourceTime, values));
 
             return new ReplaySummary(recordingId, dataSourceId, values.size(),
                     run.id(), evidenceRow.id(), settings);
@@ -203,7 +207,8 @@ public class ReplayLiveRunService {
     private void softStampEvidence(LiveReplay live) {
         try {
             evidence.updateManifest(live.evidenceId,
-                    manifest(live.recordingId, live.settings, live.cursor));
+                    manifest(live.runId, live.trigger, live.initiator, live.dataSourceId,
+                            live.startedAt, live.recordingId, live.settings, live.cursor));
         } catch (RuntimeException ignored) {
             // advisory count only
         }
@@ -218,22 +223,33 @@ public class ReplayLiveRunService {
         }
     }
 
-    private void stampAndEnd(String runId, String evidenceId, String recordingId,
+    private void stampAndEnd(String runId, String evidenceId, String trigger, String initiator,
+            String dataSourceId, Instant startedAt, String recordingId,
             DeterministicSettings settings, long valueCount, String terminalState) {
         try {
-            evidence.updateManifest(evidenceId, manifest(recordingId, settings, valueCount));
+            evidence.updateManifest(evidenceId,
+                    manifest(runId, trigger, initiator, dataSourceId, startedAt, recordingId, settings, valueCount));
         } catch (RuntimeException ignored) {
             // advisory
         }
         runs.end(runId, terminalState, now());
     }
 
-    private String manifest(String recordingId, DeterministicSettings settings, long valueCount) {
-        return json.writeValueAsString(Map.of(
-                "recordingId", recordingId,
-                "seed", settings.seed(),
-                "startTime", settings.startTime().toString(),
-                "valueCount", valueCount));
+    private String manifest(String runId, String trigger, String initiator, String dataSourceId,
+            Instant startedAt, String recordingId, DeterministicSettings settings, long valueCount) {
+        LinkedHashMap<String, Object> m = new LinkedHashMap<>();
+        m.put("kind", "REPLAY");
+        m.put("runId", runId);
+        m.put("trigger", trigger);
+        m.put("initiator", initiator);
+        m.put("startedAt", startedAt.toString());
+        m.put("endedAt", null);
+        m.put("sourceIds", List.of(dataSourceId));
+        m.put("scenarioId", null);
+        m.put("recordingId", recordingId);
+        m.put("seed", settings.seed());
+        m.put("valueCount", valueCount);
+        return json.writeValueAsString(m);
     }
 
     private DataSourceRow requireSource(String projectId, String dataSourceId) {
@@ -258,6 +274,9 @@ public class ReplayLiveRunService {
         final String evidenceId;
         final String dataSourceId;
         final String recordingId;
+        final String trigger;
+        final String initiator;
+        final Instant startedAt;
         final DeterministicSettings settings;
         final Instant replayStartWall;
         final Instant originSourceTime;
@@ -267,12 +286,16 @@ public class ReplayLiveRunService {
         volatile int cursor;
 
         LiveReplay(String runId, String evidenceId, String dataSourceId, String recordingId,
+                String trigger, String initiator, Instant startedAt,
                 DeterministicSettings settings, Instant replayStartWall, Instant originSourceTime,
                 List<NeutralValue> values) {
             this.runId = runId;
             this.evidenceId = evidenceId;
             this.dataSourceId = dataSourceId;
             this.recordingId = recordingId;
+            this.trigger = trigger;
+            this.initiator = initiator;
+            this.startedAt = startedAt;
             this.settings = settings;
             this.replayStartWall = replayStartWall;
             this.originSourceTime = originSourceTime;

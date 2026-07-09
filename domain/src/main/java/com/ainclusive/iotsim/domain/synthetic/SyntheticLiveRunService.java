@@ -20,8 +20,8 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -95,7 +95,9 @@ public class SyntheticLiveRunService {
             runs.start(run.id(), now());
             EvidenceRow evidenceRow = evidence.create(projectId, run.id(), initiator);
             runs.linkEvidence(run.id(), evidenceRow.id());
-            evidence.updateManifest(evidenceRow.id(), manifest(settings.seed(), 0));
+            Instant startedAt = wallClock.instant();
+            evidence.updateManifest(evidenceRow.id(),
+                    manifest(run.id(), trigger, initiator, dataSourceId, startedAt, settings.seed(), 0));
 
             runtime.start(dataSourceId, RuntimeStartSpecs.of(schemas, source));
 
@@ -104,7 +106,7 @@ public class SyntheticLiveRunService {
                 feeds.add(new VariableFeed(variable.generator(context), variable.updateRateMs()));
             }
             registry.put(run.id(), new LiveRun(run.id(), evidenceRow.id(), dataSourceId,
-                    settings.seed(), wallClock.instant(), maxDurationMs, feeds));
+                    trigger, initiator, settings.seed(), startedAt, maxDurationMs, feeds));
 
             return new SyntheticLiveRunSummary(dataSourceId, settings.seed(), run.id(), evidenceRow.id(), "RUNNING");
         } catch (RuntimeException e) {
@@ -179,7 +181,9 @@ public class SyntheticLiveRunService {
      */
     private void stampEvidence(LiveRun live) {
         try {
-            evidence.updateManifest(live.evidenceId(), manifest(live.seed(), totalEmitted(live)));
+            evidence.updateManifest(live.evidenceId(),
+                    manifest(live.runId(), live.trigger(), live.initiator(), live.dataSourceId(),
+                            live.startedAt(), live.seed(), totalEmitted(live)));
         } catch (RuntimeException ignored) {
             // advisory count only; the terminal-state transition must still proceed
         }
@@ -193,8 +197,21 @@ public class SyntheticLiveRunService {
         return total;
     }
 
-    private String manifest(long seed, long valueCount) {
-        return json.writeValueAsString(Map.of("synthetic", true, "live", true, "seed", seed, "valueCount", valueCount));
+    private String manifest(String runId, String trigger, String initiator, String dataSourceId,
+            Instant startedAt, long seed, long valueCount) {
+        LinkedHashMap<String, Object> m = new LinkedHashMap<>();
+        m.put("kind", "SYNTHETIC");
+        m.put("runId", runId);
+        m.put("trigger", trigger);
+        m.put("initiator", initiator);
+        m.put("startedAt", startedAt.toString());
+        m.put("endedAt", null);
+        m.put("sourceIds", List.of(dataSourceId));
+        m.put("scenarioId", null);
+        m.put("recordingId", null);
+        m.put("seed", seed);
+        m.put("valueCount", valueCount);
+        return json.writeValueAsString(m);
     }
 
     private SyntheticConfig parseConfig(String runtimeConfig) {
@@ -235,11 +252,12 @@ public class SyntheticLiveRunService {
     }
 
     /** In-memory handle for one running live feed. */
-    record LiveRun(String runId, String evidenceId, String dataSourceId, long seed,
-            Instant startWall, Long maxDurationMs, List<VariableFeed> feeds) {
+    record LiveRun(String runId, String evidenceId, String dataSourceId,
+            String trigger, String initiator, long seed,
+            Instant startedAt, Long maxDurationMs, List<VariableFeed> feeds) {
 
         long elapsedMs(Clock wallClock) {
-            return Duration.between(startWall, wallClock.instant()).toMillis();
+            return Duration.between(startedAt, wallClock.instant()).toMillis();
         }
     }
 }
