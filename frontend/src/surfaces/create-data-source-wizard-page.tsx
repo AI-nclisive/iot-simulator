@@ -830,6 +830,18 @@ export function CreateDataSourceWizardPage() {
     }
 
     try {
+      let importSchema: unknown[] | undefined;
+      if (form.basis === "import" && form.importSelectedRecordingId) {
+        try {
+          const recSchema = await apiFetch<{ nodes: unknown[] }>(
+            `/api/v1/projects/${currentProjectId}/recordings/${form.importSelectedRecordingId}/schema`,
+          );
+          importSchema = recSchema.nodes;
+        } catch {
+          // schema fetch failure is non-fatal; source is created without initialSchema
+        }
+      }
+
       const data = await apiFetch<DataSourceResponse>(
         `/api/v1/projects/${currentProjectId}/data-sources`,
         {
@@ -842,6 +854,7 @@ export function CreateDataSourceWizardPage() {
             ...(form.basis === "import" && form.importSelectedRecordingId
               ? { runtimeConfig: JSON.stringify({ importRecordingId: form.importSelectedRecordingId }) }
               : {}),
+            ...(importSchema ? { initialSchema: importSchema } : {}),
             ...(form.scheduleStartEnabled && form.scheduleStart
               ? { scheduleStart: form.scheduleStart }
               : {}),

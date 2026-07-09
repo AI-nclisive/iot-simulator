@@ -992,6 +992,13 @@ Parallel execution:
   Depends: IS-059 (to re-enable).
   Done when: protocol step shows only OPC UA; list filter shows only All protocols / OPC UA; typecheck + vitest green.
 
+- [x] `UI-466` IMPORT source creation — copy schema from recording
+  Goal: when creating an IMPORT data source the wizard fetches the selected recording's schema and passes it as `initialSchema` so the source has variables immediately after creation instead of showing an empty schema tab.
+  Surface: `Create Data Source Wizard`
+  Work includes: in the IMPORT create path, call `GET /recordings/{id}/schema` before `POST /data-sources`; include `nodes` as `initialSchema` in the create body; failure to fetch is non-fatal (source is created without schema).
+  Depends: IS-150 (recording name in manifest — unrelated but same release).
+  Done when: IMPORT source created from a named recording shows the correct schema and parameterCount > 0 immediately on the detail page; typecheck green.
+
 - [x] `UI-464` Evidence UX — hide idle badge, add navigation links
   Goal: fix two UX gaps in evidence surfaces: (1) replay-flow-page shows "EVIDENCE: READY" badge before any replay starts; (2) evidence-detail-page displays sourceIds, recordingId, scenarioId as raw text with no navigation.
   Surface: `Replay Flow`, `Evidence Detail`
