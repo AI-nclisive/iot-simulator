@@ -817,7 +817,7 @@ export function CreateDataSourceWizardPage() {
           },
         );
         if (form.startCapture) {
-          navigate(`/data-sources/${data.id}/recording`);
+          navigate(`/data-sources/${data.id}/record`);
         } else {
           navigate(`/data-sources/${data.id}`);
         }

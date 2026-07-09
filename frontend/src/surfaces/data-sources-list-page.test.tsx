@@ -53,6 +53,9 @@ const baseSource = {
   health: "Healthy" as const,
 };
 
+const mockRunSynthetic = vi.fn().mockResolvedValue(undefined);
+const mockStopSynthetic = vi.fn().mockResolvedValue(undefined);
+
 function setupStore(sources: object[]) {
   mockDataSourcesStore.mockImplementation((sel: (s: object) => unknown) =>
     sel({
@@ -61,6 +64,8 @@ function setupStore(sources: object[]) {
       error: null,
       loadDataSources: vi.fn().mockResolvedValue(undefined),
       stopDataSource: vi.fn(),
+      runSynthetic: mockRunSynthetic,
+      stopSynthetic: mockStopSynthetic,
       duplicateDataSource: vi.fn(),
       deleteDataSource: vi.fn(),
     }),
@@ -102,6 +107,33 @@ describe("DataSourcesListPage — row actions for IMPORT basis (UI-455)", () => 
     renderPage();
     await waitFor(() => expect(screen.getByRole("button", { name: "Simulate" })).toBeTruthy());
     expect(screen.queryByRole("button", { name: "Replay recording" })).toBeNull();
+  });
+});
+
+describe("DataSourcesListPage — SYNTHETIC source actions", () => {
+  it("SYNTHETIC source shows 'Run' action, not 'Simulate' or 'Record'", async () => {
+    setupStore([{ ...baseSource, basis: "SYNTHETIC", realDeviceEndpoint: null }]);
+    renderPage();
+    await waitFor(() => expect(screen.getByText("Test Source")).toBeTruthy());
+    expect(screen.queryByRole("button", { name: "Simulate" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Record" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Run" })).toBeTruthy();
+  });
+
+  it("SYNTHETIC source calls runSynthetic on Run click", async () => {
+    setupStore([{ ...baseSource, basis: "SYNTHETIC", realDeviceEndpoint: null }]);
+    renderPage();
+    await waitFor(() => expect(screen.getByText("Test Source")).toBeTruthy());
+    screen.getByRole("button", { name: "Run" }).click();
+    await waitFor(() => expect(mockRunSynthetic).toHaveBeenCalledWith("src-1", "proj-1"));
+  });
+
+  it("active SYNTHETIC source shows 'Stop' instead of 'Run'", async () => {
+    setupStore([{ ...baseSource, basis: "SYNTHETIC", status: "Active" as const, realDeviceEndpoint: null }]);
+    renderPage();
+    await waitFor(() => expect(screen.getByText("Test Source")).toBeTruthy());
+    expect(screen.getByRole("button", { name: "Stop" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Run" })).toBeNull();
   });
 });
 

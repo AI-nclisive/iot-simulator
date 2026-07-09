@@ -74,6 +74,8 @@ export function DataSourcesListPage() {
   const error = useDataSourcesStore((state) => state.error);
   const loadDataSources = useDataSourcesStore((state) => state.loadDataSources);
   const stopDataSource = useDataSourcesStore((state) => state.stopDataSource);
+  const runSynthetic = useDataSourcesStore((state) => state.runSynthetic);
+  const stopSynthetic = useDataSourcesStore((state) => state.stopSynthetic);
   const duplicateDataSource = useDataSourcesStore((state) => state.duplicateDataSource);
   const deleteDataSource = useDataSourcesStore((state) => state.deleteDataSource);
   const push = useNotificationStore((state) => state.push);
@@ -165,6 +167,24 @@ export function DataSourcesListPage() {
       await apiFetch(`/api/v1/projects/${currentProjectId}/runs/${runId}/stop`, { method: "POST" });
     } catch (err) {
       const title = err instanceof Error ? err.message : "Stop failed";
+      push({ tone: "error", title });
+    }
+  }
+
+  async function runSyntheticSource(rowId: string) {
+    try {
+      await runSynthetic(rowId, currentProjectId);
+    } catch (err) {
+      const title = err instanceof Error ? err.message : "Failed to start synthetic source";
+      push({ tone: "error", title });
+    }
+  }
+
+  async function stopSyntheticSource(rowId: string) {
+    try {
+      await stopSynthetic(rowId, currentProjectId);
+    } catch (err) {
+      const title = err instanceof Error ? err.message : "Failed to stop synthetic source";
       push({ tone: "error", title });
     }
   }
@@ -382,39 +402,54 @@ export function DataSourcesListPage() {
                 },
               ];
 
-              if (access.canRecordSource && row.basis !== "IMPORT") {
-                actions.push({
-                  label: "Record",
-                  onClick: () => navigate(`/data-sources/${row.id}/record`),
-                });
-              }
+              if (row.basis === "SYNTHETIC") {
+                if (row.status !== "Active" && access.canConfigureReplay) {
+                  actions.push({
+                    label: "Run",
+                    onClick: () => void runSyntheticSource(row.id),
+                  });
+                }
+                if (row.status === "Active" && access.canStopSource) {
+                  actions.push({
+                    label: "Stop",
+                    onClick: () => void stopSyntheticSource(row.id),
+                  });
+                }
+              } else {
+                if (access.canRecordSource && row.basis !== "IMPORT") {
+                  actions.push({
+                    label: "Record",
+                    onClick: () => navigate(`/data-sources/${row.id}/record`),
+                  });
+                }
 
-              if (access.canConfigureReplay) {
-                actions.push({
-                  label: row.basis === "IMPORT" ? "Replay recording" : "Simulate",
-                  onClick: () => navigate(`/data-sources/${row.id}/replay`),
-                });
-              }
+                if (access.canConfigureReplay) {
+                  actions.push({
+                    label: row.basis === "IMPORT" ? "Replay recording" : "Simulate",
+                    onClick: () => navigate(`/data-sources/${row.id}/replay`),
+                  });
+                }
 
-              const replayRun = activeRuns.find(
-                (r) =>
-                  r.relatedSourceId === row.id &&
-                  r.processType === "Replay" &&
-                  r.runState === "running",
-              );
-              if (replayRun && access.canConfigureReplay) {
-                actions.push({
-                  label: "Stop simulation",
-                  onClick: () => void stopSimulation(replayRun.id),
-                });
-              }
+                const replayRun = activeRuns.find(
+                  (r) =>
+                    r.relatedSourceId === row.id &&
+                    r.processType === "Replay" &&
+                    r.runState === "running",
+                );
+                if (replayRun && access.canConfigureReplay) {
+                  actions.push({
+                    label: "Stop simulation",
+                    onClick: () => void stopSimulation(replayRun.id),
+                  });
+                }
 
-              if (row.status === "Active" && access.canStopSource) {
-                actions.push({
-                  label: "Stop source",
-                  onClick: () =>
-                    setConfirmationRequest({ action: "stop", rowId: row.id }),
-                });
+                if (row.status === "Active" && access.canStopSource) {
+                  actions.push({
+                    label: "Stop source",
+                    onClick: () =>
+                      setConfirmationRequest({ action: "stop", rowId: row.id }),
+                  });
+                }
               }
 
               if (access.canDuplicateSource) {
