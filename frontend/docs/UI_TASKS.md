@@ -999,6 +999,13 @@ Parallel execution:
   Depends: IS-150 (recording name in manifest — unrelated but same release).
   Done when: IMPORT source created from a named recording shows the correct schema and parameterCount > 0 immediately on the detail page; typecheck green.
 
+- [x] `UI-465` Recording start UX — no-schema guard and detailed error messages
+  Goal: surface actionable errors when recording cannot start due to missing schema; replace raw "Bad Request" toast with a clear title + backend detail message.
+  Surface: `Recording Flow`
+  Work includes: disable "Start recording" button when parameterCount === 0; show inline SharedStatePanel explaining why (SCAN: recreate source; MANUAL: add variables in Schema tab); surface ApiError.detail as toast message field so backend reason is visible.
+  Depends: none.
+  Done when: button disabled when schema empty; panel shown with actionable message; toast includes error detail; typecheck green.
+
 - [x] `UI-464` Evidence UX — hide idle badge, add navigation links
   Goal: fix two UX gaps in evidence surfaces: (1) replay-flow-page shows "EVIDENCE: READY" badge before any replay starts; (2) evidence-detail-page displays sourceIds, recordingId, scenarioId as raw text with no navigation.
   Surface: `Replay Flow`, `Evidence Detail`

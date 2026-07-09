@@ -87,6 +87,7 @@ public class RecordingImportExportService {
                 row.dataSourceId(),
                 row.schemaVersion(),
                 row.origin(),
+                row.name(),
                 Instant.now(),
                 timeStart,
                 timeEnd,
@@ -137,7 +138,7 @@ public class RecordingImportExportService {
                 manifest.schemaVersion(),
                 "IMPORTED",
                 "SCHEMA_AND_DATA",
-                null,
+                manifest.name(),
                 actor);
 
         if (!payload.values().isEmpty()) {
