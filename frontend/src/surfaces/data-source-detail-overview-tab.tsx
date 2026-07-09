@@ -75,7 +75,7 @@ export function DataSourceDetailOverviewTab({
                   : "Click Run to start the synthetic generator. Variable definitions and signal patterns are visible in the Schema tab."
                 : source.status === "Active"
                   ? "The source is running. Open Schema to review parameters, or Values to see current readings."
-                  : "The source is stopped. Start it to enable recording, replay, and live values."}
+                  : "The source is stopped. Start it to enable recording and live values."}
           </p>
 
           {source.basis === "IMPORT" ? (
@@ -138,9 +138,9 @@ export function DataSourceDetailOverviewTab({
                 Record
               </Link>
             ) : null}
-            {source.basis !== "SYNTHETIC" ? (
+            {source.basis === "IMPORT" ? (
               <Link className="shell-text-action" to={`/data-sources/${source.id}/replay`}>
-                {source.basis === "IMPORT" ? "Replay recording" : "Simulate"}
+                Replay recording
               </Link>
             ) : null}
             <Link className="shell-text-action" to="?tab=values">

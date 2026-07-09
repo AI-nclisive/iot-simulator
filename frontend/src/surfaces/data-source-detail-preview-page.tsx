@@ -355,9 +355,9 @@ export function DataSourceDetailPreviewPage() {
               Record
             </Link>
           ) : null}
-          {access.canConfigureReplay && activeSource.basis !== "SYNTHETIC" ? (
+          {access.canConfigureReplay && activeSource.basis === "IMPORT" ? (
             <Link className="shell-action" to={`/data-sources/${activeSource.id}/replay`}>
-              {activeSource.basis === "IMPORT" ? "Replay recording" : "Simulate"}
+              Replay recording
             </Link>
           ) : null}
           {activeReplayRun && access.canConfigureReplay ? (
