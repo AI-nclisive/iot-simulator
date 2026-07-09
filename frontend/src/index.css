@@ -94,7 +94,7 @@ input {
   }
 
   .shell-chip {
-    @apply inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium whitespace-nowrap;
+    @apply inline-flex items-center rounded-full border px-2 py-1 text-xs font-medium whitespace-nowrap;
   }
 
   .shell-filter-chip {

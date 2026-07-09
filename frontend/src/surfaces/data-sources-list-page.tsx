@@ -313,7 +313,7 @@ export function DataSourcesListPage() {
             r.runState === "running",
         );
         return (
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col items-start gap-1">
             <StatusBadge label={stateMeta(row).label} tone={stateMeta(row).tone} />
             {replayRun ? <StatusBadge label="Simulating" tone="accent" /> : null}
           </div>
