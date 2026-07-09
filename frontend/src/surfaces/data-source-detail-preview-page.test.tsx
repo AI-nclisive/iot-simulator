@@ -1,5 +1,5 @@
 /**
- * Tests for DataSourceDetailPreviewPage load-on-mount fix
+ * Tests for DataSourceDetailPreviewPage
  *
  * Covers:
  * - Loading state shown when store is empty and fetch is in flight
@@ -7,6 +7,8 @@
  * - Error panel shown when source is not found after load completes
  * - loadDataSources is NOT called again after load completes (no infinite loop)
  * - Source details rendered when source is found in store
+ * - IMPORT source: header shows recording link (UI-464)
+ * - SYNTHETIC source: no Record or Replay recording buttons (UI-464)
  */
 
 import { cleanup, render, screen } from "@testing-library/react";
@@ -50,6 +52,11 @@ vi.mock("../shell/use-active-runs", () => ({
 vi.mock("../shell/notification-store", () => ({
   useNotificationStore: (selector: (s: Record<string, unknown>) => unknown) =>
     selector({ push: vi.fn() }),
+}));
+
+vi.mock("../shell/artifacts-store", () => ({
+  useArtifactsStore: (selector: (s: Record<string, unknown>) => unknown) =>
+    selector({ artifacts: [], loadRecordings: vi.fn() }),
 }));
 
 // jsdom has no EventSource; the live hooks inside tab content need a stub
@@ -214,14 +221,18 @@ describe("DataSourceDetailPreviewPage — source found", () => {
     expect(screen.getByText("Test Source")).toBeTruthy();
   });
 
-  it("shows Record and Simulate links when source is found", () => {
+  it("shows Record link for SCAN source (no Replay recording)", () => {
     setupShellStore();
-    setupDataSourcesStore({ dataSources: [mockSource], isLoading: false });
+    setupDataSourcesStore({
+      dataSources: [{ ...mockSource, basis: "SCAN", realDeviceEndpoint: "opc.tcp://device:4840" }],
+      isLoading: false,
+    });
 
     renderPage();
 
     expect(screen.getAllByRole("link", { name: "Record" }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole("link", { name: "Simulate" }).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("link", { name: "Replay recording" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Simulate" })).toBeNull();
   });
 });
 
@@ -283,5 +294,73 @@ describe("DataSourceDetailPreviewPage — live simulation badge", () => {
     renderPage();
 
     expect(screen.queryByText("Simulating")).toBeNull();
+  });
+});
+
+// ── IMPORT source header link (UI-464) ────────────────────────────────────────
+
+describe("DataSourceDetailPreviewPage — IMPORT source recording link (UI-464)", () => {
+  it("shows 'Replay recording' button for IMPORT source", () => {
+    setupShellStore();
+    setupDataSourcesStore({
+      dataSources: [{ ...mockSource, basis: "IMPORT", runtimeConfig: null }],
+      isLoading: false,
+    });
+
+    renderPage();
+
+    expect(screen.getAllByRole("link", { name: "Replay recording" }).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("link", { name: "Record" })).toBeNull();
+  });
+
+  it("shows recording link in header when IMPORT source has importRecordingId in runtimeConfig", () => {
+    setupShellStore();
+    setupDataSourcesStore({
+      dataSources: [
+        {
+          ...mockSource,
+          basis: "IMPORT",
+          runtimeConfig: JSON.stringify({ importRecordingId: "rec-abc" }),
+        },
+      ],
+      isLoading: false,
+    });
+
+    renderPage();
+
+    const recordingLink = screen.getByRole("link", { name: /Recording rec-abc/i });
+    expect(recordingLink.getAttribute("href")).toContain("/recordings/rec-abc");
+  });
+});
+
+// ── SYNTHETIC source suppresses Record / Replay recording (UI-464) ─────────────
+
+describe("DataSourceDetailPreviewPage — SYNTHETIC source buttons (UI-464)", () => {
+  it("shows Run button for SYNTHETIC source, no Record or Replay recording", () => {
+    setupShellStore();
+    setupDataSourcesStore({
+      dataSources: [{ ...mockSource, basis: "SYNTHETIC" }],
+      isLoading: false,
+    });
+
+    renderPage();
+
+    expect(screen.getByRole("button", { name: "Run" })).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "Record" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Replay recording" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Simulate" })).toBeNull();
+  });
+
+  it("shows Stop button for active SYNTHETIC source", () => {
+    setupShellStore();
+    setupDataSourcesStore({
+      dataSources: [{ ...mockSource, basis: "SYNTHETIC", status: "Active" as const }],
+      isLoading: false,
+    });
+
+    renderPage();
+
+    expect(screen.getByRole("button", { name: "Stop" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Run" })).toBeNull();
   });
 });

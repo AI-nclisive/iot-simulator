@@ -26,6 +26,7 @@ import com.ainclusive.iotsim.domain.datasource.SourceBasis;
 import com.ainclusive.iotsim.domain.schema.SchemaService;
 import com.ainclusive.iotsim.domain.support.Page;
 import com.ainclusive.iotsim.platform.secret.ConnectionCredentials;
+import tools.jackson.databind.ObjectMapper;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -51,7 +52,7 @@ class DataSourceControllerTest {
         // Default: countVariableNodes returns 0 for any single id or collection.
         given(schemaService.countVariableNodes(anyString())).willReturn(0);
         given(schemaService.countVariableNodes(any(Collection.class))).willReturn(Map.of());
-        controller = new DataSourceController(service, schemaService);
+        controller = new DataSourceController(service, schemaService, new ObjectMapper());
     }
 
     private static DataSource sample(long version, RuntimeState state) {
@@ -368,5 +369,24 @@ class DataSourceControllerTest {
                 PROJECT, new CreateDataSourceRequest("Sensor", "OPC_UA", "IMPORT", null, null, null, null, null, List.of(bad), null)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("dataType");
+    }
+
+    @Test
+    void createImportBasisWithRecordingIdBuildsRuntimeConfig() throws Exception {
+        Instant now = Instant.now();
+        DataSource ds = new DataSource("ds1", PROJECT, "Sensor", Protocol.OPC_UA, SourceBasis.IMPORT,
+                null, null, 4840, null, "{\"importRecordingId\":\"rec-42\"}", null, false,
+                RuntimeState.STOPPED, CredentialState.MISSING,
+                "opc.tcp://localhost:4840/iotsim", now, now, "local", 0);
+        ArgumentCaptor<String> runtimeConfigCaptor = ArgumentCaptor.forClass(String.class);
+        given(service.create(eq(PROJECT), any(), any(), any(), any(), any(),
+                runtimeConfigCaptor.capture(), any(), any(), any(), any()))
+                .willReturn(ds);
+
+        controller.create(PROJECT, new CreateDataSourceRequest(
+                "Sensor", "OPC_UA", "IMPORT", null, null, null, null, null, null, "rec-42"));
+
+        String captured = runtimeConfigCaptor.getValue();
+        assertThat(captured).contains("\"importRecordingId\"").contains("\"rec-42\"");
     }
 }

@@ -14,6 +14,8 @@ import com.ainclusive.iotsim.protocolmodel.DataType;
 import com.ainclusive.iotsim.protocolmodel.NodeKind;
 import com.ainclusive.iotsim.protocolmodel.SchemaNode;
 import com.ainclusive.iotsim.protocolmodel.ValueRank;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.net.URI;
@@ -64,10 +66,12 @@ public class DataSourceController {
 
     private final DataSourceService dataSources;
     private final SchemaService schemas;
+    private final ObjectMapper objectMapper;
 
-    public DataSourceController(DataSourceService dataSources, SchemaService schemas) {
+    public DataSourceController(DataSourceService dataSources, SchemaService schemas, ObjectMapper objectMapper) {
         this.dataSources = dataSources;
         this.schemas = schemas;
+        this.objectMapper = objectMapper;
     }
 
     @Operation(
@@ -107,7 +111,11 @@ public class DataSourceController {
                 : null;
         String runtimeConfig = req.runtimeConfig();
         if ("IMPORT".equals(req.basis()) && req.recordingId() != null && !req.recordingId().isBlank()) {
-            runtimeConfig = "{\"importRecordingId\":\"" + req.recordingId() + "\"}";
+            try {
+                runtimeConfig = objectMapper.writeValueAsString(Map.of("importRecordingId", req.recordingId()));
+            } catch (JacksonException e) {
+                throw new IllegalArgumentException("invalid recordingId", e);
+            }
         }
         DataSource ds = dataSources.create(
                 projectId, req.name(), req.protocol(), req.basis(),
