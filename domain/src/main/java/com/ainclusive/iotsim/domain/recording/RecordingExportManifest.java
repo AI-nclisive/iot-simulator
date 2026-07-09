@@ -15,6 +15,7 @@ public record RecordingExportManifest(
         String dataSourceId,
         int schemaVersion,
         String origin,
+        String name,
         Instant exportedAt,
         Instant timeStart,
         Instant timeEnd,

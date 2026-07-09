@@ -237,7 +237,7 @@ class RecordingImportExportServiceTest {
         ObjectMapper mapper = new ObjectMapper();
         RecordingExportManifest manifest = new RecordingExportManifest(
                 "1.0.0", recId, projectId, dataSourceId, schemaVersion,
-                "SCAN_RECORD", Instant.now(), null, null, vals.size(), List.of("node-1"));
+                "SCAN_RECORD", null, Instant.now(), null, null, vals.size(), List.of("node-1"));
         byte[] manifestBytes = mapper.writeValueAsBytes(manifest);
 
         // Build a minimal value-timeline JSON
@@ -282,7 +282,7 @@ class RecordingImportExportServiceTest {
         ObjectMapper mapper = new ObjectMapper();
         RecordingExportManifest manifest = new RecordingExportManifest(
                 version, REC_ID, PROJECT, "ds-1", 1, "SCAN_RECORD",
-                Instant.now(), null, null, 0, List.of());
+                null, Instant.now(), null, null, 0, List.of());
         byte[] manifestBytes = mapper.writeValueAsBytes(manifest);
         ByteArrayOutputStream buf = new ByteArrayOutputStream();
         try (ZipOutputStream zip = new ZipOutputStream(buf)) {
