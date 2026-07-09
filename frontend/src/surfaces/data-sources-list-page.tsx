@@ -431,9 +431,9 @@ export function DataSourcesListPage() {
                   });
                 }
 
-                if (access.canConfigureReplay) {
+                if (access.canConfigureReplay && row.basis === "IMPORT") {
                   actions.push({
-                    label: row.basis === "IMPORT" ? "Replay recording" : "Simulate",
+                    label: "Replay recording",
                     onClick: () => navigate(`/data-sources/${row.id}/replay`),
                   });
                 }

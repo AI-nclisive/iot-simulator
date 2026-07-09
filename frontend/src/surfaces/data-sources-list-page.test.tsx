@@ -4,7 +4,7 @@
  * Covers:
  * - IMPORT-basis source must not show the "Record" row action
  * - IMPORT-basis source must label the replay action "Replay recording" (not "Simulate")
- * - SCAN-basis source shows both "Record" and "Simulate"
+ * - SCAN-basis source shows only "Record" (no Simulate/Replay)
  * - parameterCount from store is rendered in the list row
  */
 
@@ -102,10 +102,11 @@ describe("DataSourcesListPage — row actions for IMPORT basis (UI-455)", () => 
     await waitFor(() => expect(screen.getByRole("button", { name: "Record" })).toBeTruthy());
   });
 
-  it("SCAN source shows 'Simulate' action (not 'Replay recording')", async () => {
+  it("SCAN source shows neither 'Simulate' nor 'Replay recording' — only Record", async () => {
     setupStore([{ ...baseSource, basis: "SCAN", realDeviceEndpoint: "opc.tcp://device:4840" }]);
     renderPage();
-    await waitFor(() => expect(screen.getByRole("button", { name: "Simulate" })).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Record" })).toBeTruthy());
+    expect(screen.queryByRole("button", { name: "Simulate" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Replay recording" })).toBeNull();
   });
 });
