@@ -116,7 +116,10 @@ public class ReplayLiveRunService {
 
             RuntimeStartSpec startSpec = RuntimeStartSpecs.of(schemas, source, settings);
             runtime.start(dataSourceId, startSpec);
-            saveLastRecording(dataSourceId, recordingId);
+            // IMPORT sources store importRecordingId in runtimeConfig; don't overwrite it.
+            if (!"IMPORT".equals(source.basis())) {
+                saveLastRecording(dataSourceId, recordingId);
+            }
 
             if (values.isEmpty()) {
                 // Nothing to replay — complete immediately.
