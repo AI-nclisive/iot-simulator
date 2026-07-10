@@ -293,6 +293,21 @@ class ReplayLiveRunServiceTest {
     }
 
     @Test
+    void startDoesNotOverwriteRuntimeConfigForImportSource() {
+        FakeDataSources importDs = new FakeDataSources(SOURCE, PROJECT, "IMPORT");
+        ReplayLiveRunService svc = new ReplayLiveRunService(
+                importDs,
+                new FakeRecordings(RECORDING, PROJECT),
+                new FakeTimeline(defaultValues()),
+                new EmptySchemas(),
+                runtime, runs, evidence, json, wall);
+
+        svc.start(PROJECT, SOURCE, RECORDING, null, true);
+
+        assertThat(importDs.savedRuntimeConfig).isNull();
+    }
+
+    @Test
     void startWithAutomationTriggerAndInitiatorIsReflectedInRun() {
         ReplayLiveRunService svc = service();
 
@@ -391,11 +406,17 @@ class ReplayLiveRunServiceTest {
     private static class FakeDataSources implements DataSourceRepository {
         final String id;
         final String projectId;
+        final String basis;
         String savedRuntimeConfig;
 
         FakeDataSources(String id, String projectId) {
+            this(id, projectId, "MANUAL");
+        }
+
+        FakeDataSources(String id, String projectId, String basis) {
             this.id = id;
             this.projectId = projectId;
+            this.basis = basis;
         }
 
         public Optional<DataSourceRow> findById(String id) {
@@ -403,7 +424,7 @@ class ReplayLiveRunServiceTest {
                 return Optional.empty();
             }
             OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-            return Optional.of(new DataSourceRow(id, projectId, "src", "OPC_UA", "MANUAL",
+            return Optional.of(new DataSourceRow(id, projectId, "src", "OPC_UA", basis,
                     null, null, 0, null, "{}", null, false, now, now, "local", 0));
         }
 
