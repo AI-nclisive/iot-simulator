@@ -115,6 +115,11 @@ class ReplayLiveRunServiceTest {
         assertThat(run.evidenceId()).isEqualTo(summary.evidenceId());
 
         String manifest = evidence.byId.get(summary.evidenceId()).manifestJson();
+        assertThat(manifest).contains("\"kind\":\"REPLAY\"");
+        assertThat(manifest).contains("\"trigger\":\"MANUAL\"");
+        assertThat(manifest).contains("\"initiator\":\"local\"");
+        assertThat(manifest).contains("\"startedAt\":");
+        assertThat(manifest).contains("\"sourceIds\":[\"" + SOURCE + "\"]");
         assertThat(manifest).contains("\"recordingId\":\"" + RECORDING + "\"");
         assertThat(manifest).contains("\"seed\":");
 
@@ -296,6 +301,10 @@ class ReplayLiveRunServiceTest {
         RunRow run = runs.byId.get(summary.runId());
         assertThat(run.trigger()).isEqualTo("AUTOMATION");
         assertThat(run.initiator()).isEqualTo("ci-bot");
+
+        String manifest = evidence.byId.get(summary.evidenceId()).manifestJson();
+        assertThat(manifest).contains("\"trigger\":\"AUTOMATION\"");
+        assertThat(manifest).contains("\"initiator\":\"ci-bot\"");
     }
 
     @Test

@@ -71,7 +71,8 @@ class SyntheticLiveRunServiceTest {
         assertThat(run.state()).isEqualTo("RUNNING");
         assertThat(run.trigger()).isEqualTo("MANUAL");
         assertThat(evidence.byId.get(summary.evidenceId()).manifestJson())
-                .contains("\"seed\":5").contains("\"live\":true");
+                .contains("\"kind\":\"SYNTHETIC\"").contains("\"seed\":5")
+                .contains("\"trigger\":\"MANUAL\"").contains("\"initiator\":\"local\"");
         assertThat(run.evidenceId()).isEqualTo(summary.evidenceId());
     }
 
