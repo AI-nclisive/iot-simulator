@@ -97,7 +97,7 @@ public class SyntheticLiveRunService {
             runs.linkEvidence(run.id(), evidenceRow.id());
             Instant startedAt = wallClock.instant();
             evidence.updateManifest(evidenceRow.id(),
-                    manifest(run.id(), trigger, initiator, dataSourceId, startedAt, settings.seed(), 0));
+                    manifest(run.id(), trigger, initiator, dataSourceId, startedAt, null, settings.seed(), 0));
 
             runtime.start(dataSourceId, RuntimeStartSpecs.of(schemas, source));
 
@@ -158,7 +158,7 @@ public class SyntheticLiveRunService {
         if (live == null) {
             return false;
         }
-        stampEvidence(live);
+        stampEvidence(live, null);
         return true;
     }
 
@@ -167,7 +167,7 @@ public class SyntheticLiveRunService {
         if (registry.remove(live.runId()) == null) {
             return; // already finalized/stopped
         }
-        stampEvidence(live);
+        stampEvidence(live, wallClock.instant());
         runs.end(live.runId(), terminalState, now());
     }
 
@@ -179,11 +179,11 @@ public class SyntheticLiveRunService {
      * RUNNING). The run's terminal state stays the source of truth. (The domain module keeps
      * no logging facade by design — same swallow-and-continue stance as the {@code tickOne} catch.)
      */
-    private void stampEvidence(LiveRun live) {
+    private void stampEvidence(LiveRun live, Instant endedAt) {
         try {
             evidence.updateManifest(live.evidenceId(),
                     manifest(live.runId(), live.trigger(), live.initiator(), live.dataSourceId(),
-                            live.startedAt(), live.seed(), totalEmitted(live)));
+                            live.startedAt(), endedAt, live.seed(), totalEmitted(live)));
         } catch (RuntimeException ignored) {
             // advisory count only; the terminal-state transition must still proceed
         }
@@ -198,14 +198,14 @@ public class SyntheticLiveRunService {
     }
 
     private String manifest(String runId, String trigger, String initiator, String dataSourceId,
-            Instant startedAt, long seed, long valueCount) {
+            Instant startedAt, Instant endedAt, long seed, long valueCount) {
         LinkedHashMap<String, Object> m = new LinkedHashMap<>();
         m.put("kind", "SYNTHETIC");
         m.put("runId", runId);
         m.put("trigger", trigger);
         m.put("initiator", initiator);
         m.put("startedAt", startedAt.toString());
-        m.put("endedAt", null);
+        m.put("endedAt", endedAt != null ? endedAt.toString() : null);
         m.put("sourceIds", List.of(dataSourceId));
         m.put("scenarioId", null);
         m.put("recordingId", null);
