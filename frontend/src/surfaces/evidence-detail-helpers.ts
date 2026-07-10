@@ -20,6 +20,11 @@ export function evidenceExportStateTone(
   return "neutral";
 }
 
-export function isEvidenceExportAvailable(status: EvidenceStatusLabel): boolean {
-  return status !== "In progress";
+export function isEvidenceExportAvailable(
+  status: EvidenceStatusLabel,
+  runEnded: boolean,
+): boolean {
+  // CAPTURING ("In progress") is the pre-export state — allow export once the
+  // run has a final endedAt so the user can assemble the bundle.
+  return status !== "In progress" || runEnded;
 }
