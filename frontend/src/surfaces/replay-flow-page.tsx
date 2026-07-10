@@ -84,9 +84,17 @@ export function ReplayFlowPage() {
   const push = useNotificationStore((state) => state.push);
   const access = resolveAccess(accessMode, sharedRole);
   const { runs: activeRuns } = useActiveRuns(currentProjectId);
-  const [selectedArtifactId, setSelectedArtifactId] = useState(
-    searchParams.get("artifactId") ?? artifacts[0]?.id ?? "",
-  );
+  const [selectedArtifactId, setSelectedArtifactId] = useState(() => {
+    const fromUrl = searchParams.get("artifactId");
+    if (fromUrl) return fromUrl;
+    if (source?.basis === "IMPORT" && source.runtimeConfig) {
+      try {
+        const cfg = JSON.parse(source.runtimeConfig) as Record<string, unknown>;
+        if (typeof cfg.importRecordingId === "string") return cfg.importRecordingId;
+      } catch { /* ignore malformed runtimeConfig */ }
+    }
+    return artifacts[0]?.id ?? "";
+  });
   const [replayState, setReplayState] = useState<ReplayUiState>("idle");
   const [runId, setRunId] = useState<string | null>(null);
   const runSeenRef = useRef(false);
