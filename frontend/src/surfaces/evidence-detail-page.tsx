@@ -257,7 +257,7 @@ export function EvidenceDetailPage() {
             </Link>
             <h2 className="mt-2 text-2xl font-semibold text-shell-ink">{title}</h2>
             <p className="mt-2 text-sm leading-6 text-shell-muted">
-              {evidenceCompletenessLabel(item.completeness)}
+              {item.completeness ? evidenceCompletenessLabel(item.completeness) : null}
             </p>
           </div>
 
@@ -370,7 +370,9 @@ export function EvidenceDetailPage() {
             <DetailRow label="Initiator" value={item.initiator} />
             <DetailRow label="Started at" value={item.startedAt} />
             <DetailRow label="Ended at" value={item.endedAt} />
-            <DetailRow label="Completeness" value={evidenceCompletenessLabel(item.completeness)} />
+            {item.completeness ? (
+              <DetailRow label="Completeness" value={evidenceCompletenessLabel(item.completeness)} />
+            ) : null}
             <DetailRow label="Run ID" value={item.runId} />
             {item.scenarioId ? (
               <DetailLinkRow label="Scenario" href={`/scenarios/${item.scenarioId}`} value={item.scenarioId} />

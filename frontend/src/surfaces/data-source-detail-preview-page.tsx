@@ -313,10 +313,13 @@ export function DataSourceDetailPreviewPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <StatusBadge label={activeState.label} tone={activeState.tone} />
-            <StatusBadge label={activeSource.health} tone={healthTone(activeSource.health)} />
             {activeReplayRun ? (
-              <StatusBadge label="Simulating" tone="accent" />
+              <StatusBadge label="Replaying" tone="accent" />
+            ) : (
+              <StatusBadge label={activeState.label} tone={activeState.tone} />
+            )}
+            {activeSource.health !== "Healthy" ? (
+              <StatusBadge label={activeSource.health} tone={healthTone(activeSource.health)} />
             ) : null}
           </div>
         </div>
@@ -355,18 +358,18 @@ export function DataSourceDetailPreviewPage() {
               Record
             </Link>
           ) : null}
-          {access.canConfigureReplay && activeSource.basis === "IMPORT" ? (
+          {access.canConfigureReplay && activeSource.basis === "IMPORT" && !activeReplayRun ? (
             <Link className="shell-action" to={`/data-sources/${activeSource.id}/replay`}>
               Replay recording
             </Link>
           ) : null}
           {activeReplayRun && access.canConfigureReplay ? (
             <button className="shell-action" type="button" onClick={() => void stopSimulation()}>
-              Stop simulation
+              Stop replay
             </button>
           ) : null}
           {sourceControlAction ? (
-            <button className="shell-action" type="button" onClick={sourceControlAction.onClick}>
+            <button className="shell-text-action" type="button" onClick={sourceControlAction.onClick}>
               {sourceControlAction.label}
             </button>
           ) : null}

@@ -312,11 +312,10 @@ export function DataSourcesListPage() {
             r.processType === "Replay" &&
             r.runState === "running",
         );
-        return (
-          <div className="flex flex-col items-start gap-1">
-            <StatusBadge label={stateMeta(row).label} tone={stateMeta(row).tone} />
-            {replayRun ? <StatusBadge label="Simulating" tone="accent" /> : null}
-          </div>
+        return replayRun ? (
+          <StatusBadge label="Replaying" tone="accent" />
+        ) : (
+          <StatusBadge label={stateMeta(row).label} tone={stateMeta(row).tone} />
         );
       },
       className: "w-[8rem]",
