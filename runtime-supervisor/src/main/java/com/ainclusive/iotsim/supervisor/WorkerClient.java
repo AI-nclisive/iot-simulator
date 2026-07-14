@@ -16,6 +16,7 @@ import com.ainclusive.iotsim.workercontract.v1.ScanRequest;
 import com.ainclusive.iotsim.workercontract.v1.ScanResponse;
 import com.ainclusive.iotsim.workercontract.v1.Schema;
 import com.ainclusive.iotsim.workercontract.v1.SecurityConfig;
+import com.ainclusive.iotsim.workercontract.v1.ShutdownRequest;
 import com.ainclusive.iotsim.workercontract.v1.StartRequest;
 import com.ainclusive.iotsim.workercontract.v1.StopRequest;
 import com.ainclusive.iotsim.workercontract.v1.StreamRequest;
@@ -97,6 +98,17 @@ public final class WorkerClient implements AutoCloseable {
 
     public Ack stop() {
         return stub.stop(StopRequest.getDefaultInstance());
+    }
+
+    /**
+     * Asks the worker to exit its process gracefully. Best-effort by design: a
+     * worker that is unreachable or already gone (e.g. after an unexpected crash)
+     * fails this call, which the caller ignores — {@link ProcessWorkerLauncher}'s
+     * terminate-with-grace-then-kill remains the safety net.
+     * See backend-specs/02_WORKER_CONTRACT_AND_IPC.md.
+     */
+    public Ack shutdown() {
+        return stub.shutdown(ShutdownRequest.getDefaultInstance());
     }
 
     public Ack injectFault(String kind, String layer, boolean active, Map<String, String> params) {

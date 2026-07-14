@@ -16,6 +16,7 @@ import com.ainclusive.iotsim.workercontract.v1.RuntimeEvent;
 import com.ainclusive.iotsim.workercontract.v1.ScanRequest;
 import com.ainclusive.iotsim.workercontract.v1.ScanResponse;
 import com.ainclusive.iotsim.workercontract.v1.SchemaNodeMsg;
+import com.ainclusive.iotsim.workercontract.v1.ShutdownRequest;
 import com.ainclusive.iotsim.workercontract.v1.StartRequest;
 import com.ainclusive.iotsim.workercontract.v1.StopRequest;
 import com.ainclusive.iotsim.workercontract.v1.StreamRequest;
@@ -41,6 +42,7 @@ final class TestProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSourc
     private final AtomicReference<TestConnectionRequest> lastTestConnection = new AtomicReference<>();
     private final AtomicReference<CaptureRequest> lastCapture = new AtomicReference<>();
     private final CountDownLatch captureCancelled = new CountDownLatch(1);
+    private final CountDownLatch shutdownReceived = new CountDownLatch(1);
     private final CountDownLatch clientEventsCancelled = new CountDownLatch(1);
     private final CountDownLatch runtimeEventsCancelled = new CountDownLatch(1);
     private volatile boolean healthLive = true;
@@ -63,6 +65,11 @@ final class TestProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSourc
     /** Waits until the supervisor cancels the capture stream (stop()). */
     boolean awaitCaptureCancelled(long timeoutSeconds) throws InterruptedException {
         return captureCancelled.await(timeoutSeconds, TimeUnit.SECONDS);
+    }
+
+    /** Waits until the supervisor asks this worker to shut down (teardown). */
+    boolean awaitShutdown(long timeoutSeconds) throws InterruptedException {
+        return shutdownReceived.await(timeoutSeconds, TimeUnit.SECONDS);
     }
 
     /** Waits until the supervisor cancels the client-events stream (stop()/teardown). */
@@ -191,6 +198,12 @@ final class TestProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSourc
 
     @Override
     public void stop(StopRequest request, StreamObserver<Ack> obs) {
+        ackOk(obs);
+    }
+
+    @Override
+    public void shutdown(ShutdownRequest request, StreamObserver<Ack> obs) {
+        shutdownReceived.countDown();
         ackOk(obs);
     }
 
