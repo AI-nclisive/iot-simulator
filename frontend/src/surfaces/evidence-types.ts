@@ -27,7 +27,7 @@ export interface EvidenceItem {
   initiator: string;
   startedAt: string;
   endedAt: string | null;
-  completeness: EvidenceCompleteness;
+  completeness: EvidenceCompleteness | null;
   sourceIds: string[] | undefined;
   scenarioId: string | null;
   recordingId: string | null;

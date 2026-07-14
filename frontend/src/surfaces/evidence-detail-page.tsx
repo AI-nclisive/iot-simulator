@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { apiFetch, authHeaders } from "../api/client";
 import { resolveAccess } from "../shell/access-policy";
+import { useArtifactsStore } from "../shell/artifacts-store";
+import { useDataSourcesStore } from "../shell/data-sources-store";
 import { useShellStore } from "../shell/shell-store";
 import { SharedStatePanel } from "../ui/shared-state-panel";
 import { StatusBadge } from "../ui/status-badge";
@@ -76,6 +78,8 @@ export function EvidenceDetailPage() {
   const sharedRole = useShellStore((state) => state.sharedRole);
   const currentProjectId = useShellStore((state) => state.currentProjectId);
   const access = resolveAccess(accessMode, sharedRole);
+  const dataSources = useDataSourcesStore((state) => state.dataSources);
+  const artifacts = useArtifactsStore((state) => state.artifacts);
 
   const [item, setItem] = useState<EvidenceItem | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -122,7 +126,7 @@ export function EvidenceDetailPage() {
   // Trigger export dialog from URL param
   useEffect(() => {
     if (searchParams.get("export") !== "1" || !access.isAdmin || !item) return;
-    if (item.status === "CAPTURING") return;
+    if (item.status === "CAPTURING" && !item.endedAt) return;
     // Clear the param — the export UI is always visible on this page
     const next = new URLSearchParams(searchParams);
     next.delete("export");
@@ -176,7 +180,7 @@ export function EvidenceDetailPage() {
         ? "Export failed"
         : evidenceExportStateLabel(item.exported, item.status);
 
-  const exportAvailable = isEvidenceExportAvailable(statusLbl);
+  const exportAvailable = isEvidenceExportAvailable(statusLbl, item.endedAt !== null);
   const recoveryMode = exportStateLbl === "Export failed";
   const title = evidenceTitle(item.kind, item.runId);
   const duration = deriveDuration(item.startedAt, item.endedAt);
@@ -253,7 +257,7 @@ export function EvidenceDetailPage() {
             </Link>
             <h2 className="mt-2 text-2xl font-semibold text-shell-ink">{title}</h2>
             <p className="mt-2 text-sm leading-6 text-shell-muted">
-              {evidenceCompletenessLabel(item.completeness)}
+              {item.completeness ? evidenceCompletenessLabel(item.completeness) : null}
             </p>
           </div>
 
@@ -366,14 +370,24 @@ export function EvidenceDetailPage() {
             <DetailRow label="Initiator" value={item.initiator} />
             <DetailRow label="Started at" value={item.startedAt} />
             <DetailRow label="Ended at" value={item.endedAt} />
-            <DetailRow label="Completeness" value={evidenceCompletenessLabel(item.completeness)} />
+            {item.completeness ? (
+              <DetailRow label="Completeness" value={evidenceCompletenessLabel(item.completeness)} />
+            ) : null}
             <DetailRow label="Run ID" value={item.runId} />
             {item.scenarioId ? (
               <DetailLinkRow label="Scenario" href={`/scenarios/${item.scenarioId}`} value={item.scenarioId} />
             ) : null}
-            {item.recordingId ? (
-              <DetailLinkRow label="Recording" href={`/recordings/${item.recordingId}`} value={item.recordingId} />
-            ) : null}
+            {item.recordingId ? (() => {
+              const artifact = artifacts.find((a) => a.id === item.recordingId);
+              const label = artifact?.name ?? item.recordingId;
+              return (
+                <DetailLinkRow
+                  label="Recording"
+                  href={`/recordings/${item.recordingId}`}
+                  value={label}
+                />
+              );
+            })() : null}
           </dl>
         </section>
 
@@ -381,14 +395,20 @@ export function EvidenceDetailPage() {
           <h3 className="text-base font-semibold text-shell-ink">Sources</h3>
           {(item.sourceIds ?? []).length > 0 ? (
             <ul className="mt-5 space-y-3">
-              {(item.sourceIds ?? []).map((sourceId) => (
-                <li
-                  key={sourceId}
-                  className="rounded-md border border-shell-line bg-white px-4 py-3 text-sm text-shell-ink"
-                >
-                  <Link className="shell-text-action" to={`/data-sources/${sourceId}`}>{sourceId}</Link>
-                </li>
-              ))}
+              {(item.sourceIds ?? []).map((sourceId) => {
+                const ds = dataSources.find((d) => d.id === sourceId);
+                const label = ds ? ds.name : sourceId;
+                return (
+                  <li
+                    key={sourceId}
+                    className="rounded-md border border-shell-line bg-white px-4 py-3 text-sm text-shell-ink"
+                  >
+                    <Link className="shell-text-action" to={`/data-sources/${sourceId}`}>
+                      {label}
+                    </Link>
+                  </li>
+                );
+              })}
             </ul>
           ) : (
             <SharedStatePanel
