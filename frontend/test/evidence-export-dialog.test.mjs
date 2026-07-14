@@ -5,53 +5,21 @@ import {
   isEvidenceExportAvailable,
 } from "../../build/frontend-test/surfaces/evidence-detail-helpers.js";
 
-const baseArtifact = {
-  id: "ev-1",
-  title: "Test",
-  projectName: "Proj",
-  sourceName: "Source",
-  runId: "run-1",
-  runType: "Replay",
-  initiator: "Alex",
-  startedAt: "2026-06-01T10:00:00Z",
-  duration: "2m",
-  completeness: "Complete",
-  valueCount: 100,
-  clientCount: 1,
-  sizeLabel: "1 MB",
-  formats: ["JSON"],
-  timeline: [],
-  clients: [],
-  issues: [],
-};
-
 describe("isEvidenceExportAvailable — export dialog availability", () => {
   it("allows export for Ready artifacts", () => {
-    assert.equal(
-      isEvidenceExportAvailable({ ...baseArtifact, status: "Ready", exportState: "Not exported" }),
-      true,
-    );
+    assert.equal(isEvidenceExportAvailable("Ready", false), true);
   });
 
-  it("allows export for Exported artifacts (re-export)", () => {
-    assert.equal(
-      isEvidenceExportAvailable({ ...baseArtifact, status: "Exported", exportState: "Exported" }),
-      true,
-    );
+  it("allows re-export after Export failed", () => {
+    assert.equal(isEvidenceExportAvailable("Export failed", false), true);
   });
 
-  it("blocks export when still Capturing", () => {
-    assert.equal(
-      isEvidenceExportAvailable({ ...baseArtifact, status: "Capturing", exportState: "Not ready" }),
-      false,
-    );
+  it("blocks export while In progress and run has not ended", () => {
+    assert.equal(isEvidenceExportAvailable("In progress", false), false);
   });
 
-  it("blocks export when exportState is Not ready regardless of status", () => {
-    assert.equal(
-      isEvidenceExportAvailable({ ...baseArtifact, status: "Partial", exportState: "Not ready" }),
-      false,
-    );
+  it("allows export while In progress once the run has ended", () => {
+    assert.equal(isEvidenceExportAvailable("In progress", true), true);
   });
 });
 

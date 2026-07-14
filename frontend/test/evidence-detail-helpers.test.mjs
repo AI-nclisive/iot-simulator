@@ -77,51 +77,19 @@ describe("evidenceDeliveryTone", () => {
 });
 
 describe("isEvidenceExportAvailable", () => {
-  const base = {
-    id: "ev-1",
-    title: "Test",
-    projectName: "Proj",
-    sourceName: "Source",
-    runId: "run-1",
-    runType: "Replay",
-    initiator: "Alex",
-    startedAt: "2026-06-01T10:00:00Z",
-    duration: "2m 10s",
-    completeness: "Complete",
-    valueCount: 100,
-    clientCount: 1,
-    sizeLabel: "1.2 MB",
-    formats: ["JSON"],
-    timeline: [],
-    clients: [],
-    issues: [],
-  };
-
-  it("returns true when Ready and Not exported", () => {
-    assert.equal(
-      isEvidenceExportAvailable({ ...base, status: "Ready", exportState: "Not exported" }),
-      true,
-    );
+  it("returns true when Ready", () => {
+    assert.equal(isEvidenceExportAvailable("Ready", false), true);
   });
 
   it("returns true when Export failed (retry is possible)", () => {
-    assert.equal(
-      isEvidenceExportAvailable({ ...base, status: "Export failed", exportState: "Export failed" }),
-      true,
-    );
+    assert.equal(isEvidenceExportAvailable("Export failed", false), true);
   });
 
-  it("returns false when Capturing", () => {
-    assert.equal(
-      isEvidenceExportAvailable({ ...base, status: "Capturing", exportState: "Not ready" }),
-      false,
-    );
+  it("returns false when In progress and run has not ended", () => {
+    assert.equal(isEvidenceExportAvailable("In progress", false), false);
   });
 
-  it("returns false when exportState is Not ready even if status is Ready", () => {
-    assert.equal(
-      isEvidenceExportAvailable({ ...base, status: "Ready", exportState: "Not ready" }),
-      false,
-    );
+  it("returns true when In progress but run has ended", () => {
+    assert.equal(isEvidenceExportAvailable("In progress", true), true);
   });
 });
