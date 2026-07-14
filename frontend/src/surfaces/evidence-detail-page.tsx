@@ -397,7 +397,7 @@ export function EvidenceDetailPage() {
             <ul className="mt-5 space-y-3">
               {(item.sourceIds ?? []).map((sourceId) => {
                 const ds = dataSources.find((d) => d.id === sourceId);
-                const label = ds ? ds.name : `${sourceId.slice(0, 8)}…`;
+                const label = ds ? ds.name : sourceId;
                 return (
                   <li
                     key={sourceId}
