@@ -12,7 +12,10 @@ public record Recording(
         String scanType,
         String name,
         long valueCount,
+        long sizeBytes,
         Instant createdAt,
         String createdBy,
-        long version) {
+        long version,
+        Instant lastUsedAt,
+        boolean hasDependents) {
 }

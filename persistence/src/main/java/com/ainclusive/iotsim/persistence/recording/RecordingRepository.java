@@ -19,4 +19,9 @@ public interface RecordingRepository {
 
     RecordingRow finalizeStats(String id, OffsetDateTime timeStart, OffsetDateTime timeEnd,
             long valueCount, long sizeBytes);
+
+    /** Deletes the recording row. Returns {@code false} if it did not exist (IS-092). */
+    default boolean deleteById(String id) {
+        throw new UnsupportedOperationException("deleteById not implemented");
+    }
 }

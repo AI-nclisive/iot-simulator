@@ -89,6 +89,21 @@ public class JooqValueTimelineRepository implements ValueTimelineRepository {
     }
 
     @Override
+    public long sumBytes(String recordingId) {
+        Long total = dsl.select(DSL.sum(DSL.function(
+                        "octet_length", Integer.class, VALUE_TIMELINE.VALUE_ENC)))
+                .from(VALUE_TIMELINE)
+                .where(VALUE_TIMELINE.RECORDING_ID.eq(recordingId))
+                .fetchOne(0, Long.class);
+        return total == null ? 0 : total;
+    }
+
+    @Override
+    public void deleteByRecording(String recordingId) {
+        dsl.deleteFrom(VALUE_TIMELINE).where(VALUE_TIMELINE.RECORDING_ID.eq(recordingId)).execute();
+    }
+
+    @Override
     public List<ValueTimelineEntry> readPage(
             String recordingId, long afterSeq, int limit, ValueFilter filter) {
         return dsl

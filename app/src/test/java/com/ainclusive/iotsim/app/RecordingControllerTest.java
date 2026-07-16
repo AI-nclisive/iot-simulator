@@ -30,7 +30,8 @@ class RecordingControllerTest {
     }
 
     private static Recording sample() {
-        return new Recording("rec1", "p1", "ds1", 1, "SCAN_RECORD", "SCHEMA_AND_DATA", null, 0, Instant.now(), "local", 0);
+        return new Recording("rec1", "p1", "ds1", 1, "SCAN_RECORD", "SCHEMA_AND_DATA", null, 0, 0L,
+                Instant.now(), "local", 0, null, false);
     }
 
     @Test
@@ -55,5 +56,11 @@ class RecordingControllerTest {
         given(service.get("p1", "missing")).willThrow(new ResourceNotFoundException("Recording", "missing"));
         assertThatThrownBy(() -> controller.get("p1", "missing"))
                 .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void deleteReturns204() {
+        ResponseEntity<Void> resp = controller.delete("p1", "rec1");
+        assertThat(resp.getStatusCode().value()).isEqualTo(204);
     }
 }
