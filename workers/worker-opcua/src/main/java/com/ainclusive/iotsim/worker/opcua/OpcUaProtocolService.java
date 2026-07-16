@@ -18,6 +18,7 @@ import com.ainclusive.iotsim.workercontract.v1.ScanRequest;
 import com.ainclusive.iotsim.workercontract.v1.ScanResponse;
 import com.ainclusive.iotsim.workercontract.v1.SchemaNodeMsg;
 import com.ainclusive.iotsim.workercontract.v1.SecurityConfig;
+import com.ainclusive.iotsim.workercontract.v1.ShutdownRequest;
 import com.ainclusive.iotsim.workercontract.v1.StartRequest;
 import com.ainclusive.iotsim.workercontract.v1.StopRequest;
 import com.ainclusive.iotsim.workercontract.v1.StreamRequest;
@@ -45,6 +46,8 @@ import java.util.concurrent.atomic.AtomicReference;
  * See backend-specs/02_WORKER_CONTRACT_AND_IPC.md.
  */
 public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSourceImplBase {
+
+    private static final int SHUTDOWN_FLUSH_DELAY_MS = 200;
 
     private final AtomicReference<String> state = new AtomicReference<>("READY");
     private final AtomicLong applied = new AtomicLong();
@@ -310,6 +313,36 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
         }
         state.set("STOPPED");
         ackOk(obs, "stopped");
+    }
+
+    /**
+     * Graceful process exit, per backend-specs/02_WORKER_CONTRACT_AND_IPC.md. Stops the
+     * OPC UA runtime, acknowledges, then exits on a separate daemon thread so the
+     * response has time to flush over gRPC before the process ends. The supervisor's
+     * terminate-with-grace-then-kill remains the fallback if this does not happen fast
+     * enough.
+     */
+    @Override
+    public void shutdown(ShutdownRequest request, StreamObserver<Ack> obs) {
+        OpcUaServerRuntime runtime = serverRuntime.get();
+        if (runtime != null) {
+            runtime.stop();
+        }
+        state.set("STOPPED");
+        ackOk(obs, "shutting down");
+        Thread exit = new Thread(() -> {
+            try {
+                // Empirically enough for gRPC to flush the ack over loopback. If interrupted,
+                // exit immediately anyway; the supervisor's terminate-with-grace-then-kill
+                // fallback covers the (rare) case where the ack hasn't flushed yet.
+                Thread.sleep(SHUTDOWN_FLUSH_DELAY_MS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            System.exit(0);
+        }, "worker-shutdown-exit");
+        exit.setDaemon(true);
+        exit.start();
     }
 
     @Override

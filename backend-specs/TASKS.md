@@ -248,7 +248,7 @@ import/export. Modbus moved to Wave G (deferred) — see the note there.
 - [x] IS-088 [BE] ✅ [ipc] InjectFault RPC — 02
 - [x] IS-089 [BE] ✅ [api] Runs resource + test-control endpoints (start/state/stop) — 05/SPEC: Control From Tests
 - [x] IS-135 [BE] ✅ [api] Regroup the REST API into 9 logical groups (consolidate per-controller `@Tag`s so Swagger shows 9 sections). FE half: UI-120 — 05
-- [ ] IS-090 [BE] ⬜ [ipc] Shutdown RPC handling — 02
+- [x] IS-090 [BE] ✅ [ipc] Shutdown RPC handling — `WorkerClient.shutdown()` calls the contract's `Shutdown` RPC; the supervisor's `closeQuietly()` (all teardown paths) now asks the worker to exit gracefully before closing the channel, with `ProcessWorkerLauncher`'s terminate-with-grace-then-kill as the fallback. `OpcUaProtocolService.shutdown()` stops the OPC UA runtime, acks, then exits the process on a daemon thread. — 02
 - [ ] IS-091 [BE] ⬜ [io] Artifact version compatibility (reject newer-than-supported) — 06
 - [ ] IS-092 [BE] ⬜ [io] Retention & cleanup (size/age/dependency-aware) — SPEC + 06
 - [x] IS-093 [BE] ✅ [persist] Value-timeline partitioning (table partition-ready) — 04

@@ -14,6 +14,7 @@ import com.ainclusive.iotsim.workercontract.v1.InjectFaultRequest;
 import com.ainclusive.iotsim.workercontract.v1.ProtocolDataSourceGrpc;
 import com.ainclusive.iotsim.workercontract.v1.Schema;
 import com.ainclusive.iotsim.workercontract.v1.SecurityConfig;
+import com.ainclusive.iotsim.workercontract.v1.ShutdownRequest;
 import com.ainclusive.iotsim.workercontract.v1.StartRequest;
 import com.ainclusive.iotsim.workercontract.v1.StopRequest;
 import io.grpc.Server;
@@ -107,6 +108,16 @@ class WorkerClientTest {
         }
     }
 
+    @Test
+    void shutdownAsksWorkerToExit() throws Exception {
+        int port = startServer(WorkerContract.VERSION);
+        try (WorkerClient client = new WorkerClient("127.0.0.1", port)) {
+            Ack ack = client.shutdown();
+            assertThat(ack.getOk()).isTrue();
+            assertThat(client.health().getState()).isEqualTo("SHUTTING_DOWN");
+        }
+    }
+
     /** Minimal worker stand-in returning a configurable contract version. */
     private static final class TestProtocolService
             extends ProtocolDataSourceGrpc.ProtocolDataSourceImplBase {
@@ -155,6 +166,12 @@ class WorkerClientTest {
         @Override
         public void injectFault(InjectFaultRequest request, StreamObserver<Ack> obs) {
             lastFaultRequest.set(request);
+            ackOk(obs);
+        }
+
+        @Override
+        public void shutdown(ShutdownRequest request, StreamObserver<Ack> obs) {
+            state.set("SHUTTING_DOWN");
             ackOk(obs);
         }
 

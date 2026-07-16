@@ -699,8 +699,20 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
         throw new WorkerLaunchException("worker did not become ready in time", last);
     }
 
+    /**
+     * Tears a worker's IPC channel down: asks it to exit gracefully (RPC {@code
+     * Shutdown}), then closes the channel. The shutdown call is best-effort — a
+     * worker that is unreachable or already gone still gets its channel closed;
+     * {@link ProcessWorkerLauncher}'s terminate-with-grace-then-kill is the
+     * safety net if the process does not exit on its own.
+     */
     private static void closeQuietly(WorkerClient client) {
         if (client != null) {
+            try {
+                client.shutdown();
+            } catch (RuntimeException ignored) {
+                // best effort; worker may be unreachable or already gone
+            }
             try {
                 client.close();
             } catch (RuntimeException ignored) {
@@ -985,14 +997,7 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
             if (toCancel != null) {
                 toCancel.cancel(true);
             }
-            if (clientToClose != null) {
-                try {
-                    clientToClose.stop();
-                } catch (RuntimeException ignored) {
-                    // best effort; we are tearing down
-                }
-                clientToClose.close();
-            }
+            closeQuietly(clientToClose);
             if (toClose != null) {
                 toClose.close();
             }
