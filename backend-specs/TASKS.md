@@ -252,7 +252,7 @@ import/export. Modbus moved to Wave G (deferred) — see the note there.
 - [ ] IS-091 [BE] ⬜ [io] Artifact version compatibility (reject newer-than-supported) — 06
 - [ ] IS-092 [BE] ⬜ [io] Retention & cleanup (size/age/dependency-aware) — SPEC + 06
 - [x] IS-093 [BE] ✅ [persist] Value-timeline partitioning (table partition-ready) — 04
-- [ ] IS-094 [BE] ⬜ [schema] Schema dependency/impact checks before save — 01
+- [x] IS-094 [BE] ✅ [schema] Schema dependency/impact checks before save — `SchemaService.save()` rejects a SYNTHETIC source's schema edit that removes or retypes (kind/dataType) a nodeId still driven by that source's own synthetic config, throwing `SchemaImpactException` (→ 422 with an `issues` list). Malformed `runtimeConfig` JSON fails loud instead of silently skipping the check. — 01
 - [x] IS-095 [BE] ✅ [build] CI pipeline (build + test on push) — 07 (delivered as IS-098)
 - [ ] IS-096 [BE] ⬜ [build] Self-contained local distribution (jlink/jpackage) — 07/STACK
 

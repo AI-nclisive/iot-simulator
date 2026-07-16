@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
+import com.ainclusive.iotsim.domain.common.SchemaImpactException;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRepository;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRow;
 import com.ainclusive.iotsim.persistence.schema.SchemaRepository;
@@ -22,17 +23,22 @@ import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.ObjectMapper;
 
 class SchemaServiceTest {
 
     private static final String PROJECT = "proj-1";
     private static final String SOURCE = "ds-1";
 
+    private InMemorySchemaRepository schemaRepo;
+    private FakeDataSourceRepository dataSourceRepo;
     private SchemaService service;
 
     @BeforeEach
     void setUp() {
-        service = new SchemaService(new InMemorySchemaRepository(), new FakeDataSourceRepository(SOURCE, PROJECT));
+        schemaRepo = new InMemorySchemaRepository();
+        dataSourceRepo = new FakeDataSourceRepository(SOURCE, PROJECT);
+        service = new SchemaService(schemaRepo, dataSourceRepo, new ObjectMapper());
     }
 
     private static List<SchemaNode> sampleNodes() {
@@ -76,6 +82,71 @@ class SchemaServiceTest {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
+    @Test
+    void removingNodeStillDrivenByOwnSyntheticConfigIsRejected() {
+        dataSourceRepo.basis = "SYNTHETIC";
+        dataSourceRepo.runtimeConfig = "{\"variables\":[{\"nodeId\":\"v1\",\"dataType\":\"FLOAT64\"}]}";
+        service.save(PROJECT, SOURCE, sampleNodes());
+
+        List<SchemaNode> withoutV1 = List.of(sampleNodes().get(0));
+        assertThatThrownBy(() -> service.save(PROJECT, SOURCE, withoutV1))
+                .isInstanceOf(SchemaImpactException.class)
+                .satisfies(e -> assertThat(((SchemaImpactException) e).issues())
+                        .anyMatch(issue -> issue.contains("v1")));
+
+        // rejected save must not have persisted a new version
+        assertThat(service.get(PROJECT, SOURCE).version()).isEqualTo(1);
+    }
+
+    @Test
+    void removingUnreferencedNodeOnSyntheticSourceSucceeds() {
+        dataSourceRepo.basis = "SYNTHETIC";
+        dataSourceRepo.runtimeConfig = "{\"variables\":[{\"nodeId\":\"other\",\"dataType\":\"FLOAT64\"}]}";
+        service.save(PROJECT, SOURCE, sampleNodes());
+
+        List<SchemaNode> withoutV1 = List.of(sampleNodes().get(0));
+        Schema v2 = service.save(PROJECT, SOURCE, withoutV1);
+        assertThat(v2.version()).isEqualTo(2);
+    }
+
+    @Test
+    void nonSyntheticSourceSkipsImpactCheck() {
+        service.save(PROJECT, SOURCE, sampleNodes());
+        List<SchemaNode> withoutV1 = List.of(sampleNodes().get(0));
+        Schema v2 = service.save(PROJECT, SOURCE, withoutV1);
+        assertThat(v2.version()).isEqualTo(2);
+    }
+
+    @Test
+    void retypingNodeStillDrivenByOwnSyntheticConfigIsRejected() {
+        dataSourceRepo.basis = "SYNTHETIC";
+        dataSourceRepo.runtimeConfig = "{\"variables\":[{\"nodeId\":\"v1\",\"dataType\":\"FLOAT64\"}]}";
+        service.save(PROJECT, SOURCE, sampleNodes());
+
+        // v1 kept, but retyped to INT32 — the config's FLOAT64 variable is now driving a mismatched node.
+        List<SchemaNode> retyped = List.of(
+                sampleNodes().get(0),
+                new SchemaNode("v1", "f1", "Plant/Temp", "Temp",
+                        NodeKind.VARIABLE, DataType.INT32, ValueRank.SCALAR, Access.READ, "degC", null));
+        assertThatThrownBy(() -> service.save(PROJECT, SOURCE, retyped))
+                .isInstanceOf(SchemaImpactException.class)
+                .satisfies(e -> assertThat(((SchemaImpactException) e).issues())
+                        .anyMatch(issue -> issue.contains("v1")));
+    }
+
+    @Test
+    void malformedRuntimeConfigOnBreakingSaveFailsLoudInsteadOfSilentlySkipping() {
+        dataSourceRepo.basis = "SYNTHETIC";
+        dataSourceRepo.runtimeConfig = "not json";
+        // First save: no current version yet, so the impact check never parses the config.
+        service.save(PROJECT, SOURCE, sampleNodes());
+
+        List<SchemaNode> withoutV1 = List.of(sampleNodes().get(0));
+        assertThatThrownBy(() -> service.save(PROJECT, SOURCE, withoutV1))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("invalid synthetic runtimeConfig");
+    }
+
     private static final class InMemorySchemaRepository implements SchemaRepository {
         private final Map<String, List<SchemaWithNodes>> byDataSource = new HashMap<>();
 
@@ -101,6 +172,8 @@ class SchemaServiceTest {
     private static final class FakeDataSourceRepository implements DataSourceRepository {
         private final String id;
         private final String projectId;
+        private String basis = "MANUAL";
+        private String runtimeConfig = "{}";
 
         FakeDataSourceRepository(String id, String projectId) {
             this.id = id;
@@ -113,8 +186,8 @@ class SchemaServiceTest {
                 return Optional.empty();
             }
             OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-            return Optional.of(new DataSourceRow(id, projectId, "src", "OPC_UA", "MANUAL",
-                    null, null, 0, null, "{}", null, false, now, now, "local", 0));
+            return Optional.of(new DataSourceRow(id, projectId, "src", "OPC_UA", basis,
+                    null, null, 0, null, runtimeConfig, null, false, now, now, "local", 0));
         }
 
         @Override

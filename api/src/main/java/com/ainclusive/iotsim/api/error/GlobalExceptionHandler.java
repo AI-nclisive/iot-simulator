@@ -5,6 +5,7 @@ import com.ainclusive.iotsim.domain.common.FeatureNotAvailableException;
 import com.ainclusive.iotsim.domain.common.PortInUseException;
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.domain.common.ScenarioInvalidException;
+import com.ainclusive.iotsim.domain.common.SchemaImpactException;
 import com.ainclusive.iotsim.domain.common.SchemaVersionMismatchException;
 import com.ainclusive.iotsim.domain.io.ProjectImportException;
 import com.ainclusive.iotsim.platform.capture.CaptureException;
@@ -76,6 +77,13 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(ScenarioInvalidException.class)
     public ProblemDetail scenarioInvalid(ScenarioInvalidException e) {
+        ProblemDetail pd = problem(HttpStatus.UNPROCESSABLE_ENTITY, e.getMessage());
+        pd.setProperty("issues", e.issues());
+        return pd;
+    }
+
+    @ExceptionHandler(SchemaImpactException.class)
+    public ProblemDetail schemaImpact(SchemaImpactException e) {
         ProblemDetail pd = problem(HttpStatus.UNPROCESSABLE_ENTITY, e.getMessage());
         pd.setProperty("issues", e.issues());
         return pd;
