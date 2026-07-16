@@ -828,7 +828,7 @@ Parallel execution:
   Done when: source/recording selects load from API; server issues merged into builder validation summary; field contracts correct; typecheck + vitest pass.
 
 - [x] `UI-127` Wire scenario CRUD + validate to live backend API
-  Goal: replace in-memory mock store with real API calls for scenarios CRUD and validation. Keep run/stop as no-ops (UI-129, blocked on IS-141).
+  Goal: replace in-memory mock store with real API calls for scenarios CRUD and validation. Keep run/stop as no-ops (wired later in UI-129).
   Surface: `Scenarios`, `Scenario Builder`
   Work includes: `scenarios-api.ts` with FE↔BE mappers (type case, sourceId↔targetSourceId, params encoding); async Zustand store with loadScenarios/createScenario/renameScenario/duplicateScenario/deleteScenario/saveScenarioSteps; load-on-mount in scenarios-page and builder; Save button in builder with loading state; loading/error states in scenarios-page.
   Depends: IS-136 scenarios API.
