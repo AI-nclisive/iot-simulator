@@ -47,6 +47,8 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSourceImplBase {
 
+    private static final int SHUTDOWN_FLUSH_DELAY_MS = 200;
+
     private final AtomicReference<String> state = new AtomicReference<>("READY");
     private final AtomicLong applied = new AtomicLong();
     private final AtomicInteger configuredNodes = new AtomicInteger();
@@ -330,7 +332,10 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
         ackOk(obs, "shutting down");
         Thread exit = new Thread(() -> {
             try {
-                Thread.sleep(200);
+                // Empirically enough for gRPC to flush the ack over loopback. If interrupted,
+                // exit immediately anyway; the supervisor's terminate-with-grace-then-kill
+                // fallback covers the (rare) case where the ack hasn't flushed yet.
+                Thread.sleep(SHUTDOWN_FLUSH_DELAY_MS);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
