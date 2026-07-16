@@ -61,7 +61,7 @@ class ScanServiceTest {
                 dataSourceRepo, projects, schemaRepo, new InMemoryRuntimeController(), credentials,
                 new ObjectMapper(), "localhost",
                 new ActivityEventService(new NoOpActivityEventRepository()));
-        SchemaService schemas = new SchemaService(schemaRepo, dataSourceRepo);
+        SchemaService schemas = new SchemaService(schemaRepo, dataSourceRepo, new ObjectMapper());
         // Synchronous executor so the async scan completes inline for deterministic asserts.
         service = new ScanService(scanner, projects, dataSources, schemas, Runnable::run);
     }
@@ -136,7 +136,7 @@ class ScanServiceTest {
         assertThat(created.credentialState().name()).isEqualTo("MISSING");
         assertThat(credentials.has(created.id())).isFalse();
 
-        Schema schema = new SchemaService(schemaRepo, dataSourceRepo).get(PROJECT, created.id());
+        Schema schema = new SchemaService(schemaRepo, dataSourceRepo, new ObjectMapper()).get(PROJECT, created.id());
         // Folder + the FLOAT64 variable persist; the excluded unknown-typed variable is dropped.
         assertThat(schema.nodes()).hasSize(2);
         assertThat(schema.nodes()).noneMatch(n -> "unknownVar".equals(n.name()));
@@ -151,7 +151,7 @@ class ScanServiceTest {
         DataSource created = service.createFromScan(PROJECT, job.jobId(), "Scanned", "{}",
                 List.of(new TypeResolution("ns=2;s=x", "INT32", null, null, false)), "alice");
 
-        Schema schema = new SchemaService(schemaRepo, dataSourceRepo).get(PROJECT, created.id());
+        Schema schema = new SchemaService(schemaRepo, dataSourceRepo, new ObjectMapper()).get(PROJECT, created.id());
         assertThat(schema.nodes()).hasSize(3);
         assertThat(schema.nodes())
                 .filteredOn(n -> "unknownVar".equals(n.name()))
@@ -205,7 +205,7 @@ class ScanServiceTest {
                         new InMemorySchemaRepository(dataSourceRepo), new InMemoryRuntimeController(), credentials,
                         new ObjectMapper(), "localhost",
                         new ActivityEventService(new NoOpActivityEventRepository())),
-                new SchemaService(new InMemorySchemaRepository(dataSourceRepo), dataSourceRepo),
+                new SchemaService(new InMemorySchemaRepository(dataSourceRepo), dataSourceRepo, new ObjectMapper()),
                 task -> { /* never executes */ });
         ScanJob job = pending.startScan(PROJECT, "OPC_UA", "opc.tcp://h", ConnectionCredentials.anonymous(), 0);
         assertThatThrownBy(() -> pending.createFromScan(PROJECT, job.jobId(), "x", null, List.of(), "a"))
