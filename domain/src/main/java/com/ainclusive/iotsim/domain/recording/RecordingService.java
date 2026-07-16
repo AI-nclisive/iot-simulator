@@ -1,14 +1,23 @@
 package com.ainclusive.iotsim.domain.recording;
 
 import com.ainclusive.iotsim.domain.activityevent.ActivityEventService;
+import com.ainclusive.iotsim.domain.common.JsonField;
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
+import com.ainclusive.iotsim.domain.common.RetentionDependencyException;
 import com.ainclusive.iotsim.domain.support.Page;
 import com.ainclusive.iotsim.domain.support.PageCursor;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRepository;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRow;
+import com.ainclusive.iotsim.persistence.evidence.EvidenceRepository;
+import com.ainclusive.iotsim.persistence.evidence.EvidenceRow;
 import com.ainclusive.iotsim.persistence.project.ProjectRepository;
 import com.ainclusive.iotsim.persistence.recording.RecordingRepository;
 import com.ainclusive.iotsim.persistence.recording.RecordingRow;
+import com.ainclusive.iotsim.persistence.run.RunRepository;
+import com.ainclusive.iotsim.persistence.run.RunRow;
+import com.ainclusive.iotsim.persistence.scenario.ScenarioRepository;
+import com.ainclusive.iotsim.persistence.scenario.ScenarioRow;
+import com.ainclusive.iotsim.persistence.scenario.ScenarioStepRow;
 import com.ainclusive.iotsim.persistence.schema.SchemaRepository;
 import com.ainclusive.iotsim.persistence.schema.SchemaWithNodes;
 import com.ainclusive.iotsim.persistence.timeline.ValueTimelineRepository;
@@ -22,12 +31,17 @@ import com.ainclusive.iotsim.protocolmodel.NeutralValue;
 import com.ainclusive.iotsim.protocolmodel.NodeKind;
 import com.ainclusive.iotsim.protocolmodel.ScanType;
 import com.ainclusive.iotsim.protocolmodel.ValueFilter;
+import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.ObjectMapper;
 
 /** Recording lifecycle: create, capture values, finalize (backend-specs/03). */
 @Service
@@ -41,13 +55,19 @@ public class RecordingService {
     private final SourceCapturer capturer;
     private final ProjectRepository projects;
     private final ActivityEventService activity;
+    private final ScenarioRepository scenarios;
+    private final RunRepository runs;
+    private final EvidenceRepository evidence;
+    private final ObjectMapper json;
 
     // Live captures in progress, keyed by data-source id (one capture per source).
     private final Map<String, ActiveCapture> active = new ConcurrentHashMap<>();
 
     public RecordingService(RecordingRepository recordings, ValueTimelineRepository timeline,
             DataSourceRepository dataSources, SchemaRepository schemas, CredentialStore credentials,
-            SourceCapturer capturer, ProjectRepository projects, ActivityEventService activity) {
+            SourceCapturer capturer, ProjectRepository projects, ActivityEventService activity,
+            ScenarioRepository scenarios, RunRepository runs, EvidenceRepository evidence,
+            ObjectMapper json) {
         this.recordings = recordings;
         this.timeline = timeline;
         this.dataSources = dataSources;
@@ -56,6 +76,10 @@ public class RecordingService {
         this.capturer = capturer;
         this.projects = projects;
         this.activity = activity;
+        this.scenarios = scenarios;
+        this.runs = runs;
+        this.evidence = evidence;
+        this.json = json;
     }
 
     @Transactional
@@ -149,12 +173,117 @@ public class RecordingService {
     public Recording complete(String projectId, String recordingId) {
         RecordingRow recording = requireRecording(projectId, recordingId);
         long count = timeline.count(recordingId);
-        return map(recordings.finalizeStats(
-                recordingId, recording.timeStart(), recording.timeEnd(), count, 0L));
+        long sizeBytes = timeline.sumBytes(recordingId);
+        RecordingRow updated = recordings.finalizeStats(
+                recordingId, recording.timeStart(), recording.timeEnd(), count, sizeBytes);
+        UsageContext usage = usageContext(projectId);
+        return map(updated, usage.lastUsedAt(recordingId), usage.hasDependents(recordingId));
+    }
+
+    /**
+     * Deletes a recording and its captured values (IS-092: retention & cleanup).
+     * Rejected with {@link RetentionDependencyException} if a scenario step still
+     * targets it (by {@code params.recordingId}) or an active/queued run was started
+     * from it — dropping the recording out from under either would break replay.
+     * A no-op (no activity emitted) if the row was already deleted by a concurrent
+     * request that won the race.
+     */
+    @Transactional
+    public void delete(String projectId, String recordingId, String actor) {
+        requireRecording(projectId, recordingId);
+        List<String> issues = usageContext(projectId).issuesFor(recordingId);
+        if (!issues.isEmpty()) {
+            throw new RetentionDependencyException(recordingId, issues);
+        }
+        timeline.deleteByRecording(recordingId);
+        if (recordings.deleteById(recordingId)) {
+            activity.emit(projectId, actor, "delete", "recording", recordingId);
+        }
+    }
+
+    /**
+     * Recording count for a project without the usage/dependency scan below — used by
+     * surfaces (e.g. the project overview dashboard) that only need "how many" (IS-092).
+     */
+    public long count(String projectId) {
+        return recordings.countByProject(projectId);
+    }
+
+    /**
+     * Every recording's last-replay time and active (scenario/run) references for a
+     * project, computed in one pass: one {@code runs.findByProject} plus one batched
+     * {@code evidence.findByProject} (not a DB round-trip per run), shared by
+     * {@code list}, {@code listPaged}, {@code get}, and {@code complete} (IS-092).
+     */
+    private UsageContext usageContext(String projectId) {
+        Map<String, EvidenceRow> evidenceById = evidence.findByProject(projectId).stream()
+                .collect(Collectors.toMap(EvidenceRow::id, e -> e));
+        Map<String, Instant> lastUsed = new HashMap<>();
+        List<DependencyRef> activeRefs = new ArrayList<>();
+        for (RunRow run : runs.findByProject(projectId)) {
+            if (run.evidenceId() == null) {
+                continue;
+            }
+            EvidenceRow ev = evidenceById.get(run.evidenceId());
+            String recordingId = ev != null ? recordingIdField(ev.manifestJson()) : null;
+            if (recordingId == null) {
+                continue;
+            }
+            Instant at = run.startedAt() != null ? run.startedAt().toInstant() : run.createdAt().toInstant();
+            lastUsed.merge(recordingId, at, (a, b) -> a.isAfter(b) ? a : b);
+            if ("RUNNING".equals(run.state()) || "QUEUED".equals(run.state())) {
+                activeRefs.add(new DependencyRef(recordingId, "referenced by an active run (" + run.id() + ")"));
+            }
+        }
+        for (ScenarioRow scenario : scenarios.findByProject(projectId)) {
+            for (ScenarioStepRow step : scenario.steps()) {
+                String recordingId = "REPLAY".equals(step.type())
+                        ? JsonField.text(json, step.params(), "recordingId") : null;
+                if (recordingId != null) {
+                    activeRefs.add(new DependencyRef(recordingId,
+                            "referenced by step " + step.ordinal() + " of scenario \"" + scenario.name() + "\""));
+                }
+            }
+        }
+        return new UsageContext(lastUsed, activeRefs);
+    }
+
+    /**
+     * Extracts the {@code recordingId} field written into a run's evidence manifest by
+     * {@code ReplayService}/{@code ReplayLiveRunService}'s {@code manifest()}/{@code seed()}
+     * helpers when a replay starts — the only producers of this key. Renaming it there
+     * without updating this reader silently stops matching (IS-092).
+     */
+    private String recordingIdField(String manifestJson) {
+        return JsonField.text(json, manifestJson, "recordingId");
+    }
+
+    /** One recording's active (blocking) reference, with a human-readable reason. */
+    private record DependencyRef(String recordingId, String description) {}
+
+    /** Per-project usage snapshot shared across the read paths below (IS-092). */
+    private record UsageContext(Map<String, Instant> lastUsedAt, List<DependencyRef> activeDependents) {
+        Instant lastUsedAt(String recordingId) {
+            return lastUsedAt.get(recordingId);
+        }
+
+        boolean hasDependents(String recordingId) {
+            return activeDependents.stream().anyMatch(ref -> ref.recordingId().equals(recordingId));
+        }
+
+        List<String> issuesFor(String recordingId) {
+            return activeDependents.stream()
+                    .filter(ref -> ref.recordingId().equals(recordingId))
+                    .map(DependencyRef::description)
+                    .toList();
+        }
     }
 
     public List<Recording> list(String projectId) {
-        return recordings.findByProject(projectId).stream().map(this::map).toList();
+        UsageContext usage = usageContext(projectId);
+        return recordings.findByProject(projectId).stream()
+                .map(r -> map(r, usage.lastUsedAt(r.id()), usage.hasDependents(r.id())))
+                .toList();
     }
 
     public Page<Recording> listPaged(String projectId, String cursor, Integer limit) {
@@ -170,11 +299,16 @@ public class RecordingService {
             RecordingRow last = rows.get(rows.size() - 1);
             nextCursor = PageCursor.encode(last.createdAt(), last.id());
         }
-        return new Page<>(rows.stream().map(this::map).toList(), nextCursor, size);
+        UsageContext usage = usageContext(projectId);
+        return new Page<>(rows.stream()
+                .map(r -> map(r, usage.lastUsedAt(r.id()), usage.hasDependents(r.id())))
+                .toList(), nextCursor, size);
     }
 
     public Recording get(String projectId, String recordingId) {
-        return map(requireRecording(projectId, recordingId));
+        RecordingRow row = requireRecording(projectId, recordingId);
+        UsageContext usage = usageContext(projectId);
+        return map(row, usage.lastUsedAt(recordingId), usage.hasDependents(recordingId));
     }
 
     /**
@@ -257,10 +391,16 @@ public class RecordingService {
                 .orElseThrow(() -> new ResourceNotFoundException("Recording", recordingId));
     }
 
+    /** Maps a freshly created/updated row with no usage context yet (create, startCapture). */
     private Recording map(RecordingRow r) {
+        return map(r, null, false);
+    }
+
+    private Recording map(RecordingRow r, Instant lastUsedAt, boolean hasDependents) {
         return new Recording(
                 r.id(), r.projectId(), r.dataSourceId(), r.schemaVersion(), r.origin(),
-                r.scanType(), r.name(), r.valueCount(), r.createdAt().toInstant(), r.createdBy(), r.version());
+                r.scanType(), r.name(), r.valueCount(), r.sizeBytes(), r.createdAt().toInstant(),
+                r.createdBy(), r.version(), lastUsedAt, hasDependents);
     }
 
     /** A live capture in progress: the recording it feeds and the session to stop. */

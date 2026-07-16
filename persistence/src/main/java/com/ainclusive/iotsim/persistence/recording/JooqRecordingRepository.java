@@ -81,6 +81,20 @@ public class JooqRecordingRepository implements RecordingRepository {
         return map(record);
     }
 
+    @Override
+    public boolean deleteById(String id) {
+        return dsl.deleteFrom(RECORDINGS).where(RECORDINGS.ID.eq(id)).execute() > 0;
+    }
+
+    @Override
+    public long countByProject(String projectId) {
+        Integer total = dsl.selectCount()
+                .from(RECORDINGS)
+                .where(RECORDINGS.PROJECT_ID.eq(projectId))
+                .fetchOne(0, Integer.class);
+        return total == null ? 0 : total;
+    }
+
     private RecordingRow map(RecordingsRecord r) {
         return new RecordingRow(
                 r.getId(),

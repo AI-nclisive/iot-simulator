@@ -4,6 +4,7 @@ import com.ainclusive.iotsim.domain.common.ConcurrencyConflictException;
 import com.ainclusive.iotsim.domain.common.FeatureNotAvailableException;
 import com.ainclusive.iotsim.domain.common.PortInUseException;
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
+import com.ainclusive.iotsim.domain.common.RetentionDependencyException;
 import com.ainclusive.iotsim.domain.common.ScenarioInvalidException;
 import com.ainclusive.iotsim.domain.common.SchemaImpactException;
 import com.ainclusive.iotsim.domain.common.SchemaVersionMismatchException;
@@ -84,6 +85,13 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(SchemaImpactException.class)
     public ProblemDetail schemaImpact(SchemaImpactException e) {
+        ProblemDetail pd = problem(HttpStatus.UNPROCESSABLE_ENTITY, e.getMessage());
+        pd.setProperty("issues", e.issues());
+        return pd;
+    }
+
+    @ExceptionHandler(RetentionDependencyException.class)
+    public ProblemDetail retentionDependency(RetentionDependencyException e) {
         ProblemDetail pd = problem(HttpStatus.UNPROCESSABLE_ENTITY, e.getMessage());
         pd.setProperty("issues", e.issues());
         return pd;

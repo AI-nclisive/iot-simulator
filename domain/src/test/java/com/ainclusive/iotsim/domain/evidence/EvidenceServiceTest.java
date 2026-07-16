@@ -380,6 +380,14 @@ class EvidenceServiceTest {
             throw new UnsupportedOperationException();
         }
 
+        public long sumBytes(String recordingId) {
+            throw new UnsupportedOperationException();
+        }
+
+        public void deleteByRecording(String recordingId) {
+            throw new UnsupportedOperationException();
+        }
+
         public List<ValueTimelineEntry> readPage(String recordingId, long afterSeq, int limit,
                 com.ainclusive.iotsim.protocolmodel.ValueFilter filter) {
             throw new UnsupportedOperationException();

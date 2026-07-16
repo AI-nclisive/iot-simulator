@@ -486,6 +486,14 @@ class ReplayLiveRunServiceTest {
         public RecordingRow finalizeStats(String i, OffsetDateTime s, OffsetDateTime e, long c, long b) {
             throw new UnsupportedOperationException();
         }
+
+        public boolean deleteById(String id) {
+            throw new UnsupportedOperationException();
+        }
+
+        public long countByProject(String projectId) {
+            throw new UnsupportedOperationException();
+        }
     }
 
     private record FakeRecordingsAtVersion(String id, String projectId, int schemaVersion)
@@ -515,6 +523,14 @@ class ReplayLiveRunServiceTest {
         public RecordingRow finalizeStats(String i, OffsetDateTime s, OffsetDateTime e, long c, long b) {
             throw new UnsupportedOperationException();
         }
+
+        public boolean deleteById(String id) {
+            throw new UnsupportedOperationException();
+        }
+
+        public long countByProject(String projectId) {
+            throw new UnsupportedOperationException();
+        }
     }
 
     private record FakeTimeline(List<NeutralValue> values) implements ValueTimelineRepository {
@@ -536,6 +552,14 @@ class ReplayLiveRunServiceTest {
 
         public List<ValueTimelineRepository.ValueTimelineEntry> readPage(String recordingId, long afterSeq, int limit,
                 ValueFilter filter) {
+            throw new UnsupportedOperationException();
+        }
+
+        public long sumBytes(String recordingId) {
+            throw new UnsupportedOperationException();
+        }
+
+        public void deleteByRecording(String recordingId) {
             throw new UnsupportedOperationException();
         }
     }

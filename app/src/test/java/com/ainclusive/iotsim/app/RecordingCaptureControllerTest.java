@@ -28,7 +28,8 @@ class RecordingCaptureControllerTest {
     }
 
     private static Recording sample(long version) {
-        return new Recording("rec1", "p1", "ds1", 2, "SCAN_RECORD", "SCHEMA_AND_DATA", null, 0, Instant.now(), "local", version);
+        return new Recording("rec1", "p1", "ds1", 2, "SCAN_RECORD", "SCHEMA_AND_DATA", null, 0, 0L,
+                Instant.now(), "local", version, null, false);
     }
 
     @Test

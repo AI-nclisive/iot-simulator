@@ -6,12 +6,21 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.ainclusive.iotsim.domain.activityevent.ActivityEventService;
 import com.ainclusive.iotsim.domain.activityevent.NoOpActivityEventRepository;
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
+import com.ainclusive.iotsim.domain.common.RetentionDependencyException;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRepository;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRow;
+import com.ainclusive.iotsim.persistence.evidence.EvidenceRepository;
+import com.ainclusive.iotsim.persistence.evidence.EvidenceRow;
 import com.ainclusive.iotsim.persistence.project.ProjectRepository;
 import com.ainclusive.iotsim.persistence.project.ProjectRow;
 import com.ainclusive.iotsim.persistence.recording.RecordingRepository;
 import com.ainclusive.iotsim.persistence.recording.RecordingRow;
+import com.ainclusive.iotsim.persistence.run.RunRepository;
+import com.ainclusive.iotsim.persistence.run.RunRow;
+import com.ainclusive.iotsim.persistence.scenario.ScenarioRepository;
+import com.ainclusive.iotsim.persistence.scenario.ScenarioRow;
+import com.ainclusive.iotsim.persistence.scenario.ScenarioStepInput;
+import com.ainclusive.iotsim.persistence.scenario.ScenarioStepRow;
 import com.ainclusive.iotsim.persistence.schema.SchemaRepository;
 import com.ainclusive.iotsim.persistence.schema.SchemaWithNodes;
 import com.ainclusive.iotsim.persistence.timeline.ValueTimelineRepository;
@@ -39,6 +48,7 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.ObjectMapper;
 
 class RecordingServiceTest {
 
@@ -50,12 +60,18 @@ class RecordingServiceTest {
     private FakeDataSourceRepository sources;
     private FakeSchemaRepository schemas;
     private FakeCapturer capturer;
+    private InMemoryScenarioRepository scenarios;
+    private InMemoryRunRepository runs;
+    private InMemoryEvidenceRepository evidence;
 
     @BeforeEach
     void setUp() {
         sources = new FakeDataSourceRepository(SOURCE, PROJECT, ENDPOINT);
         schemas = new FakeSchemaRepository();
         capturer = new FakeCapturer();
+        scenarios = new InMemoryScenarioRepository();
+        runs = new InMemoryRunRepository();
+        evidence = new InMemoryEvidenceRepository();
         service = new RecordingService(
                 new InMemoryRecordingRepository(),
                 new InMemoryValueTimelineRepository(),
@@ -64,7 +80,11 @@ class RecordingServiceTest {
                 new InMemoryCredentialStore(),
                 capturer,
                 fakeProjects(),
-                new ActivityEventService(new NoOpActivityEventRepository()));
+                new ActivityEventService(new NoOpActivityEventRepository()),
+                scenarios,
+                runs,
+                evidence,
+                new ObjectMapper());
     }
 
     @Test
@@ -203,7 +223,11 @@ class RecordingServiceTest {
                 new InMemoryValueTimelineRepository(), sources, schemas,
                 new com.ainclusive.iotsim.platform.secret.InMemoryCredentialStore(),
                 capturer, existingProject,
-                new ActivityEventService(new NoOpActivityEventRepository()));
+                new ActivityEventService(new NoOpActivityEventRepository()),
+                new InMemoryScenarioRepository(),
+                new InMemoryRunRepository(),
+                new InMemoryEvidenceRepository(),
+                new ObjectMapper());
         svc.create(PROJECT, SOURCE, com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_AND_DATA, null, "alice");
         svc.create(PROJECT, SOURCE, com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_AND_DATA, null, "bob");
         svc.create(PROJECT, SOURCE, com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_AND_DATA, null, "carol");
@@ -297,7 +321,173 @@ class RecordingServiceTest {
                 .hasMessageContaining("255");
     }
 
-        private static ProjectRepository fakeProjects() {
+    @Test
+    void countReturnsRecordingCountWithoutTouchingScenariosOrRuns() {
+        service.create(PROJECT, SOURCE, com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_AND_DATA, null, "a");
+        service.create(PROJECT, SOURCE, com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_AND_DATA, null, "b");
+
+        assertThat(service.count(PROJECT)).isEqualTo(2);
+    }
+
+    @Test
+    void completeComputesRealSizeBytesFromTimeline() {
+        Recording r = service.create(PROJECT, SOURCE,
+                com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_AND_DATA, null, "a");
+        Instant t = Instant.parse("2026-01-01T00:00:00Z");
+        service.appendValues(PROJECT, r.id(), List.of(
+                NeutralValue.good("v1", t, 1.0), NeutralValue.good("v1", t.plusMillis(1), 2.0)));
+
+        Recording completed = service.complete(PROJECT, r.id());
+        assertThat(completed.sizeBytes()).isPositive();
+    }
+
+    @Test
+    void deleteRemovesRecordingAndItsValues() {
+        Recording r = service.create(PROJECT, SOURCE,
+                com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_AND_DATA, null, "a");
+        service.appendValues(PROJECT, r.id(), List.of(
+                NeutralValue.good("v1", Instant.parse("2026-01-01T00:00:00Z"), 1.0)));
+
+        service.delete(PROJECT, r.id(), "alice");
+
+        assertThatThrownBy(() -> service.get(PROJECT, r.id()))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void deleteLostRaceIsANoOpAndDoesNotEmitActivity() {
+        Recording r = service.create(PROJECT, SOURCE,
+                com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_AND_DATA, null, "a");
+
+        // Simulates two concurrent deletes both passing requireRecording before either
+        // commits: the repository row is already gone by the time deleteById runs.
+        RecordingRepository staleRow = new RecordingRepository() {
+            @Override
+            public RecordingRow create(String projectId, String dataSourceId, int schemaVersion,
+                    String origin, String scanType, String name, String createdBy) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public java.util.Optional<RecordingRow> findById(String id) {
+                return java.util.Optional.of(new RecordingRow(id, PROJECT, SOURCE, 1, "SCAN_RECORD",
+                        "SCHEMA_AND_DATA", null, null, null, 0, 0, OffsetDateTime.now(ZoneOffset.UTC),
+                        OffsetDateTime.now(ZoneOffset.UTC), "a", 0));
+            }
+
+            @Override
+            public List<RecordingRow> findByProject(String projectId) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public List<RecordingRow> findByProjectPaged(String projectId, OffsetDateTime afterAt,
+                    String afterId, int limit) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public RecordingRow finalizeStats(String id, OffsetDateTime timeStart, OffsetDateTime timeEnd,
+                    long valueCount, long sizeBytes) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public boolean deleteById(String id) {
+                return false;
+            }
+
+            @Override
+            public long countByProject(String projectId) {
+                throw new UnsupportedOperationException();
+            }
+        };
+        CountingActivityEventRepository activityLog = new CountingActivityEventRepository();
+        RecordingService raced = new RecordingService(staleRow, new InMemoryValueTimelineRepository(),
+                sources, schemas, new InMemoryCredentialStore(), capturer, fakeProjects(),
+                new ActivityEventService(activityLog), scenarios, runs, evidence, new ObjectMapper());
+
+        raced.delete(PROJECT, r.id(), "alice");
+
+        assertThat(activityLog.count).isZero();
+    }
+
+    private static final class CountingActivityEventRepository
+            implements com.ainclusive.iotsim.persistence.activityevent.ActivityEventRepository {
+        int count;
+
+        @Override
+        public com.ainclusive.iotsim.persistence.activityevent.ActivityEventRow append(String projectId,
+                String actor, String action, String objectType, String objectId, String detailJson) {
+            count++;
+            return new com.ainclusive.iotsim.persistence.activityevent.ActivityEventRow(0, projectId, actor,
+                    action, objectType, objectId, OffsetDateTime.now(ZoneOffset.UTC), "{}");
+        }
+
+        @Override
+        public List<com.ainclusive.iotsim.persistence.activityevent.ActivityEventRow> query(
+                com.ainclusive.iotsim.persistence.activityevent.ActivityEventQuery filter) {
+            return List.of();
+        }
+    }
+
+    @Test
+    void deleteMissingRecordingThrowsNotFound() {
+        assertThatThrownBy(() -> service.delete(PROJECT, "nope", "alice"))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void deleteBlockedByScenarioStepStillTargetingIt() {
+        Recording r = service.create(PROJECT, SOURCE,
+                com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_AND_DATA, null, "a");
+        ScenarioStepRow step = new ScenarioStepRow(0, "REPLAY", SOURCE,
+                "{\"recordingId\":\"" + r.id() + "\"}");
+        scenarios.add(new ScenarioRow("scn-1", PROJECT, "Smoke", "READY", "{}", List.of(step),
+                OffsetDateTime.now(ZoneOffset.UTC), OffsetDateTime.now(ZoneOffset.UTC), "local", 0));
+
+        assertThatThrownBy(() -> service.delete(PROJECT, r.id(), "alice"))
+                .isInstanceOf(RetentionDependencyException.class)
+                .hasMessageContaining(r.id());
+
+        // rejected delete leaves the recording in place
+        assertThat(service.get(PROJECT, r.id()).id()).isEqualTo(r.id());
+    }
+
+    @Test
+    void deleteBlockedByActiveRunReplayingIt() {
+        Recording r = service.create(PROJECT, SOURCE,
+                com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_AND_DATA, null, "a");
+        evidence.add(new EvidenceRow("ev-1", PROJECT, "run-1", "CAPTURING",
+                "{\"recordingId\":\"" + r.id() + "\"}", null, OffsetDateTime.now(ZoneOffset.UTC), "local"));
+        runs.add(new RunRow("run-1", PROJECT, "REPLAY", "MANUAL", "local", "RUNNING", null, "ev-1",
+                OffsetDateTime.now(ZoneOffset.UTC), null, OffsetDateTime.now(ZoneOffset.UTC),
+                List.of(SOURCE), null));
+
+        assertThatThrownBy(() -> service.delete(PROJECT, r.id(), "alice"))
+                .isInstanceOf(RetentionDependencyException.class);
+    }
+
+    @Test
+    void getReflectsHasDependentsAndLastUsedAtFromRunHistory() {
+        Recording r = service.create(PROJECT, SOURCE,
+                com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_AND_DATA, null, "a");
+        assertThat(service.get(PROJECT, r.id()).hasDependents()).isFalse();
+        assertThat(service.get(PROJECT, r.id()).lastUsedAt()).isNull();
+
+        OffsetDateTime replayedAt = OffsetDateTime.parse("2026-02-01T00:00:00Z");
+        evidence.add(new EvidenceRow("ev-2", PROJECT, "run-2", "READY",
+                "{\"recordingId\":\"" + r.id() + "\"}", null, replayedAt, "local"));
+        runs.add(new RunRow("run-2", PROJECT, "REPLAY", "MANUAL", "local", "COMPLETED", null, "ev-2",
+                replayedAt, replayedAt.plusMinutes(1), replayedAt, List.of(SOURCE), null));
+
+        Recording after = service.get(PROJECT, r.id());
+        assertThat(after.lastUsedAt()).isEqualTo(replayedAt.toInstant());
+        // a completed (non-active) run does not block deletion
+        assertThat(after.hasDependents()).isFalse();
+    }
+
+    private static ProjectRepository fakeProjects() {
         return new ProjectRepository() {
             @Override public Optional<ProjectRow> findById(String id) { return Optional.empty(); }
             @Override public ProjectRow insert(String n, String d, String c) { throw new UnsupportedOperationException(); }
@@ -416,6 +606,16 @@ class RecordingServiceTest {
             rows.put(id, updated);
             return updated;
         }
+
+        @Override
+        public boolean deleteById(String id) {
+            return rows.remove(id) != null;
+        }
+
+        @Override
+        public long countByProject(String projectId) {
+            return rows.values().stream().filter(r -> r.projectId().equals(projectId)).count();
+        }
     }
 
     private static final class InMemoryValueTimelineRepository implements ValueTimelineRepository {
@@ -425,6 +625,16 @@ class RecordingServiceTest {
         public long append(String recordingId, List<NeutralValue> values) {
             byRecording.computeIfAbsent(recordingId, k -> new ArrayList<>()).addAll(values);
             return values.size();
+        }
+
+        @Override
+        public long sumBytes(String recordingId) {
+            return byRecording.getOrDefault(recordingId, List.of()).size() * 8L;
+        }
+
+        @Override
+        public void deleteByRecording(String recordingId) {
+            byRecording.remove(recordingId);
         }
 
         @Override
@@ -514,6 +724,152 @@ class RecordingServiceTest {
 
         @Override
         public boolean deleteById(String id) {
+            throw new UnsupportedOperationException();
+        }
+    }
+
+    /** Minimal scenario store: only what {@code RecordingService}'s dependency check reads. */
+    private static final class InMemoryScenarioRepository implements ScenarioRepository {
+        private final List<ScenarioRow> rows = new ArrayList<>();
+
+        void add(ScenarioRow row) {
+            rows.add(row);
+        }
+
+        @Override
+        public ScenarioRow create(String projectId, String name, String deterministicSettings,
+                List<ScenarioStepInput> steps, String createdBy) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Optional<ScenarioRow> findById(String id) {
+            return rows.stream().filter(r -> r.id().equals(id)).findFirst();
+        }
+
+        @Override
+        public List<ScenarioRow> findByProject(String projectId) {
+            return rows.stream().filter(r -> r.projectId().equals(projectId)).toList();
+        }
+
+        @Override
+        public List<ScenarioRow> findByProjectPaged(String projectId, OffsetDateTime afterAt,
+                String afterId, int limit) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Optional<ScenarioRow> update(String id, String name, String deterministicSettings,
+                List<ScenarioStepInput> steps, long expectedVersion) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public boolean deleteById(String id) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Optional<ScenarioRow> updateStatus(String id, String status) {
+            throw new UnsupportedOperationException();
+        }
+    }
+
+    /** Minimal run store: only what {@code RecordingService}'s dependency/last-used lookups read. */
+    private static final class InMemoryRunRepository implements RunRepository {
+        private final List<RunRow> rows = new ArrayList<>();
+
+        void add(RunRow row) {
+            rows.add(row);
+        }
+
+        @Override
+        public RunRow create(String projectId, String kind, String trigger, String initiator,
+                List<String> sourceIds, String scenarioId, String parentRunId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Optional<RunRow> findById(String id) {
+            return rows.stream().filter(r -> r.id().equals(id)).findFirst();
+        }
+
+        @Override
+        public List<RunRow> findByProject(String projectId) {
+            return rows.stream().filter(r -> r.projectId().equals(projectId)).toList();
+        }
+
+        @Override
+        public List<RunRow> findActiveByProject(String projectId) {
+            return rows.stream()
+                    .filter(r -> r.projectId().equals(projectId))
+                    .filter(r -> "RUNNING".equals(r.state()) || "QUEUED".equals(r.state()))
+                    .toList();
+        }
+
+        @Override
+        public RunRow start(String id, OffsetDateTime startedAt) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public RunRow end(String id, String terminalState, OffsetDateTime endedAt) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public RunRow linkEvidence(String runId, String evidenceId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<RunRow> findByProjectPaged(String projectId, OffsetDateTime afterAt,
+                String afterId, int limit) {
+            throw new UnsupportedOperationException();
+        }
+    }
+
+    /** Minimal evidence store: only what {@code RecordingService}'s manifest lookups read. */
+    private static final class InMemoryEvidenceRepository implements EvidenceRepository {
+        private final Map<String, EvidenceRow> rows = new HashMap<>();
+
+        void add(EvidenceRow row) {
+            rows.put(row.id(), row);
+        }
+
+        @Override
+        public EvidenceRow create(String projectId, String runId, String createdBy) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Optional<EvidenceRow> findById(String id) {
+            return Optional.ofNullable(rows.get(id));
+        }
+
+        @Override
+        public Optional<EvidenceRow> findByRun(String runId) {
+            return rows.values().stream().filter(e -> runId.equals(e.runId())).findFirst();
+        }
+
+        @Override
+        public List<EvidenceRow> findByProject(String projectId) {
+            return rows.values().stream().filter(e -> e.projectId().equals(projectId)).toList();
+        }
+
+        @Override
+        public List<EvidenceRow> findByProjectPaged(String projectId, OffsetDateTime afterAt,
+                String afterId, int limit) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public EvidenceRow updateManifest(String id, String manifestJson) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public EvidenceRow updateStatus(String id, String status, String objectRef) {
             throw new UnsupportedOperationException();
         }
     }

@@ -1,5 +1,6 @@
 package com.ainclusive.iotsim.domain.scenario;
 
+import com.ainclusive.iotsim.domain.common.JsonField;
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRepository;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRow;
@@ -13,8 +14,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
-import tools.jackson.core.JacksonException;
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /** Computes and persists a scenario's READY/INVALID status from cross-entity checks (IS-086). */
@@ -138,7 +137,7 @@ public class ScenarioValidationService {
     }
 
     private void requirePositiveLong(String paramsJson, String field, int at, List<ValidationIssue> issues) {
-        Long v = longValue(paramsJson, field);
+        Long v = JsonField.longValue(json, paramsJson, field);
         if (v == null || v <= 0) {
             issues.add(new ValidationIssue(at, ValidationIssue.ERROR,
                     "step requires params." + field + " > 0"));
@@ -146,24 +145,6 @@ public class ScenarioValidationService {
     }
 
     private String text(String paramsJson, String field) {
-        JsonNode n = node(paramsJson, field);
-        return n != null && n.isString() ? n.asString() : null;
-    }
-
-    private Long longValue(String paramsJson, String field) {
-        JsonNode n = node(paramsJson, field);
-        return n != null && n.isNumber() ? n.asLong() : null;
-    }
-
-    private JsonNode node(String paramsJson, String field) {
-        if (paramsJson == null || paramsJson.isBlank()) {
-            return null;
-        }
-        try {
-            JsonNode root = json.readTree(paramsJson);
-            return root.isObject() ? root.get(field) : null;
-        } catch (JacksonException e) {
-            return null;
-        }
+        return JsonField.text(json, paramsJson, field);
     }
 }

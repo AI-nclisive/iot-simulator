@@ -19,4 +19,10 @@ public interface RecordingRepository {
 
     RecordingRow finalizeStats(String id, OffsetDateTime timeStart, OffsetDateTime timeEnd,
             long valueCount, long sizeBytes);
+
+    /** Deletes the recording row. Returns {@code false} if it did not exist (IS-092). */
+    boolean deleteById(String id);
+
+    /** Recording count for a project without fetching the rows (IS-092: retention dashboard count). */
+    long countByProject(String projectId);
 }

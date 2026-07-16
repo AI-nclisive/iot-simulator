@@ -247,5 +247,15 @@ class SampleServiceTest {
                 java.time.OffsetDateTime timeEnd, long valueCount, long sizeBytes) {
             throw new UnsupportedOperationException();
         }
+
+        @Override
+        public boolean deleteById(String id) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public long countByProject(String projectId) {
+            throw new UnsupportedOperationException();
+        }
     }
 }
