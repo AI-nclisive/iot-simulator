@@ -396,6 +396,11 @@ class RecordingServiceTest {
             public boolean deleteById(String id) {
                 return false;
             }
+
+            @Override
+            public long countByProject(String projectId) {
+                throw new UnsupportedOperationException();
+            }
         };
         CountingActivityEventRepository activityLog = new CountingActivityEventRepository();
         RecordingService raced = new RecordingService(staleRow, new InMemoryValueTimelineRepository(),
@@ -605,6 +610,11 @@ class RecordingServiceTest {
         @Override
         public boolean deleteById(String id) {
             return rows.remove(id) != null;
+        }
+
+        @Override
+        public long countByProject(String projectId) {
+            return rows.values().stream().filter(r -> r.projectId().equals(projectId)).count();
         }
     }
 

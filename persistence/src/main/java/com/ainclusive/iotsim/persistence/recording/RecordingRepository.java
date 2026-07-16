@@ -21,7 +21,8 @@ public interface RecordingRepository {
             long valueCount, long sizeBytes);
 
     /** Deletes the recording row. Returns {@code false} if it did not exist (IS-092). */
-    default boolean deleteById(String id) {
-        throw new UnsupportedOperationException("deleteById not implemented");
-    }
+    boolean deleteById(String id);
+
+    /** Recording count for a project without fetching the rows (IS-092: retention dashboard count). */
+    long countByProject(String projectId);
 }

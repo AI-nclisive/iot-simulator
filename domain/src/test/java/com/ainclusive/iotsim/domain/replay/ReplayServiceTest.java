@@ -438,6 +438,16 @@ class ReplayServiceTest {
         public RecordingRow finalizeStats(String i, OffsetDateTime s, OffsetDateTime e, long c, long b) {
             throw new UnsupportedOperationException();
         }
+
+        @Override
+        public boolean deleteById(String id) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public long countByProject(String projectId) {
+            throw new UnsupportedOperationException();
+        }
     }
 
     private record FakeTimeline(List<NeutralValue> values) implements ValueTimelineRepository {
@@ -464,6 +474,16 @@ class ReplayServiceTest {
         @Override
         public List<ValueTimelineEntry> readPage(String recordingId, long afterSeq, int limit,
                 com.ainclusive.iotsim.protocolmodel.ValueFilter filter) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public long sumBytes(String recordingId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void deleteByRecording(String recordingId) {
             throw new UnsupportedOperationException();
         }
     }
@@ -511,6 +531,16 @@ class ReplayServiceTest {
 
         @Override
         public RecordingRow finalizeStats(String i, OffsetDateTime s, OffsetDateTime e, long c, long b) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public boolean deleteById(String id) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public long countByProject(String projectId) {
             throw new UnsupportedOperationException();
         }
     }

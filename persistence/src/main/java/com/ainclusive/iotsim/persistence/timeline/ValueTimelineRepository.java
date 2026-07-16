@@ -23,14 +23,10 @@ public interface ValueTimelineRepository {
     long count(String recordingId);
 
     /** Total encoded-value bytes stored for a recording (IS-092: real {@code sizeBytes}). */
-    default long sumBytes(String recordingId) {
-        throw new UnsupportedOperationException("sumBytes not implemented");
-    }
+    long sumBytes(String recordingId);
 
     /** Deletes every value row for a recording. Used when the recording itself is deleted (IS-092). */
-    default void deleteByRecording(String recordingId) {
-        throw new UnsupportedOperationException("deleteByRecording not implemented");
-    }
+    void deleteByRecording(String recordingId);
 
     /**
      * Keyset-paginated read: returns up to {@code limit} entries with {@code seq > afterSeq},

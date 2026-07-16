@@ -371,6 +371,12 @@ class ProjectImportServiceTest {
                 @Override
                 public RecordingRow finalizeStats(String id, OffsetDateTime timeStart,
                         OffsetDateTime timeEnd, long valueCount, long sizeBytes) { return null; }
+
+                @Override
+                public boolean deleteById(String id) { throw new UnsupportedOperationException(); }
+
+                @Override
+                public long countByProject(String projectId) { throw new UnsupportedOperationException(); }
             };
         }
 

@@ -206,7 +206,7 @@ public class RecordingService {
      * surfaces (e.g. the project overview dashboard) that only need "how many" (IS-092).
      */
     public long count(String projectId) {
-        return recordings.findByProject(projectId).size();
+        return recordings.countByProject(projectId);
     }
 
     /**
