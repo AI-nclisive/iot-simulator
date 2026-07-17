@@ -348,12 +348,14 @@ class ProjectImportServiceTest {
             return new RecordingRepository() {
                 @Override
                 public RecordingRow create(String projectId, String dataSourceId, String protocol,
-                        int schemaVersion, String origin, String scanType, String name, String createdBy) {
+                        int schemaVersion, String origin, String scanType, String name, String createdBy,
+                        String schemaNodesJson) {
                     Instant now = Instant.now();
                     OffsetDateTime odt = OffsetDateTime.ofInstant(now, ZoneOffset.UTC);
                     RecordingRow row = new RecordingRow("new-rec-" + counter.incrementAndGet(),
                             projectId, dataSourceId, protocol, schemaVersion, origin, scanType,
-                            name, null, null, 0L, 0L, odt, odt, createdBy, 0L);
+                            name, null, null, 0L, 0L, odt, odt, createdBy, 0L,
+                            schemaNodesJson != null ? schemaNodesJson : "[]");
                     createdRecordings.add(row);
                     return row;
                 }

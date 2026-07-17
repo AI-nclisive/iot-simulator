@@ -67,7 +67,7 @@ class RecordingAndTimelineIT {
 
     @Test
     void captureAndReplayTimeline() {
-        RecordingRow recording = recordings.create(projectId, dataSourceId, "OPC_UA", 1, "SCAN_RECORD", "SCHEMA_AND_DATA", null, "it");
+        RecordingRow recording = recordings.create(projectId, dataSourceId, "OPC_UA", 1, "SCAN_RECORD", "SCHEMA_AND_DATA", null, "it", "[]");
 
         Instant t = Instant.parse("2026-01-01T00:00:00Z");
         long written = timeline.append(recording.id(), List.of(
@@ -94,9 +94,9 @@ class RecordingAndTimelineIT {
 
     @Test
     void findByProjectPagedReturnsBatchNewestFirst() {
-        RecordingRow a = recordings.create(projectId, dataSourceId, "OPC_UA", 1, "SCAN_RECORD", "SCHEMA_AND_DATA", null, "it");
-        RecordingRow b = recordings.create(projectId, dataSourceId, "OPC_UA", 1, "SCAN_RECORD", "SCHEMA_AND_DATA", null, "it");
-        RecordingRow c = recordings.create(projectId, dataSourceId, "OPC_UA", 1, "SCAN_RECORD", "SCHEMA_AND_DATA", null, "it");
+        RecordingRow a = recordings.create(projectId, dataSourceId, "OPC_UA", 1, "SCAN_RECORD", "SCHEMA_AND_DATA", null, "it", "[]");
+        RecordingRow b = recordings.create(projectId, dataSourceId, "OPC_UA", 1, "SCAN_RECORD", "SCHEMA_AND_DATA", null, "it", "[]");
+        RecordingRow c = recordings.create(projectId, dataSourceId, "OPC_UA", 1, "SCAN_RECORD", "SCHEMA_AND_DATA", null, "it", "[]");
 
         List<RecordingRow> page1 = recordings.findByProjectPaged(projectId, null, null, 2);
         assertThat(page1).hasSize(2);
@@ -112,7 +112,7 @@ class RecordingAndTimelineIT {
     /** IS-136: search filter matches on schema node path. */
     @Test
     void readPageFilterBySearchMatchesPath() {
-        RecordingRow rec = recordings.create(projectId, dataSourceId, "OPC_UA", schemaVersion, "SCAN_RECORD", "SCHEMA_AND_DATA", null, "it");
+        RecordingRow rec = recordings.create(projectId, dataSourceId, "OPC_UA", schemaVersion, "SCAN_RECORD", "SCHEMA_AND_DATA", null, "it", "[]");
         Instant t = Instant.parse("2026-06-01T10:00:00Z");
         timeline.append(rec.id(), List.of(
                 NeutralValue.good("temp", t, 22.0),
@@ -131,7 +131,7 @@ class RecordingAndTimelineIT {
     /** IS-136: quality filter returns only rows with the given quality. */
     @Test
     void readPageFilterByQualityReturnsMatchingRows() {
-        RecordingRow rec = recordings.create(projectId, dataSourceId, "OPC_UA", schemaVersion, "SCAN_RECORD", "SCHEMA_AND_DATA", null, "it");
+        RecordingRow rec = recordings.create(projectId, dataSourceId, "OPC_UA", schemaVersion, "SCAN_RECORD", "SCHEMA_AND_DATA", null, "it", "[]");
         Instant t = Instant.parse("2026-06-01T11:00:00Z");
         timeline.append(rec.id(), List.of(
                 NeutralValue.good("temp", t, 20.0),
@@ -151,7 +151,7 @@ class RecordingAndTimelineIT {
     /** IS-136: from/to time range filter restricts returned rows. */
     @Test
     void readPageFilterByTimeRangeReturnsRowsInRange() {
-        RecordingRow rec = recordings.create(projectId, dataSourceId, "OPC_UA", schemaVersion, "SCAN_RECORD", "SCHEMA_AND_DATA", null, "it");
+        RecordingRow rec = recordings.create(projectId, dataSourceId, "OPC_UA", schemaVersion, "SCAN_RECORD", "SCHEMA_AND_DATA", null, "it", "[]");
         Instant base = Instant.parse("2026-06-01T12:00:00Z");
         timeline.append(rec.id(), List.of(
                 NeutralValue.good("temp", base, 1.0),
@@ -167,7 +167,7 @@ class RecordingAndTimelineIT {
     /** IS-136: countFiltered returns accurate filtered total. */
     @Test
     void countFilteredReturnsAccurateTotal() {
-        RecordingRow rec = recordings.create(projectId, dataSourceId, "OPC_UA", schemaVersion, "SCAN_RECORD", "SCHEMA_AND_DATA", null, "it");
+        RecordingRow rec = recordings.create(projectId, dataSourceId, "OPC_UA", schemaVersion, "SCAN_RECORD", "SCHEMA_AND_DATA", null, "it", "[]");
         Instant t = Instant.parse("2026-06-01T13:00:00Z");
         timeline.append(rec.id(), List.of(
                 NeutralValue.good("temp", t, 10.0),

@@ -30,6 +30,7 @@ import com.ainclusive.iotsim.platform.secret.CredentialStore;
 import com.ainclusive.iotsim.protocolmodel.NeutralValue;
 import com.ainclusive.iotsim.protocolmodel.NodeKind;
 import com.ainclusive.iotsim.protocolmodel.ScanType;
+import com.ainclusive.iotsim.protocolmodel.SchemaNode;
 import com.ainclusive.iotsim.protocolmodel.ValueFilter;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -41,11 +42,15 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
 /** Recording lifecycle: create, capture values, finalize (backend-specs/03). */
 @Service
 public class RecordingService {
+
+    private static final TypeReference<List<SchemaNode>> SCHEMA_NODE_LIST =
+            new TypeReference<>() {};
 
     private final RecordingRepository recordings;
     private final ValueTimelineRepository timeline;
@@ -93,8 +98,13 @@ public class RecordingService {
             throw new IllegalArgumentException("Recording name must not exceed 255 characters");
         }
         String safeName = trimmedName;
+        // Capture the source's current schema snapshot with the recording (IS-161) so
+        // schema-serving never depends on a live lookup against dataSourceId later.
+        String schemaNodesJson = schemas.findCurrent(dataSourceId)
+                .map(s -> json.writeValueAsString(s.nodes()))
+                .orElse("[]");
         RecordingRow row = recordings.create(projectId, dataSourceId, source.protocol(), schemaVersion,
-                "SCAN_RECORD", scanTypeStr, safeName, actor);
+                "SCAN_RECORD", scanTypeStr, safeName, actor, schemaNodesJson);
         activity.emit(projectId, actor, "create", "recording", row.id());
         return map(row);
     }
@@ -138,9 +148,10 @@ public class RecordingService {
         boolean[] started = {false};
         ActiveCapture capture = active.computeIfAbsent(dataSourceId, dsId -> {
             started[0] = true;
+            String schemaNodesJson = json.writeValueAsString(schema.nodes());
             Recording recording = map(recordings.create(
                     projectId, dsId, source.protocol(), schema.version(), "SCAN_RECORD",
-                    ScanType.SCHEMA_AND_DATA.name(), null, actor));
+                    ScanType.SCHEMA_AND_DATA.name(), null, actor, schemaNodesJson));
             CaptureSpec spec = new CaptureSpec(source.protocol(), source.realDeviceEndpoint(),
                     credentials.find(dsId).orElse(null), schema.version(), schema.nodes());
             CaptureSession session = capturer.startCapture(
@@ -340,17 +351,33 @@ public class RecordingService {
     public record RecordingValuesPage(
             List<RecordingValue> items, String nextCursor, long total) {}
 
-    /** Returns the schema captured for a recording (IS-137). */
+    /**
+     * Returns the schema captured for a recording (IS-137), read from the recording's
+     * own stored schema snapshot (IS-161) rather than a live lookup against the
+     * (possibly gone) data source — a recording is self-contained and its schema never
+     * changes underneath it once captured. Throws {@link ResourceNotFoundException} only
+     * when the stored snapshot is empty (e.g. an ancient pre-IS-161 recording, or one
+     * whose schema could not be resolved at capture/import time).
+     */
     public RecordingSchema getRecordingSchema(String projectId, String recordingId) {
         RecordingRow rec = requireRecording(projectId, recordingId);
-        SchemaWithNodes schema = schemas.findByVersion(rec.dataSourceId(), rec.schemaVersion())
-                .orElseThrow(() -> new ResourceNotFoundException("Schema",
-                        rec.dataSourceId() + "@v" + rec.schemaVersion()));
-        return new RecordingSchema(schema.nodes());
+        List<SchemaNode> nodes = readSchemaNodes(rec.schemaNodesJson());
+        if (nodes.isEmpty()) {
+            throw new ResourceNotFoundException("Schema",
+                    (rec.dataSourceId() != null ? rec.dataSourceId() : recordingId) + "@v" + rec.schemaVersion());
+        }
+        return new RecordingSchema(nodes);
+    }
+
+    private List<SchemaNode> readSchemaNodes(String schemaNodesJson) {
+        if (schemaNodesJson == null || schemaNodesJson.isBlank()) {
+            return List.of();
+        }
+        return json.readValue(schemaNodesJson, SCHEMA_NODE_LIST);
     }
 
     /** Schema snapshot linked to a recording (IS-137). */
-    public record RecordingSchema(List<com.ainclusive.iotsim.protocolmodel.SchemaNode> nodes) {}
+    public record RecordingSchema(List<SchemaNode> nodes) {}
 
     private static long decodeValueCursor(String cursor) {
         if (cursor == null || cursor.isBlank()) {

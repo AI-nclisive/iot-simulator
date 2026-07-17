@@ -17,8 +17,13 @@ import com.ainclusive.iotsim.persistence.recording.RecordingRepository;
 import com.ainclusive.iotsim.persistence.recording.RecordingRow;
 import com.ainclusive.iotsim.persistence.timeline.ValueTimelineRepository;
 import com.ainclusive.iotsim.platform.storage.ObjectStore;
+import com.ainclusive.iotsim.protocolmodel.Access;
+import com.ainclusive.iotsim.protocolmodel.DataType;
 import com.ainclusive.iotsim.protocolmodel.NeutralValue;
+import com.ainclusive.iotsim.protocolmodel.NodeKind;
 import com.ainclusive.iotsim.protocolmodel.Quality;
+import com.ainclusive.iotsim.protocolmodel.SchemaNode;
+import com.ainclusive.iotsim.protocolmodel.ValueRank;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -144,7 +149,7 @@ class RecordingImportExportServiceTest {
         given(projects.findById(PROJECT)).willReturn(Optional.of(projectRow()));
         RecordingRow created = row();
         RecordingRow finalized = row();
-        given(recordings.create(eq(PROJECT), any(), any(), any(Integer.class), eq("IMPORTED"), eq("SCHEMA_AND_DATA"), any(), eq("local")))
+        given(recordings.create(eq(PROJECT), any(), any(), any(Integer.class), eq("IMPORTED"), eq("SCHEMA_AND_DATA"), any(), eq("local"), any()))
                 .willReturn(created);
         given(recordings.finalizeStats(eq(REC_ID), any(), any(), any(Long.class), any(Long.class)))
                 .willReturn(finalized);
@@ -155,14 +160,14 @@ class RecordingImportExportServiceTest {
         Recording result = service.importRecording(PROJECT, zipContent, "local");
 
         assertThat(result).isNotNull();
-        verify(recordings).create(eq(PROJECT), eq("ds-1"), eq("OPC_UA"), eq(1), eq("IMPORTED"), eq("SCHEMA_AND_DATA"), any(), eq("local"));
+        verify(recordings).create(eq(PROJECT), eq("ds-1"), eq("OPC_UA"), eq(1), eq("IMPORTED"), eq("SCHEMA_AND_DATA"), any(), eq("local"), any());
     }
 
     @Test
     void importAppendsValueTimeline() throws Exception {
         given(projects.findById(PROJECT)).willReturn(Optional.of(projectRow()));
         RecordingRow created = row();
-        given(recordings.create(any(), any(), any(), any(Integer.class), any(), any(), any(), any())).willReturn(created);
+        given(recordings.create(any(), any(), any(), any(Integer.class), any(), any(), any(), any(), any())).willReturn(created);
         given(recordings.finalizeStats(any(), any(), any(), any(Long.class), any(Long.class))).willReturn(created);
 
         byte[] zipContent = buildExportZip(PROJECT, REC_ID, "ds-1", 1, values());
@@ -175,14 +180,14 @@ class RecordingImportExportServiceTest {
     void importForwardsNameFromManifestToCreate() throws Exception {
         given(projects.findById(PROJECT)).willReturn(Optional.of(projectRow()));
         RecordingRow created = row();
-        given(recordings.create(any(), any(), any(), any(Integer.class), any(), any(), any(), any())).willReturn(created);
+        given(recordings.create(any(), any(), any(), any(Integer.class), any(), any(), any(), any(), any())).willReturn(created);
         given(recordings.finalizeStats(any(), any(), any(), any(Long.class), any(Long.class))).willReturn(created);
 
         byte[] zipContent = buildExportZipWithName("My Named Recording");
         service.importRecording(PROJECT, zipContent, "local");
 
         verify(recordings).create(eq(PROJECT), any(), any(), any(Integer.class), eq("IMPORTED"),
-                eq("SCHEMA_AND_DATA"), eq("My Named Recording"), eq("local"));
+                eq("SCHEMA_AND_DATA"), eq("My Named Recording"), eq("local"), any());
     }
 
     @Test
@@ -211,7 +216,7 @@ class RecordingImportExportServiceTest {
         given(dataSources.findById("does-not-exist")).willReturn(Optional.empty());
         RecordingRow created = row();
         given(recordings.create(eq(PROJECT), any(), eq("OPC_UA"), any(Integer.class), eq("IMPORTED"),
-                eq("SCHEMA_AND_DATA"), any(), eq("local"))).willReturn(created);
+                eq("SCHEMA_AND_DATA"), any(), eq("local"), any())).willReturn(created);
         given(recordings.finalizeStats(any(), any(), any(), any(Long.class), any(Long.class)))
                 .willReturn(created);
 
@@ -222,7 +227,7 @@ class RecordingImportExportServiceTest {
         assertThat(result).isNotNull();
         // The unknown dataSourceId is dropped (not surfaced as an FK to a nonexistent row).
         verify(recordings).create(eq(PROJECT), isNull(), eq("OPC_UA"), any(Integer.class),
-                eq("IMPORTED"), eq("SCHEMA_AND_DATA"), any(), eq("local"));
+                eq("IMPORTED"), eq("SCHEMA_AND_DATA"), any(), eq("local"), any());
     }
 
     @Test
@@ -232,7 +237,7 @@ class RecordingImportExportServiceTest {
         ObjectMapper mapper = new ObjectMapper();
         RecordingExportManifest manifest = new RecordingExportManifest(
                 "1.0.0", REC_ID, PROJECT, "ds-1", null, 1, "SCAN_RECORD",
-                null, Instant.now(), null, null, 0, List.of());
+                null, Instant.now(), null, null, 0, List.of(), List.of());
         byte[] manifestBytes = mapper.writeValueAsBytes(manifest);
         ByteArrayOutputStream buf = new ByteArrayOutputStream();
         try (ZipOutputStream zip = new ZipOutputStream(buf)) {
@@ -253,7 +258,7 @@ class RecordingImportExportServiceTest {
         ObjectMapper mapper = new ObjectMapper();
         RecordingExportManifest manifest = new RecordingExportManifest(
                 "1.0.0", REC_ID, PROJECT, "ds-1", "BLUETOOTH", 1, "SCAN_RECORD",
-                null, Instant.now(), null, null, 0, List.of());
+                null, Instant.now(), null, null, 0, List.of(), List.of());
         byte[] manifestBytes = mapper.writeValueAsBytes(manifest);
         ByteArrayOutputStream buf = new ByteArrayOutputStream();
         try (ZipOutputStream zip = new ZipOutputStream(buf)) {
@@ -309,7 +314,7 @@ class RecordingImportExportServiceTest {
         ObjectMapper mapper = new ObjectMapper();
         RecordingExportManifest manifest = new RecordingExportManifest(
                 "1.0.0", REC_ID, PROJECT, "ds-1", "OPC_UA", 0, "SCAN_RECORD",
-                null, Instant.now(), null, null, 0, List.of());
+                null, Instant.now(), null, null, 0, List.of(), List.of());
         byte[] manifestBytes = mapper.writeValueAsBytes(manifest);
         ByteArrayOutputStream buf = new ByteArrayOutputStream();
         try (ZipOutputStream zip = new ZipOutputStream(buf)) {
@@ -339,16 +344,112 @@ class RecordingImportExportServiceTest {
                 .doesNotContain("privatekey");
     }
 
+    // ─── IS-161: recording-owned schema snapshot ───────────────────────────────
+
+    @Test
+    void exportIncludesStoredSchemaNodesInManifest() throws Exception {
+        List<SchemaNode> nodes = List.of(variable("temp"), variable("press"));
+        ObjectMapper mapper = new ObjectMapper();
+        RecordingRow rowWithSchema = row(PROJECT, REC_ID, mapper.writeValueAsString(nodes));
+        given(recordings.findById(REC_ID)).willReturn(Optional.of(rowWithSchema));
+        given(timeline.readAll(REC_ID)).willReturn(values());
+        given(objectStore.put(any(), any(), any(Long.class), any())).willReturn("key");
+
+        RecordingBundle bundle = service.export(PROJECT, REC_ID);
+        Map<String, String> zip = unzip(bundle.content());
+
+        String manifestJson = zip.get("manifest.json");
+        assertThat(manifestJson).contains("\"schemaNodes\"");
+        RecordingExportManifest manifest = mapper.readValue(manifestJson, RecordingExportManifest.class);
+        assertThat(manifest.schemaNodes()).hasSize(2);
+        assertThat(manifest.schemaNodes()).extracting(SchemaNode::nodeId)
+                .containsExactlyInAnyOrder("temp", "press");
+    }
+
+    @Test
+    void importCarriesSchemaNodesThroughEvenWhenDataSourceUnresolvable() throws Exception {
+        // Core IS-161 bug fix: schema must survive import even though the data source
+        // referenced by the manifest no longer resolves to anything.
+        given(projects.findById(PROJECT)).willReturn(Optional.of(projectRow()));
+        given(dataSources.findById("gone")).willReturn(Optional.empty());
+        RecordingRow created = row();
+        given(recordings.create(any(), any(), any(), any(Integer.class), any(), any(), any(), any(), any()))
+                .willReturn(created);
+        given(recordings.finalizeStats(any(), any(), any(), any(Long.class), any(Long.class)))
+                .willReturn(created);
+
+        List<SchemaNode> nodes = List.of(variable("temp"));
+        byte[] zipContent = buildExportZip(PROJECT, REC_ID, "gone", 1, values(), nodes);
+
+        service.importRecording(PROJECT, zipContent, "local");
+
+        org.mockito.ArgumentCaptor<String> schemaJsonCaptor = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(recordings).create(eq(PROJECT), isNull(), eq("OPC_UA"), any(Integer.class),
+                eq("IMPORTED"), eq("SCHEMA_AND_DATA"), any(), eq("local"), schemaJsonCaptor.capture());
+
+        ObjectMapper mapper = new ObjectMapper();
+        List<SchemaNode> roundTripped = mapper.readValue(schemaJsonCaptor.getValue(),
+                new tools.jackson.core.type.TypeReference<List<SchemaNode>>() {});
+        assertThat(roundTripped).extracting(SchemaNode::nodeId).containsExactly("temp");
+    }
+
+    @Test
+    void importOfOldBundleWithoutSchemaNodesFieldStoresEmptySnapshot() throws Exception {
+        // Simulates a pre-IS-161 export whose manifest.json has no schemaNodes field at all.
+        given(projects.findById(PROJECT)).willReturn(Optional.of(projectRow()));
+        RecordingRow created = row();
+        given(recordings.create(any(), any(), any(), any(Integer.class), any(), any(), any(), any(), any()))
+                .willReturn(created);
+        given(recordings.finalizeStats(any(), any(), any(), any(Long.class), any(Long.class)))
+                .willReturn(created);
+
+        ObjectMapper mapper = new ObjectMapper();
+        var manifestNode = mapper.createObjectNode();
+        manifestNode.put("formatVersion", "1.0.0");
+        manifestNode.put("recordingId", REC_ID);
+        manifestNode.put("projectId", PROJECT);
+        manifestNode.put("dataSourceId", "ds-1");
+        manifestNode.put("protocol", "OPC_UA");
+        manifestNode.put("schemaVersion", 1);
+        manifestNode.put("origin", "SCAN_RECORD");
+        manifestNode.put("exportedAt", Instant.now().toString());
+        manifestNode.put("valueCount", 0);
+        manifestNode.putArray("nodeIds");
+        // deliberately no "schemaNodes" field
+        byte[] manifestBytes = mapper.writeValueAsBytes(manifestNode);
+
+        ByteArrayOutputStream buf = new ByteArrayOutputStream();
+        try (ZipOutputStream zip = new ZipOutputStream(buf)) {
+            zip.putNextEntry(new ZipEntry("manifest.json"));
+            zip.write(manifestBytes);
+            zip.closeEntry();
+        }
+
+        service.importRecording(PROJECT, buf.toByteArray(), "local");
+
+        verify(recordings).create(eq(PROJECT), any(), eq("OPC_UA"), any(Integer.class),
+                eq("IMPORTED"), eq("SCHEMA_AND_DATA"), any(), eq("local"), eq("[]"));
+    }
+
     // ─── Helpers ─────────────────────────────────────────────────────────────
 
     private static RecordingRow row() {
-        return row(PROJECT, REC_ID);
+        return row(PROJECT, REC_ID, "[]");
     }
 
     private static RecordingRow row(String projectId, String id) {
+        return row(projectId, id, "[]");
+    }
+
+    private static RecordingRow row(String projectId, String id, String schemaNodesJson) {
         OffsetDateTime now = Instant.now().atOffset(ZoneOffset.UTC);
         return new RecordingRow(id, projectId, "ds-1", "OPC_UA", 1, "SCAN_RECORD", "SCHEMA_AND_DATA",
-                null, now, now, 2L, 0L, now, now, "local", 0L);
+                null, now, now, 2L, 0L, now, now, "local", 0L, schemaNodesJson);
+    }
+
+    private static SchemaNode variable(String nodeId) {
+        return new SchemaNode(nodeId, null, "/" + nodeId, nodeId,
+                NodeKind.VARIABLE, DataType.FLOAT64, ValueRank.SCALAR, Access.READ, null, null);
     }
 
     private static com.ainclusive.iotsim.persistence.project.ProjectRow projectRow() {
@@ -373,10 +474,15 @@ class RecordingImportExportServiceTest {
 
     private byte[] buildExportZip(String projectId, String recId, String dataSourceId,
             int schemaVersion, List<NeutralValue> vals) throws Exception {
+        return buildExportZip(projectId, recId, dataSourceId, schemaVersion, vals, List.of());
+    }
+
+    private byte[] buildExportZip(String projectId, String recId, String dataSourceId,
+            int schemaVersion, List<NeutralValue> vals, List<SchemaNode> schemaNodes) throws Exception {
         ObjectMapper mapper = new ObjectMapper();
         RecordingExportManifest manifest = new RecordingExportManifest(
                 "1.0.0", recId, projectId, dataSourceId, "OPC_UA", schemaVersion,
-                "SCAN_RECORD", null, Instant.now(), null, null, vals.size(), List.of("node-1"));
+                "SCAN_RECORD", null, Instant.now(), null, null, vals.size(), List.of("node-1"), schemaNodes);
         byte[] manifestBytes = mapper.writeValueAsBytes(manifest);
 
         // Build a minimal value-timeline JSON
@@ -421,7 +527,7 @@ class RecordingImportExportServiceTest {
         ObjectMapper mapper = new ObjectMapper();
         RecordingExportManifest manifest = new RecordingExportManifest(
                 version, REC_ID, PROJECT, "ds-1", "OPC_UA", 1, "SCAN_RECORD",
-                null, Instant.now(), null, null, 0, List.of());
+                null, Instant.now(), null, null, 0, List.of(), List.of());
         byte[] manifestBytes = mapper.writeValueAsBytes(manifest);
         ByteArrayOutputStream buf = new ByteArrayOutputStream();
         try (ZipOutputStream zip = new ZipOutputStream(buf)) {
@@ -436,7 +542,7 @@ class RecordingImportExportServiceTest {
         ObjectMapper mapper = new ObjectMapper();
         RecordingExportManifest manifest = new RecordingExportManifest(
                 "1.0.0", REC_ID, PROJECT, "ds-1", "OPC_UA", 1, "SCAN_RECORD",
-                name, Instant.now(), null, null, 0, List.of());
+                name, Instant.now(), null, null, 0, List.of(), List.of());
         byte[] manifestBytes = mapper.writeValueAsBytes(manifest);
         ByteArrayOutputStream buf = new ByteArrayOutputStream();
         try (ZipOutputStream zip = new ZipOutputStream(buf)) {

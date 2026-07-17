@@ -9,6 +9,13 @@ import java.time.OffsetDateTime;
  * (e.g. {@code OPC_UA}, {@code MODBUS_TCP}) and is what replay/import compatibility is
  * checked against — {@code dataSourceId} is now optional (nullable) and only kept as a
  * "captured from" reference; a recording is never bound to that exact instance.
+ *
+ * <p>{@code schemaNodesJson} (IS-161) is the recording's own captured schema snapshot —
+ * a JSON array shaped like {@code List<SchemaNode>} — stored with the recording so
+ * schema-serving no longer depends on a live lookup against {@code dataSourceId}, which
+ * may no longer resolve to an existing data source. {@code "[]"} means no schema
+ * captured (e.g. an ancient recording predating this column, or an unresolvable
+ * backfill).
  */
 public record RecordingRow(
         String id,
@@ -26,5 +33,6 @@ public record RecordingRow(
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt,
         String createdBy,
-        long version) {
+        long version,
+        String schemaNodesJson) {
 }

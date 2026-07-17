@@ -205,8 +205,16 @@ public class ProjectImportService {
                     // fall back to the data source's own protocol (pre-IS-160 export bundles).
                     String protocol = rec.path("protocol")
                             .asString(dsProtocolMap.getOrDefault(oldDsId, "OPC_UA"));
-                    RecordingRow row = recordings.create(
-                            newProject.id(), newDsId, protocol, schemaVersion, origin, scanType, recName, actor);
+                    // The recording's own schema snapshot (IS-161) isn't carried in this
+                    // project-level export format; recover it on a best-effort basis from the
+                    // schema just imported for the new data source above, at the recording's
+                    // schemaVersion. Falls back to "no schema captured" if it doesn't resolve
+                    // (e.g. version mismatch, orphaned schema) rather than failing the import.
+                    String schemaNodesJson = schemas.findByVersion(newDsId, schemaVersion)
+                            .map(s -> json.writeValueAsString(s.nodes()))
+                            .orElse("[]");
+                    RecordingRow row = recordings.create(newProject.id(), newDsId, protocol,
+                            schemaVersion, origin, scanType, recName, actor, schemaNodesJson);
                     if (oldRecId != null) {
                         recIdMap.put(oldRecId, row.id());
                     }
