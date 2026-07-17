@@ -63,6 +63,7 @@ type ArtifactsState = {
   samplesError: string | null;
   loadRecordings: (projectId: string) => Promise<void>;
   loadRecordingById: (projectId: string, recordingId: string) => Promise<void>;
+  deleteRecording: (projectId: string, recordingId: string) => Promise<void>;
   loadSamples: (projectId: string) => Promise<void>;
   createSample: (projectId: string, req: CreateSampleRequest) => Promise<SampleResponse>;
   deleteSample: (projectId: string, sampleId: string) => Promise<void>;
@@ -110,6 +111,16 @@ export const useArtifactsStore = create<ArtifactsState>((set, get) => ({
       const message = err instanceof ApiError ? err.title : "Failed to load recording";
       set({ error: message, isLoading: false });
     }
+  },
+
+  deleteRecording: async (projectId: string, recordingId: string) => {
+    await apiFetch<void>(
+      `/api/v1/projects/${projectId}/recordings/${recordingId}`,
+      { method: "DELETE" },
+    );
+    set((state) => ({
+      artifacts: state.artifacts.filter((a) => a.id !== recordingId),
+    }));
   },
 
   loadSamples: async (projectId: string) => {
