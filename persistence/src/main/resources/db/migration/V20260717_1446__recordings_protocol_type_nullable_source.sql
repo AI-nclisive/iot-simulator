@@ -6,7 +6,9 @@ alter table recordings add column protocol varchar
     check (protocol in ('OPC_UA', 'MODBUS_TCP'));
 
 update recordings r
-    set protocol = (select ds.protocol from data_sources ds where ds.id = r.data_source_id)
+    set protocol = coalesce(
+        (select ds.protocol from data_sources ds where ds.id = r.data_source_id),
+        'OPC_UA')
     where r.protocol is null
       and r.data_source_id is not null;
 

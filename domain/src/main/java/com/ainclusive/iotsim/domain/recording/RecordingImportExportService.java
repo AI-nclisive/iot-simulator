@@ -3,6 +3,7 @@ package com.ainclusive.iotsim.domain.recording;
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.domain.datasource.Protocol;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRepository;
+import com.ainclusive.iotsim.persistence.datasource.DataSourceRow;
 import com.ainclusive.iotsim.persistence.project.ProjectRepository;
 import com.ainclusive.iotsim.persistence.recording.RecordingRepository;
 import com.ainclusive.iotsim.persistence.recording.RecordingRow;
@@ -141,7 +142,7 @@ public class RecordingImportExportService {
         validateFormatVersion(manifest.formatVersion());
         validateSchemaVersion(manifest.schemaVersion());
         String protocol = requireProtocol(manifest.protocol());
-        String dataSourceId = resolveOptionalDataSourceId(manifest.dataSourceId());
+        String dataSourceId = resolveOptionalDataSourceId(projectId, manifest.dataSourceId());
 
         RecordingRow row = recordings.create(
                 projectId,
@@ -388,11 +389,14 @@ public class RecordingImportExportService {
      * no longer refers to an existing data source, since import/replay no longer requires
      * the exact originating source to still exist (IS-160).
      */
-    private String resolveOptionalDataSourceId(String dataSourceId) {
-        if (dataSourceId == null || dataSources.findById(dataSourceId).isEmpty()) {
+    private String resolveOptionalDataSourceId(String projectId, String dataSourceId) {
+        if (dataSourceId == null) {
             return null;
         }
-        return dataSourceId;
+        return dataSources.findById(dataSourceId)
+                .filter(ds -> projectId.equals(ds.projectId()))
+                .map(DataSourceRow::id)
+                .orElse(null);
     }
 
     private RecordingRow requireRecording(String projectId, String recordingId) {
