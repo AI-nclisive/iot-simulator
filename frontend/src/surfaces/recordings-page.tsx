@@ -256,7 +256,7 @@ export function RecordingsPage() {
                         </div>
                       </dl>
                     </button>
-                    {access.canCreateSource ? (
+                    {access.canDeleteSource ? (
                       <button
                         aria-label={`Delete recording ${row.name || row.id}`}
                         className="shell-action-danger absolute right-4 top-4"
