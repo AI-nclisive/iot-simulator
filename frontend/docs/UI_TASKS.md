@@ -1020,6 +1020,13 @@ Parallel execution:
   Depends: IS-092 (backend delete + dependency check, already shipped).
   Done when: deleting an unreferenced recording removes it from the list and calls the DELETE endpoint; deleting a referenced recording shows the backend's dependency error instead of silently failing; typecheck + vitest green.
 
+- [x] `UI-468` ✅ Recordings — fix origin label mislabeling
+  Goal: the "Imported" badge must only appear on recordings actually created via file import; recordings created via live capture must show "Recorded".
+  Surface: `Recordings`, `Recording Flow`
+  Work includes: flip `mapRecording`'s origin mapping in `artifacts-store.ts` from `r.origin === "SCAN_RECORD" ? "captured" : "imported"` (unsafe default: any unexpected value fell to "imported") to `r.origin === "IMPORTED" ? "imported" : "captured"`; `recording-flow-page.tsx`'s post-stop `appendRecording` call now sets `origin: "captured"` explicitly instead of omitting it.
+  Depends: none.
+  Done when: a live-captured recording shows "Recorded" immediately after saving and after a reload; only recordings with backend `origin: IMPORTED` show "Imported"; typecheck + vitest green.
+
 ## Recommended Sequence
 
 1. Complete the P0 shell and shared-pattern tasks first.

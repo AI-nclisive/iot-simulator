@@ -23,7 +23,7 @@ function mapRecording(r: RecordingResponse): ReusableArtifact {
     createdAt: r.createdAt,
     createdBy: r.createdBy,
     sourceId: r.dataSourceId,
-    origin: r.origin === "SCAN_RECORD" ? "captured" : "imported",
+    origin: r.origin === "IMPORTED" ? "imported" : "captured",
     valueCount: r.valueCount,
   };
 }
