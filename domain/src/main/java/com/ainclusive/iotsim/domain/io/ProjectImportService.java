@@ -122,6 +122,7 @@ public class ProjectImportService {
         // --- data sources ---
         String dsJson = zipEntries.get("data-sources.json");
         Map<String, String> dsIdMap = new HashMap<>();  // old -> new
+        Map<String, String> dsProtocolMap = new HashMap<>();  // old dataSourceId -> protocol
         if (dsJson != null) {
             JsonNode dsArray = parseJson(dsJson);
             if (dsArray.isArray()) {
@@ -155,6 +156,7 @@ public class ProjectImportService {
 
                     if (oldId != null) {
                         dsIdMap.put(oldId, row.id());
+                        dsProtocolMap.put(oldId, protocol);
                     }
                 }
             }
@@ -199,7 +201,12 @@ public class ProjectImportService {
                     String origin = rec.path("origin").asString("IMPORT");
                     String scanType = rec.path("scanType").asString("SCHEMA_AND_DATA");
                     String recName = rec.path("name").asString(null);
-                    RecordingRow row = recordings.create(newProject.id(), newDsId, schemaVersion, origin, scanType, recName, actor);
+                    // protocol (IS-160): read from the export if present (current format), else
+                    // fall back to the data source's own protocol (pre-IS-160 export bundles).
+                    String protocol = rec.path("protocol")
+                            .asString(dsProtocolMap.getOrDefault(oldDsId, "OPC_UA"));
+                    RecordingRow row = recordings.create(
+                            newProject.id(), newDsId, protocol, schemaVersion, origin, scanType, recName, actor);
                     if (oldRecId != null) {
                         recIdMap.put(oldRecId, row.id());
                     }

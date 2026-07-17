@@ -167,6 +167,7 @@ public class ProjectZipExporter {
         Map<String, Object> m = new HashMap<>();
         m.put("id", r.id());
         m.put("dataSourceId", r.dataSourceId());
+        m.put("protocol", r.protocol());
         m.put("schemaVersion", r.schemaVersion());
         m.put("origin", r.origin());
         m.put("scanType", r.scanType());

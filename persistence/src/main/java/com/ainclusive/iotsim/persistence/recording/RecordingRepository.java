@@ -7,7 +7,13 @@ import java.util.Optional;
 /** Stores recording metadata (the captured values live in the value timeline). */
 public interface RecordingRepository {
 
-    RecordingRow create(String projectId, String dataSourceId, int schemaVersion,
+    /**
+     * @param dataSourceId optional (nullable) reference to the source the recording was
+     *                     originally captured from (IS-160); no longer a hard FK requirement
+     * @param protocol required protocol type (e.g. {@code OPC_UA}, {@code MODBUS_TCP}) the
+     *                 recording is scoped to for replay/import compatibility checks (IS-160)
+     */
+    RecordingRow create(String projectId, String dataSourceId, String protocol, int schemaVersion,
             String origin, String scanType, String name, String createdBy);
 
     Optional<RecordingRow> findById(String id);

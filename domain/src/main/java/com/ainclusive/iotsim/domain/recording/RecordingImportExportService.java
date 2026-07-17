@@ -1,6 +1,9 @@
 package com.ainclusive.iotsim.domain.recording;
 
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
+import com.ainclusive.iotsim.domain.datasource.Protocol;
+import com.ainclusive.iotsim.persistence.datasource.DataSourceRepository;
+import com.ainclusive.iotsim.persistence.datasource.DataSourceRow;
 import com.ainclusive.iotsim.persistence.project.ProjectRepository;
 import com.ainclusive.iotsim.persistence.recording.RecordingRepository;
 import com.ainclusive.iotsim.persistence.recording.RecordingRow;
@@ -36,11 +39,14 @@ import tools.jackson.databind.node.ObjectNode;
  *
  * <p>Import: reads a ZIP from the HTTP upload, validates the manifest format version,
  * creates a new {@link Recording} row (with origin {@code IMPORTED}), and re-inserts
- * all value-timeline rows. The imported recording belongs to the target project and
- * keeps the original {@code dataSourceId} from the manifest (the caller supplies it
- * so the FE can map to an existing source if desired; if the source does not exist in
- * the target project the row is still created — any replay or evidence use-case will
- * surface the mismatch).
+ * all value-timeline rows. The imported recording belongs to the target project and is
+ * scoped to the manifest's {@code protocol} (IS-160) — a required field, validated against
+ * the known protocol enum values. The manifest's {@code dataSourceId} is optional metadata
+ * only ("originally captured from"): if present it is resolved on a best-effort basis (e.g.
+ * to show the FE which source it came from) but import succeeds even when it no longer
+ * resolves to an existing data source, as long as {@code protocol} is present and valid —
+ * the recording is replayable against any data source of that protocol type, not only the
+ * exact source it came from.
  */
 @Service
 public class RecordingImportExportService {
@@ -50,15 +56,17 @@ public class RecordingImportExportService {
     private final RecordingRepository recordings;
     private final ValueTimelineRepository timeline;
     private final ProjectRepository projects;
+    private final DataSourceRepository dataSources;
     private final ObjectStore objectStore;
     private final ObjectMapper json;
 
     public RecordingImportExportService(RecordingRepository recordings,
             ValueTimelineRepository timeline, ProjectRepository projects,
-            ObjectStore objectStore, ObjectMapper json) {
+            DataSourceRepository dataSources, ObjectStore objectStore, ObjectMapper json) {
         this.recordings = recordings;
         this.timeline = timeline;
         this.projects = projects;
+        this.dataSources = dataSources;
         this.objectStore = objectStore;
         this.json = json;
     }
@@ -85,6 +93,7 @@ public class RecordingImportExportService {
                 row.id(),
                 row.projectId(),
                 row.dataSourceId(),
+                row.protocol(),
                 row.schemaVersion(),
                 row.origin(),
                 row.name(),
@@ -131,10 +140,14 @@ public class RecordingImportExportService {
         ImportPayload payload = parseZip(zipContent);
         RecordingExportManifest manifest = payload.manifest();
         validateFormatVersion(manifest.formatVersion());
+        validateSchemaVersion(manifest.schemaVersion());
+        String protocol = requireProtocol(manifest.protocol());
+        String dataSourceId = resolveOptionalDataSourceId(projectId, manifest.dataSourceId());
 
         RecordingRow row = recordings.create(
                 projectId,
-                manifest.dataSourceId(),
+                dataSourceId,
+                protocol,
                 manifest.schemaVersion(),
                 "IMPORTED",
                 "SCHEMA_AND_DATA",
@@ -177,24 +190,47 @@ public class RecordingImportExportService {
     private ImportPayload parseZip(byte[] zipContent) {
         RecordingExportManifest manifest = null;
         List<NeutralValue> values = null;
+        int entryCount = 0;
         try (ZipInputStream zip = new ZipInputStream(new ByteArrayInputStream(zipContent))) {
             ZipEntry entry;
             while ((entry = zip.getNextEntry()) != null) {
+                entryCount++;
                 byte[] bytes = readBounded(zip, entry.getName());
                 if ("manifest.json".equals(entry.getName())) {
-                    manifest = json.readValue(bytes, RecordingExportManifest.class);
+                    manifest = parseManifest(bytes);
                 } else if ("value-timeline.json".equals(entry.getName())) {
                     values = parseValues(bytes);
                 }
                 zip.closeEntry();
             }
-        } catch (IOException e) {
-            throw new IllegalArgumentException("failed to read recording import ZIP: " + e.getMessage(), e);
+        } catch (IllegalArgumentException e) {
+            throw e;
+        } catch (IOException | RuntimeException e) {
+            throw new IllegalArgumentException(
+                    "not a valid recording import ZIP: " + e.getMessage(), e);
+        }
+        if (entryCount == 0) {
+            throw new IllegalArgumentException(
+                    "not a valid ZIP archive: no entries found (file is empty, not a ZIP, or corrupt)");
         }
         if (manifest == null) {
             throw new IllegalArgumentException("import ZIP is missing manifest.json");
         }
         return new ImportPayload(manifest, values != null ? values : List.of());
+    }
+
+    /**
+     * Deserializes {@code manifest.json}, converting any Jackson parse failure
+     * (invalid JSON, wrong types, etc.) into an {@link IllegalArgumentException}
+     * naming the problem, rather than letting an unchecked {@code JacksonException}
+     * escape as an opaque 500.
+     */
+    private RecordingExportManifest parseManifest(byte[] bytes) {
+        try {
+            return json.readValue(bytes, RecordingExportManifest.class);
+        } catch (RuntimeException e) {
+            throw new IllegalArgumentException("malformed manifest.json: " + e.getMessage(), e);
+        }
     }
 
     /**
@@ -315,10 +351,52 @@ public class RecordingImportExportService {
         }
     }
 
+    private static void validateSchemaVersion(int schemaVersion) {
+        if (schemaVersion < 1) {
+            throw new IllegalArgumentException(
+                    "manifest.json missing required field 'schemaVersion' (must be >= 1)");
+        }
+    }
+
     private void requireProject(String projectId) {
         if (projects.findById(projectId).isEmpty()) {
             throw new ResourceNotFoundException("Project", projectId);
         }
+    }
+
+    /**
+     * A recording is scoped to a protocol type, not to the data-source instance it was
+     * captured from (IS-160): {@code protocol} is a required manifest field, validated
+     * against the known protocol enum values so an invalid/missing value fails with a
+     * clear 400 rather than surfacing later as a replay-time surprise.
+     */
+    private static String requireProtocol(String protocol) {
+        if (protocol == null || protocol.isBlank()) {
+            throw new IllegalArgumentException("import ZIP manifest is missing required field 'protocol'");
+        }
+        try {
+            return Protocol.valueOf(protocol).name();
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException(
+                    "import ZIP manifest has unknown protocol: " + protocol, e);
+        }
+    }
+
+    /**
+     * The manifest's {@code dataSourceId} is now optional metadata only ("originally
+     * captured from") — unlike {@code protocol}, an unknown or missing value is not an
+     * error: it is resolved on a best-effort basis and dropped (kept {@code null}) if it
+     * no longer refers to an existing data source, since import/replay no longer requires
+     * the exact originating source to still exist (IS-160).
+     */
+    private String resolveOptionalDataSourceId(String projectId, String dataSourceId) {
+        if (dataSourceId == null) {
+            return null;
+        }
+        return dataSources.findById(dataSourceId)
+                .filter(ds -> projectId.equals(ds.projectId()))
+                .map(DataSourceRow::id)
+                .orElse(null);
     }
 
     private RecordingRow requireRecording(String projectId, String recordingId) {
@@ -333,7 +411,7 @@ public class RecordingImportExportService {
 
     private Recording map(RecordingRow r) {
         return new Recording(
-                r.id(), r.projectId(), r.dataSourceId(), r.schemaVersion(), r.origin(),
+                r.id(), r.projectId(), r.dataSourceId(), r.protocol(), r.schemaVersion(), r.origin(),
                 r.scanType(), r.name(), r.valueCount(), r.sizeBytes(), r.createdAt().toInstant(),
                 r.createdBy(), r.version(), null, false);
     }

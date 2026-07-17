@@ -221,13 +221,13 @@ class SampleServiceTest {
                 return Optional.empty();
             }
             OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-            return Optional.of(new RecordingRow(id, projectId, "ds-1", 1, "SCAN_RECORD",
+            return Optional.of(new RecordingRow(id, projectId, "ds-1", "OPC_UA", 1, "SCAN_RECORD",
                     "SCHEMA_AND_DATA", null, null, null, 0, 0, now, now, "local", 0));
         }
 
         @Override
-        public RecordingRow create(String projectId, String dataSourceId, int schemaVersion,
-                String origin, String scanType, String name, String createdBy) {
+        public RecordingRow create(String projectId, String dataSourceId, String protocol,
+                int schemaVersion, String origin, String scanType, String name, String createdBy) {
             throw new UnsupportedOperationException();
         }
 

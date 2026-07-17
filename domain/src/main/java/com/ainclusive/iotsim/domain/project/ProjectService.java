@@ -124,13 +124,17 @@ public class ProjectService {
 
         // Copy recording metadata rows, re-pointing to the new data source IDs.
         for (RecordingRow rec : recordings.findByProject(sourceId)) {
-            String newDsId = dsIdMap.get(rec.dataSourceId());
-            if (newDsId == null) {
+            // dataSourceId is optional (IS-160: recordings are protocol-scoped, not
+            // source-instance-scoped) — a recording with no captured-from source (e.g.
+            // imported without a matching dataSourceId) duplicates with newDsId = null.
+            String newDsId = rec.dataSourceId() != null ? dsIdMap.get(rec.dataSourceId()) : null;
+            if (rec.dataSourceId() != null && newDsId == null) {
                 throw new IllegalStateException(
                         "Recording " + rec.id() + " references unknown data source " + rec.dataSourceId());
             }
             int newSchemaVersion = dsSchemaVersionMap.getOrDefault(rec.dataSourceId(), rec.schemaVersion());
-            recordings.create(copy.id(), newDsId, newSchemaVersion, rec.origin(), "SCHEMA_AND_DATA", rec.name(), rec.createdBy());
+            recordings.create(copy.id(), newDsId, rec.protocol(), newSchemaVersion, rec.origin(),
+                    "SCHEMA_AND_DATA", rec.name(), rec.createdBy());
         }
 
         return toDomain(copy);

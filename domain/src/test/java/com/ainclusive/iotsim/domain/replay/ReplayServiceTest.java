@@ -137,6 +137,40 @@ class ReplayServiceTest {
     }
 
     // -------------------------------------------------------------------------
+    // IS-160 — protocol-type compatibility (not tied to the exact capturing source)
+    // -------------------------------------------------------------------------
+
+    @Test
+    void replayRejectsRecordingWhoseProtocolDiffersFromTargetSource() {
+        // FakeDataSources' source is OPC_UA; a MODBUS_TCP recording is not compatible,
+        // even with compatibilityAck=true (protocol mismatch is not schema-version drift).
+        List<NeutralValue> values = List.of(
+                NeutralValue.good("temp", Instant.parse("2026-01-01T00:00:00Z"), 1.0));
+        ReplayService mismatched = new ReplayService(
+                new FakeDataSources(SOURCE, PROJECT),
+                new FakeRecordingsWithProtocol(RECORDING, PROJECT, "MODBUS_TCP"),
+                new FakeTimeline(values),
+                new EmptySchemas(),
+                runtime,
+                runs,
+                evidence,
+                new ObjectMapper());
+
+        assertThatThrownBy(() -> mismatched.replay(PROJECT, SOURCE, RECORDING, null, true))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("MODBUS_TCP")
+                .hasMessageContaining("OPC_UA");
+    }
+
+    @Test
+    void replayAllowsRecordingReplayedAgainstADifferentSourceOfTheSameProtocol() {
+        // Recording captured from a source it no longer references (dataSourceId differs from
+        // the replay target) still succeeds as long as the protocol matches (IS-160).
+        ReplaySummary summary = service.replay(PROJECT, SOURCE, RECORDING, null, true);
+        assertThat(summary.dataSourceId()).isEqualTo(SOURCE);
+    }
+
+    // -------------------------------------------------------------------------
     // IS-069 — timing/ordering/compat checks
     // -------------------------------------------------------------------------
 
@@ -414,12 +448,12 @@ class ReplayServiceTest {
                 return Optional.empty();
             }
             OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-            return Optional.of(new RecordingRow(id, projectId, "ds1", 1, "SCAN_RECORD",
+            return Optional.of(new RecordingRow(id, projectId, "ds1", "OPC_UA", 1, "SCAN_RECORD",
                     "SCHEMA_AND_DATA", null, null, null, 0, 0, now, now, "local", 0));
         }
 
         @Override
-        public RecordingRow create(String p, String d, int sv, String o, String st, String n, String c) {
+        public RecordingRow create(String p, String d, String pr, int sv, String o, String st, String n, String c) {
             throw new UnsupportedOperationException();
         }
 
@@ -509,12 +543,57 @@ class ReplayServiceTest {
                 return Optional.empty();
             }
             OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-            return Optional.of(new RecordingRow(id, projectId, "ds1", schemaVersion, "SCAN_RECORD",
+            return Optional.of(new RecordingRow(id, projectId, "ds1", "OPC_UA", schemaVersion, "SCAN_RECORD",
                     "SCHEMA_AND_DATA", null, null, null, 0, 0, now, now, "local", 0));
         }
 
         @Override
-        public RecordingRow create(String p, String d, int sv, String o, String st, String n, String c) {
+        public RecordingRow create(String p, String d, String pr, int sv, String o, String st, String n, String c) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<RecordingRow> findByProject(String projectId) {
+            return List.of();
+        }
+
+        @Override
+        public List<RecordingRow> findByProjectPaged(String projectId,
+                OffsetDateTime afterAt, String afterId, int limit) {
+            return List.of();
+        }
+
+        @Override
+        public RecordingRow finalizeStats(String i, OffsetDateTime s, OffsetDateTime e, long c, long b) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public boolean deleteById(String id) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public long countByProject(String projectId) {
+            throw new UnsupportedOperationException();
+        }
+    }
+
+    /** A recording fake that returns a specific protocol (for IS-160 compat check tests). */
+    private record FakeRecordingsWithProtocol(String id, String projectId, String protocol)
+            implements RecordingRepository {
+        @Override
+        public Optional<RecordingRow> findById(String id) {
+            if (!this.id.equals(id)) {
+                return Optional.empty();
+            }
+            OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+            return Optional.of(new RecordingRow(id, projectId, "ds1", protocol, 0, "SCAN_RECORD",
+                    "SCHEMA_AND_DATA", null, null, null, 0, 0, now, now, "local", 0));
+        }
+
+        @Override
+        public RecordingRow create(String p, String d, String pr, int sv, String o, String st, String n, String c) {
             throw new UnsupportedOperationException();
         }
 

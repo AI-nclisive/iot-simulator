@@ -117,7 +117,7 @@ ToDo
 ### Capability: Store Multiple Recordings And Samples
 
 Explanation:
-Users can keep multiple recordings and samples for the same data source, covering different operating modes, product states, warning states, and failure states.
+Users can keep multiple recordings and samples for a given protocol type, covering different operating modes, product states, warning states, and failure states.
 
 Priority:
 P1
@@ -128,7 +128,7 @@ ToDo
 ### Capability: Replay Recorded Data
 
 Explanation:
-Users can replay previously recorded real data through simulated data sources to reproduce bugs and validate that fixed behavior does not regress.
+Users can replay previously recorded real data through any simulated data source of the matching protocol type — a recording is not tied to the specific data source it was captured from — to reproduce bugs and validate that fixed behavior does not regress.
 
 Priority:
 P0

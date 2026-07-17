@@ -309,13 +309,13 @@ class ScenarioValidationServiceTest {
             }
             OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
             // schemaVersion=2, source's current schema is version=1 → mismatch = WARNING
-            return Optional.of(new RecordingRow(recordingId, projectId, "src-synthetic-1",
+            return Optional.of(new RecordingRow(recordingId, projectId, "src-synthetic-1", "OPC_UA",
                     2, "LIVE", "SCHEMA_AND_DATA", null, null, null, 0, 0, now, now, "tester", 0));
         }
 
         @Override
-        public RecordingRow create(String projectId, String dataSourceId, int schemaVersion,
-                String origin, String scanType, String name, String createdBy) {
+        public RecordingRow create(String projectId, String dataSourceId, String protocol,
+                int schemaVersion, String origin, String scanType, String name, String createdBy) {
             throw new UnsupportedOperationException();
         }
 

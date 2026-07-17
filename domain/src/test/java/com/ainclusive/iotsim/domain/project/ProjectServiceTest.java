@@ -124,7 +124,7 @@ class ProjectServiceTest {
     void duplicateCopiesRecordingsWithUpdatedDataSourceIds() {
         Project src = service.create("Factory", null, "alice");
         DataSourceRow ds = dsRepo.insert(src.id(), "Sensor A", "OPC_UA", "SCAN", 0, null, null, null, "alice");
-        recordingRepo.create(src.id(), ds.id(), 1, "SCAN_RECORD", "SCHEMA_AND_DATA", null, "alice");
+        recordingRepo.create(src.id(), ds.id(), "OPC_UA", 1, "SCAN_RECORD", "SCHEMA_AND_DATA", null, "alice");
 
         Project copy = service.duplicate(src.id());
 
@@ -353,11 +353,11 @@ class ProjectServiceTest {
         private int seq;
 
         @Override
-        public RecordingRow create(String projectId, String dataSourceId, int schemaVersion,
-                String origin, String scanType, String name, String createdBy) {
+        public RecordingRow create(String projectId, String dataSourceId, String protocol,
+                int schemaVersion, String origin, String scanType, String name, String createdBy) {
             OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
             RecordingRow row = new RecordingRow(
-                    "rec-" + (++seq), projectId, dataSourceId, schemaVersion, origin, scanType,
+                    "rec-" + (++seq), projectId, dataSourceId, protocol, schemaVersion, origin, scanType,
                     name, null, null, 0L, 0L, now, now, createdBy, 0);
             rows.add(row);
             return row;

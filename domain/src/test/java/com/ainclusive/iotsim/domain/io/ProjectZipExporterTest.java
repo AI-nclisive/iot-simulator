@@ -180,7 +180,7 @@ class ProjectZipExporterTest {
                 OffsetDateTime.parse("2026-06-01T00:00:00Z"), List.of(node));
         Map<String, SchemaWithNodes> schemas = Map.of("ds-1", schema);
 
-        Recording rec = new Recording("rec-1", "proj-1", "ds-1", 1, "SCAN_RECORD", "SCHEMA_AND_DATA",
+        Recording rec = new Recording("rec-1", "proj-1", "ds-1", "OPC_UA", 1, "SCAN_RECORD", "SCHEMA_AND_DATA",
                 null, 100L, 0L, now, "local", 1L, null, false);
 
         Sample sample = new Sample("smp-1", "proj-1", "rec-1", "Sample A",
