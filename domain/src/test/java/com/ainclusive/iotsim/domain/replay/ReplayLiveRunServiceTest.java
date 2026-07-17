@@ -94,6 +94,23 @@ class ReplayLiveRunServiceTest {
     // --- tests ---
 
     @Test
+    void startRejectsRecordingWhoseProtocolDiffersFromTargetSource() {
+        // dataSources' SOURCE is OPC_UA; a MODBUS_TCP recording is not compatible,
+        // even with compatibilityAck=true (protocol mismatch is not schema-version drift).
+        ReplayLiveRunService svc = new ReplayLiveRunService(
+                dataSources,
+                new FakeRecordingsWithProtocol(RECORDING, PROJECT, "MODBUS_TCP"),
+                new FakeTimeline(defaultValues()),
+                new EmptySchemas(),
+                runtime, runs, evidence, json, wall);
+
+        assertThatThrownBy(() -> svc.start(PROJECT, SOURCE, RECORDING, null, true))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("MODBUS_TCP")
+                .hasMessageContaining("OPC_UA");
+    }
+
+    @Test
     void startOpensRunningRunAndEvidenceAndReturnsImmediately() {
         ReplayLiveRunService svc = service();
 
@@ -466,11 +483,11 @@ class ReplayLiveRunServiceTest {
                 return Optional.empty();
             }
             OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-            return Optional.of(new RecordingRow(id, projectId, "ds1", 1, "SCAN_RECORD",
+            return Optional.of(new RecordingRow(id, projectId, "ds1", "OPC_UA", 1, "SCAN_RECORD",
                     "SCHEMA_AND_DATA", null, null, null, 0, 0, now, now, "local", 0));
         }
 
-        public RecordingRow create(String p, String d, int sv, String o, String st, String n, String c) {
+        public RecordingRow create(String p, String d, String pr, int sv, String o, String st, String n, String c) {
             throw new UnsupportedOperationException();
         }
 
@@ -503,11 +520,49 @@ class ReplayLiveRunServiceTest {
                 return Optional.empty();
             }
             OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-            return Optional.of(new RecordingRow(id, projectId, "ds1", schemaVersion, "SCAN_RECORD",
+            return Optional.of(new RecordingRow(id, projectId, "ds1", "OPC_UA", schemaVersion, "SCAN_RECORD",
                     "SCHEMA_AND_DATA", null, null, null, 0, 0, now, now, "local", 0));
         }
 
-        public RecordingRow create(String p, String d, int sv, String o, String st, String n, String c) {
+        public RecordingRow create(String p, String d, String pr, int sv, String o, String st, String n, String c) {
+            throw new UnsupportedOperationException();
+        }
+
+        public List<RecordingRow> findByProject(String projectId) {
+            return List.of();
+        }
+
+        public List<RecordingRow> findByProjectPaged(String projectId,
+                OffsetDateTime afterAt, String afterId, int limit) {
+            return List.of();
+        }
+
+        public RecordingRow finalizeStats(String i, OffsetDateTime s, OffsetDateTime e, long c, long b) {
+            throw new UnsupportedOperationException();
+        }
+
+        public boolean deleteById(String id) {
+            throw new UnsupportedOperationException();
+        }
+
+        public long countByProject(String projectId) {
+            throw new UnsupportedOperationException();
+        }
+    }
+
+    /** A recording fake that returns a specific protocol (for IS-160 compat check tests). */
+    private record FakeRecordingsWithProtocol(String id, String projectId, String protocol)
+            implements RecordingRepository {
+        public Optional<RecordingRow> findById(String id) {
+            if (!this.id.equals(id)) {
+                return Optional.empty();
+            }
+            OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+            return Optional.of(new RecordingRow(id, projectId, "ds1", protocol, 0, "SCAN_RECORD",
+                    "SCHEMA_AND_DATA", null, null, null, 0, 0, now, now, "local", 0));
+        }
+
+        public RecordingRow create(String p, String d, String pr, int sv, String o, String st, String n, String c) {
             throw new UnsupportedOperationException();
         }
 

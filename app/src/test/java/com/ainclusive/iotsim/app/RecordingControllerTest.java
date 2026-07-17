@@ -30,7 +30,7 @@ class RecordingControllerTest {
     }
 
     private static Recording sample() {
-        return new Recording("rec1", "p1", "ds1", 1, "SCAN_RECORD", "SCHEMA_AND_DATA", null, 0, 0L,
+        return new Recording("rec1", "p1", "ds1", "OPC_UA", 1, "SCAN_RECORD", "SCHEMA_AND_DATA", null, 0, 0L,
                 Instant.now(), "local", 0, null, false);
     }
 

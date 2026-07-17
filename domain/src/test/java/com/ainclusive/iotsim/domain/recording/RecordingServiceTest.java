@@ -363,14 +363,14 @@ class RecordingServiceTest {
         // commits: the repository row is already gone by the time deleteById runs.
         RecordingRepository staleRow = new RecordingRepository() {
             @Override
-            public RecordingRow create(String projectId, String dataSourceId, int schemaVersion,
-                    String origin, String scanType, String name, String createdBy) {
+            public RecordingRow create(String projectId, String dataSourceId, String protocol,
+                    int schemaVersion, String origin, String scanType, String name, String createdBy) {
                 throw new UnsupportedOperationException();
             }
 
             @Override
             public java.util.Optional<RecordingRow> findById(String id) {
-                return java.util.Optional.of(new RecordingRow(id, PROJECT, SOURCE, 1, "SCAN_RECORD",
+                return java.util.Optional.of(new RecordingRow(id, PROJECT, SOURCE, "OPC_UA", 1, "SCAN_RECORD",
                         "SCHEMA_AND_DATA", null, null, null, 0, 0, OffsetDateTime.now(ZoneOffset.UTC),
                         OffsetDateTime.now(ZoneOffset.UTC), "a", 0));
             }
@@ -563,10 +563,10 @@ class RecordingServiceTest {
         private int seq;
 
         @Override
-        public RecordingRow create(String projectId, String dataSourceId, int schemaVersion,
-                String origin, String scanType, String name, String createdBy) {
+        public RecordingRow create(String projectId, String dataSourceId, String protocol,
+                int schemaVersion, String origin, String scanType, String name, String createdBy) {
             OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-            RecordingRow row = new RecordingRow("rec-" + (++seq), projectId, dataSourceId,
+            RecordingRow row = new RecordingRow("rec-" + (++seq), projectId, dataSourceId, protocol,
                     schemaVersion, origin, scanType, name, null, null, 0, 0, now, now, createdBy, 0);
             rows.put(row.id(), row);
             return row;
@@ -599,7 +599,7 @@ class RecordingServiceTest {
         public RecordingRow finalizeStats(String id, OffsetDateTime timeStart, OffsetDateTime timeEnd,
                 long valueCount, long sizeBytes) {
             RecordingRow r = rows.get(id);
-            RecordingRow updated = new RecordingRow(r.id(), r.projectId(), r.dataSourceId(),
+            RecordingRow updated = new RecordingRow(r.id(), r.projectId(), r.dataSourceId(), r.protocol(),
                     r.schemaVersion(), r.origin(), r.scanType(), r.name(), timeStart, timeEnd, valueCount,
                     sizeBytes, r.createdAt(), OffsetDateTime.now(ZoneOffset.UTC), r.createdBy(),
                     r.version() + 1);

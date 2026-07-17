@@ -111,13 +111,13 @@ public class RecordingController {
     public record CreateRecordingRequest(String dataSourceId, ScanType scanType, String name) {}
 
     public record RecordingResponse(
-            String id, String projectId, String dataSourceId, int schemaVersion, String origin,
-            String scanType, String name, long valueCount, long sizeBytes, Instant createdAt,
-            String createdBy, long version, Instant lastUsedAt, boolean hasDependents) {
+            String id, String projectId, String dataSourceId, String protocol, int schemaVersion,
+            String origin, String scanType, String name, long valueCount, long sizeBytes,
+            Instant createdAt, String createdBy, long version, Instant lastUsedAt, boolean hasDependents) {
 
         static RecordingResponse from(Recording r) {
             return new RecordingResponse(
-                    r.id(), r.projectId(), r.dataSourceId(), r.schemaVersion(), r.origin(),
+                    r.id(), r.projectId(), r.dataSourceId(), r.protocol(), r.schemaVersion(), r.origin(),
                     r.scanType(), r.name(), r.valueCount(), r.sizeBytes(), r.createdAt(), r.createdBy(),
                     r.version(), r.lastUsedAt(), r.hasDependents());
         }

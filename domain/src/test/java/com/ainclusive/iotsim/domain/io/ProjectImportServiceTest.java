@@ -217,7 +217,7 @@ class ProjectImportServiceTest {
         SchemaWithNodes schema = new SchemaWithNodes("schema-1", "ds-1", 1,
                 OffsetDateTime.parse("2026-06-01T00:00:00Z"), List.of(node));
 
-        Recording rec = new Recording("rec-1", "proj-1", "ds-1", 1, "SCAN_RECORD", "SCHEMA_AND_DATA",
+        Recording rec = new Recording("rec-1", "proj-1", "ds-1", "OPC_UA", 1, "SCAN_RECORD", "SCHEMA_AND_DATA",
                 null, 100L, 0L, now, "local", 1L, null, false);
 
         Sample sample = new Sample("smp-1", "proj-1", "rec-1", "Sample A",
@@ -347,12 +347,12 @@ class ProjectImportServiceTest {
         RecordingRepository recRepo() {
             return new RecordingRepository() {
                 @Override
-                public RecordingRow create(String projectId, String dataSourceId, int schemaVersion,
-                        String origin, String scanType, String name, String createdBy) {
+                public RecordingRow create(String projectId, String dataSourceId, String protocol,
+                        int schemaVersion, String origin, String scanType, String name, String createdBy) {
                     Instant now = Instant.now();
                     OffsetDateTime odt = OffsetDateTime.ofInstant(now, ZoneOffset.UTC);
                     RecordingRow row = new RecordingRow("new-rec-" + counter.incrementAndGet(),
-                            projectId, dataSourceId, schemaVersion, origin, scanType,
+                            projectId, dataSourceId, protocol, schemaVersion, origin, scanType,
                             name, null, null, 0L, 0L, odt, odt, createdBy, 0L);
                     createdRecordings.add(row);
                     return row;

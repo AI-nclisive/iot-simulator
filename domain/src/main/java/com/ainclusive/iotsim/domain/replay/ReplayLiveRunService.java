@@ -91,6 +91,7 @@ public class ReplayLiveRunService {
             String trigger, String initiator) {
         DataSourceRow source = requireSource(projectId, dataSourceId);
         RecordingRow recording = requireRecording(projectId, recordingId);
+        requireProtocolCompatible(recording, source);
 
         int currentSchemaVersion = schemas.findCurrent(dataSourceId)
                 .map(SchemaWithNodes::version).orElse(0);
@@ -267,6 +268,19 @@ public class ReplayLiveRunService {
         return recordings.findById(recordingId)
                 .filter(r -> r.projectId().equals(projectId))
                 .orElseThrow(() -> new ResourceNotFoundException("Recording", recordingId));
+    }
+
+    /**
+     * Recordings are scoped to a protocol type, not to the data-source instance they were
+     * captured from (IS-160): replay is allowed against any data source of a compatible
+     * protocol, and rejected with a clear 400 otherwise.
+     */
+    private static void requireProtocolCompatible(RecordingRow recording, DataSourceRow source) {
+        if (!recording.protocol().equals(source.protocol())) {
+            throw new IllegalArgumentException(
+                    "recording " + recording.id() + " was captured under protocol " + recording.protocol()
+                    + " and cannot be replayed against a " + source.protocol() + " data source");
+        }
     }
 
     private OffsetDateTime now() {

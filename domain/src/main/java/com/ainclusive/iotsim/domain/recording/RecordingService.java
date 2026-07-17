@@ -93,8 +93,8 @@ public class RecordingService {
             throw new IllegalArgumentException("Recording name must not exceed 255 characters");
         }
         String safeName = trimmedName;
-        RecordingRow row = recordings.create(projectId, dataSourceId, schemaVersion, "SCAN_RECORD",
-                scanTypeStr, safeName, actor);
+        RecordingRow row = recordings.create(projectId, dataSourceId, source.protocol(), schemaVersion,
+                "SCAN_RECORD", scanTypeStr, safeName, actor);
         activity.emit(projectId, actor, "create", "recording", row.id());
         return map(row);
     }
@@ -139,7 +139,7 @@ public class RecordingService {
         ActiveCapture capture = active.computeIfAbsent(dataSourceId, dsId -> {
             started[0] = true;
             Recording recording = map(recordings.create(
-                    projectId, dsId, schema.version(), "SCAN_RECORD",
+                    projectId, dsId, source.protocol(), schema.version(), "SCAN_RECORD",
                     ScanType.SCHEMA_AND_DATA.name(), null, actor));
             CaptureSpec spec = new CaptureSpec(source.protocol(), source.realDeviceEndpoint(),
                     credentials.find(dsId).orElse(null), schema.version(), schema.nodes());
@@ -398,7 +398,7 @@ public class RecordingService {
 
     private Recording map(RecordingRow r, Instant lastUsedAt, boolean hasDependents) {
         return new Recording(
-                r.id(), r.projectId(), r.dataSourceId(), r.schemaVersion(), r.origin(),
+                r.id(), r.projectId(), r.dataSourceId(), r.protocol(), r.schemaVersion(), r.origin(),
                 r.scanType(), r.name(), r.valueCount(), r.sizeBytes(), r.createdAt().toInstant(),
                 r.createdBy(), r.version(), lastUsedAt, hasDependents);
     }

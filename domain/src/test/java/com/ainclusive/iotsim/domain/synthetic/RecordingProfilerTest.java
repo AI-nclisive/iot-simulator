@@ -53,7 +53,7 @@ class RecordingProfilerTest {
     private void givenRecordingWithNodes(SchemaNode... nodes) {
         OffsetDateTime now = OffsetDateTime.ofInstant(T0, ZoneOffset.UTC);
         given(recordings.findById(RECORDING)).willReturn(Optional.of(new RecordingRow(
-                RECORDING, PROJECT, SOURCE, 1, "SCAN_RECORD", "SCHEMA_AND_DATA", null,
+                RECORDING, PROJECT, SOURCE, "OPC_UA", 1, "SCAN_RECORD", "SCHEMA_AND_DATA", null,
                 now, now, 0, 0, now, now, "local", 1)));
         given(schemas.findByVersion(SOURCE, 1)).willReturn(Optional.of(
                 new SchemaWithNodes("sc1", SOURCE, 1, now, List.of(nodes))));

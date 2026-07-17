@@ -98,6 +98,7 @@ public class ReplayService {
             String trigger, String initiator, String parentRunId) {
         DataSourceRow source = requireSource(projectId, dataSourceId);
         RecordingRow recording = requireRecording(projectId, recordingId);
+        requireProtocolCompatible(recording, source);
 
         // Load the current schema version for the compat check; the RuntimeStartSpec is built
         // from the source (which carries the simulator port) and its current schema.
@@ -158,5 +159,18 @@ public class ReplayService {
         return recordings.findById(recordingId)
                 .filter(r -> r.projectId().equals(projectId))
                 .orElseThrow(() -> new ResourceNotFoundException("Recording", recordingId));
+    }
+
+    /**
+     * Recordings are scoped to a protocol type, not to the data-source instance they were
+     * captured from (IS-160): replay is allowed against any data source of a compatible
+     * protocol, and rejected with a clear 400 otherwise.
+     */
+    private static void requireProtocolCompatible(RecordingRow recording, DataSourceRow source) {
+        if (!recording.protocol().equals(source.protocol())) {
+            throw new IllegalArgumentException(
+                    "recording " + recording.id() + " was captured under protocol " + recording.protocol()
+                    + " and cannot be replayed against a " + source.protocol() + " data source");
+        }
     }
 }

@@ -59,6 +59,9 @@ and runtime modules must not depend on UI-facing modules.
 - The protocol-neutral model is the single source of truth. Recording, replay,
   synthetic generation, scenarios, and faults operate only on it — never
   per-protocol.
+- Recordings are scoped to a protocol type, not to the data source instance they
+  were captured from; replay/import binds to any compatible data source of that
+  type at run time, never at capture/import time.
 - Two separate data paths: the recording path captures every value change (no
   sampling); the live path is conflated/throttled for the UI.
 - Determinism is guaranteed for generated value content and scenario step
