@@ -7,9 +7,9 @@
 #   with a real out-of-process OPC UA worker) + frontend Vite dev server (:4173).
 #
 # Usage:
-#   .\scripts\run-local.ps1            # or `up` - bring the stack up
-#   .\scripts\run-local.ps1 down       # stop backend/frontend/postgres (KEEPS db data)
-#   .\scripts\run-local.ps1 down -Wipe # also drop the pgdata volume (clean slate)
+#   .\run-local.ps1            # or `up` - bring the stack up
+#   .\run-local.ps1 down       # stop backend/frontend/postgres (KEEPS db data)
+#   .\run-local.ps1 down -Wipe # also drop the pgdata volume (clean slate)
 #
 # Runs on Windows PowerShell 5.1 and PowerShell 7+. This file is intentionally
 # ASCII-only: 5.1 reads a BOM-less .ps1 as ANSI, so any non-ASCII character
@@ -34,7 +34,7 @@ if ($PSVersionTable.PSVersion.Major -ge 7) {
 }
 
 # --- locate repo root (this script lives in <repo>\scripts) -------------------
-$RepoRoot = Split-Path -Parent $PSScriptRoot
+$RepoRoot = $PSScriptRoot
 Set-Location $RepoRoot
 
 $BackendPort  = 8080
@@ -87,7 +87,7 @@ function Write-Report {
   Write-Host "  opc.tcp://127.0.0.1:<port>/iotsim - point your external OPC UA client there."
   Write-Host "  (Set a listenPort when creating the source, else the port is ephemeral.)"
   Write-Host ""
-  Write-Host "  Tear down with: .\scripts\run-local.ps1 down"
+  Write-Host "  Tear down with: .\run-local.ps1 down"
 }
 
 function Invoke-Up {
@@ -181,8 +181,8 @@ function Invoke-Up {
       if ($tail -match 'checksum mismatch' -or $tail -match 'FlywayValidateException' -or $tail -match 'Migrations have failed validation') {
         Write-Err "backend failed: the local database is from an older schema version."
         Write-Err "recreate it, then start again:"
-        Write-Err "    .\scripts\run-local.ps1 down -Wipe"
-        Write-Err "    .\scripts\run-local.ps1"
+        Write-Err "    .\run-local.ps1 down -Wipe"
+        Write-Err "    .\run-local.ps1"
         Write-Err "(this drops local DB data). Backend log tail:"
       } else {
         Write-Err "backend never reported UP. Last 40 log lines:"
