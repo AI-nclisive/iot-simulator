@@ -107,6 +107,12 @@ describe("loadRecordings", () => {
     expect(useArtifactsStore.getState().artifacts[0].origin).toBe("imported");
   });
 
+  it("defaults an unexpected origin value to captured, not imported (UI-468)", async () => {
+    mockApiFetch.mockResolvedValueOnce({ items: [makeRecordingResponse({ origin: "SOMETHING_ELSE" })], nextCursor: null, limit: 50 });
+    await useArtifactsStore.getState().loadRecordings("proj-1");
+    expect(useArtifactsStore.getState().artifacts[0].origin).toBe("captured");
+  });
+
   it("sets error on API failure", async () => {
     mockApiFetch.mockRejectedValueOnce(
       new ApiError(500, "Server error", undefined, undefined),
