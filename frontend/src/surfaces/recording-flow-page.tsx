@@ -245,6 +245,7 @@ export function RecordingFlowPage() {
           createdAt: resp.createdAt,
           createdBy: resp.createdBy,
           sourceId: resp.dataSourceId,
+          origin: "captured",
           valueCount: resp.valueCount,
         });
         setSavedArtifactId(resp.id);
