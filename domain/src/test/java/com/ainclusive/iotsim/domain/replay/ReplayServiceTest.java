@@ -449,11 +449,11 @@ class ReplayServiceTest {
             }
             OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
             return Optional.of(new RecordingRow(id, projectId, "ds1", "OPC_UA", 1, "SCAN_RECORD",
-                    "SCHEMA_AND_DATA", null, null, null, 0, 0, now, now, "local", 0));
+                    "SCHEMA_AND_DATA", null, null, null, 0, 0, now, now, "local", 0, "[]"));
         }
 
         @Override
-        public RecordingRow create(String p, String d, String pr, int sv, String o, String st, String n, String c) {
+        public RecordingRow create(String p, String d, String pr, int sv, String o, String st, String n, String c, String sj) {
             throw new UnsupportedOperationException();
         }
 
@@ -544,11 +544,11 @@ class ReplayServiceTest {
             }
             OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
             return Optional.of(new RecordingRow(id, projectId, "ds1", "OPC_UA", schemaVersion, "SCAN_RECORD",
-                    "SCHEMA_AND_DATA", null, null, null, 0, 0, now, now, "local", 0));
+                    "SCHEMA_AND_DATA", null, null, null, 0, 0, now, now, "local", 0, "[]"));
         }
 
         @Override
-        public RecordingRow create(String p, String d, String pr, int sv, String o, String st, String n, String c) {
+        public RecordingRow create(String p, String d, String pr, int sv, String o, String st, String n, String c, String sj) {
             throw new UnsupportedOperationException();
         }
 
@@ -589,11 +589,11 @@ class ReplayServiceTest {
             }
             OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
             return Optional.of(new RecordingRow(id, projectId, "ds1", protocol, 0, "SCAN_RECORD",
-                    "SCHEMA_AND_DATA", null, null, null, 0, 0, now, now, "local", 0));
+                    "SCHEMA_AND_DATA", null, null, null, 0, 0, now, now, "local", 0, "[]"));
         }
 
         @Override
-        public RecordingRow create(String p, String d, String pr, int sv, String o, String st, String n, String c) {
+        public RecordingRow create(String p, String d, String pr, int sv, String o, String st, String n, String c, String sj) {
             throw new UnsupportedOperationException();
         }
 

@@ -5,8 +5,6 @@ import com.ainclusive.iotsim.domain.synthetic.RecordingProfile.MeasurementProfil
 import com.ainclusive.iotsim.domain.synthetic.RecordingProfile.ProfileStats;
 import com.ainclusive.iotsim.persistence.recording.RecordingRepository;
 import com.ainclusive.iotsim.persistence.recording.RecordingRow;
-import com.ainclusive.iotsim.persistence.schema.SchemaRepository;
-import com.ainclusive.iotsim.persistence.schema.SchemaWithNodes;
 import com.ainclusive.iotsim.persistence.timeline.ValueTimelineRepository;
 import com.ainclusive.iotsim.protocolmodel.NeutralValue;
 import com.ainclusive.iotsim.protocolmodel.NodeKind;
@@ -17,6 +15,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Service;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Derives a statistics-based {@link RecordingProfile} from a recording's captured values (IS-146):
@@ -37,24 +37,30 @@ public class RecordingProfiler {
     /** Default period for periodic suggestions; the recording carries no reliable period. */
     private static final long DEFAULT_PERIOD_MS = 10_000L;
 
-    private final RecordingRepository recordings;
-    private final SchemaRepository schemas;
-    private final ValueTimelineRepository timeline;
+    private static final TypeReference<List<SchemaNode>> SCHEMA_NODE_LIST = new TypeReference<>() {};
 
-    public RecordingProfiler(RecordingRepository recordings, SchemaRepository schemas,
-            ValueTimelineRepository timeline) {
+    private final RecordingRepository recordings;
+    private final ValueTimelineRepository timeline;
+    private final ObjectMapper json;
+
+    public RecordingProfiler(RecordingRepository recordings, ValueTimelineRepository timeline,
+            ObjectMapper json) {
         this.recordings = recordings;
-        this.schemas = schemas;
         this.timeline = timeline;
+        this.json = json;
     }
 
     public RecordingProfile deriveProfile(String projectId, String recordingId) {
         RecordingRow rec = recordings.findById(recordingId)
                 .filter(r -> r.projectId().equals(projectId))
                 .orElseThrow(() -> new ResourceNotFoundException("Recording", recordingId));
-        SchemaWithNodes schema = schemas.findByVersion(rec.dataSourceId(), rec.schemaVersion())
-                .orElseThrow(() -> new ResourceNotFoundException("Schema",
-                        rec.dataSourceId() + "@v" + rec.schemaVersion()));
+        // Read the recording's own stored schema snapshot (IS-161) rather than a live
+        // lookup against dataSourceId, which may no longer resolve to an existing source.
+        List<SchemaNode> nodes = readSchemaNodes(rec.schemaNodesJson());
+        if (nodes.isEmpty()) {
+            throw new ResourceNotFoundException("Schema",
+                    (rec.dataSourceId() != null ? rec.dataSourceId() : recordingId) + "@v" + rec.schemaVersion());
+        }
 
         // Group the timeline by node, preserving time order (readAll is time-ordered).
         List<NeutralValue> all = timeline.readAll(recordingId);
@@ -64,7 +70,7 @@ public class RecordingProfiler {
         }
 
         List<MeasurementProfile> measurements = new ArrayList<>();
-        for (SchemaNode node : schema.nodes()) {
+        for (SchemaNode node : nodes) {
             if (node.kind() != NodeKind.VARIABLE) {
                 continue;
             }
@@ -81,6 +87,13 @@ public class RecordingProfiler {
             measurements.add(profile(node.nodeId(), node.dataType().name(), medianDeltaMs(series), numbers));
         }
         return new RecordingProfile(measurements);
+    }
+
+    private List<SchemaNode> readSchemaNodes(String schemaNodesJson) {
+        if (schemaNodesJson == null || schemaNodesJson.isBlank()) {
+            return List.of();
+        }
+        return json.readValue(schemaNodesJson, SCHEMA_NODE_LIST);
     }
 
     /** Build the stats + per-pattern suggestions for one numeric series. */

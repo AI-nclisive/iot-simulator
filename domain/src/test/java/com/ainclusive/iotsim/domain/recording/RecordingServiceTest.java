@@ -63,6 +63,7 @@ class RecordingServiceTest {
     private InMemoryScenarioRepository scenarios;
     private InMemoryRunRepository runs;
     private InMemoryEvidenceRepository evidence;
+    private RecordingRepository recordingsUsedByService;
 
     @BeforeEach
     void setUp() {
@@ -72,8 +73,9 @@ class RecordingServiceTest {
         scenarios = new InMemoryScenarioRepository();
         runs = new InMemoryRunRepository();
         evidence = new InMemoryEvidenceRepository();
+        recordingsUsedByService = new InMemoryRecordingRepository();
         service = new RecordingService(
-                new InMemoryRecordingRepository(),
+                recordingsUsedByService,
                 new InMemoryValueTimelineRepository(),
                 sources,
                 schemas,
@@ -274,8 +276,9 @@ class RecordingServiceTest {
     @Test
     void getRecordingSchemaReturnsNodes() {
         List<SchemaNode> nodes = List.of(variable("temp", DataType.FLOAT64));
-        // schemaVersion = 2 (matches FakeDataSourceRepository default)
-        schemas.setByVersion(SOURCE, 2, nodes);
+        // schemaVersion = 2 (matches FakeDataSourceRepository default); create() snapshots
+        // the *current* schema onto the recording row (IS-161), so stub findCurrent here.
+        schemas.set(2, nodes);
         Recording r = service.create(PROJECT, SOURCE, com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_AND_DATA, null, "alice");
 
         RecordingService.RecordingSchema schema = service.getRecordingSchema(PROJECT, r.id());
@@ -288,6 +291,58 @@ class RecordingServiceTest {
         Recording r = service.create(PROJECT, SOURCE, com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_AND_DATA, null, "alice");
         assertThatThrownBy(() -> service.getRecordingSchema(PROJECT, r.id()))
                 .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void createSnapshotsCurrentSchemaOntoRowAndServesItWithoutLiveLookup() {
+        List<SchemaNode> nodes = List.of(variable("temp", DataType.FLOAT64));
+        schemas.set(2, nodes);
+        Recording r = service.create(PROJECT, SOURCE, com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_AND_DATA, null, "alice");
+
+        // The row created carries a non-empty schema snapshot of its own.
+        String schemaNodesJson = ((InMemoryRecordingRepository) serviceRecordings())
+                .rows.get(r.id()).schemaNodesJson();
+        assertThat(schemaNodesJson).isNotBlank();
+        assertThat(schemaNodesJson).isNotEqualTo("[]");
+
+        // getRecordingSchema is served from that snapshot: it must not need a live
+        // findByVersion lookup (the schema source may no longer resolve at all, IS-161).
+        RecordingService.RecordingSchema schema = service.getRecordingSchema(PROJECT, r.id());
+        assertThat(schema.nodes()).hasSize(1);
+        assertThat(schema.nodes().get(0).nodeId()).isEqualTo("temp");
+        assertThat(schemas.findByVersionCalls).isZero();
+    }
+
+    @Test
+    void startCaptureSnapshotsCurrentSchemaOntoRow() {
+        schemas.set(3, List.of(variable("temp", DataType.FLOAT64)));
+
+        Recording started = service.startCapture(PROJECT, SOURCE, "alice");
+
+        String schemaNodesJson = ((InMemoryRecordingRepository) serviceRecordings())
+                .rows.get(started.id()).schemaNodesJson();
+        assertThat(schemaNodesJson).isNotBlank();
+        assertThat(schemaNodesJson).isNotEqualTo("[]");
+
+        RecordingService.RecordingSchema schema = service.getRecordingSchema(PROJECT, started.id());
+        assertThat(schema.nodes()).hasSize(1);
+        assertThat(schemas.findByVersionCalls).isZero();
+    }
+
+    @Test
+    void getRecordingSchemaThrowsWhenStoredSnapshotIsEmpty() {
+        // No schema stubbed at all: create() stores "[]" since findCurrent() is empty.
+        Recording r = service.create(PROJECT, SOURCE, com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_AND_DATA, null, "alice");
+        String schemaNodesJson = ((InMemoryRecordingRepository) serviceRecordings())
+                .rows.get(r.id()).schemaNodesJson();
+        assertThat(schemaNodesJson).isEqualTo("[]");
+
+        assertThatThrownBy(() -> service.getRecordingSchema(PROJECT, r.id()))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    private RecordingRepository serviceRecordings() {
+        return recordingsUsedByService;
     }
 
 
@@ -364,7 +419,8 @@ class RecordingServiceTest {
         RecordingRepository staleRow = new RecordingRepository() {
             @Override
             public RecordingRow create(String projectId, String dataSourceId, String protocol,
-                    int schemaVersion, String origin, String scanType, String name, String createdBy) {
+                    int schemaVersion, String origin, String scanType, String name, String createdBy,
+                    String schemaNodesJson) {
                 throw new UnsupportedOperationException();
             }
 
@@ -372,7 +428,7 @@ class RecordingServiceTest {
             public java.util.Optional<RecordingRow> findById(String id) {
                 return java.util.Optional.of(new RecordingRow(id, PROJECT, SOURCE, "OPC_UA", 1, "SCAN_RECORD",
                         "SCHEMA_AND_DATA", null, null, null, 0, 0, OffsetDateTime.now(ZoneOffset.UTC),
-                        OffsetDateTime.now(ZoneOffset.UTC), "a", 0));
+                        OffsetDateTime.now(ZoneOffset.UTC), "a", 0, "[]"));
             }
 
             @Override
@@ -525,6 +581,7 @@ class RecordingServiceTest {
     private static final class FakeSchemaRepository implements SchemaRepository {
         private Supplier<Optional<SchemaWithNodes>> current = Optional::empty;
         private final Map<String, SchemaWithNodes> byVersion = new HashMap<>();
+        int findByVersionCalls;
 
         void set(int version, List<SchemaNode> nodes) {
             SchemaWithNodes schema = new SchemaWithNodes(
@@ -549,6 +606,7 @@ class RecordingServiceTest {
 
         @Override
         public Optional<SchemaWithNodes> findByVersion(String dataSourceId, int version) {
+            findByVersionCalls++;
             return Optional.ofNullable(byVersion.get(dataSourceId + "@" + version));
         }
 
@@ -559,15 +617,17 @@ class RecordingServiceTest {
     }
 
     private static final class InMemoryRecordingRepository implements RecordingRepository {
-        private final Map<String, RecordingRow> rows = new HashMap<>();
+        final Map<String, RecordingRow> rows = new HashMap<>();
         private int seq;
 
         @Override
         public RecordingRow create(String projectId, String dataSourceId, String protocol,
-                int schemaVersion, String origin, String scanType, String name, String createdBy) {
+                int schemaVersion, String origin, String scanType, String name, String createdBy,
+                String schemaNodesJson) {
             OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
             RecordingRow row = new RecordingRow("rec-" + (++seq), projectId, dataSourceId, protocol,
-                    schemaVersion, origin, scanType, name, null, null, 0, 0, now, now, createdBy, 0);
+                    schemaVersion, origin, scanType, name, null, null, 0, 0, now, now, createdBy, 0,
+                    schemaNodesJson != null && !schemaNodesJson.isBlank() ? schemaNodesJson : "[]");
             rows.put(row.id(), row);
             return row;
         }
@@ -602,7 +662,7 @@ class RecordingServiceTest {
             RecordingRow updated = new RecordingRow(r.id(), r.projectId(), r.dataSourceId(), r.protocol(),
                     r.schemaVersion(), r.origin(), r.scanType(), r.name(), timeStart, timeEnd, valueCount,
                     sizeBytes, r.createdAt(), OffsetDateTime.now(ZoneOffset.UTC), r.createdBy(),
-                    r.version() + 1);
+                    r.version() + 1, r.schemaNodesJson());
             rows.put(id, updated);
             return updated;
         }

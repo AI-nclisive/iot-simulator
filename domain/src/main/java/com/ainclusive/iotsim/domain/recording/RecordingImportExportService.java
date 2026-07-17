@@ -11,6 +11,7 @@ import com.ainclusive.iotsim.persistence.timeline.ValueTimelineRepository;
 import com.ainclusive.iotsim.platform.storage.ObjectStore;
 import com.ainclusive.iotsim.protocolmodel.NeutralValue;
 import com.ainclusive.iotsim.protocolmodel.Quality;
+import com.ainclusive.iotsim.protocolmodel.SchemaNode;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -25,6 +26,7 @@ import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
@@ -52,6 +54,7 @@ import tools.jackson.databind.node.ObjectNode;
 public class RecordingImportExportService {
 
     static final String FORMAT_VERSION = RecordingExportManifest.FORMAT_VERSION;
+    private static final TypeReference<List<SchemaNode>> SCHEMA_NODE_LIST = new TypeReference<>() {};
 
     private final RecordingRepository recordings;
     private final ValueTimelineRepository timeline;
@@ -101,7 +104,8 @@ public class RecordingImportExportService {
                 timeStart,
                 timeEnd,
                 values.size(),
-                nodeIds);
+                nodeIds,
+                readSchemaNodes(row.schemaNodesJson()));
 
         byte[] zipBytes = buildZip(manifest, values);
         String key = "recordings/" + recordingId + "/export.zip";
@@ -143,6 +147,10 @@ public class RecordingImportExportService {
         validateSchemaVersion(manifest.schemaVersion());
         String protocol = requireProtocol(manifest.protocol());
         String dataSourceId = resolveOptionalDataSourceId(projectId, manifest.dataSourceId());
+        // manifest.schemaNodes() is absent on bundles exported before IS-161 — Jackson 3
+        // leaves it null rather than failing, and that's treated as "no schema captured".
+        String schemaNodesJson = manifest.schemaNodes() != null
+                ? json.writeValueAsString(manifest.schemaNodes()) : "[]";
 
         RecordingRow row = recordings.create(
                 projectId,
@@ -152,7 +160,8 @@ public class RecordingImportExportService {
                 "IMPORTED",
                 "SCHEMA_AND_DATA",
                 manifest.name(),
-                actor);
+                actor,
+                schemaNodesJson);
 
         if (!payload.values().isEmpty()) {
             timeline.append(row.id(), payload.values());
@@ -407,6 +416,13 @@ public class RecordingImportExportService {
 
     private static java.time.OffsetDateTime toOffsetDateTime(Instant instant) {
         return instant == null ? null : instant.atOffset(java.time.ZoneOffset.UTC);
+    }
+
+    private List<SchemaNode> readSchemaNodes(String schemaNodesJson) {
+        if (schemaNodesJson == null || schemaNodesJson.isBlank()) {
+            return List.of();
+        }
+        return json.readValue(schemaNodesJson, SCHEMA_NODE_LIST);
     }
 
     private Recording map(RecordingRow r) {
