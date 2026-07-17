@@ -1013,6 +1013,13 @@ Parallel execution:
   Depends: none.
   Done when: badge absent on initial replay page load; tapping an ID navigates to the correct surface; typecheck green.
 
+- [x] `UI-467` ✅ Recordings — delete action
+  Goal: let users delete a recording from the Recordings list, mirroring the existing Data Sources delete pattern (confirmation dialog + surfaced backend dependency error).
+  Surface: `Recordings`
+  Work includes: add `deleteRecording` to `artifacts-store.ts` calling `DELETE /api/v1/projects/{pid}/recordings/{id}` (mirrors `deleteSample`/`deleteDataSource`); add a delete button per row in `recordings-page.tsx` with a `ConfirmationDialog` (danger tone); on 422 `RetentionDependencyException` (recording referenced by a scenario REPLAY step or an active/queued run), surface `ApiError.detail` as the error toast so the reason is visible.
+  Depends: IS-092 (backend delete + dependency check, already shipped).
+  Done when: deleting an unreferenced recording removes it from the list and calls the DELETE endpoint; deleting a referenced recording shows the backend's dependency error instead of silently failing; typecheck + vitest green.
+
 ## Recommended Sequence
 
 1. Complete the P0 shell and shared-pattern tasks first.

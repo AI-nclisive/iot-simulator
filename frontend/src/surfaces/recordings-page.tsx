@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { ApiError } from "../api";
 import { resolveAccess } from "../shell/access-policy";
 import { useArtifactsStore } from "../shell/artifacts-store";
 import { useDataSourcesStore } from "../shell/data-sources-store";
+import { useNotificationStore } from "../shell/notification-store";
 import { useShellStore } from "../shell/shell-store";
+import { ConfirmationDialog } from "../ui/confirmation-dialog";
 import { SharedStatePanel } from "../ui/shared-state-panel";
 import { StatusBadge } from "../ui/status-badge";
 import { RecordingImportDialog } from "./recording-import-dialog";
@@ -50,6 +53,8 @@ export function RecordingsPage() {
   const isLoading = useArtifactsStore((s) => s.isLoading);
   const storeError = useArtifactsStore((s) => s.error);
   const loadRecordings = useArtifactsStore((s) => s.loadRecordings);
+  const deleteRecording = useArtifactsStore((s) => s.deleteRecording);
+  const push = useNotificationStore((s) => s.push);
 
   const dataSources = useDataSourcesStore((s) => s.dataSources);
   const loadDataSources = useDataSourcesStore((s) => s.loadDataSources);
@@ -59,6 +64,8 @@ export function RecordingsPage() {
   const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [importDialogOpen, setImportDialogOpen] = useState<boolean>(false);
+  const [deleteRequest, setDeleteRequest] = useState<RecordingRow | null>(null);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
   useEffect(() => {
     if (currentProjectId) {
@@ -96,6 +103,23 @@ export function RecordingsPage() {
     }
     return true;
   });
+
+  async function confirmDelete() {
+    if (!deleteRequest || !currentProjectId) {
+      return;
+    }
+    setIsDeleting(true);
+    try {
+      await deleteRecording(currentProjectId, deleteRequest.id);
+      setDeleteRequest(null);
+    } catch (err) {
+      const title =
+        err instanceof ApiError ? (err.detail ?? err.title) : "Failed to delete recording";
+      push({ tone: "error", title });
+    } finally {
+      setIsDeleting(false);
+    }
+  }
 
   return (
     <div className="flex h-full flex-col gap-3">
@@ -199,13 +223,13 @@ export function RecordingsPage() {
             <div className="overflow-hidden rounded-md border border-shell-line bg-white">
               <ul className="divide-y divide-shell-line">
                 {filtered.map((row) => (
-                  <li key={row.id}>
+                  <li key={row.id} className="relative">
                     <button
                       className="w-full px-4 py-4 text-left transition hover:bg-shell-base/50"
                       type="button"
                       onClick={() => navigate(`/recordings/${row.id}`)}
                     >
-                      <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div className="flex flex-wrap items-start justify-between gap-2 pr-20">
                         <div className="min-w-0">
                           <p className="font-medium text-sm text-shell-ink">
                             {row.name || row.sourceName || row.sourceId || `Recording ${row.id.slice(0, 8)}`}
@@ -232,6 +256,19 @@ export function RecordingsPage() {
                         </div>
                       </dl>
                     </button>
+                    {access.canCreateSource ? (
+                      <button
+                        aria-label={`Delete recording ${row.name || row.id}`}
+                        className="shell-action-danger absolute right-4 top-4"
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteRequest(row);
+                        }}
+                      >
+                        Delete
+                      </button>
+                    ) : null}
                   </li>
                 ))}
               </ul>
@@ -249,6 +286,23 @@ export function RecordingsPage() {
           if (currentProjectId) void loadRecordings(currentProjectId);
           setImportDialogOpen(false);
         }}
+      />
+
+      <ConfirmationDialog
+        confirmLabel="Delete recording"
+        impacts={[
+          { label: "Source", value: deleteRequest?.sourceName || deleteRequest?.sourceId || "—" },
+          { label: "Values", value: (deleteRequest?.valueCount ?? 0).toLocaleString() },
+        ]}
+        isProcessing={isDeleting}
+        message="Deleting a recording removes it and its captured values from the project. It cannot be used if referenced by a scenario replay step or an active run."
+        objectLabel={deleteRequest?.name || deleteRequest?.sourceName || deleteRequest?.id}
+        open={deleteRequest !== null}
+        reversibilityLabel="This action is not reversible. The recording must be captured or imported again if removed."
+        title="Delete this recording?"
+        tone="danger"
+        onClose={() => (isDeleting ? undefined : setDeleteRequest(null))}
+        onConfirm={confirmDelete}
       />
     </div>
   );
