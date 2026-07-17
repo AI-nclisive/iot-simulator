@@ -183,6 +183,31 @@ class RecordingAndTimelineIT {
         assertThat(tempCount).isEqualTo(2);
     }
 
+    /**
+     * IS-162: a recording whose {@code data_source_id} doesn't resolve to any live
+     * {@code schemas} row (e.g. imported with an unrecoverable dataSourceId, per IS-160)
+     * must still return its value rows — the schema join is display-only (for
+     * {@code parameterPath}) and must never drop rows when it can't match.
+     */
+    @Test
+    void readPageReturnsRowsWhenSchemaIsUnresolvable() {
+        RecordingRow rec = recordings.create(
+                projectId, null, "OPC_UA", 999, "IMPORTED", "SCHEMA_AND_DATA", null, "it", "[]");
+        Instant t = Instant.parse("2026-06-01T14:00:00Z");
+        timeline.append(rec.id(), List.of(
+                NeutralValue.good("temp", t, 30.0),
+                NeutralValue.good("temp", t.plusSeconds(1), 31.0)));
+
+        List<ValueTimelineEntry> page = timeline.readPage(rec.id(), -1, 10,
+                new ValueFilter(null, List.of(), null, null));
+        assertThat(page).hasSize(2);
+        assertThat(page.get(0).parameterPath()).isNull();
+        assertThat(page.get(0).value().nodeId()).isEqualTo("temp");
+
+        long total = timeline.countFiltered(rec.id(), new ValueFilter(null, List.of(), null, null));
+        assertThat(total).isEqualTo(2);
+    }
+
     /** IS-093: value_timeline is range-partitioned by source_time with a DEFAULT partition. */
     @Test
     void valueTimelineIsRangePartitioned() {
