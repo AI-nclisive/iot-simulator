@@ -5,6 +5,21 @@ workers, and a React/TypeScript Web UI. See the design docs at the repo root
 (`SPEC.md`, `ARCHITECTURE.md`, `STACK.md`), the UI docs under `frontend/docs/`
 (`DESIGN.md` and others), and the implementation specs in `backend-specs/`.
 
+## Table of contents
+
+- [Module map](#module-map)
+- [Developer setup](#developer-setup)
+- [Run it locally](#run-it-locally)
+  - [Database data persistence](#database-data-persistence)
+  - [Backend only](#backend-only)
+  - [Frontend only](#frontend-only)
+- [Test locally](#test-locally)
+- [API & OpenAPI documentation](#api--openapi-documentation)
+- [Configuration (environment variables)](#configuration-environment-variables)
+  - [Useful Gradle tasks](#useful-gradle-tasks)
+- [Project tracking](#project-tracking)
+- [Notes](#notes)
+
 ## Module map
 
 Dependencies flow downward only (`backend-specs/07_MODULE_STRUCTURE.md`):
@@ -74,13 +89,19 @@ in `local` mode by default (auth off), no login or token is needed.
 Vite binds to `0.0.0.0`, so the same dev server can be opened from another device
 on the LAN via `http://<your-lan-ip>:4173/`.
 
-> The **`/run-local`** Claude Code skill automates this whole stack and runs it in
-> **supervisor mode** — real out-of-process OPC UA workers — so starting a data
-> source spawns an Eclipse Milo server an edge device can connect to
-> (`opc.tcp://127.0.0.1:<listenPort>/iotsim`). Build the worker once with
-> `./gradlew :workers:worker-opcua:installDist`. The manual steps above run the
-> app's default `memory` mode (no workers) — fine for UI/API clicking, but there is
-> no real protocol endpoint.
+> `run-local.sh` (macOS/Linux) / `run-local.ps1` (Windows) automate this whole
+> stack and run it in **supervisor mode** — real out-of-process OPC UA workers —
+> so starting a data source spawns an Eclipse Milo server an edge device can
+> connect to (`opc.tcp://127.0.0.1:<listenPort>/iotsim`):
+>
+> ```bash
+> ./run-local.sh          # up
+> ./run-local.sh down     # down (keeps DB data)
+> ```
+>
+> The **`/run-local`** Claude Code skill does the same thing conversationally. The
+> manual steps above run the app's default `memory` mode (no workers) — fine for
+> UI/API clicking, but there is no real protocol endpoint.
 
 ### Database data persistence
 
