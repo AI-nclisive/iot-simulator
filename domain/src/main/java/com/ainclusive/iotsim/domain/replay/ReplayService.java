@@ -161,9 +161,4 @@ public class ReplayService {
                 .orElseThrow(() -> new ResourceNotFoundException("Recording", recordingId));
     }
 
-    /**
-     * Recordings are scoped to a protocol type, not to the data-source instance they were
-     * captured from (IS-160): replay is allowed against any data source of a compatible
-     * protocol, and rejected with a clear 400 otherwise.
-     */
 }

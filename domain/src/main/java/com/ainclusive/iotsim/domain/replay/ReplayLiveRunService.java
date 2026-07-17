@@ -270,11 +270,6 @@ public class ReplayLiveRunService {
                 .orElseThrow(() -> new ResourceNotFoundException("Recording", recordingId));
     }
 
-    /**
-     * Recordings are scoped to a protocol type, not to the data-source instance they were
-     * captured from (IS-160): replay is allowed against any data source of a compatible
-     * protocol, and rejected with a clear 400 otherwise.
-     */
     private OffsetDateTime now() {
         return OffsetDateTime.ofInstant(wallClock.instant(), ZoneOffset.UTC);
     }
