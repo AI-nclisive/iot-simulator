@@ -42,6 +42,8 @@ API layer enforces authz) and decisions D6 (SSE-only) and D7 (`/api/v1`).
 - `POST …/data-sources/scan` → starts a scan job; returns `jobId`
 - `GET …/data-sources/scan/{jobId}` → progress / partial / discovered schema
   (states: unreachable, auth failure, partial, large schema, unknown type)
+- `POST …/data-sources/scan/{jobId}/cancel` → stops a running scan job early;
+  job settles as `CANCELLED` (IS-164)
 
 ### Capture (record from a real source)
 - `POST …/data-sources/{id}/recording/start` (body: scanType) → starts a new

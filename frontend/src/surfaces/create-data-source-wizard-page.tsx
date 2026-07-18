@@ -45,7 +45,8 @@ type ScanJobStatus =
   | "UNREACHABLE"
   | "AUTH_FAILURE"
   | "UNSUPPORTED"
-  | "FAILED";
+  | "FAILED"
+  | "CANCELLED";
 
 type ScanJobPhase = "CONNECTING" | "CONNECTED" | "SCANNING";
 
@@ -61,7 +62,7 @@ type ScanJobResult = {
   nodes: DiscoveredNodeResponse[];
 };
 
-type ScanStepStatus = "idle" | "scanning" | "complete" | "error" | "partial";
+type ScanStepStatus = "idle" | "scanning" | "complete" | "error" | "partial" | "cancelled";
 
 type ProtocolOption = {
   id: "OPC UA" | "Modbus TCP";
@@ -313,6 +314,7 @@ export function scanStepValidationMessage(
 ): string | null {
   if (scanStatus === "scanning") return "Scanning in progress…";
   if (scanStatus === "error") return "Scan failed";
+  if (scanStatus === "cancelled") return "Scan was stopped";
   if (scanStatus === "idle") return "Scan has not started yet";
   // complete or partial
   if (scanResult) {
@@ -608,6 +610,12 @@ export function CreateDataSourceWizardPage() {
                   exclude: false,
                 })),
               );
+            } else if (result.status === "CANCELLED") {
+              if (scanPollRef.current !== null) {
+                clearInterval(scanPollRef.current);
+                scanPollRef.current = null;
+              }
+              setScanStatus("cancelled");
             } else if (
               result.status === "UNREACHABLE" ||
               result.status === "AUTH_FAILURE" ||
@@ -1250,6 +1258,23 @@ export function CreateDataSourceWizardPage() {
     setTypeResolutions((prev) => prev.map((entry) => ({ ...entry, ...patch })));
   }
 
+  function stopScan() {
+    if (scanPollRef.current !== null) {
+      clearInterval(scanPollRef.current);
+      scanPollRef.current = null;
+    }
+    setScanStatus("cancelled");
+    if (currentProjectId && scanJobId) {
+      void apiFetch(
+        `/api/v1/projects/${currentProjectId}/data-sources/scan/${scanJobId}/cancel`,
+        { method: "POST" },
+      ).catch(() => {
+        // Best-effort: the UI already moved on; a failed cancel call just leaves
+        // the abandoned worker to hit its own timeout server-side.
+      });
+    }
+  }
+
   function retryScan() {
     setScanStatus("idle");
     setScanJobId(null);
@@ -1296,6 +1321,27 @@ export function CreateDataSourceWizardPage() {
               </p>
             )}
           </section>
+          {scanStatus === "scanning" && scanJobId ? (
+            <button className="shell-action" type="button" onClick={stopScan}>
+              Stop Scan
+            </button>
+          ) : null}
+        </div>
+      );
+    }
+
+    if (scanStatus === "cancelled") {
+      return (
+        <div className="space-y-4">
+          <section className="rounded-md border border-shell-line bg-shell-line/10 px-4 py-4">
+            <p className="text-sm font-medium text-shell-ink">Scan stopped</p>
+            <p className="mt-2 text-sm text-shell-muted">
+              The scan was stopped before it finished. You can retry it, or go back and adjust the endpoint.
+            </p>
+          </section>
+          <button className="shell-action" type="button" onClick={retryScan}>
+            Retry
+          </button>
         </div>
       );
     }

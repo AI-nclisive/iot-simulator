@@ -236,6 +236,63 @@ class ScanServiceTest {
     }
 
     @Test
+    void cancelScanStopsRunningJobAndMarksCancelled() throws InterruptedException {
+        scanner.scanResult = okResult();
+        scanner.awaitBeforeResult = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newSingleThreadExecutor();
+        try {
+            ScanService svc = new ScanService(scanner, new FakeProjectRepository(),
+                    new DataSourceService(dataSourceRepo, new FakeProjectRepository(),
+                            new InMemorySchemaRepository(dataSourceRepo), new InMemoryRuntimeController(),
+                            credentials, new ObjectMapper(), "localhost",
+                            new ActivityEventService(new NoOpActivityEventRepository())),
+                    new SchemaService(new InMemorySchemaRepository(dataSourceRepo), dataSourceRepo,
+                            new ObjectMapper()),
+                    pool::execute);
+            ScanJob job = svc.startScan(
+                    PROJECT, "OPC_UA", "opc.tcp://h", ConnectionCredentials.anonymous(), 0);
+
+            // Wait until the scan is blocked mid-flight (SCANNING) before cancelling.
+            ScanJob polled = job;
+            for (int i = 0; i < 200 && polled.phase() != com.ainclusive.iotsim.platform.scan.ScanPhase.SCANNING; i++) {
+                Thread.sleep(5);
+                polled = svc.getScan(PROJECT, job.jobId());
+            }
+            assertThat(polled.state()).isEqualTo("RUNNING");
+
+            svc.cancelScan(PROJECT, job.jobId());
+
+            ScanJob done = polled;
+            for (int i = 0; i < 200 && done.isRunning(); i++) {
+                Thread.sleep(5);
+                done = svc.getScan(PROJECT, job.jobId());
+            }
+            assertThat(done.state()).isEqualTo("CANCELLED");
+            assertThat(done.result()).isNull();
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    @Test
+    void cancelScanOnCompletedJobIsANoOp() {
+        scanner.scanResult = okResult();
+        ScanJob job = service.startScan(
+                PROJECT, "OPC_UA", "opc.tcp://h", ConnectionCredentials.anonymous(), 0);
+        assertThat(service.getScan(PROJECT, job.jobId()).state()).isEqualTo("OK");
+
+        service.cancelScan(PROJECT, job.jobId());
+
+        assertThat(service.getScan(PROJECT, job.jobId()).state()).isEqualTo("OK");
+    }
+
+    @Test
+    void cancelScanOnMissingJobThrowsNotFound() {
+        assertThatThrownBy(() -> service.cancelScan(PROJECT, "nope"))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
     void createFromScanRejectsRunningJob() {
         // An executor that never runs the task leaves the job RUNNING.
         ScanService pending = new ScanService(

@@ -121,6 +121,19 @@ class ScanControllerTest {
     }
 
     @Test
+    void cancelStopsTheJobAndReturnsItsUpdatedState() {
+        Instant now = Instant.now();
+        ScanJob cancelled = new ScanJob("job-1", PROJECT, "OPC_UA", "opc.tcp://h", "CANCELLED",
+                null, 0, null, "scan cancelled by user", now, now);
+        given(service.getScan(PROJECT, "job-1")).willReturn(cancelled);
+
+        ScanJobResponse resp = controller.cancel(PROJECT, "job-1");
+
+        verify(service).cancelScan(PROJECT, "job-1");
+        assertThat(resp.status()).isEqualTo("CANCELLED");
+    }
+
+    @Test
     void createReturns201WithEtagAndScanBasis() {
         given(service.createFromScan(eq(PROJECT), eq("job-1"), eq("Scanned"), any(), any(), any()))
                 .willReturn(scanned());

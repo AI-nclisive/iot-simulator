@@ -51,7 +51,7 @@ public class RuntimeConfig {
             String bindAddress,
             @org.springframework.beans.factory.annotation.Value("${iotsim.simulator.advertised-host:localhost}")
             String advertisedHost,
-            @org.springframework.beans.factory.annotation.Value("${iotsim.simulator.scan-timeout-seconds:120}")
+            @org.springframework.beans.factory.annotation.Value("${iotsim.simulator.scan-timeout-seconds:1800}")
             long scanTimeoutSeconds) {
         if (props.isSupervisorMode()) {
             // Persist runtime events off the IPC delivery thread (IS-048), and fan the
