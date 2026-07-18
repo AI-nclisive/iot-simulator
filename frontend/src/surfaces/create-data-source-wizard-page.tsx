@@ -1322,7 +1322,7 @@ export function CreateDataSourceWizardPage() {
             )}
           </section>
           {scanStatus === "scanning" && scanJobId ? (
-            <button className="shell-action" type="button" onClick={stopScan}>
+            <button className="shell-action-danger" type="button" onClick={stopScan}>
               Stop Scan
             </button>
           ) : null}
@@ -1745,14 +1745,19 @@ export function CreateDataSourceWizardPage() {
 
       <section className="shell-panel px-5 py-4">
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <button className="shell-action" type="button" onClick={cancelWizard}>
+          <button
+            className="shell-action"
+            disabled={scanStatus === "scanning"}
+            type="button"
+            onClick={cancelWizard}
+          >
             Cancel
           </button>
 
           <div className="flex flex-wrap items-center justify-end gap-2">
             <button
               className="shell-action"
-              disabled={safeStep === 0}
+              disabled={safeStep === 0 || scanStatus === "scanning"}
               type="button"
               onClick={goBack}
             >
