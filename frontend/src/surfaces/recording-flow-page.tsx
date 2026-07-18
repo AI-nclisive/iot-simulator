@@ -275,7 +275,7 @@ export function RecordingFlowPage() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 max-w-3xl">
             <h2 className="text-2xl font-semibold text-shell-ink">{source.name}</h2>
-            <p className="mt-2 text-sm leading-6 text-shell-muted">{source.endpoint}</p>
+            <p className="mt-2 text-sm leading-6 text-shell-muted">{source.realDeviceEndpoint ?? source.endpoint}</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">

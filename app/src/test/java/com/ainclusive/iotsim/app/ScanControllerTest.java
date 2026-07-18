@@ -100,7 +100,7 @@ class ScanControllerTest {
                         null, null, null, null, null)),
                 true, 2, "partial");
         given(service.getScan(PROJECT, "job-1")).willReturn(
-                new ScanJob("job-1", PROJECT, "OPC_UA", "opc.tcp://h", "PARTIAL", result,
+                new ScanJob("job-1", PROJECT, "OPC_UA", "opc.tcp://h", "PARTIAL", null, 2, result,
                         "partial", Instant.now(), Instant.now()));
 
         ScanJobResponse resp = controller.get(PROJECT, "job-1");
@@ -161,7 +161,8 @@ class ScanControllerTest {
 
     private static ScanJob running(String jobId) {
         Instant now = Instant.now();
-        return new ScanJob(jobId, PROJECT, "OPC_UA", "opc.tcp://h", "RUNNING", null,
+        return new ScanJob(jobId, PROJECT, "OPC_UA", "opc.tcp://h", "RUNNING",
+                com.ainclusive.iotsim.platform.scan.ScanPhase.CONNECTING, 0, null,
                 "scan in progress", now, now);
     }
 

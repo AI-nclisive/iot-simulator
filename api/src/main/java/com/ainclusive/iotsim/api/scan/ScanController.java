@@ -170,8 +170,8 @@ public class ScanController {
     public record StartScanResponse(String jobId, String status) {}
 
     public record ScanJobResponse(
-            String jobId, String status, boolean truncated, int discoveredCount,
-            int unknownCount, String message, List<DiscoveredNodeResponse> nodes) {
+            String jobId, String status, String phase, int discoveredSoFar, boolean truncated,
+            int discoveredCount, int unknownCount, String message, List<DiscoveredNodeResponse> nodes) {
 
         static ScanJobResponse from(ScanJob job) {
             ScanResult result = job.result();
@@ -180,6 +180,8 @@ public class ScanController {
             return new ScanJobResponse(
                     job.jobId(),
                     job.state(),
+                    job.phase() == null ? null : job.phase().name(),
+                    job.discoveredSoFar(),
                     result != null && result.truncated(),
                     nodes.size(),
                     result == null ? 0 : result.unknownCount(),

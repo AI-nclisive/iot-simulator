@@ -12,6 +12,8 @@ import com.ainclusive.iotsim.workercontract.v1.HelloResponse;
 import com.ainclusive.iotsim.workercontract.v1.InjectFaultRequest;
 import com.ainclusive.iotsim.workercontract.v1.ProtocolDataSourceGrpc;
 import com.ainclusive.iotsim.workercontract.v1.RuntimeEvent;
+import com.ainclusive.iotsim.workercontract.v1.ScanEvent;
+import com.ainclusive.iotsim.workercontract.v1.ScanProgress;
 import com.ainclusive.iotsim.workercontract.v1.ScanRequest;
 import com.ainclusive.iotsim.workercontract.v1.ScanResponse;
 import com.ainclusive.iotsim.workercontract.v1.Schema;
@@ -47,14 +49,21 @@ public final class WorkerClient implements AutoCloseable {
     // Scan/test-connection reach an external endpoint; the worker bounds its own
     // attempt, these deadlines just stop a hung worker from blocking the caller.
     private static final long TEST_CONNECTION_TIMEOUT_SECONDS = 30;
-    private static final long SCAN_TIMEOUT_SECONDS = 120;
+    static final long DEFAULT_SCAN_TIMEOUT_SECONDS = 120;
 
     private final ManagedChannel channel;
     private final ProtocolDataSourceGrpc.ProtocolDataSourceBlockingStub stub;
+    private final long scanTimeoutSeconds;
 
     public WorkerClient(String host, int port) {
+        this(host, port, DEFAULT_SCAN_TIMEOUT_SECONDS);
+    }
+
+    /** @param scanTimeoutSeconds deadline for {@link #scan}, configurable via {@code iotsim.simulator.scan-timeout-seconds} (a large real address space can take longer than the 120s default). */
+    public WorkerClient(String host, int port, long scanTimeoutSeconds) {
         this.channel = ManagedChannelBuilder.forAddress(host, port).usePlaintext().build();
         this.stub = ProtocolDataSourceGrpc.newBlockingStub(channel);
+        this.scanTimeoutSeconds = scanTimeoutSeconds;
     }
 
     public HelloResponse hello() {
@@ -135,9 +144,74 @@ public final class WorkerClient implements AutoCloseable {
                 .testConnection(request);
     }
 
-    /** Browses a real source via the worker (client mode) into neutral schema nodes. */
-    public ScanResponse scan(ScanRequest request) {
-        return stub.withDeadlineAfter(SCAN_TIMEOUT_SECONDS, TimeUnit.SECONDS).scan(request);
+    /**
+     * Browses a real source via the worker (client mode) into neutral schema nodes.
+     * The worker streams {@link ScanProgress} updates as it descends (via
+     * {@code onProgress}) ending with exactly one terminal result, which this method
+     * blocks for and returns. Same deadline as before (now bounding the whole
+     * stream rather than a single response).
+     */
+    public ScanResponse scan(ScanRequest request, Consumer<ScanProgress> onProgress) {
+        ProtocolDataSourceGrpc.ProtocolDataSourceStub async = ProtocolDataSourceGrpc.newStub(channel)
+                .withDeadlineAfter(scanTimeoutSeconds, TimeUnit.SECONDS);
+        CountDownLatch done = new CountDownLatch(1);
+        AtomicReference<ScanResponse> result = new AtomicReference<>();
+        AtomicReference<Throwable> error = new AtomicReference<>();
+        AtomicReference<ClientCallStreamObserver<ScanRequest>> call = new AtomicReference<>();
+        async.scan(request, new ClientResponseObserver<ScanRequest, ScanEvent>() {
+            @Override
+            public void beforeStart(ClientCallStreamObserver<ScanRequest> stream) {
+                call.set(stream);
+            }
+
+            @Override
+            public void onNext(ScanEvent event) {
+                if (event.hasResult()) {
+                    result.set(event.getResult());
+                } else if (onProgress != null) {
+                    onProgress.accept(event.getProgress());
+                }
+            }
+
+            @Override
+            public void onError(Throwable t) {
+                error.set(t);
+                done.countDown();
+            }
+
+            @Override
+            public void onCompleted() {
+                done.countDown();
+            }
+        });
+        try {
+            // Buffer past the RPC deadline so that deadline fires (as onError) first.
+            if (!done.await(scanTimeoutSeconds + 5, TimeUnit.SECONDS)) {
+                cancelQuietly(call.get(), "scan timed out waiting for worker");
+                throw new IllegalStateException("scan timed out waiting for worker");
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            cancelQuietly(call.get(), "interrupted during scan");
+            throw new IllegalStateException("interrupted during scan", e);
+        }
+        if (error.get() instanceof RuntimeException re) {
+            throw re;
+        }
+        if (error.get() != null) {
+            throw new IllegalStateException("scan failed", error.get());
+        }
+        if (result.get() == null) {
+            throw new IllegalStateException("worker completed scan stream without a result");
+        }
+        return result.get();
+    }
+
+    /** Cancels an in-flight call so the worker stops browsing once the caller gives up. */
+    private static void cancelQuietly(ClientCallStreamObserver<?> call, String reason) {
+        if (call != null) {
+            call.cancel(reason, null);
+        }
     }
 
     /**

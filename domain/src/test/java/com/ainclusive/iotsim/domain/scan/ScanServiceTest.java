@@ -196,6 +196,46 @@ class ScanServiceTest {
     }
 
     @Test
+    void progressUpdatesAreVisibleWhileScanIsRunning() throws InterruptedException {
+        scanner.scanResult = okResult();
+        scanner.awaitBeforeResult = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newSingleThreadExecutor();
+        try {
+            ScanService svc = new ScanService(scanner, new FakeProjectRepository(),
+                    new DataSourceService(dataSourceRepo, new FakeProjectRepository(),
+                            new InMemorySchemaRepository(dataSourceRepo), new InMemoryRuntimeController(),
+                            credentials, new ObjectMapper(), "localhost",
+                            new ActivityEventService(new NoOpActivityEventRepository())),
+                    new SchemaService(new InMemorySchemaRepository(dataSourceRepo), dataSourceRepo,
+                            new ObjectMapper()),
+                    pool::execute);
+            ScanJob job = svc.startScan(
+                    PROJECT, "OPC_UA", "opc.tcp://h", ConnectionCredentials.anonymous(), 0);
+
+            // The scanner blocks after emitting SCANNING/3, so the job must still be RUNNING
+            // with that progress visible — poll briefly since the worker-pool thread races us.
+            ScanJob polled = job;
+            for (int i = 0; i < 200 && polled.phase() != com.ainclusive.iotsim.platform.scan.ScanPhase.SCANNING; i++) {
+                Thread.sleep(5);
+                polled = svc.getScan(PROJECT, job.jobId());
+            }
+            assertThat(polled.state()).isEqualTo("RUNNING");
+            assertThat(polled.phase()).isEqualTo(com.ainclusive.iotsim.platform.scan.ScanPhase.SCANNING);
+            assertThat(polled.discoveredSoFar()).isEqualTo(3);
+
+            scanner.awaitBeforeResult.countDown();
+            ScanJob done = svc.getScan(PROJECT, job.jobId());
+            for (int i = 0; i < 200 && done.isRunning(); i++) {
+                Thread.sleep(5);
+                done = svc.getScan(PROJECT, job.jobId());
+            }
+            assertThat(done.state()).isEqualTo("OK");
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    @Test
     void createFromScanRejectsRunningJob() {
         // An executor that never runs the task leaves the job RUNNING.
         ScanService pending = new ScanService(
@@ -240,6 +280,9 @@ class ScanServiceTest {
         ScanResult scanResult = ScanResult.failure(ScanStatus.UNREACHABLE, "unset");
         ConnectionTestResult connectionResult = new ConnectionTestResult(ScanStatus.OK, "ok");
         RuntimeException failure;
+        /** When set, held after emitting progress but before returning the result — lets a test
+         *  observe the job mid-flight. */
+        java.util.concurrent.CountDownLatch awaitBeforeResult;
 
         @Override
         public ConnectionTestResult testConnection(ScanSpec spec) {
@@ -248,8 +291,20 @@ class ScanServiceTest {
         }
 
         @Override
-        public ScanResult scan(ScanSpec spec) {
+        public ScanResult scan(ScanSpec spec,
+                com.ainclusive.iotsim.platform.scan.ScanProgressListener onProgress) {
             this.lastSpec = spec;
+            onProgress.onProgress(com.ainclusive.iotsim.platform.scan.ScanPhase.CONNECTING, 0);
+            onProgress.onProgress(com.ainclusive.iotsim.platform.scan.ScanPhase.CONNECTED, 0);
+            onProgress.onProgress(com.ainclusive.iotsim.platform.scan.ScanPhase.SCANNING, 3);
+            if (awaitBeforeResult != null) {
+                try {
+                    awaitBeforeResult.await();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException(e);
+                }
+            }
             if (failure != null) {
                 throw failure;
             }

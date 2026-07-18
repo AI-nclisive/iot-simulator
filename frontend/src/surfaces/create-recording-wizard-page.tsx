@@ -130,8 +130,8 @@ export function CreateRecordingWizardPage() {
                 <div className="flex flex-wrap items-center gap-3">
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-shell-ink">{ds.name}</p>
-                    {ds.endpoint ? (
-                      <p className="mt-1 text-xs text-shell-muted font-mono">{ds.endpoint}</p>
+                    {ds.realDeviceEndpoint ? (
+                      <p className="mt-1 text-xs text-shell-muted font-mono">{ds.realDeviceEndpoint}</p>
                     ) : null}
                     {!canCapture ? (
                       <p className="mt-1 text-xs text-shell-muted">No real device endpoint — live capture unavailable</p>
@@ -159,7 +159,7 @@ export function CreateRecordingWizardPage() {
       { label: "Data source", value: selectedSource.name },
       { label: "Protocol", value: selectedSource.protocol },
       { label: "Status", value: selectedSource.status },
-      ...(selectedSource.endpoint ? [{ label: "Endpoint", value: selectedSource.endpoint }] : []),
+      ...(selectedSource.realDeviceEndpoint ? [{ label: "Endpoint", value: selectedSource.realDeviceEndpoint }] : []),
     ];
     return (
       <div className="space-y-4">

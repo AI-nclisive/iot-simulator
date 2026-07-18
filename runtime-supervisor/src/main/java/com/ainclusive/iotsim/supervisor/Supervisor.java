@@ -18,6 +18,8 @@ import com.ainclusive.iotsim.platform.runtime.SourceError;
 import com.ainclusive.iotsim.platform.runtime.SourceHealth;
 import com.ainclusive.iotsim.platform.scan.ConnectionTestResult;
 import com.ainclusive.iotsim.platform.scan.DiscoveredNode;
+import com.ainclusive.iotsim.platform.scan.ScanPhase;
+import com.ainclusive.iotsim.platform.scan.ScanProgressListener;
 import com.ainclusive.iotsim.platform.scan.ScanResult;
 import com.ainclusive.iotsim.platform.scan.ScanSpec;
 import com.ainclusive.iotsim.platform.scan.ScanStatus;
@@ -32,6 +34,7 @@ import com.ainclusive.iotsim.workercontract.v1.ClientEvent;
 import com.ainclusive.iotsim.workercontract.v1.ConnectionConfigMsg;
 import com.ainclusive.iotsim.workercontract.v1.Quality;
 import com.ainclusive.iotsim.workercontract.v1.RuntimeEvent;
+import com.ainclusive.iotsim.workercontract.v1.ScanProgress;
 import com.ainclusive.iotsim.workercontract.v1.ScanRequest;
 import com.ainclusive.iotsim.workercontract.v1.ScanResponse;
 import com.ainclusive.iotsim.workercontract.v1.Schema;
@@ -371,7 +374,7 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
     }
 
     @Override
-    public ScanResult scan(ScanSpec spec) {
+    public ScanResult scan(ScanSpec spec, ScanProgressListener onProgress) {
         if (!OPC_UA.equals(spec.protocol())) {
             return ScanResult.failure(ScanStatus.UNSUPPORTED, unsupportedMessage(spec.protocol()));
         }
@@ -383,9 +386,23 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
                     .setEndpointUrl(orEmpty(spec.endpointUrl()))
                     .setCredentials(toCredentialMsg(spec.credentials()))
                     .setMaxNodes(spec.maxNodes())
-                    .build());
+                    .build(),
+                    progress -> reportProgress(onProgress, progress));
             return toScanResult(response);
         });
+    }
+
+    /**
+     * Best-effort: a phase string a version-skewed worker sends that this supervisor
+     * doesn't recognize must not fail the scan (it runs inside the gRPC callback, ahead
+     * of the terminal result) — just skip that one progress tick.
+     */
+    private static void reportProgress(ScanProgressListener onProgress, ScanProgress progress) {
+        try {
+            onProgress.onProgress(ScanPhase.valueOf(progress.getPhase()), progress.getDiscoveredSoFar());
+        } catch (IllegalArgumentException ignoredUnrecognizedPhase) {
+            // best-effort progress reporting; the terminal result is unaffected
+        }
     }
 
     /**
@@ -427,7 +444,7 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
             throw new CaptureException(
                     CaptureException.Kind.UNAVAILABLE, "failed to launch " + spec.protocol() + " worker", e);
         }
-        WorkerClient client = new WorkerClient("127.0.0.1", controlPort);
+        WorkerClient client = new WorkerClient("127.0.0.1", controlPort, network.scanTimeoutSeconds());
         try {
             awaitReady(client);
             WorkerClient.StreamHandle handle = client.capture(
@@ -462,7 +479,7 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
         } catch (Exception e) {
             throw new WorkerLaunchException("failed to launch " + protocol + " worker", e);
         }
-        WorkerClient client = new WorkerClient("127.0.0.1", controlPort);
+        WorkerClient client = new WorkerClient("127.0.0.1", controlPort, network.scanTimeoutSeconds());
         try {
             awaitReady(client);
             return call.apply(client);
