@@ -20,7 +20,10 @@ service ProtocolDataSource {
   // Scan browses the address space into neutral schema nodes. Stateless, one-shot
   // — no Configure/Start needed. See backend-specs/05_API_CONTRACT.md §Scan.
   rpc TestConnection (TestConnectionRequest) returns (TestConnectionResponse);
-  rpc Scan (ScanRequest) returns (ScanResponse);
+  // Streams ScanProgress updates as the browse descends, ending with exactly one
+  // ScanEvent carrying the terminal ScanResponse (result). See backend-specs/05
+  // §Scan.
+  rpc Scan (ScanRequest) returns (stream ScanEvent);
 
   // Live capture (record real data). Like Scan, the worker acts as a protocol
   // CLIENT against a real endpoint — but instead of one-shot browsing it
@@ -138,6 +141,20 @@ message ScanResponse {
   int32 discovered_count = 4;
   int32 unknown_count = 5;            // VARIABLE nodes whose type could not be mapped
   string message = 6;
+}
+
+// One update on the Scan stream: either an in-flight progress tick or the
+// (exactly-one, terminal) scan result.
+message ScanEvent {
+  oneof event {
+    ScanProgress progress = 1;
+    ScanResponse result = 2;
+  }
+}
+
+message ScanProgress {
+  string phase = 1;              // CONNECTING | CONNECTED | SCANNING
+  int32 discovered_so_far = 2;   // running node count while phase == SCANNING
 }
 
 // ---- Live capture / record real data ----

@@ -13,6 +13,8 @@ import com.ainclusive.iotsim.workercontract.v1.HelloResponse;
 import com.ainclusive.iotsim.workercontract.v1.ProtocolDataSourceGrpc;
 import com.ainclusive.iotsim.workercontract.v1.Quality;
 import com.ainclusive.iotsim.workercontract.v1.RuntimeEvent;
+import com.ainclusive.iotsim.workercontract.v1.ScanEvent;
+import com.ainclusive.iotsim.workercontract.v1.ScanProgress;
 import com.ainclusive.iotsim.workercontract.v1.ScanRequest;
 import com.ainclusive.iotsim.workercontract.v1.ScanResponse;
 import com.ainclusive.iotsim.workercontract.v1.SchemaNodeMsg;
@@ -134,15 +136,19 @@ final class TestProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSourc
     }
 
     @Override
-    public void scan(ScanRequest request, StreamObserver<ScanResponse> obs) {
+    public void scan(ScanRequest request, StreamObserver<ScanEvent> obs) {
         lastScan.set(request);
-        obs.onNext(ScanResponse.newBuilder()
-                .setStatus("OK")
-                .addNodes(SchemaNodeMsg.newBuilder()
-                        .setNodeId("ns=2;s=temp").setPath("Temperature").setName("Temperature")
-                        .setKind("VARIABLE").setDataType("FLOAT64").setValueRank("SCALAR").setAccess("READ"))
-                .setDiscoveredCount(1)
-                .setMessage("discovered 1 nodes")
+        obs.onNext(ScanEvent.newBuilder()
+                .setProgress(ScanProgress.newBuilder().setPhase("CONNECTED"))
+                .build());
+        obs.onNext(ScanEvent.newBuilder()
+                .setResult(ScanResponse.newBuilder()
+                        .setStatus("OK")
+                        .addNodes(SchemaNodeMsg.newBuilder()
+                                .setNodeId("ns=2;s=temp").setPath("Temperature").setName("Temperature")
+                                .setKind("VARIABLE").setDataType("FLOAT64").setValueRank("SCALAR").setAccess("READ"))
+                        .setDiscoveredCount(1)
+                        .setMessage("discovered 1 nodes"))
                 .build());
         obs.onCompleted();
     }

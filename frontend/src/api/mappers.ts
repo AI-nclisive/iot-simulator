@@ -2,6 +2,8 @@ export type BackendProtocol = "OPC_UA" | "MODBUS_TCP";
 export type BackendRuntimeState = "STOPPED" | "STARTING" | "RUNNING" | "ERROR" | "STALE";
 export type BackendDataType =
   | "BOOL"
+  | "INT8"
+  | "UINT8"
   | "INT16"
   | "UINT16"
   | "INT32"
@@ -11,7 +13,14 @@ export type BackendDataType =
   | "FLOAT32"
   | "FLOAT64"
   | "STRING"
-  | "BYTES";
+  | "BYTES"
+  | "LOCALIZED_TEXT"
+  | "GUID"
+  | "STATUS_CODE"
+  | "QUALIFIED_NAME"
+  | "NODE_ID"
+  | "EXPANDED_NODE_ID"
+  | "XML_ELEMENT";
 
 export function mapProtocol(protocol: BackendProtocol): "OPC UA" | "Modbus TCP" {
   return protocol === "OPC_UA" ? "OPC UA" : "Modbus TCP";
@@ -35,15 +44,27 @@ export function mapDataType(
 ): "float" | "int" | "bool" | "string" | null {
   if (dataType === "FLOAT32" || dataType === "FLOAT64") return "float";
   if (
+    dataType === "INT8" ||
+    dataType === "UINT8" ||
     dataType === "INT16" ||
     dataType === "UINT16" ||
     dataType === "INT32" ||
     dataType === "UINT32" ||
     dataType === "INT64" ||
-    dataType === "UINT64"
+    dataType === "UINT64" ||
+    dataType === "STATUS_CODE"
   )
     return "int";
   if (dataType === "BOOL") return "bool";
-  if (dataType === "STRING") return "string";
+  if (
+    dataType === "STRING" ||
+    dataType === "LOCALIZED_TEXT" ||
+    dataType === "GUID" ||
+    dataType === "QUALIFIED_NAME" ||
+    dataType === "NODE_ID" ||
+    dataType === "EXPANDED_NODE_ID" ||
+    dataType === "XML_ELEMENT"
+  )
+    return "string";
   return null; // BYTES — no FE type yet
 }

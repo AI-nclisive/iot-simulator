@@ -50,7 +50,9 @@ public class RuntimeConfig {
             @org.springframework.beans.factory.annotation.Value("${iotsim.simulator.bind-address:0.0.0.0}")
             String bindAddress,
             @org.springframework.beans.factory.annotation.Value("${iotsim.simulator.advertised-host:localhost}")
-            String advertisedHost) {
+            String advertisedHost,
+            @org.springframework.beans.factory.annotation.Value("${iotsim.simulator.scan-timeout-seconds:120}")
+            long scanTimeoutSeconds) {
         if (props.isSupervisorMode()) {
             // Persist runtime events off the IPC delivery thread (IS-048), and fan the
             // same events to the live SSE hub (IS-046).
@@ -68,7 +70,7 @@ public class RuntimeConfig {
                     new ProcessWorkerLauncher(props.workers()), props.restartPolicy(),
                     HealthPolicy.DEFAULT, clientListener, runtimeListener, liveValuesHub,
                     props.governancePolicy(),
-                    new WorkerNetwork(bindAddress, advertisedHost));
+                    new WorkerNetwork(bindAddress, advertisedHost, scanTimeoutSeconds));
         }
         return new InMemoryRuntimeController();
     }

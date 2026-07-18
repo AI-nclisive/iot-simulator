@@ -40,11 +40,41 @@ Schemas are versioned (monotonic int). A recording/sample stores the
 
 ## 2. Data types
 
-Protocol-neutral primitive set (chosen as the intersection that maps cleanly to
-both OPC UA built-in types and Modbus registers):
+Protocol-neutral primitive set — a **superset** a protocol worker draws from, not
+an intersection every protocol must fill:
 
-`BOOL, INT16, UINT16, INT32, UINT32, INT64, UINT64, FLOAT32, FLOAT64, STRING,
-BYTES, DATETIME`
+`BOOL, INT8, UINT8, INT16, UINT16, INT32, UINT32, INT64, UINT64, FLOAT32,
+FLOAT64, STRING, BYTES, DATETIME, LOCALIZED_TEXT, GUID, STATUS_CODE,
+QUALIFIED_NAME, NODE_ID, EXPANDED_NODE_ID, XML_ELEMENT`
+
+This covers every concrete OPC UA built-in type usable as a Variable's `DataType`
+attribute except the structural/complex ones (`Structure`/`ExtensionObject`, kept
+out per the no-nested-structs rule below) and the protocol-machinery container
+types (`DataValue`, `Variant`, `DiagnosticInfo`) that a real server's Variable
+never literally declares as its `DataType` in practice.
+
+A schema/recording/data-source is always scoped to a single protocol (`ReplayGuards`
+rejects replaying a recording against a different protocol's data source), so a
+value only one protocol produces (e.g. OPC UA's `LOCALIZED_TEXT`) is simply never
+referenced by other protocols' workers — harmless dead weight, not a correctness
+concern. Each protocol worker's own `XxxTypes` mapper (e.g. `OpcUaTypes`) reverse-maps
+its native types onto whichever subset of this enum it needs.
+
+A native type is promoted to a first-class entry here only when (a) it carries
+information the user needs to interact with directly (e.g. `LOCALIZED_TEXT` is
+user-visible display text) and (b) it's a bounded, well-known type — not a general
+structure/variant. Anything else (structs, `ExtensionObject`, arrays-of-structs,
+enums, etc.) stays unresolved, per the rules below.
+
+OPC UA also defines standard *named subtypes* of these built-ins with a distinct
+`DataType` NodeId but an identical wire/value encoding to their parent (e.g.
+`UtcTime`/`Date` are `DateTime`; `Duration` is `Double`; `IntegerId`/`Counter` are
+`UInt32`; `NumericRange`/`Time`/`LocaleId`/`NormalizedString`/`DecimalString`/
+`DurationString`/`TimeString`/`DateString` are `String`). `OpcUaTypes` aliases these
+fixed, spec-defined subtypes onto their parent's neutral type — they don't get
+their own `DataType` entry since there's nothing distinct to represent. This is
+different from vendor/custom subtypes of a built-in, which stay "unknown" (their
+shape isn't spec-fixed, so aliasing them would be a guess).
 
 - `valueRank = ARRAY` wraps any primitive into a homogeneous array.
 - No nested structs in v1 (kept out to bound worker complexity; revisit with

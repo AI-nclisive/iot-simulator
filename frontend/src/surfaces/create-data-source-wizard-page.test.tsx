@@ -302,7 +302,7 @@ vi.mock("../api", async () => {
   return { ...actual, apiFetch: mockApiFetch };
 });
 
-// Default scan job stub: POST returns jobId, GET returns COMPLETE immediately.
+// Default scan job stub: POST returns jobId, GET returns OK immediately.
 function makeScanStart(jobId = "job-1") {
   return Promise.resolve({ jobId, status: "RUNNING" });
 }
@@ -318,7 +318,7 @@ function makeScanResult(overrides: Partial<{
 }> = {}) {
   return Promise.resolve({
     jobId: "job-1",
-    status: "COMPLETE",
+    status: "OK",
     discoveredCount: 3,
     unknownCount: 0,
     truncated: false,
@@ -358,13 +358,32 @@ describe("CreateDataSourceWizardPage — scan step (UI-458)", () => {
     expect(screen.getByText(/Scanning…/i)).toBeTruthy();
   });
 
-  it("transitions to complete state after polling returns COMPLETE", async () => {
+  it("shows live phase and node count while a scan is still RUNNING (IS-163)", async () => {
     mockApiFetch
       .mockImplementationOnce(() => Promise.resolve({ jobId: "job-1", status: "RUNNING" }))
       .mockImplementationOnce(() =>
         Promise.resolve({
           jobId: "job-1",
-          status: "COMPLETE",
+          status: "RUNNING",
+          phase: "SCANNING",
+          discoveredSoFar: 42,
+        }),
+      )
+      .mockImplementation(() => new Promise(() => { /* never resolves */ }));
+
+    await navigateToScanStep();
+    await advanceIntervalAndFlush(2000);
+
+    expect(screen.getByText(/discovered 42 nodes so far/i)).toBeTruthy();
+  });
+
+  it("transitions to complete state after polling returns OK", async () => {
+    mockApiFetch
+      .mockImplementationOnce(() => Promise.resolve({ jobId: "job-1", status: "RUNNING" }))
+      .mockImplementationOnce(() =>
+        Promise.resolve({
+          jobId: "job-1",
+          status: "OK",
           truncated: false,
           discoveredCount: 5,
           unknownCount: 0,
@@ -380,13 +399,13 @@ describe("CreateDataSourceWizardPage — scan step (UI-458)", () => {
     expect(screen.getByText(/Discovered 5 nodes/i)).toBeTruthy();
   });
 
-  it("shows error state and Retry button when scan poll returns ERROR", async () => {
+  it("shows error state and Retry button when scan poll returns UNREACHABLE", async () => {
     mockApiFetch
       .mockImplementationOnce(() => Promise.resolve({ jobId: "job-err", status: "RUNNING" }))
       .mockImplementationOnce(() =>
         Promise.resolve({
           jobId: "job-err",
-          status: "ERROR",
+          status: "UNREACHABLE",
           truncated: false,
           discoveredCount: 0,
           unknownCount: 0,
@@ -420,7 +439,7 @@ describe("CreateDataSourceWizardPage — scan step (UI-458)", () => {
       .mockImplementationOnce(() =>
         Promise.resolve({
           jobId: "job-1",
-          status: "COMPLETE",
+          status: "OK",
           truncated: false,
           discoveredCount: 3,
           unknownCount: 0,
@@ -442,7 +461,7 @@ describe("CreateDataSourceWizardPage — scan step (UI-458)", () => {
       .mockImplementationOnce(() =>
         Promise.resolve({
           jobId: "job-1",
-          status: "COMPLETE",
+          status: "OK",
           truncated: false,
           discoveredCount: 1,
           unknownCount: 1,
@@ -455,6 +474,8 @@ describe("CreateDataSourceWizardPage — scan step (UI-458)", () => {
     await advanceIntervalAndFlush(2000);
 
     expect(screen.getByText(/unknown types need resolution/i)).toBeTruthy();
+    // Unknown nodes default to unresolved, so Next stays disabled until the
+    // user assigns a type or excludes them.
     const btn = screen.getByRole("button", { name: "Next" }) as HTMLButtonElement;
     expect(btn.disabled).toBe(true);
   });
@@ -465,7 +486,7 @@ describe("CreateDataSourceWizardPage — scan step (UI-458)", () => {
       .mockImplementationOnce(() =>
         Promise.resolve({
           jobId: "job-1",
-          status: "COMPLETE",
+          status: "OK",
           truncated: false,
           discoveredCount: 1,
           unknownCount: 1,
@@ -479,7 +500,7 @@ describe("CreateDataSourceWizardPage — scan step (UI-458)", () => {
 
     expect(screen.getByLabelText(/Data type for/i)).toBeTruthy();
 
-    // Before resolution: Next is disabled
+    // Unresolved unknown type — Next starts disabled
     expect((screen.getByRole("button", { name: "Next" }) as HTMLButtonElement).disabled).toBe(true);
 
     // Resolve the unknown type
@@ -495,7 +516,7 @@ describe("CreateDataSourceWizardPage — scan step (UI-458)", () => {
       .mockImplementationOnce(() =>
         Promise.resolve({
           jobId: "job-2",
-          status: "COMPLETE",
+          status: "OK",
           truncated: false,
           discoveredCount: 2,
           unknownCount: 0,
@@ -538,7 +559,7 @@ describe("CreateDataSourceWizardPage — scan step (UI-458)", () => {
       .mockImplementationOnce(() =>
         Promise.resolve({
           jobId: "job-3",
-          status: "COMPLETE",
+          status: "OK",
           truncated: false,
           discoveredCount: 1,
           unknownCount: 0,

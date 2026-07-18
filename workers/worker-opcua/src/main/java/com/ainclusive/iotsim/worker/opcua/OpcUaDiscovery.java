@@ -75,13 +75,24 @@ final class OpcUaDiscovery {
         }
     }
 
+    /** Reports discovered-so-far while a scan's browse is in progress; called from the browsing thread. */
+    @FunctionalInterface
+    interface ProgressListener {
+        void onDiscovered(int soFar);
+    }
+
+    /** Nodes discovered between progress callbacks — frequent enough to feel live, rare enough not to flood the RPC. */
+    private static final int PROGRESS_STEP = 20;
+
     /** Connects and browses the address space into neutral schema nodes. */
-    static ScanOutcome scan(String endpointUrl, Credentials credentials, int maxNodes) {
+    static ScanOutcome scan(String endpointUrl, Credentials credentials, int maxNodes,
+            Runnable onConnected, ProgressListener onProgress) {
         int cap = maxNodes > 0 ? maxNodes : DEFAULT_MAX_NODES;
         OpcUaClient client = null;
         try {
             client = connect(endpointUrl, credentials);
-            return browse(client, cap);
+            onConnected.run();
+            return browse(client, cap, onProgress);
         } catch (Exception e) {
             OpcUaClientSupport.reinterruptIfNeeded(e);
             return new ScanOutcome(
@@ -99,7 +110,7 @@ final class OpcUaDiscovery {
                 credentials == null ? null : credentials.secret());
     }
 
-    private static ScanOutcome browse(OpcUaClient client, int cap) throws Exception {
+    private static ScanOutcome browse(OpcUaClient client, int cap, ProgressListener onProgress) throws Exception {
         NamespaceTable namespaces = client.getNamespaceTable();
         List<SchemaNodeMsg> nodes = new ArrayList<>();
         Set<NodeId> visited = new HashSet<>();
@@ -131,8 +142,20 @@ final class OpcUaDiscovery {
                 String path = frame.path().isEmpty() ? name : frame.path() + "/" + name;
                 nodes.add(toNode(neutralId, frame.parentId(), path, name, isVariable,
                         isVariable ? neutralTypeOf(client, childId, unknown) : null));
-                if (!isVariable) {
+                // A Variable can itself have children (e.g. a structured/complex
+                // value's component Variables via HasComponent), not just
+                // Objects/Folders — keep descending. But a Variable's HasProperty
+                // children (EURange, EngineeringUnits, EnumStrings, ...) are metadata
+                // about the value, not part of it, and are extremely common on
+                // AnalogItemType/DataItemType variables — descending into those
+                // multiplies scan RPCs without adding useful schema nodes, so they're
+                // recorded as leaves instead of pushed back onto the stack.
+                boolean isProperty = isVariable && Identifiers.HasProperty.equals(ref.getReferenceTypeId());
+                if (!isProperty) {
                     stack.push(new Frame(childId, neutralId, path));
+                }
+                if (nodes.size() % PROGRESS_STEP == 0) {
+                    onProgress.onDiscovered(nodes.size());
                 }
             }
         }

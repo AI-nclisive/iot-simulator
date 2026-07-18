@@ -112,7 +112,9 @@ public class ScanService implements DisposableBean {
 
     private void runScan(String jobId, ScanSpec spec) {
         try {
-            ScanResult result = scanner.scan(spec);
+            ScanResult result = scanner.scan(spec,
+                    (phase, discoveredSoFar) -> jobs.computeIfPresent(
+                            jobId, (id, job) -> job.isRunning() ? job.withProgress(phase, discoveredSoFar) : job));
             jobs.computeIfPresent(jobId, (id, job) -> job.completed(result));
         } catch (RuntimeException e) {
             String detail = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();

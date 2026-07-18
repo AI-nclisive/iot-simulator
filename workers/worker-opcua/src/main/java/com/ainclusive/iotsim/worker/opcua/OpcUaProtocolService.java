@@ -14,6 +14,8 @@ import com.ainclusive.iotsim.workercontract.v1.HelloResponse;
 import com.ainclusive.iotsim.workercontract.v1.InjectFaultRequest;
 import com.ainclusive.iotsim.workercontract.v1.ProtocolDataSourceGrpc;
 import com.ainclusive.iotsim.workercontract.v1.RuntimeEvent;
+import com.ainclusive.iotsim.workercontract.v1.ScanEvent;
+import com.ainclusive.iotsim.workercontract.v1.ScanProgress;
 import com.ainclusive.iotsim.workercontract.v1.ScanRequest;
 import com.ainclusive.iotsim.workercontract.v1.ScanResponse;
 import com.ainclusive.iotsim.workercontract.v1.SchemaNodeMsg;
@@ -133,18 +135,43 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
     }
 
     @Override
-    public void scan(ScanRequest request, StreamObserver<ScanResponse> obs) {
+    public void scan(ScanRequest request, StreamObserver<ScanEvent> responseObserver) {
+        ServerCallStreamObserver<ScanEvent> obs = (ServerCallStreamObserver<ScanEvent>) responseObserver;
+        sendIfNotCancelled(obs, ScanEvent.newBuilder()
+                .setProgress(ScanProgress.newBuilder().setPhase("CONNECTING"))
+                .build());
         OpcUaDiscovery.ScanOutcome outcome = OpcUaDiscovery.scan(
-                request.getEndpointUrl(), credentials(request.getCredentials()), request.getMaxNodes());
-        obs.onNext(ScanResponse.newBuilder()
-                .setStatus(outcome.status())
-                .addAllNodes(outcome.nodes())
-                .setTruncated(outcome.truncated())
-                .setDiscoveredCount(outcome.nodes().size())
-                .setUnknownCount(outcome.unknownCount())
-                .setMessage(orEmpty(outcome.message()))
+                request.getEndpointUrl(), credentials(request.getCredentials()), request.getMaxNodes(),
+                () -> sendIfNotCancelled(obs, ScanEvent.newBuilder()
+                        .setProgress(ScanProgress.newBuilder().setPhase("CONNECTED"))
+                        .build()),
+                soFar -> sendIfNotCancelled(obs, ScanEvent.newBuilder()
+                        .setProgress(ScanProgress.newBuilder().setPhase("SCANNING").setDiscoveredSoFar(soFar))
+                        .build()));
+        // The client (supervisor) may have cancelled mid-scan (e.g. the caller gave up
+        // or its own deadline fired) — the stream is already closed, so finishing it
+        // here would throw. The browse already ran to completion/cap; its result is
+        // simply discarded.
+        if (obs.isCancelled()) {
+            return;
+        }
+        obs.onNext(ScanEvent.newBuilder()
+                .setResult(ScanResponse.newBuilder()
+                        .setStatus(outcome.status())
+                        .addAllNodes(outcome.nodes())
+                        .setTruncated(outcome.truncated())
+                        .setDiscoveredCount(outcome.nodes().size())
+                        .setUnknownCount(outcome.unknownCount())
+                        .setMessage(orEmpty(outcome.message())))
                 .build());
         obs.onCompleted();
+    }
+
+    /** Best-effort send: a scan the client already cancelled must not throw on the browsing thread. */
+    private static void sendIfNotCancelled(ServerCallStreamObserver<ScanEvent> obs, ScanEvent event) {
+        if (!obs.isCancelled()) {
+            obs.onNext(event);
+        }
     }
 
     /**

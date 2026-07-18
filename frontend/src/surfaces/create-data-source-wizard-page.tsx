@@ -38,11 +38,22 @@ export type TypeResolutionEntry = {
   exclude: boolean;
 };
 
-type ScanJobStatus = "PENDING" | "RUNNING" | "COMPLETE" | "ERROR" | "PARTIAL";
+type ScanJobStatus =
+  | "RUNNING"
+  | "OK"
+  | "PARTIAL"
+  | "UNREACHABLE"
+  | "AUTH_FAILURE"
+  | "UNSUPPORTED"
+  | "FAILED";
+
+type ScanJobPhase = "CONNECTING" | "CONNECTED" | "SCANNING";
 
 type ScanJobResult = {
   jobId: string;
   status: ScanJobStatus;
+  phase: ScanJobPhase | null;
+  discoveredSoFar: number;
   truncated: boolean;
   discoveredCount: number;
   unknownCount: number;
@@ -434,6 +445,10 @@ export function CreateDataSourceWizardPage() {
   } | null>(null);
   const [typeResolutions, setTypeResolutions] = useState<TypeResolutionEntry[]>([]);
   const [scanErrorMessage, setScanErrorMessage] = useState<string | null>(null);
+  const [scanProgress, setScanProgress] = useState<{ phase: ScanJobPhase | null; discoveredSoFar: number }>({
+    phase: null,
+    discoveredSoFar: 0,
+  });
   const scanPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // Persists the completed job ID across step transitions so the create call can
   // use it even after the scan-step cleanup has reset scanJobId state to null.
@@ -570,12 +585,12 @@ export function CreateDataSourceWizardPage() {
               `/api/v1/projects/${currentProjectId}/data-sources/scan/${job.jobId}`,
             );
             if (cancelled) return;
-            if (result.status === "COMPLETE" || result.status === "PARTIAL") {
+            if (result.status === "OK" || result.status === "PARTIAL") {
               if (scanPollRef.current !== null) {
                 clearInterval(scanPollRef.current);
                 scanPollRef.current = null;
               }
-              setScanStatus(result.status === "COMPLETE" ? "complete" : "partial");
+              setScanStatus(result.status === "OK" ? "complete" : "partial");
               setScanResult({
                 discoveredCount: result.discoveredCount,
                 unknownCount: result.unknownCount,
@@ -593,7 +608,12 @@ export function CreateDataSourceWizardPage() {
                   exclude: false,
                 })),
               );
-            } else if (result.status === "ERROR") {
+            } else if (
+              result.status === "UNREACHABLE" ||
+              result.status === "AUTH_FAILURE" ||
+              result.status === "UNSUPPORTED" ||
+              result.status === "FAILED"
+            ) {
               if (scanPollRef.current !== null) {
                 clearInterval(scanPollRef.current);
                 scanPollRef.current = null;
@@ -601,17 +621,8 @@ export function CreateDataSourceWizardPage() {
               setScanStatus("error");
               setScanErrorMessage(result.message ?? "Scan failed");
             } else {
-              // PENDING or RUNNING — update live count
-              setScanResult((prev) =>
-                prev
-                  ? { ...prev, discoveredCount: result.discoveredCount }
-                  : {
-                      discoveredCount: result.discoveredCount,
-                      unknownCount: result.unknownCount,
-                      truncated: result.truncated,
-                      nodes: result.nodes,
-                    },
-              );
+              // RUNNING — reflect the worker's connecting/connected/scanning phase and count.
+              setScanProgress({ phase: result.phase, discoveredSoFar: result.discoveredSoFar });
             }
           } catch {
             if (!cancelled) {
@@ -643,6 +654,7 @@ export function CreateDataSourceWizardPage() {
       setScanStatus("idle");
       setScanResult(null);
       setScanJobId(null);
+      setScanProgress({ phase: null, discoveredSoFar: 0 });
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeStepId, scanTrigger]);
@@ -1234,29 +1246,54 @@ export function CreateDataSourceWizardPage() {
     );
   }
 
+  function handleBulkTypeResolutionChange(patch: Partial<TypeResolutionEntry>) {
+    setTypeResolutions((prev) => prev.map((entry) => ({ ...entry, ...patch })));
+  }
+
   function retryScan() {
     setScanStatus("idle");
     setScanJobId(null);
     setScanResult(null);
     setTypeResolutions([]);
     setScanErrorMessage(null);
+    setScanProgress({ phase: null, discoveredSoFar: 0 });
     setScanTrigger((t) => t + 1);
+  }
+
+  function scanPhaseLabel(phase: ScanJobPhase | null, discoveredSoFar: number): string {
+    switch (phase) {
+      case "CONNECTING":
+        return "Connecting to endpoint";
+      case "CONNECTED":
+        return "Connected — starting scan";
+      case "SCANNING":
+        return `Scanning… discovered ${discoveredSoFar} nodes so far`;
+      default:
+        return "Connecting to endpoint";
+    }
   }
 
   function renderScanStep() {
     if (scanStatus === "idle" || scanStatus === "scanning") {
       return (
         <div className="space-y-4">
-          <section className="rounded-md border border-shell-line bg-white px-4 py-6 text-center">
+          <section className="flex flex-col items-center gap-3 rounded-md border border-shell-line bg-white px-4 py-8 text-center">
+            <div
+              aria-label="Scanning"
+              className="h-8 w-8 animate-spin rounded-full border-4 border-shell-line border-t-shell-accent"
+              role="status"
+            />
             <p className="text-sm font-medium text-shell-ink">
               {scanStatus === "idle" ? "Starting scan…" : "Scanning…"}
             </p>
             {scanResult ? (
-              <p className="mt-2 text-sm text-shell-muted">
+              <p className="text-sm text-shell-muted">
                 Discovered {scanResult.discoveredCount} nodes
               </p>
             ) : (
-              <p className="mt-2 text-sm text-shell-muted">Connecting to endpoint</p>
+              <p className="text-sm text-shell-muted">
+                {scanPhaseLabel(scanProgress.phase, scanProgress.discoveredSoFar)}
+              </p>
             )}
           </section>
         </div>
@@ -1316,6 +1353,29 @@ export function CreateDataSourceWizardPage() {
             <p className="text-sm text-shell-muted">
               The following nodes have unknown types. Choose a data type or exclude them from the source.
             </p>
+            <div className="flex flex-wrap items-center gap-3 rounded-md border border-shell-line bg-shell-line/10 px-4 py-3">
+              <span className="text-sm text-shell-muted">Set all to</span>
+              <select
+                aria-label="Apply to all unknown nodes"
+                className="shell-field w-40 shrink-0"
+                value=""
+                onChange={(e) => {
+                  if (e.target.value === "__exclude__") {
+                    handleBulkTypeResolutionChange({ exclude: true, dataType: "" });
+                  } else if (e.target.value !== "") {
+                    handleBulkTypeResolutionChange({ exclude: false, dataType: e.target.value });
+                  }
+                  e.target.value = "";
+                }}
+              >
+                <option value="">Choose type…</option>
+                <option value="FLOAT64">FLOAT64</option>
+                <option value="INT32">INT32</option>
+                <option value="BOOL">BOOL</option>
+                <option value="STRING">STRING</option>
+                <option value="__exclude__">Exclude</option>
+              </select>
+            </div>
             <ul className="space-y-2">
               {unknownNodes.map((node) => {
                 const res = typeResolutions.find((r) => r.nodeId === node.nodeId);

@@ -18,6 +18,7 @@ workers, and a React/TypeScript Web UI. See the design docs at the repo root
 - [Configuration (environment variables)](#configuration-environment-variables)
   - [Useful Gradle tasks](#useful-gradle-tasks)
 - [Project tracking](#project-tracking)
+- [Debug tools](#debug-tools)
 - [Notes](#notes)
 
 ## Module map
@@ -224,6 +225,24 @@ Postgres:
 - **Board:** [IoT Simulator](https://github.com/orgs/AI-nclisive/projects/1) —
   live status by `IS-XXX` / `Area` (Todo / In Progress / In review / Done).
 - **Task catalog:** [`backend-specs/TASKS.md`](backend-specs/TASKS.md) — the source list of `IS-XXX` task IDs.
+
+## Debug tools
+
+- **`OpcUaScanTool`** (`workers/worker-opcua/src/test/java/.../OpcUaScanTool.java`)
+  — connects to a real OPC UA server via this repo's own `OpcUaDiscovery` and
+  prints its address space (tree + per-type node counts). Handy for diagnosing
+  "wizard shows 0/wrong nodes" reports without going through the full app. It's
+  a manual utility (no `@Test` methods, never run by `./gradlew test`), so
+  compile it once and run it directly:
+
+  ```bash
+  ./gradlew :workers:worker-opcua:installDist :workers:worker-opcua:compileTestJava
+  java -cp "workers/worker-opcua/build/classes/java/test:workers/worker-opcua/build/install/worker-opcua/lib/*" \
+    com.ainclusive.iotsim.worker.opcua.OpcUaScanTool "opc.tcp://host:4840/path"
+  ```
+
+  Omit the endpoint argument to default to the public Prosys demo server
+  (`opc.tcp://uademo.prosysopc.com:53530/OPCUA/SimulationServer`).
 
 ## Notes
 
