@@ -1027,6 +1027,13 @@ Parallel execution:
   Depends: none.
   Done when: a live-captured recording shows "Recorded" immediately after saving and after a reload; only recordings with backend `origin: IMPORTED` show "Imported"; typecheck + vitest green.
 
+- [x] `UI-469` ✅ Create Data Source wizard — make Stop Scan more prominent; block Back/Cancel while scanning
+  Goal: the Stop Scan button (IS-164) reads as a routine action today; make it visually distinct as a stop/danger action. Also, Back and Cancel are currently clickable while a scan is in flight, letting the user navigate away from an orphaned running scan without stopping it first.
+  Surface: `Create Data Source Wizard` (scan step)
+  Work includes: apply `shell-action-danger` (existing danger button class) to the Stop Scan button in `create-data-source-wizard-page.tsx`; disable the footer's Back and Cancel buttons while `scanStatus === "scanning"`.
+  Depends: IS-164.
+  Done when: Stop Scan renders as a danger-styled button; Back and Cancel are disabled for the duration of an active scan and re-enable once it completes, fails, or is stopped; typecheck + vitest green.
+
 ## Recommended Sequence
 
 1. Complete the P0 shell and shared-pattern tasks first.

@@ -465,6 +465,40 @@ describe("CreateDataSourceWizardPage — scan step (UI-458)", () => {
     expect(screen.getByRole("button", { name: /Retry/i })).toBeTruthy();
   });
 
+  it("renders Stop Scan as a danger-styled button (UI-469)", async () => {
+    mockApiFetch
+      .mockImplementationOnce(() => Promise.resolve({ jobId: "job-1", status: "RUNNING" }))
+      .mockImplementation(() => new Promise(() => { /* never resolves — still scanning */ }));
+
+    await navigateToScanStep();
+
+    const stopButton = screen.getByRole("button", { name: /Stop Scan/i });
+    expect(stopButton.className).toContain("shell-action-danger");
+  });
+
+  it("disables Back and Cancel while a scan is in flight (UI-469)", async () => {
+    mockApiFetch
+      .mockImplementationOnce(() => Promise.resolve({ jobId: "job-1", status: "RUNNING" }))
+      .mockImplementation(() => new Promise(() => { /* never resolves — still scanning */ }));
+
+    await navigateToScanStep();
+
+    expect((screen.getByRole("button", { name: "Back" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Cancel" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("re-enables Back and Cancel once the scan is stopped (UI-469)", async () => {
+    mockApiFetch
+      .mockImplementationOnce(() => Promise.resolve({ jobId: "job-1", status: "RUNNING" }))
+      .mockImplementation(() => new Promise(() => { /* never resolves — still scanning */ }));
+
+    await navigateToScanStep();
+    await userEvent.click(screen.getByRole("button", { name: /Stop Scan/i }));
+
+    expect((screen.getByRole("button", { name: "Back" }) as HTMLButtonElement).disabled).toBe(false);
+    expect((screen.getByRole("button", { name: "Cancel" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
   it("Next is disabled while scanning", async () => {
     mockApiFetch
       .mockImplementationOnce(() => Promise.resolve({ jobId: "job-1", status: "RUNNING" }))
