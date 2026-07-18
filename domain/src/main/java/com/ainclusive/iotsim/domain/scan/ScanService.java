@@ -130,6 +130,13 @@ public class ScanService implements DisposableBean {
         ScanExecution exec = executions.get(jobId);
         synchronized (exec) {
             exec.thread = Thread.currentThread();
+            // A cancelScan call that arrived between startScan's executions.put
+            // and this point set cancelRequested but found no thread to
+            // interrupt (nothing was registered yet) — self-interrupt now so
+            // that request isn't silently dropped.
+            if (exec.cancelRequested) {
+                exec.thread.interrupt();
+            }
         }
         try {
             ScanResult result = scanner.scan(spec,
