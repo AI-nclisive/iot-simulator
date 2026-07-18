@@ -48,8 +48,10 @@ public final class WorkerClient implements AutoCloseable {
 
     // Scan/test-connection reach an external endpoint; the worker bounds its own
     // attempt, these deadlines just stop a hung worker from blocking the caller.
+    // A scan can also be stopped early by the caller via cancel() (IS-164), so
+    // this deadline is a safety net rather than the primary way to bound a scan.
     private static final long TEST_CONNECTION_TIMEOUT_SECONDS = 30;
-    static final long DEFAULT_SCAN_TIMEOUT_SECONDS = 120;
+    static final long DEFAULT_SCAN_TIMEOUT_SECONDS = 1800;
 
     private final ManagedChannel channel;
     private final ProtocolDataSourceGrpc.ProtocolDataSourceBlockingStub stub;

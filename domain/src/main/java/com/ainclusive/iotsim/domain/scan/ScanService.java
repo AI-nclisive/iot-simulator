@@ -56,7 +56,22 @@ public class ScanService implements DisposableBean {
     private final DataSourceService dataSources;
     private final SchemaService schemas;
     private final Map<String, ScanJob> jobs = new ConcurrentHashMap<>();
+    // Tracks the in-flight scan thread + a cancel-requested flag per job so a
+    // running scan can be stopped early (IS-164): cancelScan interrupts the
+    // thread, which unblocks WorkerClient.scan's await and cancels the gRPC
+    // stream. Both runScan's finish path and cancelScan synchronize on the same
+    // ScanExecution instance so a cancel can never land on a pooled thread that
+    // has already moved on to a different job (the pool is fixed-size and
+    // reused) — the interrupt only happens while the execution is still marked
+    // as owning that thread.
+    private final Map<String, ScanExecution> executions = new ConcurrentHashMap<>();
     private final Executor executor;
+
+    private static final class ScanExecution {
+        private Thread thread;
+        private boolean cancelRequested;
+        private boolean finished;
+    }
     private final ExecutorService ownedPool;
 
     @Autowired
@@ -105,20 +120,53 @@ public class ScanService implements DisposableBean {
         String jobId = Ids.newId();
         ScanJob job = ScanJob.running(jobId, projectId, protocol, endpointUrl);
         jobs.put(jobId, job);
+        executions.put(jobId, new ScanExecution());
         ScanSpec spec = new ScanSpec(protocol, endpointUrl, credentials, maxNodes);
         executor.execute(() -> runScan(jobId, spec));
         return job;
     }
 
     private void runScan(String jobId, ScanSpec spec) {
+        ScanExecution exec = executions.get(jobId);
+        synchronized (exec) {
+            exec.thread = Thread.currentThread();
+            // A cancelScan call that arrived between startScan's executions.put
+            // and this point set cancelRequested but found no thread to
+            // interrupt (nothing was registered yet) — self-interrupt now so
+            // that request isn't silently dropped.
+            if (exec.cancelRequested) {
+                exec.thread.interrupt();
+            }
+        }
         try {
             ScanResult result = scanner.scan(spec,
                     (phase, discoveredSoFar) -> jobs.computeIfPresent(
                             jobId, (id, job) -> job.isRunning() ? job.withProgress(phase, discoveredSoFar) : job));
             jobs.computeIfPresent(jobId, (id, job) -> job.completed(result));
         } catch (RuntimeException e) {
-            String detail = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
-            jobs.computeIfPresent(jobId, (id, job) -> job.failed(detail));
+            boolean cancelled;
+            synchronized (exec) {
+                cancelled = exec.cancelRequested;
+            }
+            if (cancelled) {
+                jobs.computeIfPresent(jobId, (id, job) -> job.cancelled());
+            } else {
+                String detail = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+                jobs.computeIfPresent(jobId, (id, job) -> job.failed(detail));
+            }
+        } finally {
+            // Marking finished under the same lock cancelScan checks means a
+            // cancel arriving after this point sees `finished` and never calls
+            // interrupt() on a thread the pool may have already reassigned.
+            synchronized (exec) {
+                exec.finished = true;
+                exec.thread = null;
+            }
+            executions.remove(jobId);
+            // Clear this thread's interrupt status: interrupt() from cancelScan
+            // may have raced past the point WorkerClient.scan consumed it, and a
+            // still-interrupted pooled thread would trip the next job it runs.
+            Thread.interrupted();
         }
     }
 
@@ -129,6 +177,29 @@ public class ScanService implements DisposableBean {
         }
         evictExpired();
         return job;
+    }
+
+    /**
+     * Stops a running scan early (IS-164): interrupts the scan thread, which
+     * cancels the in-flight gRPC stream to the worker so it stops browsing. A
+     * no-op (does not throw) once the job is no longer running — safe to call
+     * more than once, or to race against the job's own natural completion.
+     */
+    public void cancelScan(String projectId, String jobId) {
+        getScan(projectId, jobId); // validates the job exists in this project
+        ScanExecution exec = executions.get(jobId);
+        if (exec == null) {
+            return;
+        }
+        synchronized (exec) {
+            if (exec.finished) {
+                return;
+            }
+            exec.cancelRequested = true;
+            if (exec.thread != null) {
+                exec.thread.interrupt();
+            }
+        }
     }
 
     /** Drops completed/failed jobs past their TTL so the registry stays bounded. */

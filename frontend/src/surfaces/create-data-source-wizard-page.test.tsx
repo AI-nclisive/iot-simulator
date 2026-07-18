@@ -202,6 +202,10 @@ describe("scanStepValidationMessage (UI-458)", () => {
     expect(scanStepValidationMessage("error", [], null)).toBe("Scan failed");
   });
 
+  it("returns cancelled message on cancelled state (IS-164)", () => {
+    expect(scanStepValidationMessage("cancelled", [], null)).toBe("Scan was stopped");
+  });
+
   it("returns null when complete with no unknown nodes", () => {
     expect(
       scanStepValidationMessage("complete", [], { nodes: [knownNode], discoveredCount: 1, unknownCount: 0, truncated: false }),
@@ -418,6 +422,46 @@ describe("CreateDataSourceWizardPage — scan step (UI-458)", () => {
     await advanceIntervalAndFlush(2000);
 
     expect(screen.getByText(/Scan failed/i)).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Retry/i })).toBeTruthy();
+  });
+
+  it("shows a Stop Scan button while scanning, and stopping it calls the cancel endpoint (IS-164)", async () => {
+    mockApiFetch
+      .mockImplementationOnce(() => Promise.resolve({ jobId: "job-1", status: "RUNNING" }))
+      .mockImplementation(() => new Promise(() => { /* never resolves — still scanning */ }));
+
+    await navigateToScanStep();
+
+    const stopButton = screen.getByRole("button", { name: /Stop Scan/i });
+    await userEvent.click(stopButton);
+
+    expect(screen.getByText(/Scan stopped/i)).toBeTruthy();
+    expect(
+      mockApiFetch.mock.calls.some(
+        (c) => typeof c[0] === "string" && (c[0] as string).includes("/scan/job-1/cancel"),
+      ),
+    ).toBe(true);
+  });
+
+  it("shows cancelled state with Retry when the scan job settles as CANCELLED", async () => {
+    mockApiFetch
+      .mockImplementationOnce(() => Promise.resolve({ jobId: "job-1", status: "RUNNING" }))
+      .mockImplementationOnce(() =>
+        Promise.resolve({
+          jobId: "job-1",
+          status: "CANCELLED",
+          truncated: false,
+          discoveredCount: 0,
+          unknownCount: 0,
+          message: "scan cancelled by user",
+          nodes: [],
+        }),
+      );
+
+    await navigateToScanStep();
+    await advanceIntervalAndFlush(2000);
+
+    expect(screen.getByText(/Scan stopped/i)).toBeTruthy();
     expect(screen.getByRole("button", { name: /Retry/i })).toBeTruthy();
   });
 

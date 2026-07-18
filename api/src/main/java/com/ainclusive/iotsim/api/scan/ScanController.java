@@ -105,6 +105,18 @@ public class ScanController {
         return ScanJobResponse.from(scans.getScan(projectId, jobId));
     }
 
+    /** Stops a running scan job early (IS-164); the job settles as CANCELLED. */
+    @Operation(
+            summary = "Cancel a running scan",
+            description = "Stops an in-flight scan job so the worker stops browsing; the job settles as"
+                    + " CANCELLED. No-op-safe to call again once the job is no longer running.")
+    @PostMapping("/{jobId}/cancel")
+    @PreAuthorize(SOURCE_EDIT)
+    public ScanJobResponse cancel(@PathVariable String projectId, @PathVariable String jobId) {
+        scans.cancelScan(projectId, jobId);
+        return ScanJobResponse.from(scans.getScan(projectId, jobId));
+    }
+
     /**
      * Creates a data source (basis=SCAN) from a completed scan. Unknown-typed
      * discovered nodes must be addressed via {@code typeResolutions} (assign a type

@@ -12,8 +12,9 @@ import java.time.Instant;
  * snapshot.
  *
  * <p>{@code state} is {@code RUNNING} while in flight, then the discovery
- * {@code ScanStatus} (OK / PARTIAL / UNREACHABLE / AUTH_FAILURE / UNSUPPORTED), or
- * {@code FAILED} on an unexpected error. Never carries credentials/secrets.
+ * {@code ScanStatus} (OK / PARTIAL / UNREACHABLE / AUTH_FAILURE / UNSUPPORTED),
+ * {@code FAILED} on an unexpected error, or {@code CANCELLED} when the user stops
+ * a running scan early (IS-164). Never carries credentials/secrets.
  * {@code phase}/{@code discoveredSoFar} are only meaningful while {@code RUNNING};
  * terminal jobs carry the full result instead.
  */
@@ -32,6 +33,7 @@ public record ScanJob(
 
     static final String RUNNING = "RUNNING";
     static final String FAILED = "FAILED";
+    static final String CANCELLED = "CANCELLED";
 
     static ScanJob running(String jobId, String projectId, String protocol, String endpointUrl) {
         Instant now = Instant.now();
@@ -52,6 +54,11 @@ public record ScanJob(
     ScanJob failed(String message) {
         return new ScanJob(jobId, projectId, protocol, endpointUrl, FAILED,
                 null, 0, null, message, createdAt, Instant.now());
+    }
+
+    ScanJob cancelled() {
+        return new ScanJob(jobId, projectId, protocol, endpointUrl, CANCELLED,
+                null, 0, null, "scan cancelled by user", createdAt, Instant.now());
     }
 
     public boolean isRunning() {
