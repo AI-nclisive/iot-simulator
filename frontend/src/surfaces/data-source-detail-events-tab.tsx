@@ -32,11 +32,12 @@ interface RuntimeEventsResponse {
 
 function humanize(type: string): string {
   switch (type) {
-    case "SOURCE_STARTED":    return "Source started";
-    case "SOURCE_STOPPED":   return "Source stopped";
+    case "SOURCE_START":     return "Source started";
+    case "SOURCE_STOP":      return "Source stopped";
     case "SOURCE_STALE":     return "Source went stale";
     case "SOURCE_RECOVERED": return "Source recovered";
     case "SOURCE_ERROR":     return "Source error";
+    case "ERROR":            return "Error";
     case "HEALTH_WARNING":   return "Health warning";
     case "HEALTH_ERROR":     return "Health error";
     case "REPLAY_STARTED":   return "Replay started";
@@ -50,13 +51,13 @@ function humanize(type: string): string {
 }
 
 function typeToLevel(type: string): RuntimeEventLevel {
-  if (type === "SOURCE_ERROR" || type === "HEALTH_ERROR") return "error";
+  if (type === "SOURCE_ERROR" || type === "HEALTH_ERROR" || type === "ERROR") return "error";
   if (type === "SOURCE_STALE" || type === "HEALTH_WARNING") return "warning";
   return "info";
 }
 
 function typeToCategory(type: string): RuntimeEvent["category"] {
-  if (["SOURCE_STARTED", "SOURCE_STOPPED", "SOURCE_STALE", "SOURCE_RECOVERED",
+  if (["SOURCE_START", "SOURCE_STOP", "SOURCE_STALE", "SOURCE_RECOVERED",
        "CLIENT_CONNECTED", "CLIENT_DISCONNECTED"].includes(type)) return "connection";
   if (["REPLAY_STARTED", "REPLAY_STOPPED"].includes(type)) return "replay";
   if (["RECORDING_STARTED", "RECORDING_STOPPED"].includes(type)) return "recording";

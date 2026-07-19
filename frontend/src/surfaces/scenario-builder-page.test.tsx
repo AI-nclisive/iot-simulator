@@ -196,7 +196,7 @@ describe("ScenarioBuilderPage", () => {
     expect(added.configured).toBe(false);
     // And the scenario must not claim it is runnable.
     expect(screen.queryByText("Ready to run")).toBeNull();
-    expect(screen.getByText(/needs configuration/)).toBeTruthy();
+    expect(screen.getAllByText(/needs configuration/).length).toBeGreaterThan(0);
   });
 
   it("admin can remove a step through the confirmation dialog", async () => {
