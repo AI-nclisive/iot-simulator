@@ -12,6 +12,7 @@ import com.ainclusive.iotsim.workercontract.v1.HealthResponse;
 import com.ainclusive.iotsim.workercontract.v1.HelloRequest;
 import com.ainclusive.iotsim.workercontract.v1.HelloResponse;
 import com.ainclusive.iotsim.workercontract.v1.InjectFaultRequest;
+import com.ainclusive.iotsim.workercontract.v1.NodeBatch;
 import com.ainclusive.iotsim.workercontract.v1.ProtocolDataSourceGrpc;
 import com.ainclusive.iotsim.workercontract.v1.RuntimeEvent;
 import com.ainclusive.iotsim.workercontract.v1.ScanEvent;
@@ -155,17 +156,32 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
         if (obs.isCancelled()) {
             return;
         }
-        obs.onNext(ScanEvent.newBuilder()
+        // Send discovered nodes in bounded chunks rather than one ScanResponse.nodes
+        // list, so a huge address space never produces a single message over gRPC's
+        // max message size (previously hit RESOURCE_EXHAUSTED past ~a few 10k nodes).
+        List<SchemaNodeMsg> nodes = outcome.nodes();
+        for (int start = 0; start < nodes.size() && !obs.isCancelled(); start += SCAN_NODE_BATCH_SIZE) {
+            int end = Math.min(start + SCAN_NODE_BATCH_SIZE, nodes.size());
+            sendIfNotCancelled(obs, ScanEvent.newBuilder()
+                    .setNodeBatch(NodeBatch.newBuilder().addAllNodes(nodes.subList(start, end)))
+                    .build());
+        }
+        if (obs.isCancelled()) {
+            return;
+        }
+        sendIfNotCancelled(obs, ScanEvent.newBuilder()
                 .setResult(ScanResponse.newBuilder()
                         .setStatus(outcome.status())
-                        .addAllNodes(outcome.nodes())
                         .setTruncated(outcome.truncated())
-                        .setDiscoveredCount(outcome.nodes().size())
+                        .setDiscoveredCount(nodes.size())
                         .setUnknownCount(outcome.unknownCount())
                         .setMessage(orEmpty(outcome.message())))
                 .build());
         obs.onCompleted();
     }
+
+    /** Nodes per {@link NodeBatch}; keeps each Scan stream message far under gRPC's 4MB default. */
+    private static final int SCAN_NODE_BATCH_SIZE = 500;
 
     /** Best-effort send: a scan the client already cancelled must not throw on the browsing thread. */
     private static void sendIfNotCancelled(ServerCallStreamObserver<ScanEvent> obs, ScanEvent event) {

@@ -121,6 +121,21 @@ class ScanControllerTest {
     }
 
     @Test
+    void nodesPagesDiscoveredNodesViaScanService() {
+        var page = new com.ainclusive.iotsim.domain.support.Page<>(List.of(
+                new DiscoveredNode("ns=2;s=t", null, "Temp", "Temp", "VARIABLE",
+                        "FLOAT64", "SCALAR", "READ", null, null)),
+                "1", 200);
+        given(service.getScanNodesPage(PROJECT, "job-1", null, null)).willReturn(page);
+
+        var resp = controller.nodes(PROJECT, "job-1", null, null);
+
+        assertThat(resp.items()).hasSize(1);
+        assertThat(resp.items().get(0).dataType()).isEqualTo("FLOAT64");
+        assertThat(resp.nextCursor()).isEqualTo("1");
+    }
+
+    @Test
     void cancelStopsTheJobAndReturnsItsUpdatedState() {
         Instant now = Instant.now();
         ScanJob cancelled = new ScanJob("job-1", PROJECT, "OPC_UA", "opc.tcp://h", "CANCELLED",

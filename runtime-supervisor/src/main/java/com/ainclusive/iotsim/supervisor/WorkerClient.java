@@ -17,6 +17,7 @@ import com.ainclusive.iotsim.workercontract.v1.ScanProgress;
 import com.ainclusive.iotsim.workercontract.v1.ScanRequest;
 import com.ainclusive.iotsim.workercontract.v1.ScanResponse;
 import com.ainclusive.iotsim.workercontract.v1.Schema;
+import com.ainclusive.iotsim.workercontract.v1.SchemaNodeMsg;
 import com.ainclusive.iotsim.workercontract.v1.SecurityConfig;
 import com.ainclusive.iotsim.workercontract.v1.ShutdownRequest;
 import com.ainclusive.iotsim.workercontract.v1.StartRequest;
@@ -32,6 +33,7 @@ import io.grpc.stub.ClientCallStreamObserver;
 import io.grpc.stub.ClientResponseObserver;
 import io.grpc.stub.StreamObserver;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -149,15 +151,18 @@ public final class WorkerClient implements AutoCloseable {
     /**
      * Browses a real source via the worker (client mode) into neutral schema nodes.
      * The worker streams {@link ScanProgress} updates as it descends (via
-     * {@code onProgress}) ending with exactly one terminal result, which this method
-     * blocks for and returns. Same deadline as before (now bounding the whole
-     * stream rather than a single response).
+     * {@code onProgress}), then the discovered nodes in bounded {@code NodeBatch}
+     * chunks (so a huge address space never arrives as one oversized message),
+     * ending with exactly one terminal result. This method blocks for the whole
+     * stream and returns the accumulated nodes alongside the terminal metadata.
+     * Same deadline as before (bounds the whole stream, not a single response).
      */
-    public ScanResponse scan(ScanRequest request, Consumer<ScanProgress> onProgress) {
+    public ScanOutcome scan(ScanRequest request, Consumer<ScanProgress> onProgress) {
         ProtocolDataSourceGrpc.ProtocolDataSourceStub async = ProtocolDataSourceGrpc.newStub(channel)
                 .withDeadlineAfter(scanTimeoutSeconds, TimeUnit.SECONDS);
         CountDownLatch done = new CountDownLatch(1);
         AtomicReference<ScanResponse> result = new AtomicReference<>();
+        List<SchemaNodeMsg> nodes = new ArrayList<>();
         AtomicReference<Throwable> error = new AtomicReference<>();
         AtomicReference<ClientCallStreamObserver<ScanRequest>> call = new AtomicReference<>();
         async.scan(request, new ClientResponseObserver<ScanRequest, ScanEvent>() {
@@ -170,6 +175,8 @@ public final class WorkerClient implements AutoCloseable {
             public void onNext(ScanEvent event) {
                 if (event.hasResult()) {
                     result.set(event.getResult());
+                } else if (event.hasNodeBatch()) {
+                    nodes.addAll(event.getNodeBatch().getNodesList());
                 } else if (onProgress != null) {
                     onProgress.accept(event.getProgress());
                 }
@@ -206,7 +213,11 @@ public final class WorkerClient implements AutoCloseable {
         if (result.get() == null) {
             throw new IllegalStateException("worker completed scan stream without a result");
         }
-        return result.get();
+        return new ScanOutcome(result.get(), nodes);
+    }
+
+    /** Terminal scan metadata plus the nodes accumulated from the stream's {@code NodeBatch} chunks. */
+    public record ScanOutcome(ScanResponse response, List<SchemaNodeMsg> nodes) {
     }
 
     /** Cancels an in-flight call so the worker stops browsing once the caller gives up. */

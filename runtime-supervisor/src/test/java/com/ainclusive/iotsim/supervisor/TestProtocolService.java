@@ -10,6 +10,7 @@ import com.ainclusive.iotsim.workercontract.v1.HealthRequest;
 import com.ainclusive.iotsim.workercontract.v1.HealthResponse;
 import com.ainclusive.iotsim.workercontract.v1.HelloRequest;
 import com.ainclusive.iotsim.workercontract.v1.HelloResponse;
+import com.ainclusive.iotsim.workercontract.v1.NodeBatch;
 import com.ainclusive.iotsim.workercontract.v1.ProtocolDataSourceGrpc;
 import com.ainclusive.iotsim.workercontract.v1.Quality;
 import com.ainclusive.iotsim.workercontract.v1.RuntimeEvent;
@@ -142,11 +143,14 @@ final class TestProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSourc
                 .setProgress(ScanProgress.newBuilder().setPhase("CONNECTED"))
                 .build());
         obs.onNext(ScanEvent.newBuilder()
-                .setResult(ScanResponse.newBuilder()
-                        .setStatus("OK")
+                .setNodeBatch(NodeBatch.newBuilder()
                         .addNodes(SchemaNodeMsg.newBuilder()
                                 .setNodeId("ns=2;s=temp").setPath("Temperature").setName("Temperature")
-                                .setKind("VARIABLE").setDataType("FLOAT64").setValueRank("SCALAR").setAccess("READ"))
+                                .setKind("VARIABLE").setDataType("FLOAT64").setValueRank("SCALAR").setAccess("READ")))
+                .build());
+        obs.onNext(ScanEvent.newBuilder()
+                .setResult(ScanResponse.newBuilder()
+                        .setStatus("OK")
                         .setDiscoveredCount(1)
                         .setMessage("discovered 1 nodes"))
                 .build());

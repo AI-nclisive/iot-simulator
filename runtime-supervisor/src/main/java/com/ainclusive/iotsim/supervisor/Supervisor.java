@@ -382,13 +382,13 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
             return ScanResult.failure(ScanStatus.UNSUPPORTED, EXTERNAL_REF_UNSUPPORTED);
         }
         return withWorker(spec.protocol(), client -> {
-            ScanResponse response = client.scan(ScanRequest.newBuilder()
+            WorkerClient.ScanOutcome outcome = client.scan(ScanRequest.newBuilder()
                     .setEndpointUrl(orEmpty(spec.endpointUrl()))
                     .setCredentials(toCredentialMsg(spec.credentials()))
                     .setMaxNodes(spec.maxNodes())
                     .build(),
                     progress -> reportProgress(onProgress, progress));
-            return toScanResult(response);
+            return toScanResult(outcome);
         });
     }
 
@@ -607,8 +607,9 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
         return b.build();
     }
 
-    private static ScanResult toScanResult(ScanResponse response) {
-        List<DiscoveredNode> nodes = response.getNodesList().stream()
+    private static ScanResult toScanResult(WorkerClient.ScanOutcome outcome) {
+        ScanResponse response = outcome.response();
+        List<DiscoveredNode> nodes = outcome.nodes().stream()
                 .map(Supervisor::toDiscoveredNode).toList();
         return new ScanResult(toStatus(response.getStatus()), nodes,
                 response.getTruncated(), response.getUnknownCount(), response.getMessage());

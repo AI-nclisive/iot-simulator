@@ -310,6 +310,38 @@ class ScanServiceTest {
     }
 
     @Test
+    void getScanNodesPagePagesThroughDiscoveredNodes() {
+        scanner.scanResult = okResult();
+        ScanJob job = service.startScan(
+                PROJECT, "OPC_UA", "opc.tcp://h", ConnectionCredentials.anonymous(), 0);
+
+        com.ainclusive.iotsim.domain.support.Page<DiscoveredNode> first =
+                service.getScanNodesPage(PROJECT, job.jobId(), null, 2);
+        assertThat(first.items()).hasSize(2);
+        assertThat(first.nextCursor()).isNotNull();
+
+        com.ainclusive.iotsim.domain.support.Page<DiscoveredNode> second =
+                service.getScanNodesPage(PROJECT, job.jobId(), first.nextCursor(), 2);
+        assertThat(second.items()).hasSize(1);
+        assertThat(second.nextCursor()).isNull();
+    }
+
+    @Test
+    void getScanNodesPageOnMissingJobThrowsNotFound() {
+        assertThatThrownBy(() -> service.getScanNodesPage(PROJECT, "nope", null, null))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void getScanNodesPageWithInvalidCursorThrowsBadRequest() {
+        scanner.scanResult = okResult();
+        ScanJob job = service.startScan(
+                PROJECT, "OPC_UA", "opc.tcp://h", ConnectionCredentials.anonymous(), 0);
+        assertThatThrownBy(() -> service.getScanNodesPage(PROJECT, job.jobId(), "not-a-number", null))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void createFromScanRejectsScanWithNoUsableNodes() {
         scanner.scanResult = ScanResult.failure(ScanStatus.UNREACHABLE, "down");
         ScanJob job = service.startScan(
