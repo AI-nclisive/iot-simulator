@@ -27,8 +27,8 @@ history.
   adoption, especially on the hot recording path.
 
 ## Frontend
-- React + TypeScript + Vite + React Router + TanStack Query/Table + Zustand +
-  Radix UI + Tailwind.
+- React + TypeScript + Vite + React Router + TanStack Query/Table/Virtual +
+  Zustand + Radix UI + Tailwind.
 - openapi-typescript (devDependency) — generates TypeScript types from the backend
   OpenAPI spec (`/openapi.json`); run via `npm run generate:api`.
 

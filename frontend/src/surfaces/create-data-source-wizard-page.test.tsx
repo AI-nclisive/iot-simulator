@@ -24,6 +24,25 @@ import {
   type WizardFormState,
 } from "./create-data-source-wizard-page";
 
+// This file's UnknownNodesList (UI-470) uses @tanstack/react-virtual, which observes
+// its scroll container's size via ResizeObserver — absent in jsdom — to decide which
+// rows are "visible". Vitest gives each test file its own jsdom instance, so these
+// stubs are scoped to this file only, not the whole suite. A plain assignment (not
+// vi.stubGlobal) is used deliberately: this file's own afterEach below calls
+// vi.unstubAllGlobals() after every test, which would strip a vi.stubGlobal-installed
+// stub after the first test and break every test after it.
+class ResizeObserverStub {
+  observe(): void {}
+  unobserve(): void {}
+  disconnect(): void {}
+}
+if (typeof globalThis.ResizeObserver === "undefined") {
+  globalThis.ResizeObserver = ResizeObserverStub as unknown as typeof ResizeObserver;
+}
+for (const prop of ["offsetHeight", "offsetWidth", "clientHeight", "clientWidth"] as const) {
+  Object.defineProperty(HTMLElement.prototype, prop, { configurable: true, value: 500 });
+}
+
 const { mockNavigate, shellStoreState, artifactsStoreState } = vi.hoisted(() => ({
   mockNavigate: vi.fn(),
   shellStoreState: {
@@ -272,6 +291,13 @@ function makeFetchResponse(status: number, body: unknown) {
   };
 }
 
+// GET .../scan/{jobId}/nodes (IS-165/UI-470) — once a job goes OK/PARTIAL, the wizard
+// fetches nodes via this paginated sub-resource instead of reading them off the job
+// status response. A single-page response (nextCursor: null) is enough for these tests.
+function makeNodesPage(nodes: DiscoveredNodeResponse[]) {
+  return Promise.resolve({ items: nodes, nextCursor: null, limit: 200 });
+}
+
 async function navigateToScanStep() {
   // Render wizard and navigate through protocol → basis → setup → scan
   render(
@@ -392,9 +418,9 @@ describe("CreateDataSourceWizardPage — scan step (UI-458)", () => {
           discoveredCount: 5,
           unknownCount: 0,
           message: null,
-          nodes: [knownNode],
         }),
-      );
+      )
+      .mockImplementationOnce(() => makeNodesPage([knownNode]));
 
     await navigateToScanStep();
 
@@ -522,9 +548,9 @@ describe("CreateDataSourceWizardPage — scan step (UI-458)", () => {
           discoveredCount: 3,
           unknownCount: 0,
           message: null,
-          nodes: [knownNode],
         }),
-      );
+      )
+      .mockImplementationOnce(() => makeNodesPage([knownNode]));
 
     await navigateToScanStep();
     await advanceIntervalAndFlush(2000);
@@ -544,9 +570,9 @@ describe("CreateDataSourceWizardPage — scan step (UI-458)", () => {
           discoveredCount: 1,
           unknownCount: 1,
           message: null,
-          nodes: [unknownNode],
         }),
-      );
+      )
+      .mockImplementationOnce(() => makeNodesPage([unknownNode]));
 
     await navigateToScanStep();
     await advanceIntervalAndFlush(2000);
@@ -569,9 +595,9 @@ describe("CreateDataSourceWizardPage — scan step (UI-458)", () => {
           discoveredCount: 1,
           unknownCount: 1,
           message: null,
-          nodes: [unknownNode],
         }),
-      );
+      )
+      .mockImplementationOnce(() => makeNodesPage([unknownNode]));
 
     await navigateToScanStep();
     await advanceIntervalAndFlush(2000);
@@ -599,9 +625,9 @@ describe("CreateDataSourceWizardPage — scan step (UI-458)", () => {
           discoveredCount: 2,
           unknownCount: 0,
           message: null,
-          nodes: [knownNode],
         }),
       )
+      .mockImplementationOnce(() => makeNodesPage([knownNode]))
       .mockImplementationOnce(() => Promise.resolve({ id: "ds-created" }));
 
     await navigateToScanStep();
@@ -642,9 +668,9 @@ describe("CreateDataSourceWizardPage — scan step (UI-458)", () => {
           discoveredCount: 1,
           unknownCount: 0,
           message: null,
-          nodes: [knownNode],
         }),
       )
+      .mockImplementationOnce(() => makeNodesPage([knownNode]))
       .mockImplementationOnce(() => Promise.resolve({ id: "ds-skip" }));
 
     await navigateToScanStep();
