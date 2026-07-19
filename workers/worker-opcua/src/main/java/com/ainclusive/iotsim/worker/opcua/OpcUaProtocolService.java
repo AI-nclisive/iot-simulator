@@ -12,12 +12,16 @@ import com.ainclusive.iotsim.workercontract.v1.HealthResponse;
 import com.ainclusive.iotsim.workercontract.v1.HelloRequest;
 import com.ainclusive.iotsim.workercontract.v1.HelloResponse;
 import com.ainclusive.iotsim.workercontract.v1.InjectFaultRequest;
+import com.ainclusive.iotsim.workercontract.v1.NodeBatch;
 import com.ainclusive.iotsim.workercontract.v1.ProtocolDataSourceGrpc;
 import com.ainclusive.iotsim.workercontract.v1.RuntimeEvent;
+import com.ainclusive.iotsim.workercontract.v1.ScanEvent;
+import com.ainclusive.iotsim.workercontract.v1.ScanProgress;
 import com.ainclusive.iotsim.workercontract.v1.ScanRequest;
 import com.ainclusive.iotsim.workercontract.v1.ScanResponse;
 import com.ainclusive.iotsim.workercontract.v1.SchemaNodeMsg;
 import com.ainclusive.iotsim.workercontract.v1.SecurityConfig;
+import com.ainclusive.iotsim.workercontract.v1.ShutdownRequest;
 import com.ainclusive.iotsim.workercontract.v1.StartRequest;
 import com.ainclusive.iotsim.workercontract.v1.StopRequest;
 import com.ainclusive.iotsim.workercontract.v1.StreamRequest;
@@ -45,6 +49,8 @@ import java.util.concurrent.atomic.AtomicReference;
  * See backend-specs/02_WORKER_CONTRACT_AND_IPC.md.
  */
 public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSourceImplBase {
+
+    private static final int SHUTDOWN_FLUSH_DELAY_MS = 200;
 
     private final AtomicReference<String> state = new AtomicReference<>("READY");
     private final AtomicLong applied = new AtomicLong();
@@ -130,18 +136,58 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
     }
 
     @Override
-    public void scan(ScanRequest request, StreamObserver<ScanResponse> obs) {
+    public void scan(ScanRequest request, StreamObserver<ScanEvent> responseObserver) {
+        ServerCallStreamObserver<ScanEvent> obs = (ServerCallStreamObserver<ScanEvent>) responseObserver;
+        sendIfNotCancelled(obs, ScanEvent.newBuilder()
+                .setProgress(ScanProgress.newBuilder().setPhase("CONNECTING"))
+                .build());
         OpcUaDiscovery.ScanOutcome outcome = OpcUaDiscovery.scan(
-                request.getEndpointUrl(), credentials(request.getCredentials()), request.getMaxNodes());
-        obs.onNext(ScanResponse.newBuilder()
-                .setStatus(outcome.status())
-                .addAllNodes(outcome.nodes())
-                .setTruncated(outcome.truncated())
-                .setDiscoveredCount(outcome.nodes().size())
-                .setUnknownCount(outcome.unknownCount())
-                .setMessage(orEmpty(outcome.message()))
+                request.getEndpointUrl(), credentials(request.getCredentials()), request.getMaxNodes(),
+                () -> sendIfNotCancelled(obs, ScanEvent.newBuilder()
+                        .setProgress(ScanProgress.newBuilder().setPhase("CONNECTED"))
+                        .build()),
+                soFar -> sendIfNotCancelled(obs, ScanEvent.newBuilder()
+                        .setProgress(ScanProgress.newBuilder().setPhase("SCANNING").setDiscoveredSoFar(soFar))
+                        .build()));
+        // The client (supervisor) may have cancelled mid-scan (e.g. the caller gave up
+        // or its own deadline fired) — the stream is already closed, so finishing it
+        // here would throw. The browse already ran to completion/cap; its result is
+        // simply discarded.
+        if (obs.isCancelled()) {
+            return;
+        }
+        // Send discovered nodes in bounded chunks rather than one ScanResponse.nodes
+        // list, so a huge address space never produces a single message over gRPC's
+        // max message size (previously hit RESOURCE_EXHAUSTED past ~a few 10k nodes).
+        List<SchemaNodeMsg> nodes = outcome.nodes();
+        for (int start = 0; start < nodes.size() && !obs.isCancelled(); start += SCAN_NODE_BATCH_SIZE) {
+            int end = Math.min(start + SCAN_NODE_BATCH_SIZE, nodes.size());
+            sendIfNotCancelled(obs, ScanEvent.newBuilder()
+                    .setNodeBatch(NodeBatch.newBuilder().addAllNodes(nodes.subList(start, end)))
+                    .build());
+        }
+        if (obs.isCancelled()) {
+            return;
+        }
+        sendIfNotCancelled(obs, ScanEvent.newBuilder()
+                .setResult(ScanResponse.newBuilder()
+                        .setStatus(outcome.status())
+                        .setTruncated(outcome.truncated())
+                        .setDiscoveredCount(nodes.size())
+                        .setUnknownCount(outcome.unknownCount())
+                        .setMessage(orEmpty(outcome.message())))
                 .build());
         obs.onCompleted();
+    }
+
+    /** Nodes per {@link NodeBatch}; keeps each Scan stream message far under gRPC's 4MB default. */
+    private static final int SCAN_NODE_BATCH_SIZE = 500;
+
+    /** Best-effort send: a scan the client already cancelled must not throw on the browsing thread. */
+    private static void sendIfNotCancelled(ServerCallStreamObserver<ScanEvent> obs, ScanEvent event) {
+        if (!obs.isCancelled()) {
+            obs.onNext(event);
+        }
     }
 
     /**
@@ -310,6 +356,36 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
         }
         state.set("STOPPED");
         ackOk(obs, "stopped");
+    }
+
+    /**
+     * Graceful process exit, per backend-specs/02_WORKER_CONTRACT_AND_IPC.md. Stops the
+     * OPC UA runtime, acknowledges, then exits on a separate daemon thread so the
+     * response has time to flush over gRPC before the process ends. The supervisor's
+     * terminate-with-grace-then-kill remains the fallback if this does not happen fast
+     * enough.
+     */
+    @Override
+    public void shutdown(ShutdownRequest request, StreamObserver<Ack> obs) {
+        OpcUaServerRuntime runtime = serverRuntime.get();
+        if (runtime != null) {
+            runtime.stop();
+        }
+        state.set("STOPPED");
+        ackOk(obs, "shutting down");
+        Thread exit = new Thread(() -> {
+            try {
+                // Empirically enough for gRPC to flush the ack over loopback. If interrupted,
+                // exit immediately anyway; the supervisor's terminate-with-grace-then-kill
+                // fallback covers the (rare) case where the ack hasn't flushed yet.
+                Thread.sleep(SHUTDOWN_FLUSH_DELAY_MS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            System.exit(0);
+        }, "worker-shutdown-exit");
+        exit.setDaemon(true);
+        exit.start();
     }
 
     @Override

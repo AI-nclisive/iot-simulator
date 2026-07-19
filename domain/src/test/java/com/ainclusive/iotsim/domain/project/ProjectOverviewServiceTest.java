@@ -87,10 +87,16 @@ class ProjectOverviewServiceTest {
                 return sourcesByProject.getOrDefault(projectId, List.of());
             }
         };
-        RecordingService recordingService = new RecordingService(null, null, null, null, null, null, null, new ActivityEventService(new NoOpActivityEventRepository())) {
+        RecordingService recordingService = new RecordingService(null, null, null, null, null, null, null,
+                new ActivityEventService(new NoOpActivityEventRepository()), null, null, null, null) {
             @Override
             public List<Recording> list(String projectId) {
                 return recordingsByProject.getOrDefault(projectId, List.of());
+            }
+
+            @Override
+            public long count(String projectId) {
+                return recordingsByProject.getOrDefault(projectId, List.of()).size();
             }
         };
         return new ProjectOverviewService(projectService, dataSourceService, recordingService);
@@ -109,6 +115,7 @@ class ProjectOverviewServiceTest {
     }
 
     private static Recording recording(String id) {
-        return new Recording(id, "p1", "ds", 1, "SCAN_RECORD", "SCHEMA_AND_DATA", null, 0L, Instant.now(), "local", 0);
+        return new Recording(id, "p1", "ds", "OPC_UA", 1, "SCAN_RECORD", "SCHEMA_AND_DATA", null, 0L, 0L,
+                Instant.now(), "local", 0, null, false);
     }
 }

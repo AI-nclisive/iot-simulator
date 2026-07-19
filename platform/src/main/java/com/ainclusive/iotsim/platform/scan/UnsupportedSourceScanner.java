@@ -17,7 +17,7 @@ public class UnsupportedSourceScanner implements SourceScanner {
     }
 
     @Override
-    public ScanResult scan(ScanSpec spec) {
+    public ScanResult scan(ScanSpec spec, ScanProgressListener onProgress) {
         return ScanResult.failure(ScanStatus.UNSUPPORTED, MESSAGE);
     }
 }

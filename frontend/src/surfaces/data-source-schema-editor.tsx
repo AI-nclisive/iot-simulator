@@ -118,65 +118,72 @@ function TreeNodeRow({
   const isExpanded = expandedIds.has(node.nodeId);
   const isSelected = selectedId === node.nodeId;
   const indent = depth * 16;
+  const isFolder = node.kind === "FOLDER";
+  const hasChildren = node.children.length > 0;
 
-  if (node.kind === "FOLDER") {
-    return (
-      <>
-        <li>
-          <button
-            className="flex w-full items-center gap-1.5 px-3 py-2 text-left text-sm hover:bg-shell-base/50 transition"
-            style={{ paddingLeft: `${12 + indent}px` }}
-            type="button"
-            onClick={() => onToggle(node.nodeId)}
-          >
-            <span className="shrink-0 text-xs text-shell-muted w-3 text-center">
-              {isExpanded ? "▾" : "▸"}
-            </span>
-            <span className="text-shell-muted font-medium truncate">{node.name}</span>
-            {node.children.length > 0 && (
-              <span className="ml-auto shrink-0 text-xs text-shell-muted">
-                {node.children.filter((c) => c.kind === "VARIABLE").length || ""}
-              </span>
-            )}
-          </button>
-        </li>
-        {isExpanded &&
-          node.children.map((child) => (
-            <TreeNodeRow
-              key={child.nodeId}
-              node={child}
-              depth={depth + 1}
-              selectedId={selectedId}
-              expandedIds={expandedIds}
-              onToggle={onToggle}
-              onSelect={onSelect}
-            />
-          ))}
-      </>
-    );
-  }
-
+  // A Variable can itself have children (e.g. a structured value's component
+  // Variables) — not just Folders — so the expand toggle is keyed off
+  // hasChildren, independent of kind. A Variable row stays selectable even
+  // when it also has children.
   return (
-    <li>
-      <button
-        className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition ${
-          isSelected ? "bg-shell-accent/5" : "hover:bg-shell-base/50"
-        }`}
-        style={{ paddingLeft: `${12 + indent}px` }}
-        type="button"
-        onClick={() => onSelect(node)}
-      >
-        <span className="shrink-0 w-3" />
-        <span className="min-w-0 flex-1 truncate font-mono text-shell-ink">
-          {node.name}
-        </span>
-        {node.dataType && (
-          <span className="shrink-0 text-xs text-shell-muted">
-            {node.dataType.charAt(0).toUpperCase() + node.dataType.slice(1).toLowerCase()}
+    <>
+      <li>
+        <button
+          className={`flex w-full items-center gap-1.5 px-3 py-2 text-left text-sm transition ${
+            !isFolder && isSelected ? "bg-shell-accent/5" : "hover:bg-shell-base/50"
+          }`}
+          style={{ paddingLeft: `${12 + indent}px` }}
+          type="button"
+          onClick={() => (isFolder ? onToggle(node.nodeId) : onSelect(node))}
+        >
+          <span
+            className="shrink-0 text-xs text-shell-muted w-3 text-center"
+            onClick={
+              hasChildren && !isFolder
+                ? (e) => {
+                    e.stopPropagation();
+                    onToggle(node.nodeId);
+                  }
+                : undefined
+            }
+          >
+            {hasChildren ? (isExpanded ? "▾" : "▸") : ""}
           </span>
-        )}
-      </button>
-    </li>
+          <span
+            className={
+              isFolder
+                ? "text-shell-muted font-medium truncate"
+                : "min-w-0 flex-1 truncate font-mono text-shell-ink"
+            }
+          >
+            {node.name}
+          </span>
+          {isFolder && hasChildren && (
+            <span className="ml-auto shrink-0 text-xs text-shell-muted">
+              {node.children.filter((c) => c.kind === "VARIABLE").length || ""}
+            </span>
+          )}
+          {!isFolder && node.dataType && (
+            <span className="shrink-0 text-xs text-shell-muted">
+              {node.dataType.charAt(0).toUpperCase() + node.dataType.slice(1).toLowerCase()}
+            </span>
+          )}
+        </button>
+      </li>
+      {isExpanded &&
+        hasChildren &&
+        node.children.map((child) => (
+          <TreeNodeRow
+            key={child.nodeId}
+            node={child}
+            depth={depth + 1}
+            selectedId={selectedId}
+            expandedIds={expandedIds}
+            onToggle={onToggle}
+            onSelect={onSelect}
+          />
+        ))}
+    </>
   );
 }
 

@@ -7,15 +7,14 @@
 #   with a real out-of-process OPC UA worker) + frontend Vite dev server (:4173).
 #
 # Usage:
-#   scripts/run-local.sh            # or `up` — bring the stack up
-#   scripts/run-local.sh down       # stop backend/frontend/postgres (KEEPS db data)
-#   scripts/run-local.sh down --wipe  # also drop the pgdata volume (clean slate)
+#   ./run-local.sh            # or `up` — bring the stack up
+#   ./run-local.sh down       # stop backend/frontend/postgres (KEEPS db data)
+#   ./run-local.sh down --wipe  # also drop the pgdata volume (clean slate)
 #
 set -euo pipefail
 
-# --- locate repo root (this script lives in <repo>/scripts) -------------------
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+# --- locate repo root (this script lives at <repo> root) -----------------------
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$REPO_ROOT"
 
 BACKEND_PORT=8080
@@ -60,7 +59,7 @@ $(log "stack is up — entry points:")
   opc.tcp://127.0.0.1:<port>/iotsim — point your external OPC UA client there.
   (Set a listenPort when creating the source, else the port is ephemeral.)
 
-  Tear down with: scripts/run-local.sh down
+  Tear down with: ./run-local.sh down
 EOF
 }
 
@@ -159,10 +158,6 @@ down() {
       kill $pids 2>/dev/null || true
     fi
   done
-
-  # STOPGAP (IS-123): supervisor-spawned workers don't shut down gracefully
-  # yet — graceful Shutdown RPC is IS-090. Kill lingering workers explicitly.
-  pkill -f worker-opcua 2>/dev/null || true
 
   if [ "$wipe" = "--wipe" ]; then
     log "wiping database (docker compose down -v)..."

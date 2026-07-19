@@ -43,7 +43,7 @@ public class ProjectOverviewService {
                 .filter(s -> s.runtimeState() == RuntimeState.ERROR
                         || s.runtimeState() == RuntimeState.STALE)
                 .count();
-        int artifacts = recordings.list(project.id()).size();
+        int artifacts = (int) recordings.count(project.id());
         return new ProjectOverview(
                 project.id(), project.name(), sources.size(), running, artifacts, attention);
     }

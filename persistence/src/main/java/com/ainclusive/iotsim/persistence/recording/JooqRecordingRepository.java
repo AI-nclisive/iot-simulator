@@ -9,6 +9,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import org.jooq.DSLContext;
+import org.jooq.JSONB;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -21,17 +22,19 @@ public class JooqRecordingRepository implements RecordingRepository {
     }
 
     @Override
-    public RecordingRow create(String projectId, String dataSourceId, int schemaVersion,
-            String origin, String scanType, String name, String createdBy) {
+    public RecordingRow create(String projectId, String dataSourceId, String protocol, int schemaVersion,
+            String origin, String scanType, String name, String createdBy, String schemaNodesJson) {
         RecordingsRecord record = dsl.insertInto(RECORDINGS)
                 .set(RECORDINGS.ID, Ids.newId())
                 .set(RECORDINGS.PROJECT_ID, projectId)
                 .set(RECORDINGS.DATA_SOURCE_ID, dataSourceId)
+                .set(RECORDINGS.PROTOCOL, protocol)
                 .set(RECORDINGS.SCHEMA_VERSION, schemaVersion)
                 .set(RECORDINGS.ORIGIN, origin)
                 .set(RECORDINGS.SCAN_TYPE, scanType)
                 .set(RECORDINGS.NAME, name)
                 .set(RECORDINGS.CREATED_BY, createdBy)
+                .set(RECORDINGS.SCHEMA_NODES, json(schemaNodesJson))
                 .returning()
                 .fetchOne();
         return map(record);
@@ -81,11 +84,30 @@ public class JooqRecordingRepository implements RecordingRepository {
         return map(record);
     }
 
+    @Override
+    public boolean deleteById(String id) {
+        return dsl.deleteFrom(RECORDINGS).where(RECORDINGS.ID.eq(id)).execute() > 0;
+    }
+
+    @Override
+    public long countByProject(String projectId) {
+        Integer total = dsl.selectCount()
+                .from(RECORDINGS)
+                .where(RECORDINGS.PROJECT_ID.eq(projectId))
+                .fetchOne(0, Integer.class);
+        return total == null ? 0 : total;
+    }
+
+    private static JSONB json(String value) {
+        return JSONB.valueOf(value != null && !value.isBlank() ? value : "[]");
+    }
+
     private RecordingRow map(RecordingsRecord r) {
         return new RecordingRow(
                 r.getId(),
                 r.getProjectId(),
                 r.getDataSourceId(),
+                r.getProtocol(),
                 r.getSchemaVersion(),
                 r.getOrigin(),
                 r.getScanType(),
@@ -97,6 +119,7 @@ public class JooqRecordingRepository implements RecordingRepository {
                 r.getCreatedAt(),
                 r.getUpdatedAt(),
                 r.getCreatedBy(),
-                r.getVersion());
+                r.getVersion(),
+                r.getSchemaNodes() == null ? "[]" : r.getSchemaNodes().data());
     }
 }

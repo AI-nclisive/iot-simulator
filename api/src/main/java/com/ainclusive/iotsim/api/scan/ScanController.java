@@ -9,6 +9,7 @@ import com.ainclusive.iotsim.domain.scan.ScanJob;
 import com.ainclusive.iotsim.domain.scan.ScanService;
 import com.ainclusive.iotsim.domain.scan.TypeResolution;
 import com.ainclusive.iotsim.domain.schema.SchemaService;
+import com.ainclusive.iotsim.domain.support.Page;
 import com.ainclusive.iotsim.platform.scan.ConnectionTestResult;
 import com.ainclusive.iotsim.platform.scan.DiscoveredNode;
 import com.ainclusive.iotsim.platform.scan.ScanResult;
@@ -23,6 +24,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -106,6 +108,37 @@ public class ScanController {
     }
 
     /**
+     * Pages a completed scan job's discovered nodes (IS-165) — an additive alternative to the
+     * full {@code nodes} list on {@link #get}, for clients that page/virtualize very large
+     * results instead of receiving them all in one response.
+     */
+    @Operation(
+            summary = "Page a scan job's discovered nodes",
+            description = "Returns a page of the scan job's discovered nodes."
+                    + " Uses cursor-based pagination via the cursor and limit query parameters.")
+    @GetMapping("/{jobId}/nodes")
+    @PreAuthorize(OBSERVE)
+    public Page<DiscoveredNodeResponse> nodes(
+            @PathVariable String projectId, @PathVariable String jobId,
+            @RequestParam(required = false) String cursor,
+            @RequestParam(required = false) Integer limit) {
+        return scans.getScanNodesPage(projectId, jobId, cursor, limit)
+                .map(DiscoveredNodeResponse::from);
+    }
+
+    /** Stops a running scan job early (IS-164); the job settles as CANCELLED. */
+    @Operation(
+            summary = "Cancel a running scan",
+            description = "Stops an in-flight scan job so the worker stops browsing; the job settles as"
+                    + " CANCELLED. No-op-safe to call again once the job is no longer running.")
+    @PostMapping("/{jobId}/cancel")
+    @PreAuthorize(SOURCE_EDIT)
+    public ScanJobResponse cancel(@PathVariable String projectId, @PathVariable String jobId) {
+        scans.cancelScan(projectId, jobId);
+        return ScanJobResponse.from(scans.getScan(projectId, jobId));
+    }
+
+    /**
      * Creates a data source (basis=SCAN) from a completed scan. Unknown-typed
      * discovered nodes must be addressed via {@code typeResolutions} (assign a type
      * or exclude); an unresolved unknown node rejects the request (400).
@@ -170,8 +203,8 @@ public class ScanController {
     public record StartScanResponse(String jobId, String status) {}
 
     public record ScanJobResponse(
-            String jobId, String status, boolean truncated, int discoveredCount,
-            int unknownCount, String message, List<DiscoveredNodeResponse> nodes) {
+            String jobId, String status, String phase, int discoveredSoFar, boolean truncated,
+            int discoveredCount, int unknownCount, String message, List<DiscoveredNodeResponse> nodes) {
 
         static ScanJobResponse from(ScanJob job) {
             ScanResult result = job.result();
@@ -180,6 +213,8 @@ public class ScanController {
             return new ScanJobResponse(
                     job.jobId(),
                     job.state(),
+                    job.phase() == null ? null : job.phase().name(),
+                    job.discoveredSoFar(),
                     result != null && result.truncated(),
                     nodes.size(),
                     result == null ? 0 : result.unknownCount(),

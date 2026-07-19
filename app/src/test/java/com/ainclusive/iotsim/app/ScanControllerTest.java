@@ -100,7 +100,7 @@ class ScanControllerTest {
                         null, null, null, null, null)),
                 true, 2, "partial");
         given(service.getScan(PROJECT, "job-1")).willReturn(
-                new ScanJob("job-1", PROJECT, "OPC_UA", "opc.tcp://h", "PARTIAL", result,
+                new ScanJob("job-1", PROJECT, "OPC_UA", "opc.tcp://h", "PARTIAL", null, 2, result,
                         "partial", Instant.now(), Instant.now()));
 
         ScanJobResponse resp = controller.get(PROJECT, "job-1");
@@ -118,6 +118,34 @@ class ScanControllerTest {
                     assertThat(unknown.dataType()).isNull();
                     assertThat(unknown.unknownType()).isTrue();
                 });
+    }
+
+    @Test
+    void nodesPagesDiscoveredNodesViaScanService() {
+        var page = new com.ainclusive.iotsim.domain.support.Page<>(List.of(
+                new DiscoveredNode("ns=2;s=t", null, "Temp", "Temp", "VARIABLE",
+                        "FLOAT64", "SCALAR", "READ", null, null)),
+                "1", 200);
+        given(service.getScanNodesPage(PROJECT, "job-1", null, null)).willReturn(page);
+
+        var resp = controller.nodes(PROJECT, "job-1", null, null);
+
+        assertThat(resp.items()).hasSize(1);
+        assertThat(resp.items().get(0).dataType()).isEqualTo("FLOAT64");
+        assertThat(resp.nextCursor()).isEqualTo("1");
+    }
+
+    @Test
+    void cancelStopsTheJobAndReturnsItsUpdatedState() {
+        Instant now = Instant.now();
+        ScanJob cancelled = new ScanJob("job-1", PROJECT, "OPC_UA", "opc.tcp://h", "CANCELLED",
+                null, 0, null, "scan cancelled by user", now, now);
+        given(service.getScan(PROJECT, "job-1")).willReturn(cancelled);
+
+        ScanJobResponse resp = controller.cancel(PROJECT, "job-1");
+
+        verify(service).cancelScan(PROJECT, "job-1");
+        assertThat(resp.status()).isEqualTo("CANCELLED");
     }
 
     @Test
@@ -161,7 +189,8 @@ class ScanControllerTest {
 
     private static ScanJob running(String jobId) {
         Instant now = Instant.now();
-        return new ScanJob(jobId, PROJECT, "OPC_UA", "opc.tcp://h", "RUNNING", null,
+        return new ScanJob(jobId, PROJECT, "OPC_UA", "opc.tcp://h", "RUNNING",
+                com.ainclusive.iotsim.platform.scan.ScanPhase.CONNECTING, 0, null,
                 "scan in progress", now, now);
     }
 

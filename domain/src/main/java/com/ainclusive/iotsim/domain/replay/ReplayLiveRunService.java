@@ -91,6 +91,7 @@ public class ReplayLiveRunService {
             String trigger, String initiator) {
         DataSourceRow source = requireSource(projectId, dataSourceId);
         RecordingRow recording = requireRecording(projectId, recordingId);
+        ReplayGuards.requireProtocolCompatible(recording, source);
 
         int currentSchemaVersion = schemas.findCurrent(dataSourceId)
                 .map(SchemaWithNodes::version).orElse(0);

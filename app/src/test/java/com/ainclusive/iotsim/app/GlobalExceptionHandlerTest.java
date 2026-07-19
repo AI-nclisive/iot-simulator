@@ -42,4 +42,14 @@ class GlobalExceptionHandlerTest {
         assertThat(pd.getStatus()).isEqualTo(503);
         assertThat(pd.getDetail()).isEqualTo("concurrent-source cap reached (50)");
     }
+
+    @Test
+    void unmappedExceptionMapsTo500WithGenericMessage() {
+        ProblemDetail pd = handler.internalError(
+                new RuntimeException("some internal detail that must not leak"));
+        assertThat(pd.getStatus()).isEqualTo(500);
+        assertThat(pd.getDetail())
+                .isEqualTo("An unexpected error occurred while processing the request.")
+                .doesNotContain("internal detail");
+    }
 }

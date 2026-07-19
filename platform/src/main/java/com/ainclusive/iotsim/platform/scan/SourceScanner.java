@@ -15,5 +15,10 @@ public interface SourceScanner {
     ConnectionTestResult testConnection(ScanSpec spec);
 
     /** Connects and browses the real source into a discovered neutral structure. */
-    ScanResult scan(ScanSpec spec);
+    default ScanResult scan(ScanSpec spec) {
+        return scan(spec, (phase, discoveredSoFar) -> { });
+    }
+
+    /** Same as {@link #scan(ScanSpec)}, reporting in-flight progress via {@code onProgress}. */
+    ScanResult scan(ScanSpec spec, ScanProgressListener onProgress);
 }

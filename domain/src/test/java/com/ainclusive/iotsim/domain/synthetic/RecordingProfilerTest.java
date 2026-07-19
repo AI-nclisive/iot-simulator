@@ -8,8 +8,6 @@ import static org.mockito.Mockito.mock;
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.persistence.recording.RecordingRepository;
 import com.ainclusive.iotsim.persistence.recording.RecordingRow;
-import com.ainclusive.iotsim.persistence.schema.SchemaRepository;
-import com.ainclusive.iotsim.persistence.schema.SchemaWithNodes;
 import com.ainclusive.iotsim.persistence.timeline.ValueTimelineRepository;
 import com.ainclusive.iotsim.protocolmodel.Access;
 import com.ainclusive.iotsim.protocolmodel.DataType;
@@ -24,6 +22,7 @@ import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.ObjectMapper;
 
 class RecordingProfilerTest {
 
@@ -33,16 +32,16 @@ class RecordingProfilerTest {
     private static final Instant T0 = Instant.parse("2026-07-06T22:00:00Z");
 
     private RecordingRepository recordings;
-    private SchemaRepository schemas;
     private ValueTimelineRepository timeline;
     private RecordingProfiler profiler;
+    private ObjectMapper json;
 
     @BeforeEach
     void setUp() {
         recordings = mock(RecordingRepository.class);
-        schemas = mock(SchemaRepository.class);
         timeline = mock(ValueTimelineRepository.class);
-        profiler = new RecordingProfiler(recordings, schemas, timeline);
+        json = new ObjectMapper();
+        profiler = new RecordingProfiler(recordings, timeline, json);
     }
 
     private static SchemaNode variable(String nodeId) {
@@ -52,11 +51,10 @@ class RecordingProfilerTest {
 
     private void givenRecordingWithNodes(SchemaNode... nodes) {
         OffsetDateTime now = OffsetDateTime.ofInstant(T0, ZoneOffset.UTC);
+        String schemaNodesJson = json.writeValueAsString(List.of(nodes));
         given(recordings.findById(RECORDING)).willReturn(Optional.of(new RecordingRow(
-                RECORDING, PROJECT, SOURCE, 1, "SCAN_RECORD", "SCHEMA_AND_DATA", null,
-                now, now, 0, 0, now, now, "local", 1)));
-        given(schemas.findByVersion(SOURCE, 1)).willReturn(Optional.of(
-                new SchemaWithNodes("sc1", SOURCE, 1, now, List.of(nodes))));
+                RECORDING, PROJECT, SOURCE, "OPC_UA", 1, "SCAN_RECORD", "SCHEMA_AND_DATA", null,
+                now, now, 0, 0, now, now, "local", 1, schemaNodesJson)));
     }
 
     private static NeutralValue at(String nodeId, long secondsAfterT0, double value) {
@@ -133,6 +131,17 @@ class RecordingProfilerTest {
     void unknownRecordingRejected() {
         given(recordings.findById("missing")).willReturn(Optional.empty());
         assertThatThrownBy(() -> profiler.deriveProfile(PROJECT, "missing"))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void emptyStoredSchemaThrowsNotFound() {
+        OffsetDateTime now = OffsetDateTime.ofInstant(T0, ZoneOffset.UTC);
+        given(recordings.findById(RECORDING)).willReturn(Optional.of(new RecordingRow(
+                RECORDING, PROJECT, SOURCE, "OPC_UA", 1, "SCAN_RECORD", "SCHEMA_AND_DATA", null,
+                now, now, 0, 0, now, now, "local", 1, "[]")));
+
+        assertThatThrownBy(() -> profiler.deriveProfile(PROJECT, RECORDING))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 }

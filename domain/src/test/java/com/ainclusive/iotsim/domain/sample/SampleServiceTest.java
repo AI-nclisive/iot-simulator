@@ -221,13 +221,14 @@ class SampleServiceTest {
                 return Optional.empty();
             }
             OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-            return Optional.of(new RecordingRow(id, projectId, "ds-1", 1, "SCAN_RECORD",
-                    "SCHEMA_AND_DATA", null, null, null, 0, 0, now, now, "local", 0));
+            return Optional.of(new RecordingRow(id, projectId, "ds-1", "OPC_UA", 1, "SCAN_RECORD",
+                    "SCHEMA_AND_DATA", null, null, null, 0, 0, now, now, "local", 0, "[]"));
         }
 
         @Override
-        public RecordingRow create(String projectId, String dataSourceId, int schemaVersion,
-                String origin, String scanType, String name, String createdBy) {
+        public RecordingRow create(String projectId, String dataSourceId, String protocol,
+                int schemaVersion, String origin, String scanType, String name, String createdBy,
+                String schemaNodesJson) {
             throw new UnsupportedOperationException();
         }
 
@@ -245,6 +246,16 @@ class SampleServiceTest {
         @Override
         public RecordingRow finalizeStats(String id, java.time.OffsetDateTime timeStart,
                 java.time.OffsetDateTime timeEnd, long valueCount, long sizeBytes) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public boolean deleteById(String id) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public long countByProject(String projectId) {
             throw new UnsupportedOperationException();
         }
     }

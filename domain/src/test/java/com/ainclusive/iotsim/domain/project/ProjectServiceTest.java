@@ -124,7 +124,7 @@ class ProjectServiceTest {
     void duplicateCopiesRecordingsWithUpdatedDataSourceIds() {
         Project src = service.create("Factory", null, "alice");
         DataSourceRow ds = dsRepo.insert(src.id(), "Sensor A", "OPC_UA", "SCAN", 0, null, null, null, "alice");
-        recordingRepo.create(src.id(), ds.id(), 1, "SCAN_RECORD", "SCHEMA_AND_DATA", null, "alice");
+        recordingRepo.create(src.id(), ds.id(), "OPC_UA", 1, "SCAN_RECORD", "SCHEMA_AND_DATA", null, "alice", "[]");
 
         Project copy = service.duplicate(src.id());
 
@@ -353,12 +353,14 @@ class ProjectServiceTest {
         private int seq;
 
         @Override
-        public RecordingRow create(String projectId, String dataSourceId, int schemaVersion,
-                String origin, String scanType, String name, String createdBy) {
+        public RecordingRow create(String projectId, String dataSourceId, String protocol,
+                int schemaVersion, String origin, String scanType, String name, String createdBy,
+                String schemaNodesJson) {
             OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
             RecordingRow row = new RecordingRow(
-                    "rec-" + (++seq), projectId, dataSourceId, schemaVersion, origin, scanType,
-                    name, null, null, 0L, 0L, now, now, createdBy, 0);
+                    "rec-" + (++seq), projectId, dataSourceId, protocol, schemaVersion, origin, scanType,
+                    name, null, null, 0L, 0L, now, now, createdBy, 0,
+                    schemaNodesJson != null ? schemaNodesJson : "[]");
             rows.add(row);
             return row;
         }
@@ -383,6 +385,16 @@ class ProjectServiceTest {
         public RecordingRow finalizeStats(String id, java.time.OffsetDateTime timeStart,
                 java.time.OffsetDateTime timeEnd, long valueCount, long sizeBytes) {
             throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public boolean deleteById(String id) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public long countByProject(String projectId) {
+            return rows.stream().filter(r -> r.projectId().equals(projectId)).count();
         }
     }
 }
