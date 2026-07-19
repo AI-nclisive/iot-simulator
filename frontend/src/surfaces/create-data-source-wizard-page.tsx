@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { useNavigate } from "react-router-dom";
 import { resolveAccess } from "../shell/access-policy";
 import { useArtifactsStore } from "../shell/artifacts-store";
@@ -59,8 +60,111 @@ type ScanJobResult = {
   discoveredCount: number;
   unknownCount: number;
   message: string | null;
-  nodes: DiscoveredNodeResponse[];
 };
+
+// Page<DiscoveredNodeResponse> from GET .../scan/{jobId}/nodes (IS-165) — nodes are
+// fetched separately from job status via this cursor-paged sub-resource so a huge
+// scan never has to travel (or render) as one unbounded list.
+type DiscoveredNodesPage = {
+  items: DiscoveredNodeResponse[];
+  nextCursor: string | null;
+  limit: number;
+};
+
+// Safety cap on pages fetched, guarding against a cursor that never advances
+// (a backend bug) turning this into an infinite loop instead of a bounded scan.
+// 5000 pages * 200/page = 1M nodes — far past any real address space.
+const MAX_SCAN_NODE_PAGES = 5000;
+
+async function fetchAllScanNodes(projectId: string, jobId: string): Promise<DiscoveredNodeResponse[]> {
+  const nodes: DiscoveredNodeResponse[] = [];
+  let cursor: string | null = null;
+  for (let page = 0; page < MAX_SCAN_NODE_PAGES; page++) {
+    const query: string = cursor ? `?cursor=${encodeURIComponent(cursor)}&limit=200` : "?limit=200";
+    const response: DiscoveredNodesPage = await apiFetch<DiscoveredNodesPage>(
+      `/api/v1/projects/${projectId}/data-sources/scan/${jobId}/nodes${query}`,
+    );
+    nodes.push(...response.items);
+    if (!response.nextCursor) return nodes;
+    cursor = response.nextCursor;
+  }
+  throw new Error(`scan nodes pagination did not terminate after ${MAX_SCAN_NODE_PAGES} pages`);
+}
+
+const UNKNOWN_NODE_ROW_HEIGHT = 68;
+const UNKNOWN_NODE_TYPE_OPTIONS = ["FLOAT64", "INT32", "BOOL", "STRING"] as const;
+
+/**
+ * Renders unknown-typed discovered nodes for type resolution. Virtualized (IS-165
+ * removed the backend node-count ceiling, so a scan can surface thousands of
+ * unknown-typed nodes) — only rows scrolled into view are ever mounted, so the DOM
+ * stays bounded regardless of how many nodes a scan discovers.
+ */
+function UnknownNodesList({
+  nodes,
+  typeResolutionsByNodeId,
+  onChange,
+}: {
+  nodes: DiscoveredNodeResponse[];
+  typeResolutionsByNodeId: Map<string, TypeResolutionEntry>;
+  onChange: (nodeId: string, patch: Partial<TypeResolutionEntry>) => void;
+}) {
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const virtualizer = useVirtualizer({
+    count: nodes.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => UNKNOWN_NODE_ROW_HEIGHT,
+    overscan: 8,
+  });
+
+  return (
+    <div ref={scrollRef} className="max-h-[28rem] overflow-y-auto" role="list">
+      <div style={{ position: "relative", height: virtualizer.getTotalSize() }}>
+        {virtualizer.getVirtualItems().map((row) => {
+          const node = nodes[row.index];
+          const res = typeResolutionsByNodeId.get(node.nodeId);
+          return (
+            <div
+              key={node.nodeId}
+              role="listitem"
+              className="absolute left-0 top-0 w-full pb-2"
+              style={{ transform: `translateY(${row.start}px)` }}
+            >
+              <div className="flex flex-wrap items-center gap-3 rounded-md border border-shell-line bg-white px-4 py-3">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-shell-ink">
+                    {node.name || node.nodeId}
+                  </p>
+                  <p className="truncate text-xs text-shell-muted">{node.path || node.nodeId}</p>
+                </div>
+                <select
+                  aria-label={`Data type for ${node.name || node.nodeId}`}
+                  className="shell-field w-40 shrink-0"
+                  value={res?.exclude ? "__exclude__" : (res?.dataType ?? "")}
+                  onChange={(e) => {
+                    if (e.target.value === "__exclude__") {
+                      onChange(node.nodeId, { exclude: true, dataType: "" });
+                    } else {
+                      onChange(node.nodeId, { exclude: false, dataType: e.target.value });
+                    }
+                  }}
+                >
+                  <option value="">Choose type…</option>
+                  {UNKNOWN_NODE_TYPE_OPTIONS.map((dataType) => (
+                    <option key={dataType} value={dataType}>
+                      {dataType}
+                    </option>
+                  ))}
+                  <option value="__exclude__">Exclude</option>
+                </select>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 type ScanStepStatus = "idle" | "scanning" | "complete" | "error" | "partial" | "cancelled";
 
@@ -447,6 +551,7 @@ export function CreateDataSourceWizardPage() {
   } | null>(null);
   const [typeResolutions, setTypeResolutions] = useState<TypeResolutionEntry[]>([]);
   const [scanErrorMessage, setScanErrorMessage] = useState<string | null>(null);
+  const [scanNodesLoading, setScanNodesLoading] = useState(false);
   const [scanProgress, setScanProgress] = useState<{ phase: ScanJobPhase | null; discoveredSoFar: number }>({
     phase: null,
     discoveredSoFar: 0,
@@ -455,6 +560,16 @@ export function CreateDataSourceWizardPage() {
   // Persists the completed job ID across step transitions so the create call can
   // use it even after the scan-step cleanup has reset scanJobId state to null.
   const scanJobIdForCreateRef = useRef<string | null>(null);
+  // Guards the async node-page-fetch (after the job itself has already gone
+  // terminal but before its nodes are loaded) against a Stop Scan click racing
+  // in during that window — without this, the fetch would still resolve and
+  // silently overwrite the optimistic "cancelled" state back to "complete".
+  const scanStoppedRef = useRef(false);
+  // A slow status GET can let a second setInterval tick fire before the first
+  // tick's terminal branch (now spanning the node-page-fetch await, not just a
+  // single request) finishes — without this, both ticks would independently
+  // start fetchAllScanNodes and race to set scanResult/typeResolutions.
+  const scanHandlingTerminalRef = useRef(false);
 
   const [synthetic, setSynthetic] = useState<SyntheticProfileValue>({
     schemaFromSourceId: null,
@@ -504,6 +619,19 @@ export function CreateDataSourceWizardPage() {
         : validationMessage(activeStepId, form, accessMode);
   const currentProtocol = protocolOptions.find((option) => option.id === form.protocol) ?? null;
   const currentBasis = basisOptions.find((option) => option.id === form.basis) ?? null;
+
+  // Recomputed only when the scan/resolution state actually changes, not on every
+  // wizard render — a scan can discover thousands of nodes (IS-165), so re-filtering
+  // the whole list or re-scanning typeResolutions on unrelated re-renders is wasted
+  // work at that scale.
+  const unknownNodes = useMemo(
+    () => (scanResult ? scanResult.nodes.filter((n) => n.unknownType) : []),
+    [scanResult],
+  );
+  const typeResolutionsByNodeId = useMemo(
+    () => new Map(typeResolutions.map((r) => [r.nodeId, r])),
+    [typeResolutions],
+  );
 
   const selectedRecording = useMemo(
     () => artifacts.find((a) => a.id === form.importSelectedRecordingId) ?? null,
@@ -562,6 +690,8 @@ export function CreateDataSourceWizardPage() {
     if (!currentProjectId || !form.protocol) return;
 
     let cancelled = false;
+    scanStoppedRef.current = false;
+    scanHandlingTerminalRef.current = false;
 
     async function startScan() {
       setScanStatus("scanning");
@@ -582,25 +712,44 @@ export function CreateDataSourceWizardPage() {
 
         // Start polling
         scanPollRef.current = setInterval(async () => {
+          // A slow GET can let this tick overlap a previous one that's already
+          // past the terminal check (and now awaiting the node-page-fetch) —
+          // skip instead of starting a second fetchAllScanNodes in parallel.
+          if (scanHandlingTerminalRef.current) return;
           try {
             const result = await apiFetch<ScanJobResult>(
               `/api/v1/projects/${currentProjectId}/data-sources/scan/${job.jobId}`,
             );
             if (cancelled) return;
             if (result.status === "OK" || result.status === "PARTIAL") {
+              scanHandlingTerminalRef.current = true;
               if (scanPollRef.current !== null) {
                 clearInterval(scanPollRef.current);
                 scanPollRef.current = null;
               }
+              setScanNodesLoading(true);
+              let nodes: DiscoveredNodeResponse[];
+              try {
+                nodes = await fetchAllScanNodes(currentProjectId, job.jobId);
+              } catch {
+                if (!cancelled && !scanStoppedRef.current) {
+                  setScanNodesLoading(false);
+                  setScanStatus("error");
+                  setScanErrorMessage("Failed to load discovered nodes");
+                }
+                return;
+              }
+              if (cancelled || scanStoppedRef.current) return;
+              setScanNodesLoading(false);
               setScanStatus(result.status === "OK" ? "complete" : "partial");
               setScanResult({
                 discoveredCount: result.discoveredCount,
                 unknownCount: result.unknownCount,
                 truncated: result.truncated,
-                nodes: result.nodes,
+                nodes,
               });
               // Pre-populate typeResolutions for unknown nodes
-              const unknownNodes = result.nodes.filter((n) => n.unknownType);
+              const unknownNodes = nodes.filter((n) => n.unknownType);
               setTypeResolutions(
                 unknownNodes.map((n) => ({
                   nodeId: n.nodeId,
@@ -663,6 +812,7 @@ export function CreateDataSourceWizardPage() {
       setScanResult(null);
       setScanJobId(null);
       setScanProgress({ phase: null, discoveredSoFar: 0 });
+      setScanNodesLoading(false);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeStepId, scanTrigger]);
@@ -1259,10 +1409,12 @@ export function CreateDataSourceWizardPage() {
   }
 
   function stopScan() {
+    scanStoppedRef.current = true;
     if (scanPollRef.current !== null) {
       clearInterval(scanPollRef.current);
       scanPollRef.current = null;
     }
+    setScanNodesLoading(false);
     setScanStatus("cancelled");
     if (currentProjectId && scanJobId) {
       void apiFetch(
@@ -1317,11 +1469,13 @@ export function CreateDataSourceWizardPage() {
               </p>
             ) : (
               <p className="text-sm text-shell-muted">
-                {scanPhaseLabel(scanProgress.phase, scanProgress.discoveredSoFar)}
+                {scanNodesLoading
+                  ? "Loading discovered nodes…"
+                  : scanPhaseLabel(scanProgress.phase, scanProgress.discoveredSoFar)}
               </p>
             )}
           </section>
-          {scanStatus === "scanning" && scanJobId ? (
+          {scanStatus === "scanning" && scanJobId && !scanNodesLoading ? (
             <button className="shell-action-danger" type="button" onClick={stopScan}>
               Stop Scan
             </button>
@@ -1364,8 +1518,6 @@ export function CreateDataSourceWizardPage() {
 
     // complete or partial
     if (!scanResult) return null;
-
-    const unknownNodes = scanResult.nodes.filter((n) => n.unknownType);
 
     return (
       <div className="space-y-4">
@@ -1415,53 +1567,19 @@ export function CreateDataSourceWizardPage() {
                 }}
               >
                 <option value="">Choose type…</option>
-                <option value="FLOAT64">FLOAT64</option>
-                <option value="INT32">INT32</option>
-                <option value="BOOL">BOOL</option>
-                <option value="STRING">STRING</option>
+                {UNKNOWN_NODE_TYPE_OPTIONS.map((dataType) => (
+                  <option key={dataType} value={dataType}>
+                    {dataType}
+                  </option>
+                ))}
                 <option value="__exclude__">Exclude</option>
               </select>
             </div>
-            <ul className="space-y-2">
-              {unknownNodes.map((node) => {
-                const res = typeResolutions.find((r) => r.nodeId === node.nodeId);
-                return (
-                  <li
-                    key={node.nodeId}
-                    className="flex flex-wrap items-center gap-3 rounded-md border border-shell-line bg-white px-4 py-3"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-shell-ink">
-                        {node.name || node.nodeId}
-                      </p>
-                      <p className="truncate text-xs text-shell-muted">{node.path || node.nodeId}</p>
-                    </div>
-                    <select
-                      aria-label={`Data type for ${node.name || node.nodeId}`}
-                      className="shell-field w-40 shrink-0"
-                      value={res?.exclude ? "__exclude__" : (res?.dataType ?? "")}
-                      onChange={(e) => {
-                        if (e.target.value === "__exclude__") {
-                          handleTypeResolutionChange(node.nodeId, { exclude: true, dataType: "" });
-                        } else {
-                          handleTypeResolutionChange(node.nodeId, {
-                            exclude: false,
-                            dataType: e.target.value,
-                          });
-                        }
-                      }}
-                    >
-                      <option value="">Choose type…</option>
-                      <option value="FLOAT64">FLOAT64</option>
-                      <option value="INT32">INT32</option>
-                      <option value="BOOL">BOOL</option>
-                      <option value="STRING">STRING</option>
-                      <option value="__exclude__">Exclude</option>
-                    </select>
-                  </li>
-                );
-              })}
-            </ul>
+            <UnknownNodesList
+              nodes={unknownNodes}
+              typeResolutionsByNodeId={typeResolutionsByNodeId}
+              onChange={handleTypeResolutionChange}
+            />
           </div>
         ) : null}
       </div>

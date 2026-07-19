@@ -1034,10 +1034,10 @@ Parallel execution:
   Depends: IS-164.
   Done when: Stop Scan renders as a danger-styled button; Back and Cancel are disabled for the duration of an active scan and re-enable once it completes, fails, or is stopped; typecheck + vitest green.
 
-- [ ] `UI-470` Create Data Source wizard — paginate + virtualize scanned node list
+- [x] `UI-470` ✅ Create Data Source wizard — paginate + virtualize scanned node list
   Goal: a scan against a huge address space returns thousands of nodes; today `renderScanStep` maps every unknown-type node straight into the DOM (`<li>` + two `<select>` each) with no pagination or virtualization, which would choke the browser once IS-165 removes the backend's node-count ceiling.
   Surface: `Create Data Source Wizard` (scan step)
-  Work includes: add `@tanstack/react-virtual` dependency (update STACK.md in this PR); on terminal scan status, fetch nodes page-by-page from the new `GET .../scan/{jobId}/nodes?cursor=&limit=` endpoint (IS-165) into a growing array instead of relying on the job-status response's full `nodes` list; render the list with `useVirtualizer` so only visible rows hit the DOM regardless of total count; bulk-select/type-resolution state stays a flat array keyed by node id.
+  Work includes: added `@tanstack/react-virtual` dependency (STACK.md updated); on terminal scan status, `fetchAllScanNodes()` pages nodes from the `GET .../scan/{jobId}/nodes?cursor=&limit=` endpoint (IS-165) into one array (the job-status response's full `nodes` list is still returned for back-compat but no longer read); new `UnknownNodesList` component renders the unknown-typed subset via `useVirtualizer` so only visible rows hit the DOM regardless of total count; a `scanHandlingTerminalRef` guards against overlapping poll ticks double-starting the fetch, and a `scanStoppedRef` guards against Stop Scan racing the fetch; `unknownNodes`/`typeResolutionsByNodeId` are memoized (the latter as a `Map` for O(1) per-row lookup) instead of recomputed on every render.
   Depends: IS-165.
   Done when: scanning a source with thousands of unknown-type nodes renders smoothly (no unbounded DOM growth) and all nodes are still selectable/resolvable; typecheck + vitest + build green.
 
