@@ -720,7 +720,10 @@ export function CreateDataSourceWizardPage() {
             const result = await apiFetch<ScanJobResult>(
               `/api/v1/projects/${currentProjectId}/data-sources/scan/${job.jobId}`,
             );
-            if (cancelled) return;
+            // Re-check right after the await too: two ticks can both be mid-flight
+            // on this GET simultaneously (neither had set the flag yet when the
+            // check above ran), so both could otherwise reach the terminal branch.
+            if (cancelled || scanHandlingTerminalRef.current) return;
             if (result.status === "OK" || result.status === "PARTIAL") {
               scanHandlingTerminalRef.current = true;
               if (scanPollRef.current !== null) {
