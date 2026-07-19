@@ -11,6 +11,7 @@ import java.net.URI;
 import java.time.Instant;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -23,8 +24,8 @@ import org.springframework.web.bind.annotation.RestController;
  * Recordings within a project (backend-specs/05_API_CONTRACT.md).
  *
  * <p>Authorization (IS-077): list/get — {@link Permission#OBSERVE};
- * create (manual recording shell) — {@link Permission#SOURCE_EDIT} (admin-level: creating
- * a recording entity is a configuration action distinct from starting live capture).
+ * create (manual recording shell) / delete (IS-092: retention &amp; cleanup) —
+ * {@link Permission#SOURCE_EDIT} (admin-level: editing recording data).
  */
 @RestController
 @Tag(name = "Recordings")
@@ -90,6 +91,19 @@ public class RecordingController {
         return ResponseEntity.ok().eTag(etag(recording.version())).body(RecordingResponse.from(recording));
     }
 
+    @Operation(
+            summary = "Delete a recording",
+            description =
+                    "Deletes the recording and its captured values, and returns 204 No Content."
+                    + " Rejected with 422 and an issues[] list if a scenario step or an active run"
+                    + " still references it (IS-092: retention & cleanup).")
+    @DeleteMapping("/{id}")
+    @PreAuthorize(SOURCE_EDIT)
+    public ResponseEntity<Void> delete(@PathVariable String projectId, @PathVariable String id) {
+        recordings.delete(projectId, id, "local");
+        return ResponseEntity.noContent().build();
+    }
+
     private static String etag(long version) {
         return "\"" + version + "\"";
     }
@@ -97,13 +111,15 @@ public class RecordingController {
     public record CreateRecordingRequest(String dataSourceId, ScanType scanType, String name) {}
 
     public record RecordingResponse(
-            String id, String projectId, String dataSourceId, int schemaVersion, String origin,
-            String scanType, String name, long valueCount, Instant createdAt, String createdBy, long version) {
+            String id, String projectId, String dataSourceId, String protocol, int schemaVersion,
+            String origin, String scanType, String name, long valueCount, long sizeBytes,
+            Instant createdAt, String createdBy, long version, Instant lastUsedAt, boolean hasDependents) {
 
         static RecordingResponse from(Recording r) {
             return new RecordingResponse(
-                    r.id(), r.projectId(), r.dataSourceId(), r.schemaVersion(), r.origin(),
-                    r.scanType(), r.name(), r.valueCount(), r.createdAt(), r.createdBy(), r.version());
+                    r.id(), r.projectId(), r.dataSourceId(), r.protocol(), r.schemaVersion(), r.origin(),
+                    r.scanType(), r.name(), r.valueCount(), r.sizeBytes(), r.createdAt(), r.createdBy(),
+                    r.version(), r.lastUsedAt(), r.hasDependents());
         }
     }
 }

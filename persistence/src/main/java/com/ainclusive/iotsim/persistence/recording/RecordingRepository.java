@@ -7,8 +7,17 @@ import java.util.Optional;
 /** Stores recording metadata (the captured values live in the value timeline). */
 public interface RecordingRepository {
 
-    RecordingRow create(String projectId, String dataSourceId, int schemaVersion,
-            String origin, String scanType, String name, String createdBy);
+    /**
+     * @param dataSourceId optional (nullable) reference to the source the recording was
+     *                     originally captured from (IS-160); no longer a hard FK requirement
+     * @param protocol required protocol type (e.g. {@code OPC_UA}, {@code MODBUS_TCP}) the
+     *                 recording is scoped to for replay/import compatibility checks (IS-160)
+     * @param schemaNodesJson the recording's own captured schema snapshot, as a JSON array
+     *                        shaped like {@code List<SchemaNode>} (IS-161); {@code null} or
+     *                        blank is stored as {@code "[]"} (no schema captured)
+     */
+    RecordingRow create(String projectId, String dataSourceId, String protocol, int schemaVersion,
+            String origin, String scanType, String name, String createdBy, String schemaNodesJson);
 
     Optional<RecordingRow> findById(String id);
 
@@ -19,4 +28,10 @@ public interface RecordingRepository {
 
     RecordingRow finalizeStats(String id, OffsetDateTime timeStart, OffsetDateTime timeEnd,
             long valueCount, long sizeBytes);
+
+    /** Deletes the recording row. Returns {@code false} if it did not exist (IS-092). */
+    boolean deleteById(String id);
+
+    /** Recording count for a project without fetching the rows (IS-092: retention dashboard count). */
+    long countByProject(String projectId);
 }

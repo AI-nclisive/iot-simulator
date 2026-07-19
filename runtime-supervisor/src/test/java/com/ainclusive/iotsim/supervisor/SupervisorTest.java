@@ -39,7 +39,7 @@ class SupervisorTest {
     }
 
     @Test
-    void startLaunchesWorkerAndStopTearsItDown() {
+    void startLaunchesWorkerAndStopTearsItDown() throws InterruptedException {
         Supervisor supervisor = supervisor();
 
         assertThat(supervisor.start("ds1", spec())).isEqualTo("RUNNING");
@@ -48,6 +48,7 @@ class SupervisorTest {
 
         assertThat(supervisor.stop("ds1")).isEqualTo("STOPPED");
         assertThat(supervisor.state("ds1")).isEqualTo("STOPPED");
+        assertThat(launcher.last().service().awaitShutdown(5)).as("Shutdown RPC before teardown").isTrue();
     }
 
     @Test

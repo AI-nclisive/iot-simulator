@@ -4,20 +4,27 @@ import com.ainclusive.iotsim.domain.common.ConcurrencyConflictException;
 import com.ainclusive.iotsim.domain.common.FeatureNotAvailableException;
 import com.ainclusive.iotsim.domain.common.PortInUseException;
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
+import com.ainclusive.iotsim.domain.common.RetentionDependencyException;
 import com.ainclusive.iotsim.domain.common.ScenarioInvalidException;
+import com.ainclusive.iotsim.domain.common.SchemaImpactException;
 import com.ainclusive.iotsim.domain.common.SchemaVersionMismatchException;
 import com.ainclusive.iotsim.domain.io.ProjectImportException;
 import com.ainclusive.iotsim.platform.capture.CaptureException;
 import com.ainclusive.iotsim.platform.runtime.RuntimeCapacityException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 /** Maps domain/API exceptions to RFC 9457 problem responses (backend-specs/05). */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger LOG = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(ResourceNotFoundException.class)
     public ProblemDetail notFound(ResourceNotFoundException e) {
@@ -81,6 +88,20 @@ public class GlobalExceptionHandler {
         return pd;
     }
 
+    @ExceptionHandler(SchemaImpactException.class)
+    public ProblemDetail schemaImpact(SchemaImpactException e) {
+        ProblemDetail pd = problem(HttpStatus.UNPROCESSABLE_ENTITY, e.getMessage());
+        pd.setProperty("issues", e.issues());
+        return pd;
+    }
+
+    @ExceptionHandler(RetentionDependencyException.class)
+    public ProblemDetail retentionDependency(RetentionDependencyException e) {
+        ProblemDetail pd = problem(HttpStatus.UNPROCESSABLE_ENTITY, e.getMessage());
+        pd.setProperty("issues", e.issues());
+        return pd;
+    }
+
     /**
      * Maps {@link AccessDeniedException} thrown by {@code @PreAuthorize} to RFC 9457 403
      * (backend-specs/05).
@@ -93,6 +114,25 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     public ProblemDetail badRequest(IllegalArgumentException e) {
         return problem(HttpStatus.BAD_REQUEST, e.getMessage());
+    }
+
+    /**
+     * Last-resort boundary for any exception not mapped above. Spring's own framework
+     * exceptions (405 method-not-allowed, 415 unsupported media type, 406
+     * not-acceptable, etc.) implement {@link ErrorResponse} and already carry the
+     * correct status/body — defer to it. Anything else is an unanticipated failure
+     * (e.g. I/O or persistence); log it server-side but never leak its message or
+     * stack trace to the client — the client gets a generic, honest 500 instead of a
+     * bare/opaque error page.
+     */
+    @ExceptionHandler(Exception.class)
+    public ProblemDetail internalError(Exception e) {
+        if (e instanceof ErrorResponse errorResponse) {
+            return errorResponse.getBody();
+        }
+        LOG.error("Unhandled exception while processing request", e);
+        return problem(HttpStatus.INTERNAL_SERVER_ERROR,
+                "An unexpected error occurred while processing the request.");
     }
 
     private static ProblemDetail problem(HttpStatus status, String detail) {

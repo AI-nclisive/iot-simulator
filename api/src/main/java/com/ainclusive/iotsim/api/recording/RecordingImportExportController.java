@@ -121,12 +121,12 @@ public class RecordingImportExportController {
 
     /** Response shape mirrors {@link RecordingController.RecordingResponse}. */
     public record RecordingResponse(
-            String id, String projectId, String dataSourceId, int schemaVersion, String origin,
-            long valueCount, Instant createdAt, String createdBy, long version) {
+            String id, String projectId, String dataSourceId, String protocol, int schemaVersion,
+            String origin, long valueCount, Instant createdAt, String createdBy, long version) {
 
         static RecordingResponse from(Recording r) {
             return new RecordingResponse(
-                    r.id(), r.projectId(), r.dataSourceId(), r.schemaVersion(), r.origin(),
+                    r.id(), r.projectId(), r.dataSourceId(), r.protocol(), r.schemaVersion(), r.origin(),
                     r.valueCount(), r.createdAt(), r.createdBy(), r.version());
         }
     }

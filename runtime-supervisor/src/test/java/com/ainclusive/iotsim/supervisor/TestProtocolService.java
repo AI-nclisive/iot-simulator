@@ -10,12 +10,16 @@ import com.ainclusive.iotsim.workercontract.v1.HealthRequest;
 import com.ainclusive.iotsim.workercontract.v1.HealthResponse;
 import com.ainclusive.iotsim.workercontract.v1.HelloRequest;
 import com.ainclusive.iotsim.workercontract.v1.HelloResponse;
+import com.ainclusive.iotsim.workercontract.v1.NodeBatch;
 import com.ainclusive.iotsim.workercontract.v1.ProtocolDataSourceGrpc;
 import com.ainclusive.iotsim.workercontract.v1.Quality;
 import com.ainclusive.iotsim.workercontract.v1.RuntimeEvent;
+import com.ainclusive.iotsim.workercontract.v1.ScanEvent;
+import com.ainclusive.iotsim.workercontract.v1.ScanProgress;
 import com.ainclusive.iotsim.workercontract.v1.ScanRequest;
 import com.ainclusive.iotsim.workercontract.v1.ScanResponse;
 import com.ainclusive.iotsim.workercontract.v1.SchemaNodeMsg;
+import com.ainclusive.iotsim.workercontract.v1.ShutdownRequest;
 import com.ainclusive.iotsim.workercontract.v1.StartRequest;
 import com.ainclusive.iotsim.workercontract.v1.StopRequest;
 import com.ainclusive.iotsim.workercontract.v1.StreamRequest;
@@ -41,6 +45,7 @@ final class TestProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSourc
     private final AtomicReference<TestConnectionRequest> lastTestConnection = new AtomicReference<>();
     private final AtomicReference<CaptureRequest> lastCapture = new AtomicReference<>();
     private final CountDownLatch captureCancelled = new CountDownLatch(1);
+    private final CountDownLatch shutdownReceived = new CountDownLatch(1);
     private final CountDownLatch clientEventsCancelled = new CountDownLatch(1);
     private final CountDownLatch runtimeEventsCancelled = new CountDownLatch(1);
     private volatile boolean healthLive = true;
@@ -63,6 +68,11 @@ final class TestProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSourc
     /** Waits until the supervisor cancels the capture stream (stop()). */
     boolean awaitCaptureCancelled(long timeoutSeconds) throws InterruptedException {
         return captureCancelled.await(timeoutSeconds, TimeUnit.SECONDS);
+    }
+
+    /** Waits until the supervisor asks this worker to shut down (teardown). */
+    boolean awaitShutdown(long timeoutSeconds) throws InterruptedException {
+        return shutdownReceived.await(timeoutSeconds, TimeUnit.SECONDS);
     }
 
     /** Waits until the supervisor cancels the client-events stream (stop()/teardown). */
@@ -127,15 +137,22 @@ final class TestProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSourc
     }
 
     @Override
-    public void scan(ScanRequest request, StreamObserver<ScanResponse> obs) {
+    public void scan(ScanRequest request, StreamObserver<ScanEvent> obs) {
         lastScan.set(request);
-        obs.onNext(ScanResponse.newBuilder()
-                .setStatus("OK")
-                .addNodes(SchemaNodeMsg.newBuilder()
-                        .setNodeId("ns=2;s=temp").setPath("Temperature").setName("Temperature")
-                        .setKind("VARIABLE").setDataType("FLOAT64").setValueRank("SCALAR").setAccess("READ"))
-                .setDiscoveredCount(1)
-                .setMessage("discovered 1 nodes")
+        obs.onNext(ScanEvent.newBuilder()
+                .setProgress(ScanProgress.newBuilder().setPhase("CONNECTED"))
+                .build());
+        obs.onNext(ScanEvent.newBuilder()
+                .setNodeBatch(NodeBatch.newBuilder()
+                        .addNodes(SchemaNodeMsg.newBuilder()
+                                .setNodeId("ns=2;s=temp").setPath("Temperature").setName("Temperature")
+                                .setKind("VARIABLE").setDataType("FLOAT64").setValueRank("SCALAR").setAccess("READ")))
+                .build());
+        obs.onNext(ScanEvent.newBuilder()
+                .setResult(ScanResponse.newBuilder()
+                        .setStatus("OK")
+                        .setDiscoveredCount(1)
+                        .setMessage("discovered 1 nodes"))
                 .build());
         obs.onCompleted();
     }
@@ -191,6 +208,12 @@ final class TestProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSourc
 
     @Override
     public void stop(StopRequest request, StreamObserver<Ack> obs) {
+        ackOk(obs);
+    }
+
+    @Override
+    public void shutdown(ShutdownRequest request, StreamObserver<Ack> obs) {
+        shutdownReceived.countDown();
         ackOk(obs);
     }
 

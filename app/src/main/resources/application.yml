@@ -39,6 +39,12 @@ iotsim:
     # / SecurityPolicy.None). Set to 127.0.0.1 to restrict to loopback. See IS-128.
     bind-address: ${IOTSIM_SIMULATOR_BIND_ADDRESS:0.0.0.0}
     advertised-host: ${IOTSIM_SIMULATOR_HOST:localhost}
+    # Deadline for a scan RPC to a worker browsing a real device (client mode).
+    # A safety net against a hung worker, not the primary stop mechanism — the
+    # user can cancel a running scan early via the cancel endpoint (IS-164).
+    # Raised from 120s (IS-164): a large/deep real address space (hundreds+ of
+    # nodes) routinely took longer than 2 minutes and hit DEADLINE_EXCEEDED.
+    scan-timeout-seconds: ${IOTSIM_SIMULATOR_SCAN_TIMEOUT_SECONDS:1800}
 
   # OIDC resource-server settings (shared mode only; IS-075).
   # All fields are optional — omit in local mode. When mode=shared, at least

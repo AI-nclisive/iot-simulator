@@ -828,7 +828,7 @@ Parallel execution:
   Done when: source/recording selects load from API; server issues merged into builder validation summary; field contracts correct; typecheck + vitest pass.
 
 - [x] `UI-127` Wire scenario CRUD + validate to live backend API
-  Goal: replace in-memory mock store with real API calls for scenarios CRUD and validation. Keep run/stop as no-ops (UI-129, blocked on IS-141).
+  Goal: replace in-memory mock store with real API calls for scenarios CRUD and validation. Keep run/stop as no-ops (wired later in UI-129).
   Surface: `Scenarios`, `Scenario Builder`
   Work includes: `scenarios-api.ts` with FE↔BE mappers (type case, sourceId↔targetSourceId, params encoding); async Zustand store with loadScenarios/createScenario/renameScenario/duplicateScenario/deleteScenario/saveScenarioSteps; load-on-mount in scenarios-page and builder; Save button in builder with loading state; loading/error states in scenarios-page.
   Depends: IS-136 scenarios API.
@@ -1012,6 +1012,34 @@ Parallel execution:
   Work includes: hide evidence StatusBadge when replayState is idle in replay-flow-page.tsx; add DetailLinkRow component to evidence-detail-page.tsx; sourceIds link to /data-sources/:id; recordingId links to /recordings/:id; scenarioId links to /scenarios/:id.
   Depends: none.
   Done when: badge absent on initial replay page load; tapping an ID navigates to the correct surface; typecheck green.
+
+- [x] `UI-467` ✅ Recordings — delete action
+  Goal: let users delete a recording from the Recordings list, mirroring the existing Data Sources delete pattern (confirmation dialog + surfaced backend dependency error).
+  Surface: `Recordings`
+  Work includes: add `deleteRecording` to `artifacts-store.ts` calling `DELETE /api/v1/projects/{pid}/recordings/{id}` (mirrors `deleteSample`/`deleteDataSource`); add a delete button per row in `recordings-page.tsx` with a `ConfirmationDialog` (danger tone); on 422 `RetentionDependencyException` (recording referenced by a scenario REPLAY step or an active/queued run), surface `ApiError.detail` as the error toast so the reason is visible.
+  Depends: IS-092 (backend delete + dependency check, already shipped).
+  Done when: deleting an unreferenced recording removes it from the list and calls the DELETE endpoint; deleting a referenced recording shows the backend's dependency error instead of silently failing; typecheck + vitest green.
+
+- [x] `UI-468` ✅ Recordings — fix origin label mislabeling
+  Goal: the "Imported" badge must only appear on recordings actually created via file import; recordings created via live capture must show "Recorded".
+  Surface: `Recordings`, `Recording Flow`
+  Work includes: flip `mapRecording`'s origin mapping in `artifacts-store.ts` from `r.origin === "SCAN_RECORD" ? "captured" : "imported"` (unsafe default: any unexpected value fell to "imported") to `r.origin === "IMPORTED" ? "imported" : "captured"`; `recording-flow-page.tsx`'s post-stop `appendRecording` call now sets `origin: "captured"` explicitly instead of omitting it.
+  Depends: none.
+  Done when: a live-captured recording shows "Recorded" immediately after saving and after a reload; only recordings with backend `origin: IMPORTED` show "Imported"; typecheck + vitest green.
+
+- [x] `UI-469` ✅ Create Data Source wizard — make Stop Scan more prominent; block Back/Cancel while scanning
+  Goal: the Stop Scan button (IS-164) reads as a routine action today; make it visually distinct as a stop/danger action. Also, Back and Cancel are currently clickable while a scan is in flight, letting the user navigate away from an orphaned running scan without stopping it first.
+  Surface: `Create Data Source Wizard` (scan step)
+  Work includes: apply `shell-action-danger` (existing danger button class) to the Stop Scan button in `create-data-source-wizard-page.tsx`; disable the footer's Back and Cancel buttons while `scanStatus === "scanning"`.
+  Depends: IS-164.
+  Done when: Stop Scan renders as a danger-styled button; Back and Cancel are disabled for the duration of an active scan and re-enable once it completes, fails, or is stopped; typecheck + vitest green.
+
+- [x] `UI-470` ✅ Create Data Source wizard — paginate + virtualize scanned node list
+  Goal: a scan against a huge address space returns thousands of nodes; today `renderScanStep` maps every unknown-type node straight into the DOM (`<li>` + two `<select>` each) with no pagination or virtualization, which would choke the browser once IS-165 removes the backend's node-count ceiling.
+  Surface: `Create Data Source Wizard` (scan step)
+  Work includes: added `@tanstack/react-virtual` dependency (STACK.md updated); on terminal scan status, `fetchAllScanNodes()` pages nodes from the `GET .../scan/{jobId}/nodes?cursor=&limit=` endpoint (IS-165) into one array (the job-status response's full `nodes` list is still returned for back-compat but no longer read); new `UnknownNodesList` component renders the unknown-typed subset via `useVirtualizer` so only visible rows hit the DOM regardless of total count; a `scanHandlingTerminalRef` guards against overlapping poll ticks double-starting the fetch, and a `scanStoppedRef` guards against Stop Scan racing the fetch; `unknownNodes`/`typeResolutionsByNodeId` are memoized (the latter as a `Map` for O(1) per-row lookup) instead of recomputed on every render.
+  Depends: IS-165.
+  Done when: scanning a source with thousands of unknown-type nodes renders smoothly (no unbounded DOM growth) and all nodes are still selectable/resolvable; typecheck + vitest + build green.
 
 ## Recommended Sequence
 

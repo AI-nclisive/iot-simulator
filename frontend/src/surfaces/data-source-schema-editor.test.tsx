@@ -156,8 +156,8 @@ describe("DataSourceSchemaEditor — dependency warnings in UI", () => {
     render(<DataSourceSchemaEditor source={mockSource} projectId={PROJECT_ID} />);
 
     // Wait for schema to load
-    await screen.findByText("oven/zone[1]/temp");
-    await userEvent.click(screen.getByText("oven/zone[1]/temp"));
+    await screen.findByText("zone1.temp");
+    await userEvent.click(screen.getByText("zone1.temp"));
 
     // No Dependency impact section without changes
     expect(screen.queryByText("Dependency impact")).toBeNull();
@@ -166,8 +166,8 @@ describe("DataSourceSchemaEditor — dependency warnings in UI", () => {
   it("shows identifier warning after changing description", async () => {
     render(<DataSourceSchemaEditor source={mockSource} projectId={PROJECT_ID} />);
 
-    await screen.findByText("oven/zone[1]/temp");
-    await userEvent.click(screen.getByText("oven/zone[1]/temp"));
+    await screen.findByText("zone1.temp");
+    await userEvent.click(screen.getByText("zone1.temp"));
 
     const descriptionInputs = screen.getAllByRole("textbox");
     const descriptionInput = descriptionInputs.find(
@@ -188,8 +188,8 @@ describe("DataSourceSchemaEditor — onUnsavedChanges callback", () => {
     const onUnsavedChanges = vi.fn();
     render(<DataSourceSchemaEditor source={mockSource} projectId={PROJECT_ID} onUnsavedChanges={onUnsavedChanges} />);
 
-    await screen.findByText("oven/zone[1]/temp");
-    await userEvent.click(screen.getByText("oven/zone[1]/temp"));
+    await screen.findByText("zone1.temp");
+    await userEvent.click(screen.getByText("zone1.temp"));
     const unitInputs = screen.getAllByRole("textbox");
     const unitInput = unitInputs.find(
       (el) => (el as HTMLInputElement).value === "°C",
@@ -205,8 +205,8 @@ describe("DataSourceSchemaEditor — onUnsavedChanges callback", () => {
     const onUnsavedChanges = vi.fn();
     render(<DataSourceSchemaEditor source={mockSource} projectId={PROJECT_ID} onUnsavedChanges={onUnsavedChanges} />);
 
-    await screen.findByText("oven/zone[1]/temp");
-    await userEvent.click(screen.getByText("oven/zone[1]/temp"));
+    await screen.findByText("zone1.temp");
+    await userEvent.click(screen.getByText("zone1.temp"));
     const unitInputs = screen.getAllByRole("textbox");
     const unitInput = unitInputs.find(
       (el) => (el as HTMLInputElement).value === "°C",
@@ -233,8 +233,8 @@ describe("DataSourceSchemaEditor — ConfirmationDialog flow when saving with wa
   it("clicking Save when dependency warnings are active opens the ConfirmationDialog", async () => {
     render(<DataSourceSchemaEditor source={mockSource} projectId={PROJECT_ID} />);
 
-    await screen.findByText("oven/zone[1]/temp");
-    await userEvent.click(screen.getByText("oven/zone[1]/temp"));
+    await screen.findByText("zone1.temp");
+    await userEvent.click(screen.getByText("zone1.temp"));
 
     const descriptionInputs = screen.getAllByRole("textbox");
     const descriptionInput = descriptionInputs.find(
@@ -261,8 +261,8 @@ describe("DataSourceSchemaEditor — ConfirmationDialog flow when saving with wa
       .mockResolvedValueOnce(mockSchemaResponse); // PUT schema on save
     render(<DataSourceSchemaEditor source={mockSource} projectId={PROJECT_ID} />);
 
-    await screen.findByText("oven/zone[1]/temp");
-    await userEvent.click(screen.getByText("oven/zone[1]/temp"));
+    await screen.findByText("zone1.temp");
+    await userEvent.click(screen.getByText("zone1.temp"));
     const descriptionInputs = screen.getAllByRole("textbox");
     const descriptionInput = descriptionInputs.find(
       (el) => (el as HTMLInputElement).value === "Zone 1 temperature sensor",
@@ -283,8 +283,8 @@ describe("DataSourceSchemaEditor — ConfirmationDialog flow when saving with wa
   it("cancelling the ConfirmationDialog does NOT save and leaves the form dirty", async () => {
     render(<DataSourceSchemaEditor source={mockSource} projectId={PROJECT_ID} />);
 
-    await screen.findByText("oven/zone[1]/temp");
-    await userEvent.click(screen.getByText("oven/zone[1]/temp"));
+    await screen.findByText("zone1.temp");
+    await userEvent.click(screen.getByText("zone1.temp"));
     const descriptionInputs = screen.getAllByRole("textbox");
     const descriptionInput = descriptionInputs.find(
       (el) => (el as HTMLInputElement).value === "Zone 1 temperature sensor",
@@ -317,6 +317,18 @@ describe("DataSourceSchemaEditor — NodeDto round-trip on save", () => {
       version: 1,
       nodes: [
         {
+          nodeId: "f-root",
+          parentId: null,
+          path: "root",
+          name: "root",
+          kind: "FOLDER" as const,
+          dataType: null,
+          valueRank: null,
+          access: null,
+          unit: null,
+          description: null,
+        },
+        {
           nodeId: "v-001",
           parentId: "f-root",
           path: "root/temp",
@@ -335,8 +347,8 @@ describe("DataSourceSchemaEditor — NodeDto round-trip on save", () => {
       .mockResolvedValueOnce(schemaWithRichNodes); // PUT on save
 
     render(<DataSourceSchemaEditor source={mockSource} projectId={PROJECT_ID} />);
-    await screen.findByText("root/temp");
-    await userEvent.click(screen.getByText("root/temp"));
+    // Top-level folders auto-expand on load, so "temp" is visible without a click.
+    await userEvent.click(await screen.findByText("temp"));
 
     const unitInput = screen.getAllByRole("textbox").find(
       (el) => (el as HTMLInputElement).value === "°C",
@@ -409,8 +421,8 @@ describe("DataSourceSchemaEditor — NodeDto round-trip on save", () => {
       .mockResolvedValueOnce(schemaWithFolder); // PUT on save
 
     render(<DataSourceSchemaEditor source={mockSource} projectId={PROJECT_ID} />);
-    await screen.findByText("root/pressure");
-    await userEvent.click(screen.getByText("root/pressure"));
+    // Top-level folders auto-expand on load, so "pressure" is visible without a click.
+    await userEvent.click(await screen.findByText("pressure"));
 
     const unitInput = screen.getAllByRole("textbox").find(
       (el) => (el as HTMLInputElement).value === "bar",
@@ -447,7 +459,7 @@ describe("DataSourceSchemaEditor — NodeDto round-trip on save", () => {
         {
           nodeId: "v-bytes",
           parentId: null,
-          path: "sensor/raw",
+          path: "raw",
           name: "raw",
           kind: "VARIABLE" as const,
           dataType: "BYTES",
@@ -465,8 +477,8 @@ describe("DataSourceSchemaEditor — NodeDto round-trip on save", () => {
       .mockResolvedValueOnce(schemaWithBytes); // PUT on save
 
     render(<DataSourceSchemaEditor source={mockSource} projectId={PROJECT_ID} />);
-    await screen.findByText("sensor/raw");
-    await userEvent.click(screen.getByText("sensor/raw"));
+    await screen.findByText("raw");
+    await userEvent.click(screen.getByText("raw"));
 
     // Edit unit (not description) to avoid triggering the dependency-warning dialog
     const unitInputs = screen.getAllByRole("textbox");
@@ -505,7 +517,7 @@ describe("DataSourceSchemaEditor — NodeDto round-trip on save", () => {
         {
           nodeId: "v-dt",
           parentId: null,
-          path: "sensor/timestamp",
+          path: "timestamp",
           name: "timestamp",
           kind: "VARIABLE" as const,
           dataType: "DATETIME",
@@ -523,8 +535,8 @@ describe("DataSourceSchemaEditor — NodeDto round-trip on save", () => {
       .mockResolvedValueOnce(schemaWithDatetime);
 
     render(<DataSourceSchemaEditor source={mockSource} projectId={PROJECT_ID} />);
-    await screen.findByText("sensor/timestamp");
-    await userEvent.click(screen.getByText("sensor/timestamp"));
+    await screen.findByText("timestamp");
+    await userEvent.click(screen.getByText("timestamp"));
 
     // Edit unit (not description) to avoid triggering the dependency-warning dialog
     const unitInputs = screen.getAllByRole("textbox");
@@ -633,14 +645,17 @@ describe("buildTree", () => {
 describe("DataSourceSchemaEditor — edit-lock banner (UI-459)", () => {
   it("shows EditLockBanner when useEditLease returns locked-by-other", async () => {
     mockApiFetch.mockResolvedValueOnce(mockSchemaResponse);
-    mockUseEditLease.mockReturnValueOnce({
+    // Not mockReturnValueOnce: the component re-renders after the schema
+    // loads, and a "once" value would be consumed by an earlier render,
+    // leaving later renders back on the default "held" state.
+    mockUseEditLease.mockReturnValue({
       leaseState: "locked-by-other",
       lockedByHolder: "david",
     });
 
     render(<DataSourceSchemaEditor source={mockSource} projectId={PROJECT_ID} />);
 
-    await screen.findByText("oven/zone[1]/temp");
+    await screen.findByText("zone1.temp");
 
     expect(screen.getByText(/david/)).toBeTruthy();
     expect(screen.getByText(/read-only/)).toBeTruthy();
@@ -649,15 +664,15 @@ describe("DataSourceSchemaEditor — edit-lock banner (UI-459)", () => {
 
   it("disables edit controls when locked-by-other", async () => {
     mockApiFetch.mockResolvedValueOnce(mockSchemaResponse);
-    mockUseEditLease.mockReturnValueOnce({
+    mockUseEditLease.mockReturnValue({
       leaseState: "locked-by-other",
       lockedByHolder: "david",
     });
 
     render(<DataSourceSchemaEditor source={mockSource} projectId={PROJECT_ID} />);
 
-    await screen.findByText("oven/zone[1]/temp");
-    await userEvent.click(screen.getByText("oven/zone[1]/temp"));
+    await screen.findByText("zone1.temp");
+    await userEvent.click(screen.getByText("zone1.temp"));
 
     const saveButton = screen.getByRole("button", { name: "Save schema" }) as HTMLButtonElement;
     // Save should be disabled (no unsaved changes AND locked)
@@ -674,7 +689,7 @@ describe("DataSourceSchemaEditor — edit-lock banner (UI-459)", () => {
 
     render(<DataSourceSchemaEditor source={mockSource} projectId={PROJECT_ID} />);
 
-    await screen.findByText("oven/zone[1]/temp");
+    await screen.findByText("zone1.temp");
 
     expect(screen.queryByText(/read-only/)).toBeNull();
   });

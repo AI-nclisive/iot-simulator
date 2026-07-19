@@ -20,7 +20,12 @@ service ProtocolDataSource {
   // Scan browses the address space into neutral schema nodes. Stateless, one-shot
   // — no Configure/Start needed. See backend-specs/05_API_CONTRACT.md §Scan.
   rpc TestConnection (TestConnectionRequest) returns (TestConnectionResponse);
-  rpc Scan (ScanRequest) returns (ScanResponse);
+  // Streams ScanProgress updates as the browse descends, followed by the
+  // discovered nodes in NodeBatch chunks (bounded per-message so a huge address
+  // space never exceeds gRPC's max message size), ending with exactly one
+  // ScanEvent carrying the terminal ScanResponse (status/counts only — no
+  // nodes). See backend-specs/05 §Scan.
+  rpc Scan (ScanRequest) returns (stream ScanEvent);
 
   // Live capture (record real data). Like Scan, the worker acts as a protocol
   // CLIENT against a real endpoint — but instead of one-shot browsing it
@@ -132,12 +137,36 @@ message ScanRequest {
 }
 
 message ScanResponse {
+  reserved 2;
+  reserved "nodes";               // discovered nodes now delivered via NodeBatch events, not here
   string status = 1;                  // OK | PARTIAL | UNREACHABLE | AUTH_FAILURE
-  repeated SchemaNodeMsg nodes = 2;   // discovered structure (empty data_type = unknown type)
   bool truncated = 3;                 // hit max_nodes (large schema) -> PARTIAL
   int32 discovered_count = 4;
   int32 unknown_count = 5;            // VARIABLE nodes whose type could not be mapped
   string message = 6;
+}
+
+// A bounded chunk of discovered nodes. Kept well under gRPC's max message size
+// regardless of total address-space size, so a huge server can't blow the 4MB
+// default frame limit the way one giant ScanResponse.nodes list used to.
+message NodeBatch {
+  repeated SchemaNodeMsg nodes = 1;
+}
+
+// One update on the Scan stream: an in-flight progress tick, a chunk of
+// discovered nodes, or the (exactly-one, terminal) scan result (status/counts
+// only — nodes arrive exclusively via node_batch events beforehand).
+message ScanEvent {
+  oneof event {
+    ScanProgress progress = 1;
+    ScanResponse result = 2;
+    NodeBatch node_batch = 3;
+  }
+}
+
+message ScanProgress {
+  string phase = 1;              // CONNECTING | CONNECTED | SCANNING
+  int32 discovered_so_far = 2;   // running node count while phase == SCANNING
 }
 
 // ---- Live capture / record real data ----

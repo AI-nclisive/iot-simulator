@@ -53,10 +53,12 @@ public final class ValueCodec {
     public static Kind kindOf(DataType type) {
         return switch (type) {
             case BOOL -> Kind.BOOL;
-            case STRING -> Kind.TEXT;
+            case STRING, LOCALIZED_TEXT, GUID, QUALIFIED_NAME, NODE_ID, EXPANDED_NODE_ID, XML_ELEMENT ->
+                    Kind.TEXT;
             case BYTES -> Kind.BYTES;
             case FLOAT32, FLOAT64 -> Kind.NUM;
-            case INT16, UINT16, INT32, UINT32, INT64, UINT64, DATETIME -> Kind.INT;
+            case INT8, UINT8, INT16, UINT16, INT32, UINT32, INT64, UINT64, DATETIME, STATUS_CODE ->
+                    Kind.INT;
         };
     }
 

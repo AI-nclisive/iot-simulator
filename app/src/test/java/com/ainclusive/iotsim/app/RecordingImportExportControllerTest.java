@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.ainclusive.iotsim.api.recording.RecordingImportExportController;
@@ -43,8 +44,8 @@ class RecordingImportExportControllerTest {
     private static final String REC_ID = "rec-1";
 
     private static Recording recording() {
-        return new Recording(REC_ID, PROJECT, "ds-1", 1, "SCAN_RECORD", "SCHEMA_AND_DATA", null, 5,
-                Instant.parse("2026-01-01T00:00:00Z"), "local", 0);
+        return new Recording(REC_ID, PROJECT, "ds-1", "OPC_UA", 1, "SCAN_RECORD", "SCHEMA_AND_DATA", null, 5, 0L,
+                Instant.parse("2026-01-01T00:00:00Z"), "local", 0, null, false);
     }
 
     private static RecordingBundle bundle() {
@@ -119,5 +120,39 @@ class RecordingImportExportControllerTest {
 
         mvc.perform(multipart("/api/v1/projects/" + PROJECT + "/recordings/import").file(file))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void importWithMalformedZipReturns400WithProblemDetail() throws Exception {
+        given(service.importRecording(eq(PROJECT), any(), eq("local")))
+                .willThrow(new IllegalArgumentException(
+                        "not a valid ZIP archive: no entries found (file is empty, not a ZIP, or corrupt)"));
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "recording.zip", "application/zip",
+                "definitely not a zip".getBytes(StandardCharsets.UTF_8));
+
+        mvc.perform(multipart("/api/v1/projects/" + PROJECT + "/recordings/import").file(file))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.detail").value(
+                        "not a valid ZIP archive: no entries found (file is empty, not a ZIP, or corrupt)"));
+    }
+
+    @Test
+    void importWithUnexpectedFailureReturns500WithGenericMessageNotStackTrace() throws Exception {
+        given(service.importRecording(eq(PROJECT), any(), eq("local")))
+                .willThrow(new RuntimeException(
+                        "boom: this internal detail must never reach the client"));
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "recording.zip", "application/zip",
+                "PK fake-zip".getBytes(StandardCharsets.UTF_8));
+
+        mvc.perform(multipart("/api/v1/projects/" + PROJECT + "/recordings/import").file(file))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.status").value(500))
+                .andExpect(jsonPath("$.detail").value(
+                        "An unexpected error occurred while processing the request."));
     }
 }

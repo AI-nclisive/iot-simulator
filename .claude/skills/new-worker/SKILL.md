@@ -79,6 +79,21 @@ Package `com.ainclusive.iotsim.worker.<proto>` (mirror `worker-opcua`):
 - Projection: map the **protocol-neutral schema/value model ⇄ native address model**
   here — this is the only place that mapping exists. Recording-in (`Capture`) and
   live-out (`ApplyValues`) are distinct paths; keep them separate.
+- Data types: implement a `<Proto>Types` module (mirror `worker-opcua`'s
+  `OpcUaTypes.java`) as the single place housing this worker's native type ⇄
+  neutral `DataType` mapping, default values, and to/from-native value
+  conversion. `protocolmodel.DataType` is a **superset**, not an intersection
+  every protocol must fill (backend-specs/01 §2) — a schema/recording is always
+  scoped to one protocol, so a value only your protocol produces doesn't affect
+  others. Default to reusing existing `DataType` values; only propose adding a
+  new shared enum value when your protocol has a genuinely distinct value type
+  worth first-class representation (the user needs to interact with it
+  directly, and it's a bounded well-known type, not a general
+  structure/variant) — that's a `protocol-model` change (`DataType.java` plus
+  the compiler-enforced `ValueCodec.kindOf`/`SyntheticValueCoercion.coerce`
+  exhaustive switches), not a worker-local decision. Anything else stays
+  `null`/"unknown" at scan time for the user to resolve or exclude (IS-044
+  pattern) — never silently coerced.
 
 IPC is loopback-only and versioned; a mismatched contract version is refused, not
 tolerated. **Do not touch `runtime-supervisor`** — it discovers and governs any

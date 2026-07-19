@@ -98,6 +98,7 @@ public class ReplayService {
             String trigger, String initiator, String parentRunId) {
         DataSourceRow source = requireSource(projectId, dataSourceId);
         RecordingRow recording = requireRecording(projectId, recordingId);
+        ReplayGuards.requireProtocolCompatible(recording, source);
 
         // Load the current schema version for the compat check; the RuntimeStartSpec is built
         // from the source (which carries the simulator port) and its current schema.
@@ -159,4 +160,5 @@ public class ReplayService {
                 .filter(r -> r.projectId().equals(projectId))
                 .orElseThrow(() -> new ResourceNotFoundException("Recording", recordingId));
     }
+
 }
