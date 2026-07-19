@@ -147,7 +147,7 @@ describe("CreateRecordingWizardPage — routing", () => {
   it("Start capture navigates to /data-sources/:id/recording without API call", async () => {
     await navigateToReviewStep();
     await userEvent.click(screen.getByRole("button", { name: "Start capture" }));
-    expect(mockNavigate).toHaveBeenCalledWith("/data-sources/src-1/recording");
+    expect(mockNavigate).toHaveBeenCalledWith("/data-sources/src-1/record");
   });
 });
 

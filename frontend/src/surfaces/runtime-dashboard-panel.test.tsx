@@ -1,34 +1,25 @@
 /**
- * Tests for RuntimeDashboardPanel (UI-025)
+ * Tests for RuntimeDashboardPanel (UI-025, rewired to live API by UI-111)
  *
  * Covers:
  * - runStateTone: running → warning, failed → danger, queued/stopped/completed → neutral
- * - runStateLabel: correct labels for each state
- * - Automated badge shown only for automation-sourced runs
+ * - runProcessLabel: correct labels for each state
  * - Failed run shows error banner
- * - Queued run shows queued message, no evidence badge
+ * - Empty state when no active runs
  */
 
 import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ActiveRun } from "../shell/mock-workspace";
+import type { ActiveRunResponse } from "../shell/use-active-runs";
 
-const { mockActiveRuns } = vi.hoisted(() => ({
-  mockActiveRuns: vi.fn(() => [] as ActiveRun[]),
+const { mockUseActiveRuns } = vi.hoisted(() => ({
+  mockUseActiveRuns: vi.fn(),
 }));
 
-vi.mock("../shell/mock-workspace", async () => {
-  const actual = await vi.importActual<typeof import("../shell/mock-workspace")>(
-    "../shell/mock-workspace",
-  );
-  return {
-    ...actual,
-    get activeRuns() {
-      return mockActiveRuns();
-    },
-  };
-});
+vi.mock("../shell/use-active-runs", () => ({
+  useActiveRuns: mockUseActiveRuns,
+}));
 
 // Panel reads the current project id from the shell store (UI-098).
 vi.mock("../shell/shell-store", () => ({
@@ -53,23 +44,26 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-function baseRun(overrides: Partial<ActiveRun> = {}): ActiveRun {
+function baseRun(overrides: Partial<ActiveRunResponse> = {}): ActiveRunResponse {
   return {
     id: "run-1",
     label: "Test run",
     initiator: "user",
-    startedAt: "10:00",
-    runSource: "manual",
+    startedAt: "2026-01-01T10:00:00Z",
     runState: "running",
     processType: "Replay",
-    parameterCount: 10,
-    previewParameters: ["p1"],
-    previewOverflowCount: 9,
+    relatedSourceId: "src-1",
     relatedLabel: "Source A",
-    relatedPath: "/data-sources/src-1",
-    evidence: "Ready",
     ...overrides,
   };
+}
+
+function setActiveRuns(runs: ActiveRunResponse[], overrides: { isLoading?: boolean; error?: string | null } = {}) {
+  mockUseActiveRuns.mockReturnValue({
+    runs,
+    isLoading: overrides.isLoading ?? false,
+    error: overrides.error ?? null,
+  });
 }
 
 function renderPanel() {
@@ -82,76 +76,48 @@ function renderPanel() {
 
 describe("RuntimeDashboardPanel — empty state", () => {
   it("shows empty state panel when no active runs", () => {
-    mockActiveRuns.mockReturnValue([]);
+    setActiveRuns([]);
     renderPanel();
-    expect(screen.getByText(/No active runtime/)).toBeTruthy();
+    expect(screen.getByText(/No active runs/)).toBeTruthy();
   });
 });
 
 describe("RuntimeDashboardPanel — run states", () => {
   it("shows Running label for running state", () => {
-    mockActiveRuns.mockReturnValue([baseRun({ runState: "running" })]);
+    setActiveRuns([baseRun({ runState: "running" })]);
     renderPanel();
     expect(screen.getByText("Replay in progress")).toBeTruthy();
   });
 
   it("shows Failed label for failed state", () => {
-    mockActiveRuns.mockReturnValue([baseRun({ runState: "failed", evidence: "Retry needed" })]);
+    setActiveRuns([baseRun({ runState: "failed" })]);
     renderPanel();
     expect(screen.getByText("Replay failed")).toBeTruthy();
   });
 
   it("shows Queued label for queued state", () => {
-    mockActiveRuns.mockReturnValue([baseRun({ runState: "queued" })]);
+    setActiveRuns([baseRun({ runState: "queued" })]);
     renderPanel();
     expect(screen.getByText("Replay waiting")).toBeTruthy();
   });
 
   it("shows Completed label for completed state", () => {
-    mockActiveRuns.mockReturnValue([baseRun({ runState: "completed" })]);
+    setActiveRuns([baseRun({ runState: "completed" })]);
     renderPanel();
     expect(screen.getByText("Replay completed")).toBeTruthy();
   });
 
   it("shows Stopped label for stopped state", () => {
-    mockActiveRuns.mockReturnValue([baseRun({ runState: "stopped" })]);
+    setActiveRuns([baseRun({ runState: "stopped" })]);
     renderPanel();
     expect(screen.getByText("Replay stopped")).toBeTruthy();
   });
 });
 
-describe("RuntimeDashboardPanel — automated badge", () => {
-  it("shows Automated badge for automation-sourced runs", () => {
-    mockActiveRuns.mockReturnValue([baseRun({ runSource: "automation" })]);
-    renderPanel();
-    expect(screen.getByText("Automated")).toBeTruthy();
-  });
-
-  it("does not show Automated badge for manual runs", () => {
-    mockActiveRuns.mockReturnValue([baseRun({ runSource: "manual" })]);
-    renderPanel();
-    expect(screen.queryByText("Automated")).toBeNull();
-  });
-});
-
 describe("RuntimeDashboardPanel — failed run", () => {
   it("shows error banner on failed run", () => {
-    mockActiveRuns.mockReturnValue([baseRun({ runState: "failed", evidence: "Retry needed" })]);
+    setActiveRuns([baseRun({ runState: "failed" })]);
     renderPanel();
     expect(screen.getByText(/This run failed/)).toBeTruthy();
-  });
-});
-
-describe("RuntimeDashboardPanel — queued run", () => {
-  it("does not show evidence badge for queued run", () => {
-    mockActiveRuns.mockReturnValue([baseRun({ runState: "queued" })]);
-    renderPanel();
-    expect(screen.queryByText(/Evidence:/)).toBeNull();
-  });
-
-  it("shows queued waiting message", () => {
-    mockActiveRuns.mockReturnValue([baseRun({ runState: "queued" })]);
-    renderPanel();
-    expect(screen.getByText(/Waiting to start/)).toBeTruthy();
   });
 });

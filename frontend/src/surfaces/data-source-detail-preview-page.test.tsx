@@ -250,27 +250,27 @@ describe("DataSourceDetailPreviewPage — live simulation badge", () => {
     relatedLabel: null,
   };
 
-  it("shows Simulating badge when a RUNNING Replay run is linked to this source", () => {
+  it("shows Replaying badge when a RUNNING Replay run is linked to this source", () => {
     setupShellStore();
     setupDataSourcesStore({ dataSources: [mockSource], isLoading: false });
     mockUseActiveRuns.mockReturnValue({ runs: [activeReplayRun], isLoading: false, error: null });
 
     renderPage();
 
-    expect(screen.getByText("Simulating")).toBeTruthy();
+    expect(screen.getByText("Replaying")).toBeTruthy();
   });
 
-  it("shows Stop simulation button for admin when active replay run exists", () => {
+  it("shows Stop replay button for admin when active replay run exists", () => {
     setupShellStore(); // admin role
     setupDataSourcesStore({ dataSources: [mockSource], isLoading: false });
     mockUseActiveRuns.mockReturnValue({ runs: [activeReplayRun], isLoading: false, error: null });
 
     renderPage();
 
-    expect(screen.getByRole("button", { name: "Stop simulation" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Stop replay" })).toBeTruthy();
   });
 
-  it("hides Stop simulation button for shared user without canConfigureReplay", () => {
+  it("hides Stop replay button for shared user without canConfigureReplay", () => {
     mockShellStore.mockImplementation((sel: (s: Record<string, unknown>) => unknown) =>
       sel({ currentProjectId: PROJECT_ID, accessMode: "shared", sharedRole: "observer" }),
     );
@@ -279,10 +279,10 @@ describe("DataSourceDetailPreviewPage — live simulation badge", () => {
 
     renderPage();
 
-    expect(screen.queryByRole("button", { name: "Stop simulation" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Stop replay" })).toBeNull();
   });
 
-  it("shows no Simulating badge when active run belongs to a different source", () => {
+  it("shows no Replaying badge when active run belongs to a different source", () => {
     setupShellStore();
     setupDataSourcesStore({ dataSources: [mockSource], isLoading: false });
     mockUseActiveRuns.mockReturnValue({
@@ -293,7 +293,7 @@ describe("DataSourceDetailPreviewPage — live simulation badge", () => {
 
     renderPage();
 
-    expect(screen.queryByText("Simulating")).toBeNull();
+    expect(screen.queryByText("Replaying")).toBeNull();
   });
 });
 
