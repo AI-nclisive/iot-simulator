@@ -5,6 +5,8 @@ import com.ainclusive.iotsim.domain.datasource.DataSource;
 import com.ainclusive.iotsim.domain.datasource.DataSourceService;
 import com.ainclusive.iotsim.domain.datasource.Protocol;
 import com.ainclusive.iotsim.domain.schema.SchemaService;
+import com.ainclusive.iotsim.domain.support.Page;
+import com.ainclusive.iotsim.domain.support.PageCursor;
 import com.ainclusive.iotsim.persistence.project.ProjectRepository;
 import com.ainclusive.iotsim.platform.Ids;
 import com.ainclusive.iotsim.platform.scan.ConnectionTestResult;
@@ -199,6 +201,40 @@ public class ScanService implements DisposableBean {
             if (exec.thread != null) {
                 exec.thread.interrupt();
             }
+        }
+    }
+
+    /**
+     * Pages a scan job's discovered nodes (IS-165): the job holds the full result
+     * in memory (fine — a JVM heap holds far more than a gRPC/JSON message size
+     * ceiling), but callers page through it via an offset-encoded cursor instead of
+     * ever receiving the whole list in one response. The list is a stable,
+     * already-materialized in-memory snapshot (not DB rows), so a simple integer
+     * offset is used rather than {@link PageCursor}'s keyset (createdAt/id)
+     * encoding — but the limit is clamped via the same {@link PageCursor#clamp}
+     * convention every other paged endpoint uses.
+     */
+    public Page<DiscoveredNode> getScanNodesPage(String projectId, String jobId, String cursor, Integer limit) {
+        ScanJob job = getScan(projectId, jobId);
+        List<DiscoveredNode> nodes = job.result() == null ? List.of() : job.result().nodes();
+        int effectiveLimit = PageCursor.clamp(limit);
+        int offset = parseOffset(cursor);
+        if (offset >= nodes.size()) {
+            return new Page<>(List.of(), null, effectiveLimit);
+        }
+        int end = Math.min(offset + effectiveLimit, nodes.size());
+        String nextCursor = end < nodes.size() ? String.valueOf(end) : null;
+        return new Page<>(nodes.subList(offset, end), nextCursor, effectiveLimit);
+    }
+
+    private static int parseOffset(String cursor) {
+        if (cursor == null || cursor.isBlank()) {
+            return 0;
+        }
+        try {
+            return Math.max(Integer.parseInt(cursor), 0);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("invalid cursor: " + cursor);
         }
     }
 

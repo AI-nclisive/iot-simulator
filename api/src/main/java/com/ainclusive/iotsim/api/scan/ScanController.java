@@ -9,6 +9,7 @@ import com.ainclusive.iotsim.domain.scan.ScanJob;
 import com.ainclusive.iotsim.domain.scan.ScanService;
 import com.ainclusive.iotsim.domain.scan.TypeResolution;
 import com.ainclusive.iotsim.domain.schema.SchemaService;
+import com.ainclusive.iotsim.domain.support.Page;
 import com.ainclusive.iotsim.platform.scan.ConnectionTestResult;
 import com.ainclusive.iotsim.platform.scan.DiscoveredNode;
 import com.ainclusive.iotsim.platform.scan.ScanResult;
@@ -23,6 +24,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -103,6 +105,25 @@ public class ScanController {
     @PreAuthorize(OBSERVE)
     public ScanJobResponse get(@PathVariable String projectId, @PathVariable String jobId) {
         return ScanJobResponse.from(scans.getScan(projectId, jobId));
+    }
+
+    /**
+     * Pages a completed scan job's discovered nodes (IS-165) — an additive alternative to the
+     * full {@code nodes} list on {@link #get}, for clients that page/virtualize very large
+     * results instead of receiving them all in one response.
+     */
+    @Operation(
+            summary = "Page a scan job's discovered nodes",
+            description = "Returns a page of the scan job's discovered nodes."
+                    + " Uses cursor-based pagination via the cursor and limit query parameters.")
+    @GetMapping("/{jobId}/nodes")
+    @PreAuthorize(OBSERVE)
+    public Page<DiscoveredNodeResponse> nodes(
+            @PathVariable String projectId, @PathVariable String jobId,
+            @RequestParam(required = false) String cursor,
+            @RequestParam(required = false) Integer limit) {
+        return scans.getScanNodesPage(projectId, jobId, cursor, limit)
+                .map(DiscoveredNodeResponse::from);
     }
 
     /** Stops a running scan job early (IS-164); the job settles as CANCELLED. */
