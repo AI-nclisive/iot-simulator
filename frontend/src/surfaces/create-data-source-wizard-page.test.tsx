@@ -559,6 +559,41 @@ describe("CreateDataSourceWizardPage — scan step (UI-458)", () => {
     expect(btn.disabled).toBe(false);
   });
 
+  it("does not re-scan when navigating Next then Back to the scan step (UI-471)", async () => {
+    mockApiFetch
+      .mockImplementationOnce(() => Promise.resolve({ jobId: "job-1", status: "RUNNING" }))
+      .mockImplementationOnce(() =>
+        Promise.resolve({
+          jobId: "job-1",
+          status: "OK",
+          truncated: false,
+          discoveredCount: 3,
+          unknownCount: 0,
+          message: null,
+        }),
+      )
+      .mockImplementationOnce(() => makeNodesPage([knownNode]));
+
+    await navigateToScanStep();
+    await advanceIntervalAndFlush(2000);
+
+    expect((screen.getByRole("button", { name: "Next" }) as HTMLButtonElement).disabled).toBe(false);
+
+    // Leave the scan step (Next → "recording"), then come back (Back → "scan").
+    await userEvent.click(screen.getByRole("button", { name: "Next" }));
+    await userEvent.click(screen.getByRole("button", { name: "Back" }));
+
+    // No re-scan was triggered by the round-trip.
+    const scanPostCalls = mockApiFetch.mock.calls.filter(
+      (c: unknown[]) =>
+        typeof c[0] === "string" &&
+        (c[0] as string).endsWith("/data-sources/scan") &&
+        (c[1] as { method?: string } | undefined)?.method === "POST",
+    );
+    expect(scanPostCalls.length).toBe(1);
+    expect((screen.getByRole("button", { name: "Next" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
   it("Next is disabled when there are unresolved unknown types", async () => {
     mockApiFetch
       .mockImplementationOnce(() => Promise.resolve({ jobId: "job-1", status: "RUNNING" }))

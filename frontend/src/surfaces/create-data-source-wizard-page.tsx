@@ -686,12 +686,105 @@ export function CreateDataSourceWizardPage() {
   // Auto-start scan when the user enters the "scan" step
   useEffect(() => {
     if (activeStepId !== "scan") return;
-    if (scanStatus !== "idle") return;
+    // "idle" -> nothing scanned yet, start fresh. "scanning" -> a scan is
+    // already in flight (e.g. user navigated away mid-scan and came back);
+    // resume polling the existing job instead of starting a second one.
+    // Any other status (complete/partial/error/cancelled) means this step
+    // already has a result — leave it alone so Back/Next doesn't re-scan.
+    if (scanStatus !== "idle" && scanStatus !== "scanning") return;
     if (!currentProjectId || !form.protocol) return;
+    if (scanStatus === "scanning" && !scanJobIdForCreateRef.current) return;
 
     let cancelled = false;
     scanStoppedRef.current = false;
     scanHandlingTerminalRef.current = false;
+
+    function pollJob(jobId: string) {
+      scanPollRef.current = setInterval(async () => {
+        // A slow GET can let this tick overlap a previous one that's already
+        // past the terminal check (and now awaiting the node-page-fetch) —
+        // skip instead of starting a second fetchAllScanNodes in parallel.
+        if (scanHandlingTerminalRef.current) return;
+        try {
+          const result = await apiFetch<ScanJobResult>(
+            `/api/v1/projects/${currentProjectId}/data-sources/scan/${jobId}`,
+          );
+          // Re-check right after the await too: two ticks can both be mid-flight
+          // on this GET simultaneously (neither had set the flag yet when the
+          // check above ran), so both could otherwise reach the terminal branch.
+          if (cancelled || scanHandlingTerminalRef.current) return;
+          if (result.status === "OK" || result.status === "PARTIAL") {
+            scanHandlingTerminalRef.current = true;
+            if (scanPollRef.current !== null) {
+              clearInterval(scanPollRef.current);
+              scanPollRef.current = null;
+            }
+            setScanNodesLoading(true);
+            let nodes: DiscoveredNodeResponse[];
+            try {
+              nodes = await fetchAllScanNodes(currentProjectId, jobId);
+            } catch {
+              if (!cancelled && !scanStoppedRef.current) {
+                setScanNodesLoading(false);
+                setScanStatus("error");
+                setScanErrorMessage("Failed to load discovered nodes");
+              }
+              return;
+            }
+            if (cancelled || scanStoppedRef.current) return;
+            setScanNodesLoading(false);
+            setScanStatus(result.status === "OK" ? "complete" : "partial");
+            setScanResult({
+              discoveredCount: result.discoveredCount,
+              unknownCount: result.unknownCount,
+              truncated: result.truncated,
+              nodes,
+            });
+            // Pre-populate typeResolutions for unknown nodes
+            const unknownNodes = nodes.filter((n) => n.unknownType);
+            setTypeResolutions(
+              unknownNodes.map((n) => ({
+                nodeId: n.nodeId,
+                dataType: "",
+                valueRank: n.valueRank ?? 1,
+                access: n.access ?? "READ",
+                exclude: false,
+              })),
+            );
+          } else if (result.status === "CANCELLED") {
+            if (scanPollRef.current !== null) {
+              clearInterval(scanPollRef.current);
+              scanPollRef.current = null;
+            }
+            setScanStatus("cancelled");
+          } else if (
+            result.status === "UNREACHABLE" ||
+            result.status === "AUTH_FAILURE" ||
+            result.status === "UNSUPPORTED" ||
+            result.status === "FAILED"
+          ) {
+            if (scanPollRef.current !== null) {
+              clearInterval(scanPollRef.current);
+              scanPollRef.current = null;
+            }
+            setScanStatus("error");
+            setScanErrorMessage(result.message ?? "Scan failed");
+          } else {
+            // RUNNING — reflect the worker's connecting/connected/scanning phase and count.
+            setScanProgress({ phase: result.phase, discoveredSoFar: result.discoveredSoFar });
+          }
+        } catch {
+          if (!cancelled) {
+            if (scanPollRef.current !== null) {
+              clearInterval(scanPollRef.current);
+              scanPollRef.current = null;
+            }
+            setScanStatus("error");
+            setScanErrorMessage("Failed to poll scan status");
+          }
+        }
+      }, 2000);
+    }
 
     async function startScan() {
       setScanStatus("scanning");
@@ -709,92 +802,7 @@ export function CreateDataSourceWizardPage() {
         if (cancelled) return;
         setScanJobId(job.jobId);
         scanJobIdForCreateRef.current = job.jobId;
-
-        // Start polling
-        scanPollRef.current = setInterval(async () => {
-          // A slow GET can let this tick overlap a previous one that's already
-          // past the terminal check (and now awaiting the node-page-fetch) —
-          // skip instead of starting a second fetchAllScanNodes in parallel.
-          if (scanHandlingTerminalRef.current) return;
-          try {
-            const result = await apiFetch<ScanJobResult>(
-              `/api/v1/projects/${currentProjectId}/data-sources/scan/${job.jobId}`,
-            );
-            // Re-check right after the await too: two ticks can both be mid-flight
-            // on this GET simultaneously (neither had set the flag yet when the
-            // check above ran), so both could otherwise reach the terminal branch.
-            if (cancelled || scanHandlingTerminalRef.current) return;
-            if (result.status === "OK" || result.status === "PARTIAL") {
-              scanHandlingTerminalRef.current = true;
-              if (scanPollRef.current !== null) {
-                clearInterval(scanPollRef.current);
-                scanPollRef.current = null;
-              }
-              setScanNodesLoading(true);
-              let nodes: DiscoveredNodeResponse[];
-              try {
-                nodes = await fetchAllScanNodes(currentProjectId, job.jobId);
-              } catch {
-                if (!cancelled && !scanStoppedRef.current) {
-                  setScanNodesLoading(false);
-                  setScanStatus("error");
-                  setScanErrorMessage("Failed to load discovered nodes");
-                }
-                return;
-              }
-              if (cancelled || scanStoppedRef.current) return;
-              setScanNodesLoading(false);
-              setScanStatus(result.status === "OK" ? "complete" : "partial");
-              setScanResult({
-                discoveredCount: result.discoveredCount,
-                unknownCount: result.unknownCount,
-                truncated: result.truncated,
-                nodes,
-              });
-              // Pre-populate typeResolutions for unknown nodes
-              const unknownNodes = nodes.filter((n) => n.unknownType);
-              setTypeResolutions(
-                unknownNodes.map((n) => ({
-                  nodeId: n.nodeId,
-                  dataType: "",
-                  valueRank: n.valueRank ?? 1,
-                  access: n.access ?? "READ",
-                  exclude: false,
-                })),
-              );
-            } else if (result.status === "CANCELLED") {
-              if (scanPollRef.current !== null) {
-                clearInterval(scanPollRef.current);
-                scanPollRef.current = null;
-              }
-              setScanStatus("cancelled");
-            } else if (
-              result.status === "UNREACHABLE" ||
-              result.status === "AUTH_FAILURE" ||
-              result.status === "UNSUPPORTED" ||
-              result.status === "FAILED"
-            ) {
-              if (scanPollRef.current !== null) {
-                clearInterval(scanPollRef.current);
-                scanPollRef.current = null;
-              }
-              setScanStatus("error");
-              setScanErrorMessage(result.message ?? "Scan failed");
-            } else {
-              // RUNNING — reflect the worker's connecting/connected/scanning phase and count.
-              setScanProgress({ phase: result.phase, discoveredSoFar: result.discoveredSoFar });
-            }
-          } catch {
-            if (!cancelled) {
-              if (scanPollRef.current !== null) {
-                clearInterval(scanPollRef.current);
-                scanPollRef.current = null;
-              }
-              setScanStatus("error");
-              setScanErrorMessage("Failed to poll scan status");
-            }
-          }
-        }, 2000);
+        pollJob(job.jobId);
       } catch (err) {
         if (!cancelled) {
           setScanStatus("error");
@@ -803,19 +811,26 @@ export function CreateDataSourceWizardPage() {
       }
     }
 
-    void startScan();
+    if (scanStatus === "scanning" && scanJobIdForCreateRef.current) {
+      // Resuming: a scan was already in flight before this step was left —
+      // reattach the poller instead of kicking off a second scan job.
+      pollJob(scanJobIdForCreateRef.current);
+    } else {
+      void startScan();
+    }
 
     return () => {
+      // Only stop the in-flight poll here — don't wipe scanStatus/scanResult.
+      // This cleanup fires on every step change (e.g. Next away from "scan"),
+      // and resetting to "idle" would defeat the `scanStatus !== "idle"` guard
+      // above, causing a brand-new scan on every Back/Next round-trip instead
+      // of reusing the already-discovered result. Explicit rescans go through
+      // retryScan()/stopScan(), which reset state themselves.
       cancelled = true;
       if (scanPollRef.current !== null) {
         clearInterval(scanPollRef.current);
         scanPollRef.current = null;
       }
-      setScanStatus("idle");
-      setScanResult(null);
-      setScanJobId(null);
-      setScanProgress({ phase: null, discoveredSoFar: 0 });
-      setScanNodesLoading(false);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeStepId, scanTrigger]);
