@@ -23,6 +23,32 @@ class SyntheticConfigMapperTest {
     }
 
     @Test
+    void mapsStringConstant() {
+        // IS-168: a CONSTANT for a structural/identifier type carries stringValue,
+        // not the numeric value field.
+        var stringSpec = new PatternSpec("CONSTANT", null, null, null, null, null, null, null,
+                "ns=2;s=Foo", null);
+        var p = SyntheticConfigMapper.toPattern(stringSpec);
+        assertThat(p).isEqualTo(new SyntheticPattern.Constant("ns=2;s=Foo"));
+    }
+
+    @Test
+    void mapsBytesConstantFromBase64() {
+        var bytesSpec = new PatternSpec("CONSTANT", null, null, null, null, null, null, null,
+                null, java.util.Base64.getEncoder().encodeToString(new byte[] {1, 2, 3}));
+        var p = SyntheticConfigMapper.toPattern(bytesSpec);
+        assertThat((byte[]) ((SyntheticPattern.Constant) p).value()).containsExactly(1, 2, 3);
+    }
+
+    @Test
+    void constantWithNoValueShapeRejected() {
+        var emptySpec = new PatternSpec("CONSTANT", null, null, null, null, null, null, null, null, null);
+        assertThatThrownBy(() -> SyntheticConfigMapper.toPattern(emptySpec))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("value");
+    }
+
+    @Test
     void mapsSineWithPeriodMillis() {
         var p = SyntheticConfigMapper.toPattern(spec("SINE", null, 0.0, 10.0, 2000L, null, null, null));
         assertThat(p).isEqualTo(new SyntheticPattern.Sine(0.0, 10.0, Duration.ofMillis(2000)));
