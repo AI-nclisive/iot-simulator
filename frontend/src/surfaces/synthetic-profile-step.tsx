@@ -161,6 +161,18 @@ function hexToBase64(hex: string): string | null {
   return btoa(binary);
 }
 
+/** Inverse of `hexToBase64` — standard Base64 → plain lowercase hex, for displaying a
+ * previously-derived/prefilled BYTES constant back in the (hex) Value input. */
+function base64ToHex(b64: string): string {
+  if (b64 === "") return "";
+  const binary = atob(b64);
+  let hex = "";
+  for (let i = 0; i < binary.length; i++) {
+    hex += binary.charCodeAt(i).toString(16).padStart(2, "0");
+  }
+  return hex;
+}
+
 /**
  * Build a serialized pattern from a draft, or null when the draft is incomplete/invalid.
  * `dataType` decides how a CONSTANT's value is shaped on the wire (IS-168): a plain
@@ -171,9 +183,10 @@ export function toPattern(d: NodeDraft, dataType: string | null = null): Synthet
   switch (d.pattern) {
     case "CONSTANT": {
       if (isTextConstantType(dataType)) {
-        return d.value.trim() === "" && dataType !== "QUALIFIED_NAME" && dataType !== "XML_ELEMENT"
+        const trimmed = d.value.trim();
+        return trimmed === "" && dataType !== "QUALIFIED_NAME" && dataType !== "XML_ELEMENT"
           ? null
-          : { type: "CONSTANT", stringValue: d.value };
+          : { type: "CONSTANT", stringValue: trimmed };
       }
       if (dataType === "BYTES") {
         const b64 = hexToBase64(d.value);
@@ -214,7 +227,9 @@ export function draftFromPattern(pattern: SyntheticPatternSpec, updateRateMs: nu
   switch (pattern.type) {
     case "CONSTANT": {
       const value =
-        pattern.stringValue ?? pattern.bytesValueBase64 ?? String(pattern.value ?? 0);
+        pattern.stringValue ??
+        (pattern.bytesValueBase64 != null ? base64ToHex(pattern.bytesValueBase64) : null) ??
+        String(pattern.value ?? 0);
       return { ...rate, pattern: "CONSTANT", value };
     }
     case "RANDOM_WALK":

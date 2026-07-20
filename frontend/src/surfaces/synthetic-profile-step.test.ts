@@ -159,11 +159,20 @@ describe("draftFromPattern — suggested pattern → draft fields", () => {
     });
   });
 
-  it("maps CONSTANT with bytesValueBase64 (IS-168)", () => {
+  it("maps CONSTANT with bytesValueBase64 back to hex for the Value input (IS-168)", () => {
     expect(draftFromPattern({ type: "CONSTANT", bytesValueBase64: "AQID" }, 500)).toEqual({
       pattern: "CONSTANT",
-      value: "AQID",
+      value: "010203",
       updateRateMs: "500",
     });
+  });
+
+  it("round-trips a BYTES constant through draftFromPattern and back through toPattern", () => {
+    const original: import("../shell/data-sources-store").SyntheticPatternSpec = {
+      type: "CONSTANT",
+      bytesValueBase64: "AQID",
+    };
+    const back = draft(draftFromPattern(original, 500));
+    expect(toPattern(back, "BYTES")).toEqual(original);
   });
 });
