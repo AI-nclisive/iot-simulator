@@ -1852,6 +1852,39 @@ export function CreateDataSourceWizardPage() {
     return renderReviewStep();
   }
 
+  function renderStepNav(position: "top" | "bottom") {
+    return (
+      <div
+        className="flex flex-wrap items-center justify-end gap-2"
+        data-nav-position={position}
+      >
+        <button
+          className="shell-action"
+          disabled={safeStep === 0 || scanStatus === "scanning"}
+          type="button"
+          onClick={goBack}
+        >
+          Back
+        </button>
+
+        {safeStep === activeSteps.length - 1 ? (
+          <button className="shell-action" type="button" onClick={createSource}>
+            Create source
+          </button>
+        ) : (
+          <button
+            className="shell-action"
+            disabled={!!currentValidationMessage}
+            type="button"
+            onClick={goNext}
+          >
+            Next
+          </button>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-full flex-col gap-3">
       <section className="shell-panel px-5 py-5">
@@ -1911,6 +1944,8 @@ export function CreateDataSourceWizardPage() {
             />
           ) : null}
 
+          <div className="border-b border-shell-line pb-4">{renderStepNav("top")}</div>
+
           {renderCurrentStep()}
         </div>
       </section>
@@ -1926,31 +1961,7 @@ export function CreateDataSourceWizardPage() {
             Cancel
           </button>
 
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <button
-              className="shell-action"
-              disabled={safeStep === 0 || scanStatus === "scanning"}
-              type="button"
-              onClick={goBack}
-            >
-              Back
-            </button>
-
-            {safeStep === activeSteps.length - 1 ? (
-              <button className="shell-action" type="button" onClick={createSource}>
-                Create source
-              </button>
-              ) : (
-                <button
-                  className="shell-action"
-                  disabled={!!currentValidationMessage}
-                  type="button"
-                  onClick={goNext}
-                >
-                  Next
-                </button>
-              )}
-          </div>
+          {renderStepNav("bottom")}
         </div>
       </section>
     </div>
