@@ -1069,6 +1069,13 @@ Parallel execution:
   Depends: none.
   Done when: Recordings' Delete renders as a red text link matching Data Sources; typecheck + vitest green.
 
+- [x] `UI-479` ✅ Create Data Source wizard (Synthetic) — surface backend error detail on Create source failure
+  Goal: creating a Synthetic data source that fails on the backend (e.g. 400 Bad Request — invalid pattern config, port conflict) surfaced only a generic toast ("Failed to create synthetic source"), silently dropping the backend's specific `ApiError.detail` validation message.
+  Surface: `Create Data Source Wizard` (synthetic basis)
+  Work includes: all three `catch` blocks in `createSource()` (`create-data-source-wizard-page.tsx`) — synthetic, scan-path, and manual/import-path, which shared the identical bug — now compute `message` via `err instanceof ApiError ? (err.detail ?? err.message) : (err instanceof Error ? err.message : undefined)` and pass it to `push({ tone: "error", title, message })`, mirroring the existing pattern in `recording-flow-page.tsx`'s `handleStartRecording()` and `recordings-page.tsx`'s delete handling.
+  Depends: none.
+  Done when: a rejected `createSyntheticSource(...)` call surfaces the backend's `.detail` as the toast message instead of a generic title-only toast; typecheck + vitest green.
+
 ## Recommended Sequence
 
 1. Complete the P0 shell and shared-pattern tasks first.
