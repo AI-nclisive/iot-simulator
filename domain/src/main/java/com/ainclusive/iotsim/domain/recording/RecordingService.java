@@ -186,7 +186,8 @@ public class RecordingService {
      * so a client can discover an in-progress (or orphaned, e.g. left running after a
      * page reload) capture instead of only finding out via a rejected {@code start}.
      */
-    public CaptureStatus captureStatus(String dataSourceId) {
+    public CaptureStatus captureStatus(String projectId, String dataSourceId) {
+        requireSource(projectId, dataSourceId);
         ActiveCapture capture = active.get(dataSourceId);
         return capture == null
                 ? new CaptureStatus(false, null)

@@ -195,16 +195,22 @@ class RecordingServiceTest {
     @Test
     void captureStatusReflectsStartAndStop() {
         schemas.set(1, List.of(variable("temp", DataType.FLOAT64)));
-        assertThat(service.captureStatus(SOURCE).capturing()).isFalse();
-        assertThat(service.captureStatus(SOURCE).recordingId()).isNull();
+        assertThat(service.captureStatus(PROJECT, SOURCE).capturing()).isFalse();
+        assertThat(service.captureStatus(PROJECT, SOURCE).recordingId()).isNull();
 
         Recording started = service.startCapture(PROJECT, SOURCE, "alice");
-        assertThat(service.captureStatus(SOURCE).capturing()).isTrue();
-        assertThat(service.captureStatus(SOURCE).recordingId()).isEqualTo(started.id());
+        assertThat(service.captureStatus(PROJECT, SOURCE).capturing()).isTrue();
+        assertThat(service.captureStatus(PROJECT, SOURCE).recordingId()).isEqualTo(started.id());
 
         service.stopCapture(PROJECT, SOURCE);
-        assertThat(service.captureStatus(SOURCE).capturing()).isFalse();
-        assertThat(service.captureStatus(SOURCE).recordingId()).isNull();
+        assertThat(service.captureStatus(PROJECT, SOURCE).capturing()).isFalse();
+        assertThat(service.captureStatus(PROJECT, SOURCE).recordingId()).isNull();
+    }
+
+    @Test
+    void captureStatusRejectsSourceFromAnotherProject() {
+        assertThatThrownBy(() -> service.captureStatus("other-project", SOURCE))
+                .isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test

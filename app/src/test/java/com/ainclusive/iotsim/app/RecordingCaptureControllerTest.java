@@ -71,7 +71,7 @@ class RecordingCaptureControllerTest {
 
     @Test
     void statusReportsNotCapturingWhenNoneActive() {
-        given(service.captureStatus("ds1")).willReturn(new CaptureStatus(false, null));
+        given(service.captureStatus("p1", "ds1")).willReturn(new CaptureStatus(false, null));
 
         CaptureStatusResponse resp = controller.status("p1", "ds1");
 
@@ -81,7 +81,7 @@ class RecordingCaptureControllerTest {
 
     @Test
     void statusReportsCapturingWithRecordingId() {
-        given(service.captureStatus("ds1")).willReturn(new CaptureStatus(true, "rec1"));
+        given(service.captureStatus("p1", "ds1")).willReturn(new CaptureStatus(true, "rec1"));
 
         CaptureStatusResponse resp = controller.status("p1", "ds1");
 

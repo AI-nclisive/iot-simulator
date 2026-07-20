@@ -90,7 +90,7 @@ public class RecordingCaptureController {
     @PreAuthorize(OBSERVE)
     public CaptureStatusResponse status(
             @PathVariable String projectId, @PathVariable String dataSourceId) {
-        CaptureStatus status = recordings.captureStatus(dataSourceId);
+        CaptureStatus status = recordings.captureStatus(projectId, dataSourceId);
         return new CaptureStatusResponse(status.capturing(), status.recordingId());
     }
 
