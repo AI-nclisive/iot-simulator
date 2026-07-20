@@ -22,14 +22,21 @@ import type { SourceValueRow } from "../surfaces/mock-source-values";
 // Hoisted mock factories — declared before any vi.mock calls
 // ---------------------------------------------------------------------------
 
-const { mockUseLiveValues, mockApiFetch, mockNavigate, mockPush, mockAppendRecording } =
-  vi.hoisted(() => ({
-    mockUseLiveValues: vi.fn((): LiveValuesResult => ({ rows: [], status: "connecting" })),
-    mockApiFetch: vi.fn(),
-    mockNavigate: vi.fn(),
-    mockPush: vi.fn(),
-    mockAppendRecording: vi.fn(),
-  }));
+const {
+  mockUseLiveValues,
+  mockApiFetch,
+  mockNavigate,
+  mockPush,
+  mockAppendRecording,
+  mockLoadDataSources,
+} = vi.hoisted(() => ({
+  mockUseLiveValues: vi.fn((): LiveValuesResult => ({ rows: [], status: "connecting" })),
+  mockApiFetch: vi.fn(),
+  mockNavigate: vi.fn(),
+  mockPush: vi.fn(),
+  mockAppendRecording: vi.fn(),
+  mockLoadDataSources: vi.fn(),
+}));
 
 // ---------------------------------------------------------------------------
 // Module mocks
@@ -77,6 +84,8 @@ vi.mock("../shell/data-sources-store", () => ({
           parameterCount: 2480,
         },
       ],
+      isLoading: false,
+      loadDataSources: mockLoadDataSources,
     }),
 }));
 
@@ -144,6 +153,21 @@ function renderPage() {
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
+
+describe("RecordingFlowPage — source not yet in store (UI-472)", () => {
+  it("reloads data sources once when the source isn't found locally", () => {
+    render(
+      <MemoryRouter initialEntries={["/data-sources/src-just-created/record"]}>
+        <Routes>
+          <Route path="data-sources/:sourceId/record" element={<RecordingFlowPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(mockLoadDataSources).toHaveBeenCalledWith("proj-1");
+    expect(mockLoadDataSources).toHaveBeenCalledTimes(1);
+  });
+});
 
 describe("RecordingFlowPage — ready state", () => {
   it("shows Start recording button that is not disabled", () => {

@@ -1004,6 +1004,10 @@ export function CreateDataSourceWizardPage() {
             }),
           },
         );
+        // Populate the store with the freshly created row before navigating —
+        // the record/replay destination pages look the source up from the
+        // store with no fallback reload, so without this they'd find nothing.
+        await loadDataSources(currentProjectId);
         if (form.startCapture) {
           navigate(`/data-sources/${data.id}/record`);
         } else {
@@ -1054,6 +1058,8 @@ export function CreateDataSourceWizardPage() {
       );
       const createdId = data.id;
 
+      // Same fallback-free lookup issue as the scan path above (UI-472).
+      await loadDataSources(currentProjectId);
       navigate(`/data-sources/${createdId}`);
     } catch (err) {
       console.error("[createSource]", err);
