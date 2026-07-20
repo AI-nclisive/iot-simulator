@@ -917,6 +917,10 @@ async function navigateToSyntheticConfigure() {
 }
 
 describe("CreateDataSourceWizardPage — step nav rendered top and bottom (UI-478)", () => {
+  afterEach(() => {
+    mockApiFetch.mockReset();
+  });
+
   it("renders two Next buttons on the synthetic configure step", async () => {
     await navigateToSyntheticConfigure();
 
@@ -937,19 +941,55 @@ describe("CreateDataSourceWizardPage — step nav rendered top and bottom (UI-47
   });
 
   it("clicking the TOP Next button advances the step exactly like the bottom one", async () => {
-    // Use the scan-setup path (basis step), where Next becomes enabled once the source
-    // name is filled in, to exercise a real Next click.
-    await navigateToScanSetup();
-    await userEvent.type(screen.getByLabelText("Source name"), "Test source");
+    // The top nav only renders on the synthetic "configure" step (UI-480), so exercise
+    // it there: fill in enough of the profile form for Next to become enabled, using the
+    // same reuse-schema setup as navigateToSyntheticReview().
+    dataSourcesStoreState.dataSources = [{ id: "src-reuse", name: "Existing OPC Source" }];
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path.includes("/recordings")) {
+        return Promise.resolve({ items: [] });
+      }
+      if (path.includes("/schema")) {
+        return Promise.resolve({
+          id: "sch-1",
+          dataSourceId: "src-reuse",
+          version: 1,
+          nodes: [
+            {
+              nodeId: "ns=2;s=Force",
+              path: "Force",
+              name: "Force",
+              kind: "VARIABLE",
+              dataType: "FLOAT64",
+              unit: null,
+            },
+          ],
+        });
+      }
+      return Promise.resolve({});
+    });
 
-    const [topNext] = screen.getAllByRole("button", { name: "Next" }) as HTMLButtonElement[];
-    expect(topNext.disabled).toBe(false);
+    await navigateToSyntheticConfigure();
 
-    await userEvent.click(topNext);
+    await userEvent.type(screen.getByLabelText("Source name"), "Synthetic Line A");
+    const reuseSchemaSelect = screen
+      .getByText("Reuse schema from source")
+      .closest("label")!
+      .querySelector("select")!;
+    fireEvent.change(reuseSchemaSelect, { target: { value: "src-reuse" } });
 
-    // Advancing from "setup" on the scan path lands on the "Scan" step.
+    let topNext: HTMLButtonElement;
     await waitFor(() => {
-      expect(screen.getByText(/Step 4 of 7/)).toBeTruthy();
+      [topNext] = screen.getAllByRole("button", { name: "Next" }) as HTMLButtonElement[];
+      expect(topNext.disabled).toBe(false);
+    });
+
+    await userEvent.click(topNext!);
+
+    // Advancing from "configure" on the synthetic path lands on the "Review" step
+    // (SYNTHETIC_STEPS: protocol, basis, configure, review — 4 steps total).
+    await waitFor(() => {
+      expect(screen.getByText(/Step 4 of 4/)).toBeTruthy();
     });
   });
 });

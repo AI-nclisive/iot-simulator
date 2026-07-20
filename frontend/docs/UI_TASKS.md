@@ -1097,6 +1097,13 @@ Parallel execution:
   Depends: none.
   Done when: a rejected `createSyntheticSource(...)` call surfaces the backend's `.detail` as the toast message instead of a generic title-only toast; typecheck + vitest green.
 
+- [x] `UI-480` ✅ Create Data Source wizard — top step nav (UI-478) shows on every step instead of only the long Synthetic configure step
+  Goal: UI-478's top copy of the Back/Next/Create-source nav was supposed to render only on the Synthetic basis's "Configure profile" step (the one with an unbounded generated-variable list), but the shipped implementation rendered it unconditionally on every wizard step — Protocol, Basis, Setup, Scan, Review — cluttering short steps with a redundant duplicate nav bar both above and below their content.
+  Surface: `Create Data Source Wizard`
+  Work includes: gated the top `renderStepNav("top")` block in `create-data-source-wizard-page.tsx` behind `activeStepId === "configure"`, so it renders only on the Synthetic basis's "Configure profile" step; the bottom nav is unchanged and still renders on every step. Updated the UI-478 test suite's third test (`create-data-source-wizard-page.test.tsx`) to exercise the synthetic "configure" step's top Next button (previously it incorrectly exercised the "setup" step, which no longer renders a top nav) and assert it advances to the "Review" step.
+  Depends: UI-478 (merged).
+  Done when: the top nav renders only on the Synthetic "Configure profile" step and nowhere else; the bottom nav and Cancel are unaffected; typecheck + vitest green.
+
 ## Recommended Sequence
 
 1. Complete the P0 shell and shared-pattern tasks first.

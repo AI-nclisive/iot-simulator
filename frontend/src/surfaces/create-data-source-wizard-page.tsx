@@ -1944,7 +1944,9 @@ export function CreateDataSourceWizardPage() {
             />
           ) : null}
 
-          <div className="border-b border-shell-line pb-4">{renderStepNav("top")}</div>
+          {activeStepId === "configure" ? (
+            <div className="border-b border-shell-line pb-4">{renderStepNav("top")}</div>
+          ) : null}
 
           {renderCurrentStep()}
         </div>
