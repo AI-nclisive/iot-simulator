@@ -23,6 +23,12 @@ type RecordingResponse = {
   version: number;
 };
 
+// Backend response for GET .../recording/status (IS-166)
+type CaptureStatusResponse = {
+  capturing: boolean;
+  recordingId: string | null;
+};
+
 type RecordingUiState =
   | "ready"
   | "recording"
@@ -107,6 +113,7 @@ export function RecordingFlowPage() {
   const [savedArtifactId, setSavedArtifactId] = useState<string | null>(null);
   const [activeRecordingId, setActiveRecordingId] = useState<string | null>(null);
   const fetchedForProjectRef = useRef<string | null>(null);
+  const statusCheckedForRef = useRef<string | null>(null);
 
   const captureActive =
     recordingState === "recording" || recordingState === "no-values-yet";
@@ -124,6 +131,36 @@ export function RecordingFlowPage() {
       void loadDataSources(currentProjectId);
     }
   }, [currentProjectId, source, isLoadingSources, loadDataSources]);
+
+  // IS-166/UI-476: a capture already running for this source (e.g. left active
+  // after a previous page reload with no Stop) is otherwise invisible — this
+  // page always defaulted to "ready" regardless of real server-side state.
+  // Check once per project+source and resume into the active state if so.
+  useEffect(() => {
+    if (!currentProjectId || !sourceId) return;
+    const key = `${currentProjectId}:${sourceId}`;
+    if (statusCheckedForRef.current === key) return;
+    statusCheckedForRef.current = key;
+
+    (async () => {
+      try {
+        const status = await apiFetch<CaptureStatusResponse>(
+          `/api/v1/projects/${currentProjectId}/data-sources/${sourceId}/recording/status`,
+        );
+        if (status.capturing) {
+          setActiveRecordingId(status.recordingId);
+          setDurationSeconds(0);
+          setValueCount(0);
+          setLastReceivedHint("Waiting for the first value");
+          setRecordingState("no-values-yet");
+          setSavedArtifactId(null);
+        }
+      } catch {
+        // Best-effort: if the status check fails, the page just falls back to
+        // its normal "ready" default — no worse than before this existed.
+      }
+    })();
+  }, [currentProjectId, sourceId]);
 
   // Real elapsed duration clock
   useEffect(() => {

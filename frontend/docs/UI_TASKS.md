@@ -1076,6 +1076,13 @@ Parallel execution:
   Depends: none.
   Done when: Recordings' Delete renders as a red text link matching Data Sources; typecheck + vitest green.
 
+- [x] `UI-476` ✅ Recording Flow — query capture status on mount instead of always assuming ready
+  Goal: `RecordingFlowPage`'s `recordingState` was pure local React state that always started at `"ready"` on mount, regardless of whether a capture was actually already running for the data source server-side — a capture left running (e.g. after a page reload with no Stop) was invisible and unstoppable from the UI, only surfacing as a rejected Start (IS-166 added the status endpoint for exactly this reason).
+  Surface: `Recording Flow`
+  Work includes: `recording-flow-page.tsx` now calls `GET .../data-sources/{id}/recording/status` once per project+source in a mount effect (guarded by a ref so it doesn't refire on re-render); if `capturing: true`, initializes into the active (`no-values-yet`) state with `activeRecordingId` set from the response instead of "ready", so Stop recording is available and reflects the true server-side state.
+  Depends: IS-166.
+  Done when: opening the recording page for a source with an active server-side capture shows Stop recording (not Start) immediately; a source with no active capture behaves as before; typecheck + vitest green.
+
 - [x] `UI-477` ✅ Create Data Source wizard — Schedule step: replace native datetime-local with a locale-fixed date-picker
   Goal: the Schedule step's start/end fields used native `<input type="datetime-local">`; the app's own text is English-only, but the native picker's calendar popup renders per the viewer's OS/browser locale (e.g. Russian) with no way for the page to override it.
   Surface: `Create Data Source Wizard` (schedule step)

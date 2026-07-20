@@ -126,9 +126,12 @@ describe("RecordingFlowPage — no schema (UI-465)", () => {
     dataSourcesState.dataSources = [
       { ...dataSourcesState.dataSources[0], parameterCount: 5 },
     ];
-    mockApiFetch.mockRejectedValueOnce(
-      new StubApiError("Bad Request", 400, "schema has no variables to capture"),
-    );
+    mockApiFetch
+      // UI-476: mount-time capture-status check fires before any user action.
+      .mockResolvedValueOnce({ capturing: false, recordingId: null })
+      .mockRejectedValueOnce(
+        new StubApiError("Bad Request", 400, "schema has no variables to capture"),
+      );
 
     renderNoSchemaPage();
 
