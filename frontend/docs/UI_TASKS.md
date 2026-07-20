@@ -1111,6 +1111,13 @@ Parallel execution:
   Depends: UI-478 (merged).
   Done when: the top nav renders only on the Synthetic "Configure profile" step and nowhere else; the bottom nav and Cancel are unaffected; typecheck + vitest green.
 
+- [x] `UI-481` ✅ Create Data Source wizard — Import picker shows source name, not truncated id, when a recording has no name
+  Goal: the Import basis recording picker showed unnamed recordings as `Recording <truncated-id>`, less useful than the Recordings list's fallback (the recording's originating data source name) for the same unnamed recordings.
+  Surface: `Create Data Source Wizard` (import basis)
+  Work includes: the Import step's recording list in `create-data-source-wizard-page.tsx` now resolves `sourceName` from the already-loaded `dataSources` store by the recording's `sourceId` and falls back `name || sourceName || \`Recording ${id.slice(0,8)}\`` — matching `recordings-page.tsx`'s existing fallback chain.
+  Depends: none.
+  Done when: an unnamed recording's picker row shows its originating source's name instead of a truncated id, when that source is resolvable; typecheck + vitest green.
+
 ## Recommended Sequence
 
 1. Complete the P0 shell and shared-pattern tasks first.
