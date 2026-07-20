@@ -31,6 +31,11 @@ history.
   Zustand + Radix UI + Tailwind.
 - openapi-typescript (devDependency) — generates TypeScript types from the backend
   OpenAPI spec (`/openapi.json`); run via `npm run generate:api`.
+- react-datepicker — controlled date/time picker for the Create Data Source
+  wizard's Schedule step; renders its calendar in an explicit, fixed locale
+  (`en-US`) instead of the native `<input type="datetime-local">` popup, which
+  a browser renders per the viewer's OS/browser locale with no way for the
+  page to override it (UI-477).
 
 ## Platform and tooling
 - Auth: OAuth2/OIDC (e.g. Keycloak, AWS Cognito, Azure Entra ID).

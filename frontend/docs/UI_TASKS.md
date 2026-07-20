@@ -1076,6 +1076,13 @@ Parallel execution:
   Depends: none.
   Done when: Recordings' Delete renders as a red text link matching Data Sources; typecheck + vitest green.
 
+- [x] `UI-477` ✅ Create Data Source wizard — Schedule step: replace native datetime-local with a locale-fixed date-picker
+  Goal: the Schedule step's start/end fields used native `<input type="datetime-local">`; the app's own text is English-only, but the native picker's calendar popup renders per the viewer's OS/browser locale (e.g. Russian) with no way for the page to override it.
+  Surface: `Create Data Source Wizard` (schedule step)
+  Work includes: new `ScheduleDatePicker` (`frontend/src/ui/schedule-date-picker.tsx`) wraps `react-datepicker` with an explicit registered `en-US` locale (`date-fns/locale/en-US`) and `showTimeSelect`, so the calendar always renders in English regardless of OS/browser locale; parses/formats to the same `YYYY-MM-DDTHH:mm` string the form state already used, so no other wizard code changed; `renderScheduleStep()`'s Start-at/End-at fields now use it. New dependency `react-datepicker` (STACK.md updated, mirrors how UI-470 added `@tanstack/react-virtual`).
+  Depends: none.
+  Done when: Schedule start/end fields render an English-locale calendar+time picker regardless of the viewer's OS locale; existing schedule validation/review-step display unaffected; typecheck + vitest green.
+
 - [x] `UI-479` ✅ Create Data Source wizard (Synthetic) — surface backend error detail on Create source failure
   Goal: creating a Synthetic data source that fails on the backend (e.g. 400 Bad Request — invalid pattern config, port conflict) surfaced only a generic toast ("Failed to create synthetic source"), silently dropping the backend's specific `ApiError.detail` validation message.
   Surface: `Create Data Source Wizard` (synthetic basis)
