@@ -595,6 +595,58 @@ describe("CreateDataSourceWizardPage — scan step (UI-458)", () => {
     expect((screen.getByRole("button", { name: "Next" }) as HTMLButtonElement).disabled).toBe(false);
   });
 
+  it("runs a fresh scan when the endpoint changes after going back to Setup (UI-473)", async () => {
+    mockApiFetch
+      .mockImplementationOnce(() => Promise.resolve({ jobId: "job-1", status: "RUNNING" }))
+      .mockImplementationOnce(() =>
+        Promise.resolve({
+          jobId: "job-1",
+          status: "OK",
+          truncated: false,
+          discoveredCount: 3,
+          unknownCount: 0,
+          message: null,
+        }),
+      )
+      .mockImplementationOnce(() => makeNodesPage([knownNode]))
+      .mockImplementationOnce(() => Promise.resolve({ jobId: "job-2", status: "RUNNING" }))
+      .mockImplementationOnce(() =>
+        Promise.resolve({
+          jobId: "job-2",
+          status: "OK",
+          truncated: false,
+          discoveredCount: 1,
+          unknownCount: 0,
+          message: null,
+        }),
+      )
+      .mockImplementationOnce(() => makeNodesPage([knownNode]));
+
+    await navigateToScanStep();
+    await advanceIntervalAndFlush(2000);
+    expect((screen.getByRole("button", { name: "Next" }) as HTMLButtonElement).disabled).toBe(false);
+
+    // Go back to Setup and change the endpoint.
+    await userEvent.click(screen.getByRole("button", { name: "Back" }));
+    const endpointInput = screen.getByLabelText("Real endpoint") as HTMLInputElement;
+    await userEvent.clear(endpointInput);
+    await userEvent.type(endpointInput, "opc.tcp://a-different-host:4840");
+
+    // Return to the scan step — a fresh scan must run against the new endpoint.
+    await userEvent.click(screen.getByRole("button", { name: "Next" }));
+    await advanceIntervalAndFlush(2000);
+
+    const scanPostCalls = mockApiFetch.mock.calls.filter(
+      (c: unknown[]) =>
+        typeof c[0] === "string" &&
+        (c[0] as string).endsWith("/data-sources/scan") &&
+        (c[1] as { method?: string } | undefined)?.method === "POST",
+    );
+    expect(scanPostCalls.length).toBe(2);
+    const secondBody = JSON.parse((scanPostCalls[1][1] as { body: string }).body);
+    expect(secondBody.endpointUrl).toBe("opc.tcp://a-different-host:4840");
+  });
+
   it("Next is disabled when there are unresolved unknown types", async () => {
     mockApiFetch
       .mockImplementationOnce(() => Promise.resolve({ jobId: "job-1", status: "RUNNING" }))

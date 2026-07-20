@@ -1055,6 +1055,13 @@ Parallel execution:
   Depends: none.
   Done when: creating a Real source with "start capture" enabled lands on the live capture page showing the new source instead of "not found"; same for the non-capture and IMPORT paths; typecheck + vitest green.
 
+- [x] `UI-473` ✅ Create Data Source wizard — scan reuses stale result after endpoint changed on Setup
+  Goal: regression found via live testing right after UI-471: completing a scan, going back to Setup, changing the real device endpoint, and returning to Scan reused the stale result (or in-flight job) for the OLD endpoint instead of scanning the new one.
+  Surface: `Create Data Source Wizard` (scan step)
+  Work includes: the scan auto-start `useEffect` in `create-data-source-wizard-page.tsx` now tracks a `scannedParamsKeyRef` (protocol + endpoint) alongside `scanStatus`; the "already scanned, don't re-scan" guard from UI-471 only applies when the key matches the current form values — if the endpoint/protocol changed since the last scan, a fresh scan always runs (clearing stale `scanResult`/`scanJobId`/`typeResolutions`/`scanErrorMessage` first, and cancelling any stale in-flight poll for the old params).
+  Depends: UI-471.
+  Done when: completing a scan, going back to Setup, changing the endpoint, and returning to Scan always runs a fresh scan against the new endpoint; the UI-471 same-endpoint no-re-scan behavior still holds; typecheck + vitest green.
+
 ## Recommended Sequence
 
 1. Complete the P0 shell and shared-pattern tasks first.
