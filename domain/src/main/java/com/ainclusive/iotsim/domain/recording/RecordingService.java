@@ -34,9 +34,12 @@ import com.ainclusive.iotsim.protocolmodel.SchemaNode;
 import com.ainclusive.iotsim.protocolmodel.ValueFilter;
 import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -151,7 +154,8 @@ public class RecordingService {
             String schemaNodesJson = json.writeValueAsString(schema.nodes());
             Recording recording = map(recordings.create(
                     projectId, dsId, source.protocol(), schema.version(), "SCAN_RECORD",
-                    ScanType.SCHEMA_AND_DATA.name(), null, actor, schemaNodesJson));
+                    ScanType.SCHEMA_AND_DATA.name(), defaultCaptureName(source.name()), actor,
+                    schemaNodesJson));
             CaptureSpec spec = new CaptureSpec(source.protocol(), source.realDeviceEndpoint(),
                     credentials.find(dsId).orElse(null), schema.version(), schema.nodes());
             CaptureSession session = capturer.startCapture(
@@ -164,6 +168,20 @@ public class RecordingService {
         }
         activity.emit(projectId, actor, "start_capture", "recording", capture.recordingId());
         return get(projectId, capture.recordingId());
+    }
+
+    private static final DateTimeFormatter DEFAULT_NAME_TIMESTAMP =
+            DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm", Locale.ENGLISH).withZone(ZoneOffset.UTC);
+
+    /**
+     * A default name for a capture-started recording (IS-167): recordings had no name
+     * at all before this, so every list/picker screen fell back to something else
+     * (the source's name, a truncated id, ...) and two captures from the same source
+     * were indistinguishable. Mirrors the date format the frontend already uses
+     * elsewhere (e.g. {@code 20 Jul 2026, 15:30}).
+     */
+    private static String defaultCaptureName(String sourceName) {
+        return sourceName + " — " + DEFAULT_NAME_TIMESTAMP.format(Instant.now());
     }
 
     /**

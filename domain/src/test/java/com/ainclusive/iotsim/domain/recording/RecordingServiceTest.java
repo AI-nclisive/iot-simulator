@@ -159,6 +159,18 @@ class RecordingServiceTest {
     }
 
     @Test
+    void startCaptureGeneratesADefaultNameFromTheSourceName() {
+        schemas.set(1, List.of(variable("temp", DataType.FLOAT64)));
+
+        Recording started = service.startCapture(PROJECT, SOURCE, "alice");
+
+        // FakeDataSourceRepository names the source "src" (see below); two captures
+        // from the same source get distinct names since the default includes a
+        // timestamp — this only asserts the source name is present (IS-167).
+        assertThat(started.name()).contains("src");
+    }
+
+    @Test
     void startCaptureWhileAlreadyCapturingIsRejected() {
         schemas.set(1, List.of(variable("temp", DataType.FLOAT64)));
         service.startCapture(PROJECT, SOURCE, "alice");
