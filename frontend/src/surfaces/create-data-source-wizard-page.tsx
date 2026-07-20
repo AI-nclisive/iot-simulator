@@ -1389,6 +1389,7 @@ export function CreateDataSourceWizardPage() {
                 <ul className="space-y-2">
                   {artifacts.map((artifact) => {
                     const isSelected = form.importSelectedRecordingId === artifact.id;
+                    const sourceName = dataSources.find((row) => row.id === artifact.sourceId)?.name;
                     return (
                       <li key={artifact.id}>
                         <button
@@ -1401,7 +1402,7 @@ export function CreateDataSourceWizardPage() {
                           onClick={() => updateForm({ importSelectedRecordingId: artifact.id })}
                         >
                           <p className="text-sm font-medium text-shell-ink">
-                            {artifact.name || `Recording ${artifact.id.slice(0, 8)}`}
+                            {artifact.name || sourceName || `Recording ${artifact.id.slice(0, 8)}`}
                           </p>
                           <div className="mt-1 flex flex-wrap items-center gap-2">
                             <span className="text-xs text-shell-muted">
