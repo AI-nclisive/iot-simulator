@@ -44,6 +44,61 @@ const PATTERN_TYPES: { value: PatternType; label: string }[] = [
   { value: "CONSTANT", label: "Constant" },
 ];
 
+/**
+ * IS-168: structural/identifier types have no natural dynamic-signal semantics —
+ * a real device wouldn't vary a NodeId reference or a GUID over time either,
+ * they're structural OPC UA plumbing, not measured values. The backend only
+ * accepts a CONSTANT for these; the wizard locks the pattern choice to match
+ * instead of letting the user pick a pattern that will always be rejected.
+ */
+const CONSTANT_ONLY_TYPES = new Set([
+  "GUID",
+  "STATUS_CODE",
+  "QUALIFIED_NAME",
+  "NODE_ID",
+  "EXPANDED_NODE_ID",
+  "XML_ELEMENT",
+  "BYTES",
+  "DATETIME",
+]);
+
+/** Whether this data type's CONSTANT value is free-text (not a plain number). */
+function isTextConstantType(dataType: string | null): boolean {
+  return (
+    dataType === "GUID" ||
+    dataType === "QUALIFIED_NAME" ||
+    dataType === "NODE_ID" ||
+    dataType === "EXPANDED_NODE_ID" ||
+    dataType === "XML_ELEMENT"
+  );
+}
+
+/** A type-appropriate starting value for a CONSTANT-only node — not seeded from a
+ * real device's captured value (that plumbing doesn't exist in the schema-reuse
+ * path today), just something valid to start editing from. */
+function defaultConstantValue(dataType: string | null): string {
+  switch (dataType) {
+    case "GUID":
+      return typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : "00000000-0000-0000-0000-000000000000";
+    case "NODE_ID":
+    case "EXPANDED_NODE_ID":
+      return "ns=0;i=0";
+    case "QUALIFIED_NAME":
+    case "XML_ELEMENT":
+      return "";
+    case "STATUS_CODE":
+      return "0";
+    case "DATETIME":
+      return String(Date.now());
+    case "BYTES":
+      return "";
+    default:
+      return "0";
+  }
+}
+
 export type NodeDraft = {
   enabled: boolean;
   pattern: PatternType;
@@ -62,7 +117,19 @@ export type SyntheticProfileValue = {
   measurementCount: number;
 };
 
-export function defaultDraft(): NodeDraft {
+export function defaultDraft(dataType: string | null = null): NodeDraft {
+  if (CONSTANT_ONLY_TYPES.has(dataType ?? "")) {
+    return {
+      enabled: true,
+      pattern: "CONSTANT",
+      min: "0",
+      max: "100",
+      periodMs: "10000",
+      volatility: "1",
+      value: defaultConstantValue(dataType),
+      updateRateMs: "1000",
+    };
+  }
   return {
     enabled: true,
     pattern: "SINE",
@@ -80,10 +147,52 @@ function num(s: string): number | null {
   return s.trim() === "" || Number.isNaN(n) ? null : n;
 }
 
-/** Build a serialized pattern from a draft, or null when the draft is incomplete/invalid. */
-export function toPattern(d: NodeDraft): SyntheticPatternSpec | null {
+/** Plain hex string ("0a1f", case-insensitive, no separators) → standard Base64, or null if invalid. */
+function hexToBase64(hex: string): string | null {
+  const trimmed = hex.trim();
+  if (trimmed === "") return "";
+  if (!/^[0-9a-fA-F]+$/.test(trimmed) || trimmed.length % 2 !== 0) return null;
+  const bytes = new Uint8Array(trimmed.length / 2);
+  for (let i = 0; i < bytes.length; i++) {
+    bytes[i] = Number.parseInt(trimmed.slice(i * 2, i * 2 + 2), 16);
+  }
+  let binary = "";
+  for (const b of bytes) binary += String.fromCharCode(b);
+  return btoa(binary);
+}
+
+/** Inverse of `hexToBase64` — standard Base64 → plain lowercase hex, for displaying a
+ * previously-derived/prefilled BYTES constant back in the (hex) Value input. */
+function base64ToHex(b64: string): string {
+  if (b64 === "") return "";
+  const binary = atob(b64);
+  let hex = "";
+  for (let i = 0; i < binary.length; i++) {
+    hex += binary.charCodeAt(i).toString(16).padStart(2, "0");
+  }
+  return hex;
+}
+
+/**
+ * Build a serialized pattern from a draft, or null when the draft is incomplete/invalid.
+ * `dataType` decides how a CONSTANT's value is shaped on the wire (IS-168): a plain
+ * number for ordinary measurement types, `stringValue` for identifier/text
+ * structural types, `bytesValueBase64` for BYTES.
+ */
+export function toPattern(d: NodeDraft, dataType: string | null = null): SyntheticPatternSpec | null {
   switch (d.pattern) {
     case "CONSTANT": {
+      if (isTextConstantType(dataType)) {
+        const trimmed = d.value.trim();
+        return trimmed === "" && dataType !== "QUALIFIED_NAME" && dataType !== "XML_ELEMENT"
+          ? null
+          : { type: "CONSTANT", stringValue: trimmed };
+      }
+      if (dataType === "BYTES") {
+        const b64 = hexToBase64(d.value);
+        return b64 == null ? null : { type: "CONSTANT", bytesValueBase64: b64 };
+      }
+      // STATUS_CODE / DATETIME / ordinary numeric measurement types.
       const v = num(d.value);
       return v == null ? null : { type: "CONSTANT", value: v };
     }
@@ -116,8 +225,13 @@ export function toPattern(d: NodeDraft): SyntheticPatternSpec | null {
 export function draftFromPattern(pattern: SyntheticPatternSpec, updateRateMs: number): Partial<NodeDraft> {
   const rate = { updateRateMs: String(updateRateMs) };
   switch (pattern.type) {
-    case "CONSTANT":
-      return { ...rate, pattern: "CONSTANT", value: String(pattern.value ?? 0) };
+    case "CONSTANT": {
+      const value =
+        pattern.stringValue ??
+        (pattern.bytesValueBase64 != null ? base64ToHex(pattern.bytesValueBase64) : null) ??
+        String(pattern.value ?? 0);
+      return { ...rate, pattern: "CONSTANT", value };
+    }
     case "RANDOM_WALK":
       return {
         ...rate,
@@ -207,7 +321,7 @@ export function SyntheticProfileStep({
         setLoadError("This source's schema has no measurements to drive.");
       }
       setNodes(schema.nodes);
-      setDrafts(Object.fromEntries(vars.map((n) => [n.nodeId, defaultDraft()])));
+      setDrafts(Object.fromEntries(vars.map((n) => [n.nodeId, defaultDraft(n.dataType)])));
     } catch {
       setLoadError("This source has no schema yet. Pick a scanned, imported, or edited source.");
     } finally {
@@ -301,7 +415,7 @@ export function SyntheticProfileStep({
       const d = drafts[node.nodeId];
       if (!d || !d.enabled) continue;
       anyEnabled = true;
-      const pattern = toPattern(d);
+      const pattern = toPattern(d, node.dataType);
       const rate = num(d.updateRateMs);
       if (pattern == null || rate == null || rate <= 0) {
         valid = false;
@@ -403,9 +517,12 @@ export function SyntheticProfileStep({
 
           <ul className="space-y-2">
             {variableNodes.map((node) => {
-              const d = drafts[node.nodeId] ?? defaultDraft();
+              const d = drafts[node.nodeId] ?? defaultDraft(node.dataType);
+              const constantOnly = CONSTANT_ONLY_TYPES.has(node.dataType ?? "");
               const showRange = d.pattern !== "CONSTANT";
               const showPeriod = d.pattern === "SINE" || d.pattern === "RAMP" || d.pattern === "SQUARE";
+              const isBytes = node.dataType === "BYTES";
+              const valueInputType = isTextConstantType(node.dataType) || isBytes ? "text" : "number";
               return (
                 <li
                   key={node.nodeId}
@@ -430,17 +547,23 @@ export function SyntheticProfileStep({
                     <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                       <label className="flex flex-col gap-1 text-xs uppercase tracking-wide text-shell-muted">
                         Pattern
-                        <select
-                          className="shell-field"
-                          value={d.pattern}
-                          onChange={(e) => changePattern(node.nodeId, e.target.value as PatternType)}
-                        >
-                          {PATTERN_TYPES.map((p) => (
-                            <option key={p.value} value={p.value}>
-                              {p.label}
-                            </option>
-                          ))}
-                        </select>
+                        {constantOnly ? (
+                          <select className="shell-field" value="CONSTANT" disabled>
+                            <option value="CONSTANT">Constant (required for {node.dataType})</option>
+                          </select>
+                        ) : (
+                          <select
+                            className="shell-field"
+                            value={d.pattern}
+                            onChange={(e) => changePattern(node.nodeId, e.target.value as PatternType)}
+                          >
+                            {PATTERN_TYPES.map((p) => (
+                              <option key={p.value} value={p.value}>
+                                {p.label}
+                              </option>
+                            ))}
+                          </select>
+                        )}
                       </label>
 
                       {d.pattern === "CONSTANT" ? (
@@ -448,7 +571,8 @@ export function SyntheticProfileStep({
                           Value
                           <input
                             className="shell-field"
-                            type="number"
+                            type={valueInputType}
+                            placeholder={isBytes ? "Hex, e.g. 0a1f" : undefined}
                             value={d.value}
                             onChange={(e) => patchDraft(node.nodeId, { value: e.target.value })}
                           />
