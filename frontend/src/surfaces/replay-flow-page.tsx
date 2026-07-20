@@ -81,9 +81,26 @@ export function ReplayFlowPage() {
   const source = useDataSourcesStore((state) =>
     state.dataSources.find((row) => row.id === sourceId),
   );
+  const isLoadingSources = useDataSourcesStore((state) => state.isLoading);
+  const loadDataSources = useDataSourcesStore((state) => state.loadDataSources);
   const push = useNotificationStore((state) => state.push);
   const access = resolveAccess(accessMode, sharedRole);
   const { runs: activeRuns } = useActiveRuns(currentProjectId);
+  const fetchedForProjectRef = useRef<string | null>(null);
+
+  // UI-472: if the store hasn't been populated yet (e.g. deep-linked here right
+  // after creation), reload it once instead of showing "not found" forever.
+  useEffect(() => {
+    if (
+      currentProjectId &&
+      !source &&
+      !isLoadingSources &&
+      fetchedForProjectRef.current !== currentProjectId
+    ) {
+      fetchedForProjectRef.current = currentProjectId;
+      void loadDataSources(currentProjectId);
+    }
+  }, [currentProjectId, source, isLoadingSources, loadDataSources]);
   const [selectedArtifactId, setSelectedArtifactId] = useState(() => {
     const fromUrl = searchParams.get("artifactId");
     if (fromUrl) return fromUrl;

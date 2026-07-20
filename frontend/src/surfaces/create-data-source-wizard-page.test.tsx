@@ -43,7 +43,7 @@ for (const prop of ["offsetHeight", "offsetWidth", "clientHeight", "clientWidth"
   Object.defineProperty(HTMLElement.prototype, prop, { configurable: true, value: 500 });
 }
 
-const { mockNavigate, shellStoreState, artifactsStoreState } = vi.hoisted(() => ({
+const { mockNavigate, shellStoreState, artifactsStoreState, mockLoadDataSources } = vi.hoisted(() => ({
   mockNavigate: vi.fn(),
   shellStoreState: {
     accessMode: "local" as "local" | "shared",
@@ -56,6 +56,7 @@ const { mockNavigate, shellStoreState, artifactsStoreState } = vi.hoisted(() => 
     error: null as string | null,
     loadRecordings: vi.fn(),
   },
+  mockLoadDataSources: vi.fn(),
 }));
 
 vi.mock("react-router-dom", async () => {
@@ -73,7 +74,7 @@ vi.mock("../shell/data-sources-store", () => ({
     selector({
       createDataSource: vi.fn(() => "src-new"),
       createSyntheticSource: vi.fn(() => "src-syn"),
-      loadDataSources: vi.fn(),
+      loadDataSources: mockLoadDataSources,
       dataSources: [],
     }),
 }));
@@ -690,6 +691,10 @@ describe("CreateDataSourceWizardPage — scan step (UI-458)", () => {
 
     // Default startCapture=true → redirects to live capture page
     expect(mockNavigate).toHaveBeenCalledWith("/data-sources/ds-created/record");
+
+    // UI-472: the store must be reloaded before navigating away, so the
+    // destination page's dataSources.find(...) lookup doesn't come up empty.
+    expect(mockLoadDataSources).toHaveBeenCalledWith("proj-test");
   });
 
   it("navigates to /data-sources/:id when Skip is chosen on recording step (startCapture=false)", async () => {

@@ -20,13 +20,14 @@ const RUN_ID = "run-99";
 
 // ── hoisted mocks ─────────────────────────────────────────────────────────────
 
-const { mockUseActiveRuns, mockApiFetch } = vi.hoisted(() => ({
+const { mockUseActiveRuns, mockApiFetch, mockLoadDataSources } = vi.hoisted(() => ({
   mockUseActiveRuns: vi.fn(() => ({
     runs: [] as ActiveRunResponse[],
     isLoading: false,
     error: null as string | null,
   })),
   mockApiFetch: vi.fn(),
+  mockLoadDataSources: vi.fn(),
 }));
 
 vi.mock("../shell/use-active-runs", () => ({ useActiveRuns: mockUseActiveRuns }));
@@ -69,6 +70,8 @@ vi.mock("../shell/data-sources-store", () => ({
           health: "Healthy",
         },
       ],
+      isLoading: false,
+      loadDataSources: mockLoadDataSources,
     }),
 }));
 
@@ -107,6 +110,23 @@ function renderPage() {
 let ReplayFlowPage: typeof import("./replay-flow-page").ReplayFlowPage;
 beforeAll(async () => {
   ({ ReplayFlowPage } = await import("./replay-flow-page"));
+});
+
+// ── source not yet in store (UI-472) ──────────────────────────────────────────
+
+describe("ReplayFlowPage — source not yet in store (UI-472)", () => {
+  it("reloads data sources once when the source isn't found locally", () => {
+    render(
+      <MemoryRouter initialEntries={["/data-sources/src-just-created/replay"]}>
+        <Routes>
+          <Route path="/data-sources/:sourceId/replay" element={<ReplayFlowPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(mockLoadDataSources).toHaveBeenCalledWith(PROJECT_ID);
+    expect(mockLoadDataSources).toHaveBeenCalledTimes(1);
+  });
 });
 
 // ── completion detection (UI-126) ─────────────────────────────────────────────

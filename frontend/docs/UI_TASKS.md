@@ -1048,6 +1048,13 @@ Parallel execution:
   Depends: none.
   Done when: completing a scan, clicking Next, then Back shows the previously discovered result with no new scan job; leaving mid-scan and returning resumes polling the same job; Retry/Stop Scan unaffected; typecheck + vitest green.
 
+- [x] `UI-472` ✅ Create Data Source wizard (Real source) — "This source could not be found" after Create source
+  Goal: creating a Real source (scan-based) data source showed a permanent "This source could not be found." error on the destination page (record/replay) even though the source was created successfully on the backend.
+  Surface: `Create Data Source Wizard`, `Recording Flow`, `Replay Flow`
+  Work includes: `createSource()`'s scan-based and import/manual paths in `create-data-source-wizard-page.tsx` now call `loadDataSources(currentProjectId)` before navigating away, so the store holds the freshly created row (mirrors what the synthetic path already did via the store's own `createSyntheticSource` action); `recording-flow-page.tsx` and `replay-flow-page.tsx` also gained a self-healing effect (mirroring `data-source-detail-preview-page.tsx`'s existing pattern) that reloads data sources once if the source isn't found locally yet, as defense-in-depth for any other route that lands on these pages before the store is warm.
+  Depends: none.
+  Done when: creating a Real source with "start capture" enabled lands on the live capture page showing the new source instead of "not found"; same for the non-capture and IMPORT paths; typecheck + vitest green.
+
 ## Recommended Sequence
 
 1. Complete the P0 shell and shared-pattern tasks first.
