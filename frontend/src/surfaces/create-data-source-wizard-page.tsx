@@ -6,7 +6,7 @@ import { useArtifactsStore } from "../shell/artifacts-store";
 import { useDataSourcesStore } from "../shell/data-sources-store";
 import { useShellStore } from "../shell/shell-store";
 import { useNotificationStore } from "../shell/notification-store";
-import { apiFetch } from "../api";
+import { ApiError, apiFetch } from "../api";
 import type { BackendProtocol } from "../api";
 import { SharedStatePanel } from "../ui/shared-state-panel";
 import { StatusBadge } from "../ui/status-badge";
@@ -1013,8 +1013,9 @@ export function CreateDataSourceWizardPage() {
         navigate(`/data-sources/${createdId}`);
       } catch (err) {
         console.error("[createSyntheticSource]", err);
-        const title = err instanceof Error ? err.message : "Failed to create synthetic source";
-        push({ tone: "error", title });
+        const message =
+          err instanceof ApiError ? (err.detail ?? err.message) : err instanceof Error ? err.message : undefined;
+        push({ tone: "error", title: "Failed to create synthetic source", message });
       }
       return;
     }
@@ -1043,8 +1044,9 @@ export function CreateDataSourceWizardPage() {
         }
       } catch (err) {
         console.error("[createSource/scan]", err);
-        const title = err instanceof Error ? err.message : "Failed to create source from scan";
-        push({ tone: "error", title });
+        const message =
+          err instanceof ApiError ? (err.detail ?? err.message) : err instanceof Error ? err.message : undefined;
+        push({ tone: "error", title: "Failed to create source from scan", message });
       }
       return;
     }
@@ -1091,8 +1093,9 @@ export function CreateDataSourceWizardPage() {
       navigate(`/data-sources/${createdId}`);
     } catch (err) {
       console.error("[createSource]", err);
-      const title = err instanceof Error ? err.message : "Failed to create source";
-      push({ tone: "error", title });
+      const message =
+        err instanceof ApiError ? (err.detail ?? err.message) : err instanceof Error ? err.message : undefined;
+      push({ tone: "error", title: "Failed to create source", message });
     }
   }
 

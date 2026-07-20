@@ -9,12 +9,15 @@
  * - validationMessage enforces credentials in shared mode
  * - UI-458: SCAN scan step — auto-start, polling, complete state, error+retry,
  *   unknown type resolution, Next button validation, create-from-scan endpoint
+ * - UI-479: synthetic-source creation failure surfaces the backend's ApiError.detail
+ *   as the toast message, not just a generic title
  */
 
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ApiError } from "../api";
 import {
   CreateDataSourceWizardPage,
   scanStepValidationMessage,
@@ -43,7 +46,15 @@ for (const prop of ["offsetHeight", "offsetWidth", "clientHeight", "clientWidth"
   Object.defineProperty(HTMLElement.prototype, prop, { configurable: true, value: 500 });
 }
 
-const { mockNavigate, shellStoreState, artifactsStoreState, mockLoadDataSources } = vi.hoisted(() => ({
+const {
+  mockNavigate,
+  shellStoreState,
+  artifactsStoreState,
+  mockLoadDataSources,
+  mockCreateSyntheticSource,
+  dataSourcesStoreState,
+  mockPush,
+} = vi.hoisted(() => ({
   mockNavigate: vi.fn(),
   shellStoreState: {
     accessMode: "local" as "local" | "shared",
@@ -57,6 +68,11 @@ const { mockNavigate, shellStoreState, artifactsStoreState, mockLoadDataSources 
     loadRecordings: vi.fn(),
   },
   mockLoadDataSources: vi.fn(),
+  mockCreateSyntheticSource: vi.fn(() => Promise.resolve("src-syn")),
+  dataSourcesStoreState: {
+    dataSources: [] as Array<{ id: string; name: string }>,
+  },
+  mockPush: vi.fn(),
 }));
 
 vi.mock("react-router-dom", async () => {
@@ -73,9 +89,9 @@ vi.mock("../shell/data-sources-store", () => ({
   useDataSourcesStore: (selector: (s: Record<string, unknown>) => unknown) =>
     selector({
       createDataSource: vi.fn(() => "src-new"),
-      createSyntheticSource: vi.fn(() => "src-syn"),
+      createSyntheticSource: mockCreateSyntheticSource,
       loadDataSources: mockLoadDataSources,
-      dataSources: [],
+      dataSources: dataSourcesStoreState.dataSources,
     }),
 }));
 
@@ -84,9 +100,15 @@ vi.mock("../shell/artifacts-store", () => ({
     selector(artifactsStoreState as unknown as Record<string, unknown>),
 }));
 
+vi.mock("../shell/notification-store", () => ({
+  useNotificationStore: (selector: (s: Record<string, unknown>) => unknown) =>
+    selector({ push: mockPush }),
+}));
+
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  dataSourcesStoreState.dataSources = [];
   vi.useRealTimers();
   vi.unstubAllGlobals();
 });
@@ -866,6 +888,89 @@ describe("CreateDataSourceWizardPage — IMPORT schema copy (UI-466)", () => {
       expect(createCall).toBeTruthy();
       const body = JSON.parse((createCall![1] as RequestInit).body as string);
       expect(body.initialSchema).toBeUndefined();
+    });
+  });
+});
+
+// ─── SYNTHETIC path — error detail surfacing (UI-479) ────────────────────────
+
+async function navigateToSyntheticReview() {
+  dataSourcesStoreState.dataSources = [{ id: "src-reuse", name: "Existing OPC Source" }];
+
+  mockApiFetch.mockImplementation((path: string) => {
+    if (path.includes("/recordings")) {
+      return Promise.resolve({ items: [] });
+    }
+    if (path.includes("/schema")) {
+      return Promise.resolve({
+        id: "sch-1",
+        dataSourceId: "src-reuse",
+        version: 1,
+        nodes: [
+          {
+            nodeId: "ns=2;s=Force",
+            path: "Force",
+            name: "Force",
+            kind: "VARIABLE",
+            dataType: "FLOAT64",
+            unit: null,
+          },
+        ],
+      });
+    }
+    return Promise.resolve({});
+  });
+
+  render(
+    <MemoryRouter>
+      <CreateDataSourceWizardPage />
+    </MemoryRouter>,
+  );
+
+  // Protocol
+  await userEvent.click(screen.getByText("OPC UA"));
+  await userEvent.click(screen.getByRole("button", { name: "Next" }));
+
+  // Basis — "Synthetic device"
+  await userEvent.click(screen.getByText("Synthetic device"));
+  await userEvent.click(screen.getByRole("button", { name: "Next" }));
+
+  // Configure profile step: name + reuse-schema source (defaults produce a valid pattern)
+  await userEvent.type(screen.getByLabelText("Source name"), "Synthetic Line A");
+  const reuseSchemaSelect = screen
+    .getByText("Reuse schema from source")
+    .closest("label")!
+    .querySelector("select")!;
+  fireEvent.change(reuseSchemaSelect, { target: { value: "src-reuse" } });
+
+  await waitFor(() => {
+    expect((screen.getByRole("button", { name: "Next" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  await userEvent.click(screen.getByRole("button", { name: "Next" }));
+}
+
+describe("CreateDataSourceWizardPage — SYNTHETIC create-source error detail (UI-479)", () => {
+  afterEach(() => {
+    mockApiFetch.mockReset();
+  });
+
+  it("surfaces ApiError.detail as the toast message when createSyntheticSource fails", async () => {
+    mockCreateSyntheticSource.mockRejectedValueOnce(
+      new ApiError(400, "Bad Request", "invalid pattern config for node Force", undefined),
+    );
+
+    await navigateToSyntheticReview();
+    await userEvent.click(screen.getByRole("button", { name: "Create source" }));
+
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tone: "error",
+          title: "Failed to create synthetic source",
+          message: "invalid pattern config for node Force",
+        }),
+      );
     });
   });
 });
