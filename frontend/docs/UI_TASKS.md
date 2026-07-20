@@ -1083,6 +1083,13 @@ Parallel execution:
   Depends: none.
   Done when: Schedule start/end fields render an English-locale calendar+time picker regardless of the viewer's OS locale; existing schedule validation/review-step display unaffected; typecheck + vitest green.
 
+- [x] `UI-478` ✅ Create Data Source wizard (Synthetic) — move step navigation to the top for long schemas
+  Goal: on the Synthetic basis's "Configure profile" step, `SyntheticProfileStep` maps an unbounded list of variable/measurement rows, pushing the wizard's single Back/Next/Create-source footer far below the fold for large generated schemas and forcing users to scroll to advance.
+  Surface: `Create Data Source Wizard`
+  Work includes: refactored the footer's Back/Next/Create-source button group in `create-data-source-wizard-page.tsx` into a shared `renderStepNav(position)` function, rendered once right under the step header (before `renderCurrentStep()`) and once at the bottom in its original footer position, so both copies always share the same handlers and disabled-state logic; Cancel stays bottom-only (unchanged position/behavior).
+  Depends: none.
+  Done when: a top copy of Back/Next/Create-source renders above every step's content, in sync with the bottom copy; clicking the top Next/Back/Create-source behaves identically to the bottom one; typecheck + vitest green.
+
 - [x] `UI-479` ✅ Create Data Source wizard (Synthetic) — surface backend error detail on Create source failure
   Goal: creating a Synthetic data source that fails on the backend (e.g. 400 Bad Request — invalid pattern config, port conflict) surfaced only a generic toast ("Failed to create synthetic source"), silently dropping the backend's specific `ApiError.detail` validation message.
   Surface: `Create Data Source Wizard` (synthetic basis)

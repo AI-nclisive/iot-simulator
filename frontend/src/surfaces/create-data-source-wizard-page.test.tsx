@@ -122,11 +122,11 @@ async function navigateToScanSetup() {
 
   // Step 0: choose protocol
   await userEvent.click(screen.getByText("OPC UA"));
-  await userEvent.click(screen.getByRole("button", { name: "Next" }));
+  await userEvent.click(screen.getAllByRole("button", { name: "Next" })[0]);
 
   // Step 1: choose Real source basis
   await userEvent.click(screen.getByText("Real source"));
-  await userEvent.click(screen.getByRole("button", { name: "Next" }));
+  await userEvent.click(screen.getAllByRole("button", { name: "Next" })[0]);
 }
 
 describe("CreateDataSourceWizardPage — setup step", () => {
@@ -137,7 +137,7 @@ describe("CreateDataSourceWizardPage — setup step", () => {
 
   it("Next is disabled when source name is empty", async () => {
     await navigateToScanSetup();
-    const btn = screen.getByRole("button", { name: "Next" }) as HTMLButtonElement;
+    const btn = screen.getAllByRole("button", { name: "Next" })[0] as HTMLButtonElement;
     expect(btn.disabled).toBe(true);
   });
 });
@@ -150,7 +150,7 @@ describe("CreateDataSourceWizardPage — basis step (UI-121)", () => {
       </MemoryRouter>,
     );
     await userEvent.click(screen.getByText("OPC UA"));
-    await userEvent.click(screen.getByRole("button", { name: "Next" }));
+    await userEvent.click(screen.getAllByRole("button", { name: "Next" })[0]);
     expect(screen.queryByText("Manual schema")).toBeNull();
   });
 });
@@ -160,7 +160,7 @@ describe("CreateDataSourceWizardPage — scan setup validation", () => {
     await navigateToScanSetup();
     await userEvent.type(screen.getByLabelText("Source name"), "Test source");
 
-    const btn = screen.getByRole("button", { name: "Next" }) as HTMLButtonElement;
+    const btn = screen.getAllByRole("button", { name: "Next" })[0] as HTMLButtonElement;
     expect(btn.disabled).toBe(false);
   });
 });
@@ -331,17 +331,17 @@ async function navigateToScanStep() {
 
   // Protocol step
   await userEvent.click(screen.getByText("OPC UA"));
-  await userEvent.click(screen.getByRole("button", { name: "Next" }));
+  await userEvent.click(screen.getAllByRole("button", { name: "Next" })[0]);
 
   // Basis step — Real source
   await userEvent.click(screen.getByText("Real source"));
-  await userEvent.click(screen.getByRole("button", { name: "Next" }));
+  await userEvent.click(screen.getAllByRole("button", { name: "Next" })[0]);
 
   // Setup step — fill required fields
   await userEvent.type(screen.getByLabelText("Source name"), "Test source");
 
   // Next is now enabled — go to scan step
-  await userEvent.click(screen.getByRole("button", { name: "Next" }));
+  await userEvent.click(screen.getAllByRole("button", { name: "Next" })[0]);
 }
 
 // The integration tests for the scan step mock `apiFetch` at the module level
@@ -532,7 +532,7 @@ describe("CreateDataSourceWizardPage — scan step (UI-458)", () => {
 
     await navigateToScanStep();
 
-    expect((screen.getByRole("button", { name: "Back" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getAllByRole("button", { name: "Back" })[0] as HTMLButtonElement).disabled).toBe(true);
     expect((screen.getByRole("button", { name: "Cancel" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
@@ -544,7 +544,7 @@ describe("CreateDataSourceWizardPage — scan step (UI-458)", () => {
     await navigateToScanStep();
     await userEvent.click(screen.getByRole("button", { name: /Stop Scan/i }));
 
-    expect((screen.getByRole("button", { name: "Back" }) as HTMLButtonElement).disabled).toBe(false);
+    expect((screen.getAllByRole("button", { name: "Back" })[0] as HTMLButtonElement).disabled).toBe(false);
     expect((screen.getByRole("button", { name: "Cancel" }) as HTMLButtonElement).disabled).toBe(false);
   });
 
@@ -556,7 +556,7 @@ describe("CreateDataSourceWizardPage — scan step (UI-458)", () => {
     await navigateToScanStep();
 
     // Interval hasn't fired yet → scanStatus is still "scanning"
-    const btn = screen.getByRole("button", { name: "Next" }) as HTMLButtonElement;
+    const btn = screen.getAllByRole("button", { name: "Next" })[0] as HTMLButtonElement;
     expect(btn.disabled).toBe(true);
   });
 
@@ -578,7 +578,7 @@ describe("CreateDataSourceWizardPage — scan step (UI-458)", () => {
     await navigateToScanStep();
     await advanceIntervalAndFlush(2000);
 
-    const btn = screen.getByRole("button", { name: "Next" }) as HTMLButtonElement;
+    const btn = screen.getAllByRole("button", { name: "Next" })[0] as HTMLButtonElement;
     expect(btn.disabled).toBe(false);
   });
 
@@ -600,11 +600,11 @@ describe("CreateDataSourceWizardPage — scan step (UI-458)", () => {
     await navigateToScanStep();
     await advanceIntervalAndFlush(2000);
 
-    expect((screen.getByRole("button", { name: "Next" }) as HTMLButtonElement).disabled).toBe(false);
+    expect((screen.getAllByRole("button", { name: "Next" })[0] as HTMLButtonElement).disabled).toBe(false);
 
     // Leave the scan step (Next → "recording"), then come back (Back → "scan").
-    await userEvent.click(screen.getByRole("button", { name: "Next" }));
-    await userEvent.click(screen.getByRole("button", { name: "Back" }));
+    await userEvent.click(screen.getAllByRole("button", { name: "Next" })[0]);
+    await userEvent.click(screen.getAllByRole("button", { name: "Back" })[0]);
 
     // No re-scan was triggered by the round-trip.
     const scanPostCalls = mockApiFetch.mock.calls.filter(
@@ -614,7 +614,7 @@ describe("CreateDataSourceWizardPage — scan step (UI-458)", () => {
         (c[1] as { method?: string } | undefined)?.method === "POST",
     );
     expect(scanPostCalls.length).toBe(1);
-    expect((screen.getByRole("button", { name: "Next" }) as HTMLButtonElement).disabled).toBe(false);
+    expect((screen.getAllByRole("button", { name: "Next" })[0] as HTMLButtonElement).disabled).toBe(false);
   });
 
   it("runs a fresh scan when the endpoint changes after going back to Setup (UI-473)", async () => {
@@ -646,16 +646,16 @@ describe("CreateDataSourceWizardPage — scan step (UI-458)", () => {
 
     await navigateToScanStep();
     await advanceIntervalAndFlush(2000);
-    expect((screen.getByRole("button", { name: "Next" }) as HTMLButtonElement).disabled).toBe(false);
+    expect((screen.getAllByRole("button", { name: "Next" })[0] as HTMLButtonElement).disabled).toBe(false);
 
     // Go back to Setup and change the endpoint.
-    await userEvent.click(screen.getByRole("button", { name: "Back" }));
+    await userEvent.click(screen.getAllByRole("button", { name: "Back" })[0]);
     const endpointInput = screen.getByLabelText("Real endpoint") as HTMLInputElement;
     await userEvent.clear(endpointInput);
     await userEvent.type(endpointInput, "opc.tcp://a-different-host:4840");
 
     // Return to the scan step — a fresh scan must run against the new endpoint.
-    await userEvent.click(screen.getByRole("button", { name: "Next" }));
+    await userEvent.click(screen.getAllByRole("button", { name: "Next" })[0]);
     await advanceIntervalAndFlush(2000);
 
     const scanPostCalls = mockApiFetch.mock.calls.filter(
@@ -690,7 +690,7 @@ describe("CreateDataSourceWizardPage — scan step (UI-458)", () => {
     expect(screen.getByText(/unknown types need resolution/i)).toBeTruthy();
     // Unknown nodes default to unresolved, so Next stays disabled until the
     // user assigns a type or excludes them.
-    const btn = screen.getByRole("button", { name: "Next" }) as HTMLButtonElement;
+    const btn = screen.getAllByRole("button", { name: "Next" })[0] as HTMLButtonElement;
     expect(btn.disabled).toBe(true);
   });
 
@@ -715,13 +715,13 @@ describe("CreateDataSourceWizardPage — scan step (UI-458)", () => {
     expect(screen.getByLabelText(/Data type for/i)).toBeTruthy();
 
     // Unresolved unknown type — Next starts disabled
-    expect((screen.getByRole("button", { name: "Next" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getAllByRole("button", { name: "Next" })[0] as HTMLButtonElement).disabled).toBe(true);
 
     // Resolve the unknown type
     await userEvent.selectOptions(screen.getByLabelText(/Data type for/i), "FLOAT64");
 
     // Now Next should be enabled
-    expect((screen.getByRole("button", { name: "Next" }) as HTMLButtonElement).disabled).toBe(false);
+    expect((screen.getAllByRole("button", { name: "Next" })[0] as HTMLButtonElement).disabled).toBe(false);
   });
 
   it("calls scan/{jobId}/create endpoint on final Create source click (scan path)", async () => {
@@ -744,15 +744,15 @@ describe("CreateDataSourceWizardPage — scan step (UI-458)", () => {
     await advanceIntervalAndFlush(2000);
 
     // Scan complete — Next should be enabled
-    expect((screen.getByRole("button", { name: "Next" }) as HTMLButtonElement).disabled).toBe(false);
+    expect((screen.getAllByRole("button", { name: "Next" })[0] as HTMLButtonElement).disabled).toBe(false);
 
     // Navigate through recording, schedule, and review steps
-    await userEvent.click(screen.getByRole("button", { name: "Next" }));
-    await userEvent.click(screen.getByRole("button", { name: "Next" }));
-    await userEvent.click(screen.getByRole("button", { name: "Next" }));
+    await userEvent.click(screen.getAllByRole("button", { name: "Next" })[0]);
+    await userEvent.click(screen.getAllByRole("button", { name: "Next" })[0]);
+    await userEvent.click(screen.getAllByRole("button", { name: "Next" })[0]);
 
     // Click Create source
-    await userEvent.click(screen.getByRole("button", { name: "Create source" }));
+    await userEvent.click(screen.getAllByRole("button", { name: "Create source" })[0]);
 
     // Verify the create call used the scan endpoint
     await waitFor(() => {
@@ -791,14 +791,14 @@ describe("CreateDataSourceWizardPage — scan step (UI-458)", () => {
     await advanceIntervalAndFlush(2000);
 
     // On recording step, click "Skip — just create the source"
-    await userEvent.click(screen.getByRole("button", { name: "Next" }));
+    await userEvent.click(screen.getAllByRole("button", { name: "Next" })[0]);
     await userEvent.click(screen.getByText(/Skip — just create the source/));
 
     // Continue through schedule and review
-    await userEvent.click(screen.getByRole("button", { name: "Next" }));
-    await userEvent.click(screen.getByRole("button", { name: "Next" }));
+    await userEvent.click(screen.getAllByRole("button", { name: "Next" })[0]);
+    await userEvent.click(screen.getAllByRole("button", { name: "Next" })[0]);
 
-    await userEvent.click(screen.getByRole("button", { name: "Create source" }));
+    await userEvent.click(screen.getAllByRole("button", { name: "Create source" })[0]);
 
     await waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith("/data-sources/ds-skip");
@@ -825,18 +825,18 @@ async function navigateToImportReview() {
 
   // Protocol
   await userEvent.click(screen.getByText("OPC UA"));
-  await userEvent.click(screen.getByRole("button", { name: "Next" }));
+  await userEvent.click(screen.getAllByRole("button", { name: "Next" })[0]);
 
   // Basis — "Prepared data"
   await userEvent.click(screen.getByText("Prepared data"));
-  await userEvent.click(screen.getByRole("button", { name: "Next" }));
+  await userEvent.click(screen.getAllByRole("button", { name: "Next" })[0]);
 
   // Import step — fill name and select the recording
   await userEvent.type(screen.getByLabelText("Source name"), "Hydraulic Press Sim");
   await userEvent.click(screen.getByText(fakeRecording.name));
 
   // Next is now enabled (name + recording selected)
-  await userEvent.click(screen.getByRole("button", { name: "Next" }));
+  await userEvent.click(screen.getAllByRole("button", { name: "Next" })[0]);
 }
 
 describe("CreateDataSourceWizardPage — IMPORT schema copy (UI-466)", () => {
@@ -851,7 +851,7 @@ describe("CreateDataSourceWizardPage — IMPORT schema copy (UI-466)", () => {
       .mockImplementationOnce(() => Promise.resolve({ id: "ds-import-1" })); // POST /data-sources
 
     await navigateToImportReview();
-    await userEvent.click(screen.getByRole("button", { name: "Create source" }));
+    await userEvent.click(screen.getAllByRole("button", { name: "Create source" })[0]);
 
     await waitFor(() => {
       const schemaCall = mockApiFetch.mock.calls.find(
@@ -876,7 +876,7 @@ describe("CreateDataSourceWizardPage — IMPORT schema copy (UI-466)", () => {
       .mockImplementationOnce(() => Promise.resolve({ id: "ds-import-2" })); // POST /data-sources
 
     await navigateToImportReview();
-    await userEvent.click(screen.getByRole("button", { name: "Create source" }));
+    await userEvent.click(screen.getAllByRole("button", { name: "Create source" })[0]);
 
     await waitFor(() => {
       const createCall = mockApiFetch.mock.calls.find(
@@ -888,6 +888,68 @@ describe("CreateDataSourceWizardPage — IMPORT schema copy (UI-466)", () => {
       expect(createCall).toBeTruthy();
       const body = JSON.parse((createCall![1] as RequestInit).body as string);
       expect(body.initialSchema).toBeUndefined();
+    });
+  });
+});
+
+// ─── UI-478: step navigation duplicated at the top of the page ──────────────
+//
+// On the Synthetic basis's "Configure profile" step, SyntheticProfileStep maps an
+// unbounded list of variable rows, which can push the footer's Next button far below
+// the fold on a large generated schema. A second, top copy of the same nav (sharing
+// the same handlers/disabled-state logic) should render right above the step body so
+// long-schema users don't have to scroll to advance.
+
+async function navigateToSyntheticConfigure() {
+  render(
+    <MemoryRouter>
+      <CreateDataSourceWizardPage />
+    </MemoryRouter>,
+  );
+
+  // Step 0: choose protocol
+  await userEvent.click(screen.getByText("OPC UA"));
+  await userEvent.click(screen.getAllByRole("button", { name: "Next" })[0]);
+
+  // Step 1: choose Synthetic device basis
+  await userEvent.click(screen.getByText("Synthetic device"));
+  await userEvent.click(screen.getAllByRole("button", { name: "Next" })[0]);
+}
+
+describe("CreateDataSourceWizardPage — step nav rendered top and bottom (UI-478)", () => {
+  it("renders two Next buttons on the synthetic configure step", async () => {
+    await navigateToSyntheticConfigure();
+
+    expect(screen.getByText("Configure profile")).toBeTruthy();
+    const nextButtons = screen.getAllByRole("button", { name: "Next" });
+    expect(nextButtons.length).toBe(2);
+  });
+
+  it("top and bottom nav agree on disabled state", async () => {
+    await navigateToSyntheticConfigure();
+
+    const [topNext, bottomNext] = screen.getAllByRole("button", {
+      name: "Next",
+    }) as HTMLButtonElement[];
+    // Neither a schema source nor synthetic patterns have been configured yet, so
+    // the shared configureValidationMessage disables both copies identically.
+    expect(topNext.disabled).toBe(bottomNext.disabled);
+  });
+
+  it("clicking the TOP Next button advances the step exactly like the bottom one", async () => {
+    // Use the scan-setup path (basis step), where Next becomes enabled once the source
+    // name is filled in, to exercise a real Next click.
+    await navigateToScanSetup();
+    await userEvent.type(screen.getByLabelText("Source name"), "Test source");
+
+    const [topNext] = screen.getAllByRole("button", { name: "Next" }) as HTMLButtonElement[];
+    expect(topNext.disabled).toBe(false);
+
+    await userEvent.click(topNext);
+
+    // Advancing from "setup" on the scan path lands on the "Scan" step.
+    await waitFor(() => {
+      expect(screen.getByText(/Step 4 of 7/)).toBeTruthy();
     });
   });
 });
@@ -929,11 +991,11 @@ async function navigateToSyntheticReview() {
 
   // Protocol
   await userEvent.click(screen.getByText("OPC UA"));
-  await userEvent.click(screen.getByRole("button", { name: "Next" }));
+  await userEvent.click(screen.getAllByRole("button", { name: "Next" })[0]);
 
   // Basis — "Synthetic device"
   await userEvent.click(screen.getByText("Synthetic device"));
-  await userEvent.click(screen.getByRole("button", { name: "Next" }));
+  await userEvent.click(screen.getAllByRole("button", { name: "Next" })[0]);
 
   // Configure profile step: name + reuse-schema source (defaults produce a valid pattern)
   await userEvent.type(screen.getByLabelText("Source name"), "Synthetic Line A");
@@ -944,10 +1006,11 @@ async function navigateToSyntheticReview() {
   fireEvent.change(reuseSchemaSelect, { target: { value: "src-reuse" } });
 
   await waitFor(() => {
-    expect((screen.getByRole("button", { name: "Next" }) as HTMLButtonElement).disabled).toBe(false);
+    const [topNext] = screen.getAllByRole("button", { name: "Next" }) as HTMLButtonElement[];
+    expect(topNext.disabled).toBe(false);
   });
 
-  await userEvent.click(screen.getByRole("button", { name: "Next" }));
+  await userEvent.click(screen.getAllByRole("button", { name: "Next" })[0]);
 }
 
 describe("CreateDataSourceWizardPage — SYNTHETIC create-source error detail (UI-479)", () => {
