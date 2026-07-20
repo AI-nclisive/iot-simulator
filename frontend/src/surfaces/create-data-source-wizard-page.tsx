@@ -8,6 +8,7 @@ import { useShellStore } from "../shell/shell-store";
 import { useNotificationStore } from "../shell/notification-store";
 import { apiFetch } from "../api";
 import type { BackendProtocol } from "../api";
+import { ScheduleDatePicker } from "../ui/schedule-date-picker";
 import { SharedStatePanel } from "../ui/shared-state-panel";
 import { StatusBadge } from "../ui/status-badge";
 import { SyntheticProfileStep, type SyntheticProfileValue } from "./synthetic-profile-step";
@@ -1660,11 +1661,10 @@ export function CreateDataSourceWizardPage() {
           {form.scheduleStartEnabled ? (
             <label className="flex flex-col gap-2 text-sm text-shell-muted">
               Start at
-              <input
-                className="shell-field"
-                type="datetime-local"
+              <ScheduleDatePicker
                 value={form.scheduleStart}
-                onChange={(e) => updateForm({ scheduleStart: e.target.value })}
+                onChange={(value) => updateForm({ scheduleStart: value })}
+                placeholder="Select start date and time"
               />
             </label>
           ) : null}
@@ -1680,11 +1680,10 @@ export function CreateDataSourceWizardPage() {
           {form.scheduleEndEnabled ? (
             <label className="flex flex-col gap-2 text-sm text-shell-muted">
               End at
-              <input
-                className="shell-field"
-                type="datetime-local"
+              <ScheduleDatePicker
                 value={form.scheduleEnd}
-                onChange={(e) => updateForm({ scheduleEnd: e.target.value })}
+                onChange={(value) => updateForm({ scheduleEnd: value })}
+                placeholder="Select end date and time"
               />
             </label>
           ) : null}
