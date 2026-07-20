@@ -1118,6 +1118,13 @@ Parallel execution:
   Depends: none.
   Done when: an unnamed recording's picker row shows its originating source's name instead of a truncated id, when that source is resolvable; typecheck + vitest green.
 
+- [x] `UI-482` ✅ Create Data Source wizard (Synthetic) — restrict pattern/value input for CONSTANT-only structural types
+  Goal: IS-168 (backend) restricted structural/identifier data types (GUID, STATUS_CODE, QUALIFIED_NAME, NODE_ID, EXPANDED_NODE_ID, XML_ELEMENT, BYTES, DATETIME) to a CONSTANT pattern only, since a dynamic pattern has no physical meaning for them; the wizard's "Configure profile" step still offered all 6 pattern choices and a numeric-only Value input for every node, so picking e.g. SINE for a NODE_ID node still failed with a 400 with no indication in the UI of why.
+  Surface: `Create Data Source Wizard` (synthetic basis)
+  Work includes: `synthetic-profile-step.tsx` now locks the Pattern select to a disabled "Constant (required)" option for `CONSTANT_ONLY_TYPES` nodes; the CONSTANT Value input switches to a text input (with a hex placeholder for BYTES) for string-shaped structural types and BYTES, numeric otherwise; `defaultDraft(dataType)` seeds a type-appropriate default (UUID for GUID, `ns=0;i=0` for NODE_ID/EXPANDED_NODE_ID, `0` for STATUS_CODE, current timestamp for DATETIME, empty string otherwise) instead of always defaulting to SINE; `toPattern`/`draftFromPattern` round-trip the new `stringValue`/`bytesValueBase64` wire fields (hex ⇄ Base64 for BYTES) alongside the existing numeric `value`. `SyntheticPatternSpec` in `data-sources-store.ts` widened to match.
+  Depends: IS-168 (backend, merged).
+  Done when: a structural/identifier node's Pattern select is locked to Constant with a sensible default value; creating a Synthetic source reusing a schema with a NODE_ID (or other structural type) node succeeds end-to-end; typecheck + vitest + build green.
+
 ## Recommended Sequence
 
 1. Complete the P0 shell and shared-pattern tasks first.
