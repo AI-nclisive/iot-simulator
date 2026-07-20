@@ -1041,6 +1041,13 @@ Parallel execution:
   Depends: IS-165.
   Done when: scanning a source with thousands of unknown-type nodes renders smoothly (no unbounded DOM growth) and all nodes are still selectable/resolvable; typecheck + vitest + build green.
 
+- [x] `UI-471` ✅ Create Data Source wizard — scan re-triggers on Back/Next instead of reusing result
+  Goal: navigating Next away from the scan step and then Back re-triggers a brand-new scan job against the device instead of reusing the already-completed scan result.
+  Surface: `Create Data Source Wizard` (scan step)
+  Work includes: the scan auto-start `useEffect` in `create-data-source-wizard-page.tsx` no longer resets `scanStatus`/`scanResult`/`scanJobId` in its cleanup (which ran on every step change, defeating the `scanStatus !== "idle"` guard); cleanup now only stops the in-flight poll interval; re-entering the scan step while a scan is still in-flight (status `"scanning"`) resumes polling the existing job (via `scanJobIdForCreateRef`) instead of starting a second one; explicit rescans still go through `retryScan()`/`stopScan()`, which reset state themselves.
+  Depends: none.
+  Done when: completing a scan, clicking Next, then Back shows the previously discovered result with no new scan job; leaving mid-scan and returning resumes polling the same job; Retry/Stop Scan unaffected; typecheck + vitest green.
+
 ## Recommended Sequence
 
 1. Complete the P0 shell and shared-pattern tasks first.
