@@ -53,6 +53,10 @@ API layer enforces authz) and decisions D6 (SSE-only) and D7 (`/api/v1`).
 - `POST …/data-sources/{id}/recording/start` (body: scanType) → starts a new
   Recording; worker connects to `realDeviceEndpoint` in client mode
 - `POST …/data-sources/{id}/recording/stop` → ends capture, finalises Recording
+- `GET …/data-sources/{id}/recording/status` → `{capturing, recordingId}`;
+  reports whether a capture is currently running for the source, so a stuck
+  or orphaned capture is discoverable instead of only surfacing as a
+  rejected `start` (IS-166)
 - `GET/POST …/recordings` · `GET …/recordings/{id}` · `DELETE …/recordings/{id}`
 - `GET …/recordings/{id}/schema` · `GET …/recordings/{id}/values`
 - `POST …/recordings/import` · `GET …/recordings/{id}/export`

@@ -6,9 +6,11 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 
 import com.ainclusive.iotsim.api.recording.RecordingCaptureController;
+import com.ainclusive.iotsim.api.recording.RecordingCaptureController.CaptureStatusResponse;
 import com.ainclusive.iotsim.api.recording.RecordingController.RecordingResponse;
 import com.ainclusive.iotsim.domain.recording.Recording;
 import com.ainclusive.iotsim.domain.recording.RecordingService;
+import com.ainclusive.iotsim.domain.recording.RecordingService.CaptureStatus;
 import com.ainclusive.iotsim.platform.capture.CaptureException;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
@@ -65,5 +67,25 @@ class RecordingCaptureControllerTest {
 
         assertThatThrownBy(() -> controller.start("p1", "ds1"))
                 .isInstanceOf(CaptureException.class);
+    }
+
+    @Test
+    void statusReportsNotCapturingWhenNoneActive() {
+        given(service.captureStatus("p1", "ds1")).willReturn(new CaptureStatus(false, null));
+
+        CaptureStatusResponse resp = controller.status("p1", "ds1");
+
+        assertThat(resp.capturing()).isFalse();
+        assertThat(resp.recordingId()).isNull();
+    }
+
+    @Test
+    void statusReportsCapturingWithRecordingId() {
+        given(service.captureStatus("p1", "ds1")).willReturn(new CaptureStatus(true, "rec1"));
+
+        CaptureStatusResponse resp = controller.status("p1", "ds1");
+
+        assertThat(resp.capturing()).isTrue();
+        assertThat(resp.recordingId()).isEqualTo("rec1");
     }
 }

@@ -193,6 +193,27 @@ class RecordingServiceTest {
     }
 
     @Test
+    void captureStatusReflectsStartAndStop() {
+        schemas.set(1, List.of(variable("temp", DataType.FLOAT64)));
+        assertThat(service.captureStatus(PROJECT, SOURCE).capturing()).isFalse();
+        assertThat(service.captureStatus(PROJECT, SOURCE).recordingId()).isNull();
+
+        Recording started = service.startCapture(PROJECT, SOURCE, "alice");
+        assertThat(service.captureStatus(PROJECT, SOURCE).capturing()).isTrue();
+        assertThat(service.captureStatus(PROJECT, SOURCE).recordingId()).isEqualTo(started.id());
+
+        service.stopCapture(PROJECT, SOURCE);
+        assertThat(service.captureStatus(PROJECT, SOURCE).capturing()).isFalse();
+        assertThat(service.captureStatus(PROJECT, SOURCE).recordingId()).isNull();
+    }
+
+    @Test
+    void captureStatusRejectsSourceFromAnotherProject() {
+        assertThatThrownBy(() -> service.captureStatus("other-project", SOURCE))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
     void listPagedThrowsNotFoundForMissingProject() {
         assertThatThrownBy(() -> service.listPaged("no-such-project", null, null))
                 .isInstanceOf(com.ainclusive.iotsim.domain.common.ResourceNotFoundException.class);
