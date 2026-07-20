@@ -121,7 +121,7 @@ export function DataSourceDetailSettingsTab({
 
         <label className="flex flex-col gap-2 text-sm text-shell-muted">
           Simulator serve URL
-          <div className="shell-field cursor-default select-none bg-shell-base/40 text-shell-muted font-mono text-xs">
+          <div className="shell-field cursor-default select-none break-all bg-shell-base/40 text-shell-muted font-mono text-xs">
             {source.endpoint || "—"}
           </div>
         </label>

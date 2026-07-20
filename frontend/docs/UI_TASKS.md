@@ -1062,6 +1062,13 @@ Parallel execution:
   Depends: UI-471.
   Done when: completing a scan, going back to Setup, changing the endpoint, and returning to Scan always runs a fresh scan against the new endpoint; the UI-471 same-endpoint no-re-scan behavior still holds; typecheck + vitest green.
 
+- [x] `UI-474` ✅ Data Source Detail — long endpoint URLs overflow their cards, blow out page width
+  Goal: long unbroken endpoint URLs (e.g. a long OPC UA `opc.tcp://...` address) overflowed their card/field boundaries on the Data Source Detail page instead of wrapping, pushing the whole page wider than the viewport (tabs and side panels cut off at both edges).
+  Surface: `Data Source Detail` (Overview tab, Settings tab, page header)
+  Work includes: added `break-all` to the "Simulator serve URL" and "Real device endpoint" `<dd>` values in `data-source-detail-overview-tab.tsx`, the read-only "Simulator serve URL" field in `data-source-detail-settings-tab.tsx`, and the "Real device:" header line in `data-source-detail-preview-page.tsx`, so long unbreakable URLs wrap within their container instead of forcing horizontal page overflow.
+  Depends: none.
+  Done when: the Overview tab, Settings tab, and page header wrap long endpoint URLs onto multiple lines and the page never scrolls horizontally regardless of endpoint length; verified live against a real long OPC UA demo endpoint; typecheck + vitest green.
+
 - [x] `UI-475` ✅ Recordings — Delete action should be a text link, matching Data Sources style
   Goal: the Recordings list's Delete action rendered as a solid red button (`shell-action-danger`), while the Data Sources list's Delete renders as a red text link (`shell-text-action-danger`) via the shared table-pattern row actions. Align the two for visual consistency.
   Surface: `Recordings`

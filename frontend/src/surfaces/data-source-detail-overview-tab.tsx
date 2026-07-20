@@ -94,14 +94,14 @@ export function DataSourceDetailOverviewTab({
               <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
                 {source.basis === "IMPORT" ? "Replay serve URL" : "Simulator serve URL"}
               </dt>
-              <dd className="mt-2 font-mono text-sm text-shell-ink">{source.endpoint || "—"}</dd>
+              <dd className="mt-2 break-all font-mono text-sm text-shell-ink">{source.endpoint || "—"}</dd>
             </div>
             {source.basis === "SCAN" ? (
               <div>
                 <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
                   Real device endpoint
                 </dt>
-                <dd className="mt-2 font-mono text-sm text-shell-ink">
+                <dd className="mt-2 break-all font-mono text-sm text-shell-ink">
                   {source.realDeviceEndpoint || "—"}
                 </dd>
               </div>

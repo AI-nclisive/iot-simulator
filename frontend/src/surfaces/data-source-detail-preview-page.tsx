@@ -290,7 +290,7 @@ export function DataSourceDetailPreviewPage() {
           <div className="min-w-0 max-w-3xl">
             <h2 className="text-2xl font-semibold text-shell-ink">{activeSource.name}</h2>
             {activeSource.basis === "SCAN" && activeSource.realDeviceEndpoint ? (
-              <p className="mt-1 text-xs text-shell-muted">
+              <p className="mt-1 break-all text-xs text-shell-muted">
                 Real device: <span className="font-mono">{activeSource.realDeviceEndpoint}</span>
               </p>
             ) : null}
