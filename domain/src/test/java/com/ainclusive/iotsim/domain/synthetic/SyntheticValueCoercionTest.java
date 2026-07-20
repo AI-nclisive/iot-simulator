@@ -1,15 +1,23 @@
 package com.ainclusive.iotsim.domain.synthetic;
 
 import static com.ainclusive.iotsim.protocolmodel.DataType.BOOL;
+import static com.ainclusive.iotsim.protocolmodel.DataType.BYTES;
+import static com.ainclusive.iotsim.protocolmodel.DataType.DATETIME;
+import static com.ainclusive.iotsim.protocolmodel.DataType.EXPANDED_NODE_ID;
 import static com.ainclusive.iotsim.protocolmodel.DataType.FLOAT32;
 import static com.ainclusive.iotsim.protocolmodel.DataType.FLOAT64;
+import static com.ainclusive.iotsim.protocolmodel.DataType.GUID;
 import static com.ainclusive.iotsim.protocolmodel.DataType.INT16;
 import static com.ainclusive.iotsim.protocolmodel.DataType.INT32;
 import static com.ainclusive.iotsim.protocolmodel.DataType.INT64;
+import static com.ainclusive.iotsim.protocolmodel.DataType.NODE_ID;
+import static com.ainclusive.iotsim.protocolmodel.DataType.QUALIFIED_NAME;
+import static com.ainclusive.iotsim.protocolmodel.DataType.STATUS_CODE;
 import static com.ainclusive.iotsim.protocolmodel.DataType.STRING;
 import static com.ainclusive.iotsim.protocolmodel.DataType.UINT16;
 import static com.ainclusive.iotsim.protocolmodel.DataType.UINT32;
 import static com.ainclusive.iotsim.protocolmodel.DataType.UINT64;
+import static com.ainclusive.iotsim.protocolmodel.DataType.XML_ELEMENT;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
@@ -61,5 +69,35 @@ class SyntheticValueCoercionTest {
     @Test
     void rejectsNonNumberForNumericType() {
         assertThatIllegalArgumentException().isThrownBy(() -> SyntheticValueCoercion.coerce("nope", INT16));
+    }
+
+    // ─── IS-168: structural/identifier types (CONSTANT-only upstream) ────────────
+
+    @Test
+    void stringShapedStructuralTypesPassThroughAsStrings() {
+        assertThat(SyntheticValueCoercion.coerce("2:Foo", QUALIFIED_NAME)).isEqualTo("2:Foo");
+        assertThat(SyntheticValueCoercion.coerce("ns=2;s=Foo", NODE_ID)).isEqualTo("ns=2;s=Foo");
+        assertThat(SyntheticValueCoercion.coerce("ns=2;s=Foo", EXPANDED_NODE_ID)).isEqualTo("ns=2;s=Foo");
+        assertThat(SyntheticValueCoercion.coerce("<a/>", XML_ELEMENT)).isEqualTo("<a/>");
+    }
+
+    @Test
+    void guidValidatesAsAUuidString() {
+        String guid = "11111111-1111-1111-1111-111111111111";
+        assertThat(SyntheticValueCoercion.coerce(guid, GUID)).isEqualTo(guid);
+        assertThatIllegalArgumentException().isThrownBy(() -> SyntheticValueCoercion.coerce("not-a-guid", GUID));
+    }
+
+    @Test
+    void statusCodeAndDatetimeCoerceToLongLikeIntegerTypes() {
+        assertThat(SyntheticValueCoercion.coerce(0.0, STATUS_CODE)).isEqualTo(0L);
+        assertThat(SyntheticValueCoercion.coerce(1_753_000_000_000.0, DATETIME)).isEqualTo(1_753_000_000_000L);
+    }
+
+    @Test
+    void bytesAcceptsAByteArrayAndRejectsOtherwise() {
+        byte[] raw = {1, 2, 3};
+        assertThat(SyntheticValueCoercion.coerce(raw, BYTES)).isEqualTo(raw);
+        assertThatIllegalArgumentException().isThrownBy(() -> SyntheticValueCoercion.coerce("nope", BYTES));
     }
 }

@@ -13,8 +13,13 @@ import java.util.Set;
  *
  * <p>{@code BYTES}, {@code DATETIME}, and the identifier/structural types
  * ({@code GUID}, {@code STATUS_CODE}, {@code QUALIFIED_NAME}, {@code NODE_ID},
- * {@code EXPANDED_NODE_ID}, {@code XML_ELEMENT}) have no natural generated-signal
- * semantics and are out of scope for v1, so they are rejected here.
+ * {@code EXPANDED_NODE_ID}, {@code XML_ELEMENT}) have no natural DYNAMIC
+ * generated-signal semantics — a real device wouldn't vary a NodeId reference
+ * or a GUID over time either, they're structural OPC UA plumbing, not measured
+ * signals (IS-168). A dynamic pattern (ramp/sine/square/random/enum-cycle/
+ * step-sequence) is therefore still rejected for them, but a {@link
+ * SyntheticPattern.Constant} (fixed value) is allowed, since that's exactly
+ * what these fields already are on a real device.
  *
  * @param nodeId       target variable node id
  * @param dataType     the node's neutral type; generated values are coerced to it
@@ -23,7 +28,7 @@ import java.util.Set;
  */
 public record SyntheticVariable(String nodeId, DataType dataType, SyntheticPattern pattern, long updateRateMs) {
 
-    private static final Set<DataType> UNSUPPORTED = EnumSet.of(
+    private static final Set<DataType> CONSTANT_ONLY = EnumSet.of(
             DataType.BYTES, DataType.DATETIME, DataType.GUID, DataType.STATUS_CODE,
             DataType.QUALIFIED_NAME, DataType.NODE_ID, DataType.EXPANDED_NODE_ID, DataType.XML_ELEMENT);
 
@@ -34,8 +39,9 @@ public record SyntheticVariable(String nodeId, DataType dataType, SyntheticPatte
         if (updateRateMs <= 0) {
             throw new IllegalArgumentException("updateRateMs must be > 0: " + updateRateMs);
         }
-        if (UNSUPPORTED.contains(dataType)) {
-            throw new IllegalArgumentException("synthetic generation does not support " + dataType + " in v1");
+        if (CONSTANT_ONLY.contains(dataType) && !(pattern instanceof SyntheticPattern.Constant)) {
+            throw new IllegalArgumentException(
+                    "synthetic generation only supports a constant value for " + dataType + " (v1)");
         }
     }
 

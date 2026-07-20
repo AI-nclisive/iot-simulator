@@ -93,6 +93,15 @@ Used in storage (`scenario_steps`), project export, and the builder API.
 - Determinism: `seed` (required when deterministic) drives all randomness;
   generation uses the explicit clock so the same seed + clock ⇒ identical series
   (`01_…` §4). Boundary-case presets supported (min/max/edge values).
+- Structural/identifier types (`GUID`, `STATUS_CODE`, `QUALIFIED_NAME`,
+  `NODE_ID`, `EXPANDED_NODE_ID`, `XML_ELEMENT`, `BYTES`, `DATETIME`) only
+  accept `CONSTANT` (IS-168) — a dynamic pattern has no physical meaning for
+  them (a real device wouldn't vary a NodeId reference or a GUID over time
+  either; they're structural OPC UA plumbing, not measured signals). A
+  `CONSTANT` for these carries its value as `stringValue` (identifier/text
+  types) or `bytesValueBase64` (`BYTES`) instead of the numeric `value` field,
+  defaulting to a type-appropriate synthetic default (not seeded from a real
+  device's value — that plumbing doesn't exist yet).
 
 ## Deterministic run settings (serialized)
 
@@ -107,4 +116,6 @@ Run Settings).
 ## Open questions for reviewer
 
 - Confirm ZIP+manifest as the container for all bundle artifacts.
-- Confirm the synthetic pattern set for v1.
+- ~~Confirm the synthetic pattern set for v1.~~ Resolved (IS-168): the 8-pattern
+  set stands; structural/identifier types are additionally restricted to
+  `CONSTANT` only, not excluded entirely.
