@@ -55,6 +55,10 @@ type CreateDataSourceInput = {
 export type SyntheticPatternSpec = {
   type: "CONSTANT" | "RAMP" | "SINE" | "SQUARE" | "RANDOM_UNIFORM" | "RANDOM_WALK";
   value?: number;
+  /** IS-168: a CONSTANT for a string-shaped structural/identifier type (GUID, NODE_ID, ...). */
+  stringValue?: string;
+  /** IS-168: a CONSTANT for BYTES, standard Base64. */
+  bytesValueBase64?: string;
   min?: number;
   max?: number;
   periodMs?: number;
