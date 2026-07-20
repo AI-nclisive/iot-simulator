@@ -35,10 +35,20 @@ public sealed interface SyntheticPattern {
     /** Binds this pattern to a node's RNG stream, yielding a fresh run-scoped signal. */
     Signal bind(RandomGenerator rng);
 
-    /** A fixed value. */
-    record Constant(double value) implements SyntheticPattern {
+    /**
+     * A fixed value. {@code value} is usually a {@code Double} (the common numeric
+     * case), but may be any non-null payload the node's data type can be coerced
+     * from (e.g. a {@code String} for {@code NODE_ID}/{@code GUID}, a {@code byte[]}
+     * for {@code BYTES}) — see {@link SyntheticValueCoercion} for the types that
+     * only accept {@code Constant} (a dynamic pattern has no physical meaning for
+     * structural/identifier fields).
+     */
+    record Constant(Object value) implements SyntheticPattern {
         public Constant {
-            requireFinite(value, "value");
+            Objects.requireNonNull(value, "value");
+            if (value instanceof Double d) {
+                requireFinite(d, "value");
+            }
         }
 
         @Override
