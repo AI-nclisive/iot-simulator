@@ -39,6 +39,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -170,7 +171,7 @@ public class RecordingService {
     }
 
     private static final DateTimeFormatter DEFAULT_NAME_TIMESTAMP =
-            DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm").withZone(ZoneOffset.UTC);
+            DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm", Locale.ENGLISH).withZone(ZoneOffset.UTC);
 
     /**
      * A default name for a capture-started recording (IS-167): recordings had no name
