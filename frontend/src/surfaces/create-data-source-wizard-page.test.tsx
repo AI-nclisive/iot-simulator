@@ -1024,7 +1024,7 @@ describe("CreateDataSourceWizardPage — SYNTHETIC create-source error detail (U
     );
 
     await navigateToSyntheticReview();
-    await userEvent.click(screen.getByRole("button", { name: "Create source" }));
+    await userEvent.click(screen.getAllByRole("button", { name: "Create source" })[0]);
 
     await waitFor(() => {
       expect(mockPush).toHaveBeenCalledWith(
