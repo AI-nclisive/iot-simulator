@@ -285,6 +285,8 @@ describe("RecordingFlowPage — stop recording", () => {
     mockUseLiveValues.mockReturnValue({ rows: [], status: "open" });
 
     mockApiFetch
+      // UI-476: mount-time capture-status check fires before any user action.
+      .mockResolvedValueOnce({ capturing: false, recordingId: null })
       .mockResolvedValueOnce(startResponse)
       .mockResolvedValueOnce({ ...startResponse, valueCount: 42 });
 
@@ -307,5 +309,58 @@ describe("RecordingFlowPage — stop recording", () => {
       "/api/v1/projects/proj-1/data-sources/src-1/recording/stop",
       { method: "POST" },
     );
+  });
+});
+
+describe("RecordingFlowPage — resume into active capture on mount (IS-166/UI-476)", () => {
+  it("queries capture status on mount and shows Stop recording when already capturing", async () => {
+    mockUseLiveValues.mockReturnValue({ rows: [], status: "connecting" });
+    mockApiFetch.mockResolvedValueOnce({ capturing: true, recordingId: "rec-orphaned" });
+
+    renderPage();
+
+    expect(mockApiFetch).toHaveBeenCalledWith(
+      "/api/v1/projects/proj-1/data-sources/src-1/recording/status",
+    );
+
+    // Resumes into the active state instead of defaulting to "ready" — Stop
+    // recording (not Start) should be available, reflecting the real
+    // server-side capture the page would otherwise have no way to know about.
+    expect(await screen.findByRole("button", { name: "Stop recording" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Start recording" })).toBeNull();
+  });
+
+  it("stays in the ready state when no capture is running", async () => {
+    mockUseLiveValues.mockReturnValue({ rows: [], status: "connecting" });
+    mockApiFetch.mockResolvedValueOnce({ capturing: false, recordingId: null });
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith(
+        "/api/v1/projects/proj-1/data-sources/src-1/recording/status",
+      );
+    });
+    expect(screen.getByRole("button", { name: "Start recording" })).toBeTruthy();
+  });
+
+  it("only checks capture status once per source, not on every re-render", async () => {
+    mockUseLiveValues.mockReturnValue({ rows: [], status: "connecting" });
+    mockApiFetch.mockResolvedValueOnce({ capturing: false, recordingId: null });
+
+    const { rerender } = renderPage();
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledTimes(1);
+    });
+
+    rerender(
+      <MemoryRouter initialEntries={["/data-sources/src-1/record"]}>
+        <Routes>
+          <Route path="data-sources/:sourceId/record" element={<RecordingFlowPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(mockApiFetch).toHaveBeenCalledTimes(1);
   });
 });
