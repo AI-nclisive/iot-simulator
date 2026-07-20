@@ -1062,6 +1062,13 @@ Parallel execution:
   Depends: UI-471.
   Done when: completing a scan, going back to Setup, changing the endpoint, and returning to Scan always runs a fresh scan against the new endpoint; the UI-471 same-endpoint no-re-scan behavior still holds; typecheck + vitest green.
 
+- [x] `UI-475` ✅ Recordings — Delete action should be a text link, matching Data Sources style
+  Goal: the Recordings list's Delete action rendered as a solid red button (`shell-action-danger`), while the Data Sources list's Delete renders as a red text link (`shell-text-action-danger`) via the shared table-pattern row actions. Align the two for visual consistency.
+  Surface: `Recordings`
+  Work includes: changed the Delete button's className in `recordings-page.tsx` from `shell-action-danger` to `shell-text-action-danger`; unchanged aria-label, click-stopPropagation, and confirmation-dialog flow.
+  Depends: none.
+  Done when: Recordings' Delete renders as a red text link matching Data Sources; typecheck + vitest green.
+
 ## Recommended Sequence
 
 1. Complete the P0 shell and shared-pattern tasks first.

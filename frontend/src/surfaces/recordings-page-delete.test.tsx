@@ -76,6 +76,17 @@ describe("RecordingsPage — delete action (UI-467)", () => {
     await waitFor(() => expect(mockDeleteRecording).toHaveBeenCalledWith("proj-1", "rec-1"));
   });
 
+  it("renders the card's Delete action as a text link, matching Data Sources (UI-475)", () => {
+    render(
+      <MemoryRouter>
+        <RecordingsPage />
+      </MemoryRouter>,
+    );
+
+    const deleteButton = screen.getByRole("button", { name: /delete recording nightly capture/i });
+    expect(deleteButton.className).toContain("shell-text-action-danger");
+  });
+
   it("surfaces the backend detail as a toast when delete is rejected", async () => {
     mockDeleteRecording.mockRejectedValueOnce(
       new ApiError(422, "Unprocessable Entity", "delete of rec-1 is blocked by existing dependents", undefined),
