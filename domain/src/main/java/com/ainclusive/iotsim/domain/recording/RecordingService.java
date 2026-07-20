@@ -181,6 +181,21 @@ public class RecordingService {
         return complete(projectId, capture.recordingId());
     }
 
+    /**
+     * Reports whether a live capture is currently running for a data source (IS-166),
+     * so a client can discover an in-progress (or orphaned, e.g. left running after a
+     * page reload) capture instead of only finding out via a rejected {@code start}.
+     */
+    public CaptureStatus captureStatus(String dataSourceId) {
+        ActiveCapture capture = active.get(dataSourceId);
+        return capture == null
+                ? new CaptureStatus(false, null)
+                : new CaptureStatus(true, capture.recordingId());
+    }
+
+    /** Whether a capture is active for a data source and, if so, which recording it feeds. */
+    public record CaptureStatus(boolean capturing, String recordingId) {}
+
     public Recording complete(String projectId, String recordingId) {
         RecordingRow recording = requireRecording(projectId, recordingId);
         long count = timeline.count(recordingId);

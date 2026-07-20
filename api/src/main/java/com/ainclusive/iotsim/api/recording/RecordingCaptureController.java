@@ -4,11 +4,13 @@ import com.ainclusive.iotsim.api.recording.RecordingController.RecordingResponse
 import com.ainclusive.iotsim.api.security.Permission;
 import com.ainclusive.iotsim.domain.recording.Recording;
 import com.ainclusive.iotsim.domain.recording.RecordingService;
+import com.ainclusive.iotsim.domain.recording.RecordingService.CaptureStatus;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.net.URI;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -35,6 +37,9 @@ public class RecordingCaptureController {
     private static final String SOURCE_STOP =
             "@permissionService.hasPermission(authentication,"
             + " T(com.ainclusive.iotsim.api.security.Permission).SOURCE_STOP)";
+    private static final String OBSERVE =
+            "@permissionService.hasPermission(authentication,"
+            + " T(com.ainclusive.iotsim.api.security.Permission).OBSERVE)";
 
     private final RecordingService recordings;
 
@@ -72,6 +77,25 @@ public class RecordingCaptureController {
         Recording recording = recordings.stopCapture(projectId, dataSourceId);
         return ResponseEntity.ok().eTag(etag(recording.version())).body(RecordingResponse.from(recording));
     }
+
+    /** Reports whether a capture is currently running for this data source (IS-166). */
+    @Operation(
+            summary = "Get capture status",
+            description =
+                    "Reports whether a live capture is currently running for this data source"
+                    + " and, if so, which recording it's feeding — so a stuck or orphaned"
+                    + " capture (e.g. left running after a page reload) can be discovered"
+                    + " and stopped instead of only surfacing as a rejected start.")
+    @GetMapping("/status")
+    @PreAuthorize(OBSERVE)
+    public CaptureStatusResponse status(
+            @PathVariable String projectId, @PathVariable String dataSourceId) {
+        CaptureStatus status = recordings.captureStatus(dataSourceId);
+        return new CaptureStatusResponse(status.capturing(), status.recordingId());
+    }
+
+    /** Whether a capture is active for a data source and, if so, which recording it feeds. */
+    public record CaptureStatusResponse(boolean capturing, String recordingId) {}
 
     private static String etag(long version) {
         return "\"" + version + "\"";
