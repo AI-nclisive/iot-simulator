@@ -570,6 +570,11 @@ export function CreateDataSourceWizardPage() {
   // single request) finishes — without this, both ticks would independently
   // start fetchAllScanNodes and race to set scanResult/typeResolutions.
   const scanHandlingTerminalRef = useRef(false);
+  // Identifies which protocol+endpoint the current scanStatus/scanResult belong
+  // to. If the user goes back to Setup, changes the endpoint, and returns to
+  // Scan, this no longer matches — so a stale "complete"/"scanning" status for
+  // the OLD endpoint doesn't get reused for the new one (UI-471 follow-up).
+  const scannedParamsKeyRef = useRef<string | null>(null);
 
   const [synthetic, setSynthetic] = useState<SyntheticProfileValue>({
     schemaFromSourceId: null,
@@ -686,14 +691,23 @@ export function CreateDataSourceWizardPage() {
   // Auto-start scan when the user enters the "scan" step
   useEffect(() => {
     if (activeStepId !== "scan") return;
-    // "idle" -> nothing scanned yet, start fresh. "scanning" -> a scan is
-    // already in flight (e.g. user navigated away mid-scan and came back);
-    // resume polling the existing job instead of starting a second one.
-    // Any other status (complete/partial/error/cancelled) means this step
-    // already has a result — leave it alone so Back/Next doesn't re-scan.
-    if (scanStatus !== "idle" && scanStatus !== "scanning") return;
     if (!currentProjectId || !form.protocol) return;
-    if (scanStatus === "scanning" && !scanJobIdForCreateRef.current) return;
+
+    const paramsKey = `${form.protocol}::${form.realDeviceEndpoint}`;
+    const paramsChanged = scannedParamsKeyRef.current !== paramsKey;
+
+    // "idle" -> nothing scanned yet, start fresh. "scanning" -> a scan is
+    // already in flight for the SAME params (e.g. user navigated away
+    // mid-scan and came back); resume polling instead of starting a second
+    // one. Any other status (complete/partial/error/cancelled) for the same
+    // params means this step already has a result — leave it alone so
+    // Back/Next doesn't re-scan. But if the endpoint/protocol changed since
+    // the last scan (user went back to Setup and edited it), none of that
+    // applies — always run a fresh scan for the new params.
+    if (!paramsChanged) {
+      if (scanStatus !== "idle" && scanStatus !== "scanning") return;
+      if (scanStatus === "scanning" && !scanJobIdForCreateRef.current) return;
+    }
 
     let cancelled = false;
     scanStoppedRef.current = false;
@@ -787,7 +801,13 @@ export function CreateDataSourceWizardPage() {
     }
 
     async function startScan() {
+      scannedParamsKeyRef.current = paramsKey;
       setScanStatus("scanning");
+      setScanResult(null);
+      setScanJobId(null);
+      setTypeResolutions([]);
+      setScanErrorMessage(null);
+      setScanProgress({ phase: null, discoveredSoFar: 0 });
       try {
         const job = await apiFetch<{ jobId: string; status: string }>(
           `/api/v1/projects/${currentProjectId}/data-sources/scan`,
@@ -811,11 +831,19 @@ export function CreateDataSourceWizardPage() {
       }
     }
 
-    if (scanStatus === "scanning" && scanJobIdForCreateRef.current) {
-      // Resuming: a scan was already in flight before this step was left —
-      // reattach the poller instead of kicking off a second scan job.
+    if (!paramsChanged && scanStatus === "scanning" && scanJobIdForCreateRef.current) {
+      // Resuming: a scan was already in flight for these same params before
+      // this step was left — reattach the poller instead of starting a
+      // second scan job.
       pollJob(scanJobIdForCreateRef.current);
     } else {
+      // Either this is the first scan for these params, or the params
+      // changed since the last one — either way, run a fresh scan. If an
+      // old poll for stale params was still running, stop it first.
+      if (scanPollRef.current !== null) {
+        clearInterval(scanPollRef.current);
+        scanPollRef.current = null;
+      }
       void startScan();
     }
 
