@@ -2,6 +2,7 @@ package com.ainclusive.iotsim.domain.synthetic;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 import static org.assertj.core.api.Assertions.within;
 
 import com.ainclusive.iotsim.domain.synthetic.SyntheticPattern.Constant;
@@ -117,6 +118,16 @@ class SyntheticPatternTest {
         assertThatIllegalArgumentException().isThrownBy(() -> new StepSequence(List.of()));
         assertThatIllegalArgumentException()
                 .isThrownBy(() -> new Step("x", Duration.ZERO));
+    }
+
+    @Test
+    void constantAcceptsNonNumericPayloads() {
+        // IS-168: a Constant may carry any non-null value a node's data type can be
+        // coerced from — not just a number.
+        assertThat(new Constant("ns=2;s=Foo").bind(rng()).valueAt(0, Duration.ZERO)).isEqualTo("ns=2;s=Foo");
+        byte[] bytes = {1, 2, 3};
+        assertThat(new Constant(bytes).bind(rng()).valueAt(0, Duration.ZERO)).isEqualTo(bytes);
+        assertThatNullPointerException().isThrownBy(() -> new Constant(null));
     }
 
     @Test

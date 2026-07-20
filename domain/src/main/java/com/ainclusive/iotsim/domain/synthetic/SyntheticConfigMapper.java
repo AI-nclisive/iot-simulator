@@ -2,6 +2,7 @@ package com.ainclusive.iotsim.domain.synthetic;
 
 import com.ainclusive.iotsim.domain.synthetic.SyntheticPattern.StepSequence.Step;
 import java.time.Duration;
+import java.util.Base64;
 import java.util.List;
 
 /** Maps the serialized {@link SyntheticConfig} to runnable domain {@link SyntheticVariable}s. */
@@ -20,7 +21,7 @@ public final class SyntheticConfigMapper {
             throw new IllegalArgumentException("pattern type is required");
         }
         return switch (spec.type()) {
-            case "CONSTANT" -> new SyntheticPattern.Constant(req(spec.value(), "value"));
+            case "CONSTANT" -> new SyntheticPattern.Constant(constantValue(spec));
             case "RAMP" -> new SyntheticPattern.Ramp(req(spec.min(), "min"), req(spec.max(), "max"), period(spec));
             case "SINE" -> new SyntheticPattern.Sine(req(spec.min(), "min"), req(spec.max(), "max"), period(spec));
             case "SQUARE" -> new SyntheticPattern.Square(req(spec.min(), "min"), req(spec.max(), "max"), period(spec));
@@ -32,6 +33,21 @@ public final class SyntheticConfigMapper {
             case "STEP_SEQUENCE" -> new SyntheticPattern.StepSequence(steps(spec));
             default -> throw new IllegalArgumentException("unknown pattern type: " + spec.type());
         };
+    }
+
+    /** A CONSTANT's value arrives in exactly one of three shapes (IS-168). */
+    private static Object constantValue(PatternSpec spec) {
+        if (spec.value() != null) {
+            return spec.value();
+        }
+        if (spec.stringValue() != null) {
+            return spec.stringValue();
+        }
+        if (spec.bytesValueBase64() != null) {
+            return Base64.getDecoder().decode(spec.bytesValueBase64());
+        }
+        throw new IllegalArgumentException(
+                "one of value, stringValue, or bytesValueBase64 is required for the CONSTANT pattern");
     }
 
     private static List<Step> steps(PatternSpec spec) {

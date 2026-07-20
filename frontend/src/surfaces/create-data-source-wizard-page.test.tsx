@@ -62,7 +62,7 @@ const {
     currentProjectId: "proj-test",
   },
   artifactsStoreState: {
-    artifacts: [] as Array<{ id: string; name?: string; createdAt: string }>,
+    artifacts: [] as Array<{ id: string; name?: string; createdAt: string; sourceId?: string }>,
     isLoading: false,
     error: null as string | null,
     loadRecordings: vi.fn(),
@@ -838,6 +838,54 @@ async function navigateToImportReview() {
   // Next is now enabled (name + recording selected)
   await userEvent.click(screen.getAllByRole("button", { name: "Next" })[0]);
 }
+
+describe("CreateDataSourceWizardPage — IMPORT recording picker name fallback (UI-481)", () => {
+  afterEach(() => {
+    artifactsStoreState.artifacts = [];
+    dataSourcesStoreState.dataSources = [];
+  });
+
+  it("falls back to the originating source's name when the recording has no name", async () => {
+    artifactsStoreState.artifacts = [
+      { id: "rec-unnamed", createdAt: new Date("2026-01-01T00:00:00Z").toISOString(), sourceId: "src-1" },
+    ];
+    dataSourcesStoreState.dataSources = [{ id: "src-1", name: "Press Line A" }];
+
+    render(
+      <MemoryRouter>
+        <CreateDataSourceWizardPage />
+      </MemoryRouter>,
+    );
+
+    await userEvent.click(screen.getByText("OPC UA"));
+    await userEvent.click(screen.getAllByRole("button", { name: "Next" })[0]);
+    await userEvent.click(screen.getByText("Prepared data"));
+    await userEvent.click(screen.getAllByRole("button", { name: "Next" })[0]);
+
+    expect(screen.getByText("Press Line A")).toBeTruthy();
+    expect(screen.queryByText(/Recording rec-unna/)).toBeNull();
+  });
+
+  it("falls back to a truncated id when neither the recording nor its source has a name", async () => {
+    artifactsStoreState.artifacts = [
+      { id: "rec-orphaned", createdAt: new Date("2026-01-01T00:00:00Z").toISOString(), sourceId: "src-gone" },
+    ];
+    dataSourcesStoreState.dataSources = [];
+
+    render(
+      <MemoryRouter>
+        <CreateDataSourceWizardPage />
+      </MemoryRouter>,
+    );
+
+    await userEvent.click(screen.getByText("OPC UA"));
+    await userEvent.click(screen.getAllByRole("button", { name: "Next" })[0]);
+    await userEvent.click(screen.getByText("Prepared data"));
+    await userEvent.click(screen.getAllByRole("button", { name: "Next" })[0]);
+
+    expect(screen.getByText("Recording rec-orph")).toBeTruthy();
+  });
+});
 
 describe("CreateDataSourceWizardPage — IMPORT schema copy (UI-466)", () => {
   afterEach(() => {
