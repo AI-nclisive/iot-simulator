@@ -1167,7 +1167,7 @@ Parallel execution:
   Depends: UI-487.
   Done when: the bulk control applies a pattern to every enabled row and leaves deselected rows untouched; typecheck + vitest + build green.
 
-- [ ] `UI-489` Manual Schemas list page (nav/list)
+- [x] `UI-489` ✅ Manual Schemas list page (nav/list)
   Goal: a new "Manual Schemas" section (project-scoped) listing reusable, standalone structure artifacts — name, protocol, variable count, updated date — with create/duplicate/delete actions, modeled on `recordings-page.tsx`.
   Surface: new `Manual Schemas` list page + nav entry.
   Depends: IS-171, IS-172 (backend, merged).
@@ -1179,7 +1179,7 @@ Parallel execution:
   Depends: UI-489, IS-172 (merged).
   Done when: structural edits at any depth, types, unit/description all work standalone; Save/Save-As dialog appears only when there are unsaved changes; typecheck + vitest + build green.
 
-- [ ] `UI-491` Synthetic wizard — pick a Manual Schema as parameter source
+- [x] `UI-491` ✅ Synthetic wizard — pick a Manual Schema as parameter source
   Goal: in the Create Data Source wizard's Synthetic "Configure profile" step (`synthetic-profile-step.tsx`), add "Manual schema" as a parameter-source option alongside the existing "existing source's schema" and "prefill from recording" options — a schema is required to get any parameters to drive.
   Surface: `Create Data Source Wizard` (synthetic basis).
   Depends: IS-173 (merged), UI-489.
