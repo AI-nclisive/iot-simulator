@@ -1406,10 +1406,13 @@ export function CreateDataSourceWizardPage() {
                           </p>
                           <div className="mt-1 flex flex-wrap items-center gap-2">
                             <span className="text-xs text-shell-muted">
-                              {new Date(artifact.createdAt).toLocaleDateString("en-GB", {
+                              {new Date(artifact.createdAt).toLocaleString("en-GB", {
                                 day: "2-digit",
                                 month: "short",
                                 year: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                                hour12: false,
                               })}
                             </span>
                           </div>
