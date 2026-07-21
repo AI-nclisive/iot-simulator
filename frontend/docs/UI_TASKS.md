@@ -1132,6 +1132,13 @@ Parallel execution:
   Depends: none.
   Done when: the Pattern select shows only the 3 plain-language options by default; "Show more patterns" reveals all 6; a row with an already-selected advanced pattern starts expanded; typecheck + vitest + build green.
 
+- [x] `UI-484` ✅ Synthetic wizard — clarify Prefill from recording (purpose text + mark which measurements changed)
+  Goal: "Prefill from recording" (IS-146) works correctly, but a schema can have far more measurements than a recording actually captured (e.g. 250 vs. 10 matched); after a successful prefill the toast says "Prefilled N measurements" but nothing in a long list shows which rows changed, so a user scrolling to an unmatched row could reasonably conclude prefill did nothing.
+  Surface: `Create Data Source Wizard` (synthetic basis)
+  Work includes: a plain-language explanatory line added under the Prefill control; `prefillFromRecording` now tracks which nodeIds were actually updated (computed from the `drafts` closure, not the `setDrafts` updater's `cur` — reading that synchronously right after the call would be stale) into a new `prefilledNodeIds` state, rendered as a "Prefilled" badge + accent border on each affected row, with the view auto-scrolling the first affected row into view via a `rowRefs` map. No change to the underlying prefill matching/derivation logic.
+  Depends: none.
+  Done when: the Prefill control explains its purpose; every row actually updated by the last prefill is visually marked; the view scrolls to the first affected row after a successful prefill; typecheck + vitest + build green.
+
 ## Recommended Sequence
 
 1. Complete the P0 shell and shared-pattern tasks first.
