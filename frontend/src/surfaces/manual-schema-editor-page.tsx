@@ -188,13 +188,18 @@ export function ManualSchemaEditorPage() {
   }
 
   function handleDeleteNode(nodeId: string) {
-    // Removing a folder drops its whole subtree, matching how deleting a
-    // scanned folder would leave no orphaned children behind. Computed from the
-    // current `nodes` state (passed explicitly, not read from an implicit closure)
-    // so the traversal's input is obvious at the call site.
-    const toRemove = collectSubtreeIds(nodes, nodeId);
-    setNodes((prev) => prev.filter((n) => !toRemove.has(n.nodeId)));
-    if (selectedId && toRemove.has(selectedId)) setSelectedId(null);
+    // Removing a folder drops its whole subtree, matching how deleting a scanned
+    // folder would leave no orphaned children behind. The mutation itself derives
+    // toRemove from the updater's own `prev`, not the outer `nodes` closure, so it's
+    // correct even if another pending update hasn't flushed into `nodes` yet; the
+    // selection check below recomputes the same (pure, cheap) traversal against the
+    // current `nodes` rather than trying to read a value out of the updater — a
+    // setState updater's own execution timing isn't something callers can rely on.
+    setNodes((prev) => {
+      const toRemove = collectSubtreeIds(prev, nodeId);
+      return prev.filter((n) => !toRemove.has(n.nodeId));
+    });
+    if (selectedId && collectSubtreeIds(nodes, nodeId).has(selectedId)) setSelectedId(null);
   }
 
   function openSaveDialog() {
