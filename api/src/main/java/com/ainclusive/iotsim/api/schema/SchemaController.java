@@ -91,7 +91,8 @@ public class SchemaController {
                         "variable node '" + d.path() + "' requires dataType, valueRank and access");
             }
             nodes.add(new SchemaNode(d.nodeId(), d.parentId(), d.path(), d.name(),
-                    kind, dataType, valueRank, access, d.unit(), d.description()));
+                    kind, dataType, valueRank, access, d.unit(), d.description(), d.arrayDimensions(),
+                    d.typeDefinition(), SchemaReferenceMapper.toModel(d.references())));
         }
         return nodes;
     }
@@ -112,7 +113,14 @@ public class SchemaController {
 
     public record NodeDto(
             String nodeId, String parentId, String path, String name, String kind,
-            String dataType, String valueRank, String access, String unit, String description) {
+            String dataType, String valueRank, String access, String unit, String description,
+            List<Integer> arrayDimensions, String typeDefinition, List<ReferenceDto> references) {
+
+        public NodeDto(String nodeId, String parentId, String path, String name, String kind,
+                String dataType, String valueRank, String access, String unit, String description) {
+            this(nodeId, parentId, path, name, kind, dataType, valueRank, access, unit, description,
+                    List.of(), null, List.of());
+        }
 
         static NodeDto from(SchemaNode n) {
             return new NodeDto(
@@ -120,7 +128,8 @@ public class SchemaController {
                     n.dataType() == null ? null : n.dataType().name(),
                     n.valueRank() == null ? null : n.valueRank().name(),
                     n.access() == null ? null : n.access().name(),
-                    n.unit(), n.description());
+                    n.unit(), n.description(), n.arrayDimensions(), n.typeDefinition(),
+                    n.references().stream().map(ReferenceDto::from).toList());
         }
     }
 

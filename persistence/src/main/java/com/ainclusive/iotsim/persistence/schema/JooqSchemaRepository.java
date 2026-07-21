@@ -4,7 +4,10 @@ import static com.ainclusive.iotsim.persistence.jooq.tables.DataSources.DATA_SOU
 import static com.ainclusive.iotsim.persistence.jooq.tables.SchemaNodes.SCHEMA_NODES;
 import static com.ainclusive.iotsim.persistence.jooq.tables.Schemas.SCHEMAS;
 import static org.jooq.impl.DSL.count;
+import static org.jooq.impl.DSL.field;
 import static org.jooq.impl.DSL.max;
+import static org.jooq.impl.DSL.name;
+import static org.jooq.impl.DSL.table;
 
 import com.ainclusive.iotsim.persistence.jooq.tables.records.SchemaNodesRecord;
 import com.ainclusive.iotsim.persistence.jooq.tables.records.SchemasRecord;
@@ -12,7 +15,9 @@ import com.ainclusive.iotsim.platform.Ids;
 import com.ainclusive.iotsim.protocolmodel.Access;
 import com.ainclusive.iotsim.protocolmodel.DataType;
 import com.ainclusive.iotsim.protocolmodel.NodeKind;
+import com.ainclusive.iotsim.protocolmodel.ReferenceType;
 import com.ainclusive.iotsim.protocolmodel.SchemaNode;
+import com.ainclusive.iotsim.protocolmodel.SchemaReference;
 import com.ainclusive.iotsim.protocolmodel.ValueRank;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -22,10 +27,27 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.jooq.DSLContext;
+import org.jooq.Field;
+import org.jooq.Table;
 import org.springframework.stereotype.Repository;
 
 @Repository
 public class JooqSchemaRepository implements SchemaRepository {
+
+    private static final Field<Integer[]> ARRAY_DIMENSIONS =
+            field(name("schema_nodes", "array_dimensions"), Integer[].class);
+    private static final Field<String> TYPE_DEFINITION = field(name("schema_nodes", "type_definition"), String.class);
+    private static final Table<?> NODE_REFERENCES = table(name("schema_node_references"));
+    private static final Field<String> REFERENCE_SCHEMA_ID =
+            field(name("schema_node_references", "schema_id"), String.class);
+    private static final Field<String> REFERENCE_SOURCE_ID =
+            field(name("schema_node_references", "source_node_id"), String.class);
+    private static final Field<String> REFERENCE_TARGET_ID =
+            field(name("schema_node_references", "target_node_id"), String.class);
+    private static final Field<String> REFERENCE_TYPE =
+            field(name("schema_node_references", "reference_type"), String.class);
+    private static final Field<Boolean> REFERENCE_FORWARD =
+            field(name("schema_node_references", "is_forward"), Boolean.class);
 
     private final DSLContext dsl;
 
@@ -46,11 +68,12 @@ public class JooqSchemaRepository implements SchemaRepository {
         if (schema == null) {
             return Optional.empty();
         }
+        Map<String, List<SchemaReference>> references = referencesBySource(schemaId);
         List<SchemaNode> nodes = dsl.selectFrom(SCHEMA_NODES)
                 .where(SCHEMA_NODES.SCHEMA_ID.eq(schemaId))
                 .orderBy(SCHEMA_NODES.PATH)
                 .fetch()
-                .map(this::toNode);
+                .map(r -> toNode(r, references));
         return Optional.of(new SchemaWithNodes(
                 schema.getId(), dataSourceId, schema.getVersion(), schema.getCreatedAt(), nodes));
     }
@@ -63,11 +86,12 @@ public class JooqSchemaRepository implements SchemaRepository {
         if (schema == null) {
             return Optional.empty();
         }
+        Map<String, List<SchemaReference>> references = referencesBySource(schema.getId());
         List<SchemaNode> nodes = dsl.selectFrom(SCHEMA_NODES)
                 .where(SCHEMA_NODES.SCHEMA_ID.eq(schema.getId()))
                 .orderBy(SCHEMA_NODES.PATH)
                 .fetch()
-                .map(this::toNode);
+                .map(r -> toNode(r, references));
         return Optional.of(new SchemaWithNodes(
                 schema.getId(), dataSourceId, schema.getVersion(), schema.getCreatedAt(), nodes));
     }
@@ -103,7 +127,20 @@ public class JooqSchemaRepository implements SchemaRepository {
                         .set(SCHEMA_NODES.ACCESS, n.access() == null ? null : n.access().name())
                         .set(SCHEMA_NODES.UNIT, n.unit())
                         .set(SCHEMA_NODES.DESCRIPTION, n.description())
+                        .set(ARRAY_DIMENSIONS, n.arrayDimensions().toArray(Integer[]::new))
+                        .set(TYPE_DEFINITION, n.typeDefinition())
                         .execute();
+            }
+            for (SchemaNode n : nodes) {
+                for (SchemaReference reference : n.references()) {
+                    tx.insertInto(NODE_REFERENCES)
+                            .set(REFERENCE_SCHEMA_ID, schemaId)
+                            .set(REFERENCE_SOURCE_ID, n.nodeId())
+                            .set(REFERENCE_TARGET_ID, reference.targetNodeId())
+                            .set(REFERENCE_TYPE, reference.type().name())
+                            .set(REFERENCE_FORWARD, reference.forward())
+                            .execute();
+                }
             }
 
             tx.update(DATA_SOURCES)
@@ -141,7 +178,17 @@ public class JooqSchemaRepository implements SchemaRepository {
         return counts;
     }
 
-    private SchemaNode toNode(SchemaNodesRecord r) {
+    private Map<String, List<SchemaReference>> referencesBySource(String schemaId) {
+        Map<String, List<SchemaReference>> result = new HashMap<>();
+        dsl.select(REFERENCE_SOURCE_ID, REFERENCE_TARGET_ID, REFERENCE_TYPE, REFERENCE_FORWARD)
+                .from(NODE_REFERENCES).where(REFERENCE_SCHEMA_ID.eq(schemaId)).fetch().forEach(row ->
+                        result.computeIfAbsent(row.get(REFERENCE_SOURCE_ID), unused -> new java.util.ArrayList<>())
+                                .add(new SchemaReference(row.get(REFERENCE_TARGET_ID),
+                                        ReferenceType.valueOf(row.get(REFERENCE_TYPE)), row.get(REFERENCE_FORWARD))));
+        return result;
+    }
+
+    private SchemaNode toNode(SchemaNodesRecord r, Map<String, List<SchemaReference>> referencesBySource) {
         return new SchemaNode(
                 r.getNodeId(),
                 r.getParentId(),
@@ -152,6 +199,9 @@ public class JooqSchemaRepository implements SchemaRepository {
                 r.getValueRank() == null ? null : ValueRank.valueOf(r.getValueRank()),
                 r.getAccess() == null ? null : Access.valueOf(r.getAccess()),
                 r.getUnit(),
-                r.getDescription());
+                r.getDescription(),
+                r.get(ARRAY_DIMENSIONS) == null ? List.of() : List.of(r.get(ARRAY_DIMENSIONS)),
+                r.get(TYPE_DEFINITION),
+                referencesBySource.getOrDefault(r.getNodeId(), List.of()));
     }
 }

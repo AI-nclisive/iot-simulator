@@ -2,6 +2,8 @@ package com.ainclusive.iotsim.api.datasource;
 
 import com.ainclusive.iotsim.api.error.PreconditionRequiredException;
 import com.ainclusive.iotsim.api.scan.ScanController;
+import com.ainclusive.iotsim.api.schema.ReferenceDto;
+import com.ainclusive.iotsim.api.schema.SchemaReferenceMapper;
 import com.ainclusive.iotsim.api.security.Permission;
 import com.ainclusive.iotsim.api.support.ConnectionConfigRequest;
 import com.ainclusive.iotsim.api.support.CredentialRequests;
@@ -268,7 +270,8 @@ public class DataSourceController {
             }
             nodes.add(new SchemaNode(
                     d.nodeId(), d.parentId(), d.path(), d.name(),
-                    kind, dataType, valueRank, access, d.unit(), d.description()));
+                    kind, dataType, valueRank, access, d.unit(), d.description(), d.arrayDimensions(),
+                    d.typeDefinition(), SchemaReferenceMapper.toModel(d.references())));
         }
         return nodes;
     }
@@ -316,7 +319,15 @@ public class DataSourceController {
 
     public record NodeDto(
             String nodeId, String parentId, String path, String name, String kind,
-            String dataType, String valueRank, String access, String unit, String description) {}
+            String dataType, String valueRank, String access, String unit, String description,
+            List<Integer> arrayDimensions, String typeDefinition, List<ReferenceDto> references) {
+        public NodeDto(String nodeId, String parentId, String path, String name, String kind,
+                String dataType, String valueRank, String access, String unit, String description) {
+            this(nodeId, parentId, path, name, kind, dataType, valueRank, access, unit, description,
+                    List.of(), null, List.of());
+        }
+    }
+
 
     public record CreateDataSourceRequest(
             String name, String protocol, String basis, Integer simulatorPort,

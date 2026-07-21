@@ -1,6 +1,8 @@
 package com.ainclusive.iotsim.api.manualschema;
 
 import com.ainclusive.iotsim.api.error.PreconditionRequiredException;
+import com.ainclusive.iotsim.api.schema.ReferenceDto;
+import com.ainclusive.iotsim.api.schema.SchemaReferenceMapper;
 import com.ainclusive.iotsim.api.security.Permission;
 import com.ainclusive.iotsim.domain.manualschema.ManualSchema;
 import com.ainclusive.iotsim.domain.manualschema.ManualSchemaService;
@@ -156,7 +158,8 @@ public class ManualSchemaController {
             }
             nodes.add(new SchemaNode(
                     d.nodeId(), d.parentId(), d.path(), d.name(),
-                    kind, dataType, valueRank, access, d.unit(), d.description()));
+                    kind, dataType, valueRank, access, d.unit(), d.description(), d.arrayDimensions(),
+                    d.typeDefinition(), SchemaReferenceMapper.toModel(d.references())));
         }
         return nodes;
     }
@@ -204,7 +207,14 @@ public class ManualSchemaController {
 
     public record NodeDto(
             String nodeId, String parentId, String path, String name, String kind,
-            String dataType, String valueRank, String access, String unit, String description) {
+            String dataType, String valueRank, String access, String unit, String description,
+            List<Integer> arrayDimensions, String typeDefinition, List<ReferenceDto> references) {
+
+        public NodeDto(String nodeId, String parentId, String path, String name, String kind,
+                String dataType, String valueRank, String access, String unit, String description) {
+            this(nodeId, parentId, path, name, kind, dataType, valueRank, access, unit, description,
+                    List.of(), null, List.of());
+        }
 
         static NodeDto from(SchemaNode n) {
             return new NodeDto(
@@ -212,9 +222,11 @@ public class ManualSchemaController {
                     n.dataType() == null ? null : n.dataType().name(),
                     n.valueRank() == null ? null : n.valueRank().name(),
                     n.access() == null ? null : n.access().name(),
-                    n.unit(), n.description());
+                    n.unit(), n.description(), n.arrayDimensions(), n.typeDefinition(),
+                    n.references().stream().map(ReferenceDto::from).toList());
         }
     }
+
 
     public record CreateManualSchemaRequest(String protocol, String name, String description, List<NodeDto> nodes) {}
 
