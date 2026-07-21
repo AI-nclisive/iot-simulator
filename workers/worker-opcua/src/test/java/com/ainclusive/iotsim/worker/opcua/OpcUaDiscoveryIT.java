@@ -93,6 +93,30 @@ class OpcUaDiscoveryIT {
     }
 
     @Test
+    void scanPreservesNestedFolderAndVariableHierarchy() throws Exception {
+        int port = freePort();
+        OpcUaServerRuntime runtime = new OpcUaServerRuntime(port, List.of(
+                new VarDef("plant", null, "Plant", "FOLDER", null),
+                new VarDef("tank", "plant", "Tank1", "FOLDER", null),
+                new VarDef("temperature", "tank", "Temperature", "VARIABLE", "FLOAT64")));
+        runtime.start();
+        try {
+            OpcUaDiscovery.ScanOutcome outcome = OpcUaDiscovery.scan(
+                    runtime.endpointUrl(), ANON, 0, () -> { }, soFar -> { });
+
+            assertThat(outcome.status()).isEqualTo(OpcUaDiscovery.OK);
+            Map<String, SchemaNodeMsg> byName = outcome.nodes().stream()
+                    .collect(Collectors.toMap(SchemaNodeMsg::getName, Function.identity()));
+            assertThat(byName.get("Plant").getKind()).isEqualTo("FOLDER");
+            assertThat(byName.get("Tank1").getParentId()).isEqualTo(byName.get("Plant").getNodeId());
+            assertThat(byName.get("Temperature").getParentId()).isEqualTo(byName.get("Tank1").getNodeId());
+            assertThat(byName.get("Temperature").getDataType()).isEqualTo("FLOAT64");
+        } finally {
+            runtime.stop();
+        }
+    }
+
+    @Test
     void testConnectionSucceedsAgainstRunningServer() throws Exception {
         int port = freePort();
         OpcUaServerRuntime runtime = new OpcUaServerRuntime(
