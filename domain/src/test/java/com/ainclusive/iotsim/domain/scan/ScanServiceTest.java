@@ -63,7 +63,7 @@ class ScanServiceTest {
                 new ActivityEventService(new NoOpActivityEventRepository()));
         SchemaService schemas = new SchemaService(schemaRepo, dataSourceRepo, new ObjectMapper());
         // Synchronous executor so the async scan completes inline for deterministic asserts.
-        service = new ScanService(scanner, projects, dataSources, schemas, Runnable::run);
+        service = new ScanService(scanner, projects, dataSources, schemas, credentials, Runnable::run);
     }
 
     @Test
@@ -208,6 +208,7 @@ class ScanServiceTest {
                             new ActivityEventService(new NoOpActivityEventRepository())),
                     new SchemaService(new InMemorySchemaRepository(dataSourceRepo), dataSourceRepo,
                             new ObjectMapper()),
+                    credentials,
                     pool::execute);
             ScanJob job = svc.startScan(
                     PROJECT, "OPC_UA", "opc.tcp://h", ConnectionCredentials.anonymous(), 0);
@@ -248,6 +249,7 @@ class ScanServiceTest {
                             new ActivityEventService(new NoOpActivityEventRepository())),
                     new SchemaService(new InMemorySchemaRepository(dataSourceRepo), dataSourceRepo,
                             new ObjectMapper()),
+                    credentials,
                     pool::execute);
             ScanJob job = svc.startScan(
                     PROJECT, "OPC_UA", "opc.tcp://h", ConnectionCredentials.anonymous(), 0);
@@ -303,6 +305,7 @@ class ScanServiceTest {
                         new ObjectMapper(), "localhost",
                         new ActivityEventService(new NoOpActivityEventRepository())),
                 new SchemaService(new InMemorySchemaRepository(dataSourceRepo), dataSourceRepo, new ObjectMapper()),
+                credentials,
                 task -> { /* never executes */ });
         ScanJob job = pending.startScan(PROJECT, "OPC_UA", "opc.tcp://h", ConnectionCredentials.anonymous(), 0);
         assertThatThrownBy(() -> pending.createFromScan(PROJECT, job.jobId(), "x", null, List.of(), "a"))
@@ -347,6 +350,108 @@ class ScanServiceTest {
         ScanJob job = service.startScan(
                 PROJECT, "OPC_UA", "opc.tcp://h", ConnectionCredentials.anonymous(), 0);
         assertThatThrownBy(() -> service.createFromScan(PROJECT, job.jobId(), "x", null, List.of(), "a"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void startRescanReusesStoredProtocolEndpointAndCredentials() {
+        scanner.scanResult = okResult();
+        ScanJob createJob = service.startScan(
+                PROJECT, "OPC_UA", "opc.tcp://h", ConnectionCredentials.anonymous(), 0);
+        DataSource source = service.createFromScan(PROJECT, createJob.jobId(), "Scanned Pump",
+                "opc.tcp://real-device:4840", List.of(new TypeResolution("ns=2;s=x", "INT32", null, null, false)),
+                "alice");
+        // Rescan reuses the real device's own connection, unlike create — so a credential
+        // held for this source (put directly, since createFromScan never copies scan secrets
+        // onto the created row) must be forwarded to the scanner, not re-collected from the user.
+        credentials.put(source.id(), ConnectionCredentials.password("op", "secret"));
+
+        ScanJob rescanJob = service.startRescan(PROJECT, source.id());
+
+        assertThat(service.getScan(PROJECT, rescanJob.jobId()).state()).isEqualTo("OK");
+        assertThat(scanner.lastSpec.protocol()).isEqualTo("OPC_UA");
+        assertThat(scanner.lastSpec.endpointUrl()).isEqualTo("opc.tcp://real-device:4840");
+        assertThat(scanner.lastSpec.credentials().secret()).isEqualTo("secret");
+    }
+
+    @Test
+    void startRescanRejectsNonScanBasisSource() {
+        DataSourceRow other = dataSourceRepo.insert(
+                PROJECT, "Manual source", "OPC_UA", "MANUAL", 4840, "opc.tcp://h", "{}", null, "alice");
+        assertThatThrownBy(() -> service.startRescan(PROJECT, other.id()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("SCAN-basis");
+    }
+
+    @Test
+    void startRescanRejectsSourceWithNoRealDeviceEndpoint() {
+        DataSourceRow noEndpoint = dataSourceRepo.insert(
+                PROJECT, "No endpoint", "OPC_UA", "SCAN", 4840, null, "{}", null, "alice");
+        assertThatThrownBy(() -> service.startRescan(PROJECT, noEndpoint.id()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("real-device endpoint");
+    }
+
+    @Test
+    void applyRescanSavesNewSchemaVersionOnTheExistingSource() {
+        scanner.scanResult = okResult();
+        ScanJob createJob = service.startScan(
+                PROJECT, "OPC_UA", "opc.tcp://h", ConnectionCredentials.anonymous(), 0);
+        DataSource source = service.createFromScan(PROJECT, createJob.jobId(), "Scanned Pump",
+                "opc.tcp://h", List.of(new TypeResolution("ns=2;s=x", "INT32", null, null, false)), "alice");
+        int versionBefore = source.schemaVersion();
+
+        // A second scan discovers a changed structure — only the folder and the known
+        // variable this time, no unknown-typed node needing resolution.
+        scanner.scanResult = new ScanResult(ScanStatus.OK, List.of(
+                new DiscoveredNode("ns=2;s=plant", null, "Plant", "Plant", "FOLDER",
+                        null, null, null, null, null),
+                new DiscoveredNode("ns=2;s=temp", "ns=2;s=plant", "Plant/Temp", "Temp", "VARIABLE",
+                        "FLOAT64", "SCALAR", "READ", null, null)),
+                false, 1, "discovered 2 nodes");
+        ScanJob rescanJob = service.startRescan(PROJECT, source.id());
+
+        DataSource updated = service.applyRescan(PROJECT, source.id(), rescanJob.jobId(), List.of());
+
+        assertThat(updated.id()).isEqualTo(source.id());
+        assertThat(updated.schemaVersion()).isGreaterThan(versionBefore);
+        Schema schema = new SchemaService(schemaRepo, dataSourceRepo, new ObjectMapper()).get(PROJECT, source.id());
+        assertThat(schema.nodes()).hasSize(2);
+        assertThat(schema.nodes()).noneMatch(n -> "unknownVar".equals(n.name()));
+    }
+
+    @Test
+    void applyRescanRejectsUnresolvedUnknownNode() {
+        scanner.scanResult = okResult();
+        ScanJob createJob = service.startScan(
+                PROJECT, "OPC_UA", "opc.tcp://h", ConnectionCredentials.anonymous(), 0);
+        DataSource source = service.createFromScan(PROJECT, createJob.jobId(), "Scanned Pump", "opc.tcp://h",
+                List.of(new TypeResolution("ns=2;s=x", "INT32", null, null, false)), "alice");
+
+        scanner.scanResult = okResult();
+        ScanJob rescanJob = service.startRescan(PROJECT, source.id());
+
+        assertThatThrownBy(() -> service.applyRescan(PROJECT, source.id(), rescanJob.jobId(), List.of()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("requiring resolution");
+    }
+
+    @Test
+    void applyRescanRejectsRunningJob() {
+        ScanService pending = new ScanService(
+                scanner,
+                new FakeProjectRepository(),
+                new DataSourceService(dataSourceRepo, new FakeProjectRepository(),
+                        new InMemorySchemaRepository(dataSourceRepo), new InMemoryRuntimeController(), credentials,
+                        new ObjectMapper(), "localhost",
+                        new ActivityEventService(new NoOpActivityEventRepository())),
+                new SchemaService(new InMemorySchemaRepository(dataSourceRepo), dataSourceRepo, new ObjectMapper()),
+                credentials,
+                task -> { /* never executes */ });
+        ScanJob job = pending.startScan(PROJECT, "OPC_UA", "opc.tcp://h", ConnectionCredentials.anonymous(), 0);
+
+        // The running-job check short-circuits before the target source is even looked up.
+        assertThatThrownBy(() -> pending.applyRescan(PROJECT, "ds-does-not-matter", job.jobId(), List.of()))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 

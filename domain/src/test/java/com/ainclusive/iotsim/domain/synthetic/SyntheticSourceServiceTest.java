@@ -14,6 +14,8 @@ import com.ainclusive.iotsim.domain.datasource.DataSourceService;
 import com.ainclusive.iotsim.domain.datasource.Protocol;
 import com.ainclusive.iotsim.domain.datasource.RuntimeState;
 import com.ainclusive.iotsim.domain.datasource.SourceBasis;
+import com.ainclusive.iotsim.domain.manualschema.ManualSchema;
+import com.ainclusive.iotsim.domain.manualschema.ManualSchemaService;
 import com.ainclusive.iotsim.domain.schema.Schema;
 import com.ainclusive.iotsim.domain.schema.SchemaService;
 import com.ainclusive.iotsim.protocolmodel.Access;
@@ -34,13 +36,15 @@ class SyntheticSourceServiceTest {
 
     private DataSourceService dataSources;
     private SchemaService schemas;
+    private ManualSchemaService manualSchemas;
     private SyntheticSourceService service;
 
     @BeforeEach
     void setUp() {
         dataSources = mock(DataSourceService.class);
         schemas = mock(SchemaService.class);
-        service = new SyntheticSourceService(dataSources, schemas, new ObjectMapper());
+        manualSchemas = mock(ManualSchemaService.class);
+        service = new SyntheticSourceService(dataSources, schemas, manualSchemas, new ObjectMapper());
     }
 
     private static SyntheticConfig config() {
@@ -64,7 +68,7 @@ class SyntheticSourceServiceTest {
                 any(), any(), any(), any(), any(), any(), eq("local"))).willReturn(sample("ds1"));
         given(dataSources.get(PROJECT, "ds1")).willReturn(sample("ds1"));
 
-        DataSource result = service.create(PROJECT, "Gen", "OPC_UA", null, config(), null, "local");
+        DataSource result = service.create(PROJECT, "Gen", "OPC_UA", null, config(), null, null, "local");
 
         assertThat(result.id()).isEqualTo("ds1");
 
@@ -85,7 +89,7 @@ class SyntheticSourceServiceTest {
 
     @Test
     void createWithNullConfigRejected() {
-        assertThatThrownBy(() -> service.create(PROJECT, "Gen", "OPC_UA", null, null, null, "local"))
+        assertThatThrownBy(() -> service.create(PROJECT, "Gen", "OPC_UA", null, null, null, null, "local"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("config is required");
     }
@@ -95,7 +99,7 @@ class SyntheticSourceServiceTest {
         var bad = new SyntheticConfig(1L, List.of(
                 new SyntheticVariableConfig("x", DataType.FLOAT64,
                         new PatternSpec("RAMP", null, 0.0, 10.0, null, null, null, null), 100)));
-        assertThatThrownBy(() -> service.create(PROJECT, "Gen", "OPC_UA", null, bad, null, "local"))
+        assertThatThrownBy(() -> service.create(PROJECT, "Gen", "OPC_UA", null, bad, null, null, "local"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("periodMs");
     }
@@ -120,7 +124,7 @@ class SyntheticSourceServiceTest {
                 any(), any(), any(), any(), any(), any(), eq("local"))).willReturn(sample("ds2"));
         given(dataSources.get(PROJECT, "ds2")).willReturn(sample("ds2"));
 
-        service.create(PROJECT, "Twin", "OPC_UA", null, config(), "src1", "local");
+        service.create(PROJECT, "Twin", "OPC_UA", null, config(), "src1", null, "local");
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<SchemaNode>> nodes = ArgumentCaptor.forClass(List.class);
@@ -140,7 +144,7 @@ class SyntheticSourceServiceTest {
                 new SyntheticVariableConfig("ghost", DataType.FLOAT64,
                         new PatternSpec("CONSTANT", 1.0, null, null, null, null, null, null), 250)));
 
-        assertThatThrownBy(() -> service.create(PROJECT, "Twin", "OPC_UA", null, config, "src1", "local"))
+        assertThatThrownBy(() -> service.create(PROJECT, "Twin", "OPC_UA", null, config, "src1", null, "local"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("ghost");
     }
@@ -153,8 +157,72 @@ class SyntheticSourceServiceTest {
                 new SyntheticVariableConfig("temp", DataType.BOOL,
                         new PatternSpec("CONSTANT", 1.0, null, null, null, null, null, null), 250)));
 
-        assertThatThrownBy(() -> service.create(PROJECT, "Twin", "OPC_UA", null, config, "src1", "local"))
+        assertThatThrownBy(() -> service.create(PROJECT, "Twin", "OPC_UA", null, config, "src1", null, "local"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("does not match");
+    }
+
+    // ── manualSchemaId: reuse a standalone manual schema verbatim (IS-173) ───────────────────
+
+    private static ManualSchema sampleManualSchema() {
+        SchemaNode folder = new SchemaNode("f1", null, "/Reactor", "Reactor",
+                NodeKind.FOLDER, null, ValueRank.SCALAR, Access.READ, null, null);
+        SchemaNode temp = new SchemaNode("temp", "f1", "/Reactor/Temperature", "Temperature",
+                NodeKind.VARIABLE, DataType.FLOAT64, ValueRank.SCALAR, Access.READ, "degC", "reactor temp");
+        SchemaNode level = new SchemaNode("level", "f1", "/Reactor/Level", "Level",
+                NodeKind.VARIABLE, DataType.INT32, ValueRank.SCALAR, Access.READ, "%", null);
+        Instant now = Instant.now();
+        return new ManualSchema("ms1", PROJECT, "OPC_UA", "Reactor template", null,
+                List.of(folder, temp, level), now, now, "local", 0);
+    }
+
+    @Test
+    void createWithManualSchemaIdCopiesSchemaVerbatim() {
+        given(manualSchemas.get(PROJECT, "ms1")).willReturn(sampleManualSchema());
+        given(dataSources.create(eq(PROJECT), eq("Twin"), eq("OPC_UA"), eq("SYNTHETIC"),
+                any(), any(), any(), any(), any(), any(), eq("local"))).willReturn(sample("ds3"));
+        given(dataSources.get(PROJECT, "ds3")).willReturn(sample("ds3"));
+
+        service.create(PROJECT, "Twin", "OPC_UA", null, config(), null, "ms1", "local");
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<SchemaNode>> nodes = ArgumentCaptor.forClass(List.class);
+        verify(schemas).save(eq(PROJECT), eq("ds3"), nodes.capture());
+        assertThat(nodes.getValue()).hasSize(3);
+        SchemaNode temp = nodes.getValue().stream().filter(n -> n.nodeId().equals("temp")).findFirst().orElseThrow();
+        assertThat(temp.name()).isEqualTo("Temperature");
+        assertThat(temp.unit()).isEqualTo("degC");
+    }
+
+    @Test
+    void createWithManualSchemaIdRejectsUnknownNode() {
+        given(manualSchemas.get(PROJECT, "ms1")).willReturn(sampleManualSchema());
+        var config = new SyntheticConfig(1L, List.of(
+                new SyntheticVariableConfig("ghost", DataType.FLOAT64,
+                        new PatternSpec("CONSTANT", 1.0, null, null, null, null, null, null), 250)));
+
+        assertThatThrownBy(() -> service.create(PROJECT, "Twin", "OPC_UA", null, config, null, "ms1", "local"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("ghost");
+    }
+
+    @Test
+    void createWithManualSchemaIdRejectsTypeMismatch() {
+        given(manualSchemas.get(PROJECT, "ms1")).willReturn(sampleManualSchema());
+        var config = new SyntheticConfig(1L, List.of(
+                new SyntheticVariableConfig("temp", DataType.BOOL,
+                        new PatternSpec("CONSTANT", 1.0, null, null, null, null, null, null), 250)));
+
+        assertThatThrownBy(() -> service.create(PROJECT, "Twin", "OPC_UA", null, config, null, "ms1", "local"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("does not match");
+    }
+
+    @Test
+    void createWithBothSchemaFromSourceIdAndManualSchemaIdRejected() {
+        assertThatThrownBy(() ->
+                        service.create(PROJECT, "Twin", "OPC_UA", null, config(), "src1", "ms1", "local"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("mutually exclusive");
     }
 }

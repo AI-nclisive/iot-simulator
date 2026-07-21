@@ -17,12 +17,15 @@ const { mockUpdateSourceConfiguration } = vi.hoisted(() => ({
 
 vi.mock("../shell/shell-store", () => ({
   useShellStore: (selector: (s: Record<string, unknown>) => unknown) =>
-    selector({ accessMode: "local", sharedRole: "admin" }),
+    selector({ accessMode: "local", sharedRole: "admin", currentProjectId: "proj-1" }),
 }));
 
 vi.mock("../shell/data-sources-store", () => ({
   useDataSourcesStore: (selector: (s: Record<string, unknown>) => unknown) =>
-    selector({ updateSourceConfiguration: mockUpdateSourceConfiguration }),
+    selector({
+      updateSourceConfiguration: mockUpdateSourceConfiguration,
+      applyRescan: vi.fn(),
+    }),
 }));
 
 const source: DataSourceRow = {
@@ -33,6 +36,12 @@ const source: DataSourceRow = {
   parameterCount: 100,
   status: "Stopped",
   health: "Healthy",
+};
+
+const scanSource: DataSourceRow = {
+  ...source,
+  basis: "SCAN",
+  realDeviceEndpoint: "opc.tcp://real-device:4840",
 };
 
 afterEach(() => {
@@ -75,5 +84,17 @@ describe("DataSourceDetailSettingsTab — async save badge sequencing (UI-137)",
     await userEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
     await waitFor(() => expect(screen.getByText("Saved")).toBeTruthy());
+  });
+});
+
+describe("DataSourceDetailSettingsTab — Rescan panel visibility", () => {
+  it("shows the Rescan panel for a SCAN-basis source", () => {
+    render(<DataSourceDetailSettingsTab source={scanSource} />);
+    expect(screen.getByRole("button", { name: /Rescan tags/i })).toBeTruthy();
+  });
+
+  it("does not show the Rescan panel for a non-SCAN-basis source", () => {
+    render(<DataSourceDetailSettingsTab source={source} />);
+    expect(screen.queryByRole("button", { name: /Rescan tags/i })).toBeNull();
   });
 });

@@ -163,7 +163,8 @@ public class ScanController {
                 .body(DataSourceResponse.from(ds, paramCount));
     }
 
-    private static List<TypeResolution> toResolutions(List<TypeResolutionRequest> reqs) {
+    /** Reused by {@code DataSourceController}'s rescan-apply endpoint to avoid duplicating this mapping. */
+    public static List<TypeResolution> toResolutions(List<TypeResolutionRequest> reqs) {
         if (reqs == null) {
             return List.of();
         }

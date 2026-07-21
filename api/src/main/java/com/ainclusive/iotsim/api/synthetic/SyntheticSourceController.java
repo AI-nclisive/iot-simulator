@@ -59,7 +59,7 @@ public class SyntheticSourceController {
         }
         DataSource ds = syntheticSources.create(
                 projectId, req.name(), req.protocol(), req.simulatorPort(), req.config(),
-                req.schemaFromSourceId(), "local");
+                req.schemaFromSourceId(), req.manualSchemaId(), "local");
         int paramCount = schemas.countVariableNodes(ds.id());
         return ResponseEntity.created(
                         URI.create("/api/v1/projects/" + projectId + "/data-sources/" + ds.id()))
@@ -69,10 +69,12 @@ public class SyntheticSourceController {
 
     /**
      * {@code schemaFromSourceId} (optional, IS-145): reuse an existing source's schema verbatim
-     * (names/paths/units) and drive the nodes named in {@code config}; when null the schema is
-     * derived from the config variables.
+     * (names/paths/units) and drive the nodes named in {@code config}. {@code manualSchemaId}
+     * (optional, IS-173): same copy-by-snapshot reuse, sourced from a standalone manual schema
+     * instead — mutually exclusive with {@code schemaFromSourceId}. When neither is set, the
+     * schema is derived from the config variables.
      */
     public record CreateSyntheticSourceRequest(
             String name, String protocol, Integer simulatorPort, SyntheticConfig config,
-            String schemaFromSourceId) {}
+            String schemaFromSourceId, String manualSchemaId) {}
 }

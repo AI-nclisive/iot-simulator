@@ -1146,22 +1146,43 @@ Parallel execution:
   Depends: none (complements IS-169, backend, merged).
   Done when: the picker's date/time subtitle includes a time component matching the Recordings page's format; typecheck + vitest + build green.
 
+- [x] `UI-486` ✅ Allow decimal values in synthetic pattern number fields
+  Goal: the synthetic pattern editor's numeric fields (Min, Max, Period, Volatility, Update rate, Seed) rejected decimal input — the backend already stores these as `Double` (`PatternSpec`), but the `<input type="number">` elements had no `step` attribute, so the browser's default integer-only step semantics applied.
+  Surface: `Create Data Source Wizard` (synthetic basis)
+  Work includes: `synthetic-profile-step.tsx` — added `step="any"` to every numeric pattern field (Seed, Min, Max, Period, Volatility, Update rate). No backend or parsing change needed; `num()` already accepts decimals via `Number(s)`.
+  Depends: none.
+  Done when: every numeric pattern field accepts a decimal value (e.g. 36.6); typecheck + vitest + build green.
+
+- [x] `UI-487` ✅ Select-all / deselect-all for synthetic measurement rows
+  Goal: the synthetic pattern editor's measurement list has a per-row "enabled" checkbox but no way to select/deselect all rows at once — with schemas of 200+ measurements, toggling each row individually is impractical.
+  Surface: `Create Data Source Wizard` (synthetic basis)
+  Work includes: `synthetic-profile-step.tsx` gained a master "Select all" checkbox above the measurement list (`setAllEnabled`, `enabledCount`/`allEnabled`/`someEnabled` derived from `drafts`), with an indeterminate visual state when some but not all rows are enabled.
+  Depends: none.
+  Done when: the master checkbox checks/unchecks every row at once and shows indeterminate when partially selected; typecheck + vitest + build green.
+
+- [x] `UI-488` ✅ Bulk-apply a pattern to selected synthetic measurement rows
+  Goal: there was no way to set the same pattern (e.g. Random) for many synthetic measurement rows at once — the user had to change each row's Pattern select individually, even after selecting multiple rows via UI-487's select-all.
+  Surface: `Create Data Source Wizard` (synthetic basis)
+  Work includes: `synthetic-profile-step.tsx` gained a "Set pattern for selected…" control next to UI-487's select-all checkbox; `setPatternForSelected` applies the chosen pattern to every currently-enabled row, skipping `CONSTANT_ONLY_TYPES` (IS-168) nodes, reusing `changePattern`'s per-node recording-suggestion re-apply logic.
+  Depends: UI-487.
+  Done when: the bulk control applies a pattern to every enabled row and leaves deselected rows untouched; typecheck + vitest + build green.
+
 - [ ] `UI-489` Manual Schemas list page (nav/list)
   Goal: a new "Manual Schemas" section (project-scoped) listing reusable, standalone structure artifacts — name, protocol, variable count, updated date — with create/duplicate/delete actions, modeled on `recordings-page.tsx`.
   Surface: new `Manual Schemas` list page + nav entry.
-  Depends: IS-171, IS-172 (backend).
+  Depends: IS-171, IS-172 (backend, merged).
   Done when: list loads/paginates from `GET /manual-schemas`; create/duplicate/delete wired; empty and loading states; typecheck + vitest + build green.
 
 - [ ] `UI-490` Standalone Manual Schema editor with Save / Save As
   Goal: reuse the existing Full Schema Editor (`data-source-schema-editor.tsx`) in a standalone mode bound to a `ManualSchema` instead of a data source's schema. On Save with unsaved changes, prompt the user to choose: save into this schema, or save as a new one (no monotonic version chain, per `03_DOMAIN_MODEL.md` §ManualSchema).
   Surface: `Manual Schemas` — editor.
-  Depends: UI-489, IS-172.
+  Depends: UI-489, IS-172 (merged).
   Done when: structural edits at any depth, types, unit/description all work standalone; Save/Save-As dialog appears only when there are unsaved changes; typecheck + vitest + build green.
 
 - [ ] `UI-491` Synthetic wizard — pick a Manual Schema as parameter source
   Goal: in the Create Data Source wizard's Synthetic "Configure profile" step (`synthetic-profile-step.tsx`), add "Manual schema" as a parameter-source option alongside the existing "existing source's schema" and "prefill from recording" options — a schema is required to get any parameters to drive.
   Surface: `Create Data Source Wizard` (synthetic basis).
-  Depends: IS-173, UI-489.
+  Depends: IS-173 (merged), UI-489.
   Done when: picking a Manual Schema populates the per-measurement pattern editor from its nodes; `manualSchemaId` sent to `POST .../data-sources/synthetic`; mutually exclusive with picking an existing source; typecheck + vitest + build green.
 
 ## Recommended Sequence

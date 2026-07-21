@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { resolveAccess } from "../shell/access-policy";
 import { useDataSourcesStore } from "../shell/data-sources-store";
 import { useShellStore } from "../shell/shell-store";
+import { DataSourceRescanPanel } from "./data-source-rescan-panel";
 import { EditLockBanner, type EditLockState } from "../ui/edit-lock-banner";
 import { SharedStatePanel } from "../ui/shared-state-panel";
 import { StatusBadge } from "../ui/status-badge";
@@ -14,6 +15,7 @@ export function DataSourceDetailSettingsTab({
 }) {
   const accessMode = useShellStore((state) => state.accessMode);
   const sharedRole = useShellStore((state) => state.sharedRole);
+  const currentProjectId = useShellStore((state) => state.currentProjectId);
   const updateSourceConfiguration = useDataSourcesStore(
     (state) => state.updateSourceConfiguration,
   );
@@ -140,6 +142,10 @@ export function DataSourceDetailSettingsTab({
           </div>
         </label>
       </div>
+
+      {isScanBasis && isEditable && currentProjectId ? (
+        <DataSourceRescanPanel source={source} projectId={currentProjectId} />
+      ) : null}
 
       {validationMessage ? (
         <p className="text-sm text-shell-danger">{validationMessage}</p>
