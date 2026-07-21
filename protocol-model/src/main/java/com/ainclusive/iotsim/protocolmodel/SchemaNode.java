@@ -1,7 +1,7 @@
 package com.ainclusive.iotsim.protocolmodel;
 
-import java.util.Objects;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * One addressable node in a protocol-neutral schema tree.

@@ -234,7 +234,9 @@ public class ManualSchemaController {
     }
 
     private static List<SchemaReference> references(List<ReferenceDto> dtos) {
-        if (dtos == null) return List.of();
+        if (dtos == null) {
+            return List.of();
+        }
         return dtos.stream().map(d -> new SchemaReference(d.targetNodeId(),
                 parseEnum(ReferenceType.class, d.type(), "reference.type"), d.forward())).toList();
     }
