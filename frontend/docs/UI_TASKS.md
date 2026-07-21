@@ -1173,7 +1173,7 @@ Parallel execution:
   Depends: IS-171, IS-172 (backend, merged).
   Done when: list loads/paginates from `GET /manual-schemas`; create/duplicate/delete wired; empty and loading states; typecheck + vitest + build green.
 
-- [ ] `UI-490` Standalone Manual Schema editor with Save / Save As
+- [x] `UI-490` ✅ Standalone Manual Schema editor with Save / Save As
   Goal: reuse the existing Full Schema Editor (`data-source-schema-editor.tsx`) in a standalone mode bound to a `ManualSchema` instead of a data source's schema. On Save with unsaved changes, prompt the user to choose: save into this schema, or save as a new one (no monotonic version chain, per `03_DOMAIN_MODEL.md` §ManualSchema).
   Surface: `Manual Schemas` — editor.
   Depends: UI-489, IS-172 (merged).
