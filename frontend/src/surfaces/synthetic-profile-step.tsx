@@ -13,7 +13,7 @@
  * measurement's pattern re-applies that type's ranges.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch } from "../api";
 import { useNotificationStore } from "../shell/notification-store";
 import type { DataSourceRow } from "../shell/data-sources-store";
@@ -283,6 +283,11 @@ export function SyntheticProfileStep({
   const [suggestions, setSuggestions] = useState<
     Record<string, { updateRateMs: number; byType: Record<string, SyntheticPatternSpec> }>
   >({});
+  // UI-484: nodeIds actually updated by the last successful prefill, so those rows can be
+  // visually marked — a recording rarely covers every schema measurement, and without this
+  // a user scrolling to an unmatched row could reasonably conclude prefill did nothing.
+  const [prefilledNodeIds, setPrefilledNodeIds] = useState<Set<string>>(new Set());
+  const rowRefs = useRef<Record<string, HTMLLIElement | null>>({});
 
   const variableNodes = useMemo(() => nodes.filter((n) => n.kind === "VARIABLE"), [nodes]);
 
@@ -310,6 +315,7 @@ export function SyntheticProfileStep({
     setNodes([]);
     setDrafts({});
     setLoadError(null);
+    setPrefilledNodeIds(new Set());
     if (!id) return;
     setLoading(true);
     try {
@@ -372,6 +378,12 @@ export function SyntheticProfileStep({
         }
         return next;
       });
+      // Computed from the `drafts` closure (not the setDrafts updater's `cur`) so it's ready
+      // to use immediately below — the updater callback only runs when React processes the
+      // state update, which is too late to read synchronously here.
+      const updatedNodeIds = profile.measurements
+        .filter((m) => drafts[m.nodeId] && m.suggestions[m.recommended])
+        .map((m) => m.nodeId);
       setDrafts((cur) => {
         const next = { ...cur };
         for (const m of profile.measurements) {
@@ -386,12 +398,19 @@ export function SyntheticProfileStep({
         }
         return next;
       });
+      // UI-484: mark which rows actually changed and scroll the first one into view — the
+      // recording may only cover a fraction of the schema's measurements, and a long list
+      // otherwise leaves no way to tell prefill worked from an unmatched row elsewhere.
+      setPrefilledNodeIds(new Set(updatedNodeIds));
+      if (updatedNodeIds.length > 0) {
+        rowRefs.current[updatedNodeIds[0]]?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
       push(
         matched > 0
           ? {
               tone: "success",
               title: `Prefilled ${matched} measurement${matched === 1 ? "" : "s"} from the recording.`,
-              message: "Switch a measurement's pattern to see that type's suggested ranges.",
+              message: "Prefilled measurements are marked below. Switch a pattern to see that type's suggested ranges.",
             }
           : {
               tone: "warning",
@@ -514,6 +533,11 @@ export function SyntheticProfileStep({
               </button>
             </div>
           </div>
+          <p className="text-xs text-shell-muted">
+            Copies realistic ranges and a suggested pattern from a real recording into any
+            measurement it has captured data for — measurements the recording doesn't cover keep
+            their current settings.
+          </p>
 
           <ul className="space-y-2">
             {variableNodes.map((node) => {
@@ -523,10 +547,17 @@ export function SyntheticProfileStep({
               const showPeriod = d.pattern === "SINE" || d.pattern === "RAMP" || d.pattern === "SQUARE";
               const isBytes = node.dataType === "BYTES";
               const valueInputType = isTextConstantType(node.dataType) || isBytes ? "text" : "number";
+              const wasPrefilled = prefilledNodeIds.has(node.nodeId);
               return (
                 <li
                   key={node.nodeId}
-                  className="rounded-md border border-shell-line bg-white px-4 py-3"
+                  ref={(el) => {
+                    rowRefs.current[node.nodeId] = el;
+                  }}
+                  className={
+                    "rounded-md border bg-white px-4 py-3 " +
+                    (wasPrefilled ? "border-shell-accent" : "border-shell-line")
+                  }
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <label className="flex items-center gap-2 text-sm font-medium text-shell-ink">
@@ -540,6 +571,11 @@ export function SyntheticProfileStep({
                         {node.path} · {node.dataType ?? "—"}
                         {node.unit ? ` · ${node.unit}` : ""}
                       </span>
+                      {wasPrefilled ? (
+                        <span className="rounded-full bg-shell-accent/10 px-2 py-0.5 text-xs font-normal normal-case text-shell-accent">
+                          Prefilled
+                        </span>
+                      ) : null}
                     </label>
                   </div>
 
