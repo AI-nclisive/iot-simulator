@@ -20,14 +20,26 @@ export type CreateManualSchemaInput = {
   nodes?: NodeDto[];
 };
 
+export type UpdateManualSchemaInput = {
+  name: string;
+  description?: string | null;
+  nodes: NodeDto[];
+};
+
 type ManualSchemasState = {
   schemas: ManualSchemaResponse[];
   isLoading: boolean;
   error: string | null;
   loadManualSchemas: (projectId: string) => Promise<void>;
+  loadManualSchemaById: (projectId: string, id: string) => Promise<ManualSchemaResponse>;
   createManualSchema: (
     projectId: string,
     input: CreateManualSchemaInput,
+  ) => Promise<ManualSchemaResponse>;
+  updateManualSchema: (
+    projectId: string,
+    id: string,
+    input: UpdateManualSchemaInput,
   ) => Promise<ManualSchemaResponse>;
   duplicateManualSchema: (
     projectId: string,
@@ -69,6 +81,20 @@ export const useManualSchemasStore = create<ManualSchemasState>((set) => ({
     }
   },
 
+  // Always fetches fresh (no cache shortcut): the response's ETag is keyed to this
+  // exact path by apiFetch and is required as If-Match on the next PUT/DELETE, so
+  // the editor must GET here before any save — a cached hit (e.g. right after
+  // create/duplicate, which POST to a different path) would leave that ETag unset.
+  loadManualSchemaById: async (projectId: string, id: string) => {
+    const schema = await apiFetch<ManualSchemaResponse>(
+      `/api/v1/projects/${projectId}/manual-schemas/${id}`,
+    );
+    set((state) => ({
+      schemas: [schema, ...state.schemas.filter((s) => s.id !== schema.id)],
+    }));
+    return schema;
+  },
+
   createManualSchema: async (projectId, input) => {
     const schema = await apiFetch<ManualSchemaResponse>(
       `/api/v1/projects/${projectId}/manual-schemas`,
@@ -83,6 +109,24 @@ export const useManualSchemasStore = create<ManualSchemasState>((set) => ({
       },
     );
     set((state) => ({ schemas: [schema, ...state.schemas] }));
+    return schema;
+  },
+
+  updateManualSchema: async (projectId, id, input) => {
+    const schema = await apiFetch<ManualSchemaResponse>(
+      `/api/v1/projects/${projectId}/manual-schemas/${id}`,
+      {
+        method: "PUT",
+        body: JSON.stringify({
+          name: input.name,
+          description: input.description ?? null,
+          nodes: input.nodes,
+        }),
+      },
+    );
+    set((state) => ({
+      schemas: state.schemas.map((s) => (s.id === schema.id ? schema : s)),
+    }));
     return schema;
   },
 

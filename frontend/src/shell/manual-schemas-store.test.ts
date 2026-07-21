@@ -1,7 +1,9 @@
 /**
- * Tests for useManualSchemasStore (UI-489).
+ * Tests for useManualSchemasStore (UI-489/UI-490).
  *
- * Mocks apiFetch. Covers load/create/duplicate/delete.
+ * Mocks apiFetch. Covers load/create/update/duplicate/delete and the
+ * always-fresh-fetch behavior of loadManualSchemaById (needed so PUT's
+ * If-Match ETag, which apiFetch keys per-path, is set before any save).
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi, type MockedFunction } from "vitest";
@@ -81,6 +83,19 @@ describe("loadManualSchemas", () => {
   });
 });
 
+describe("loadManualSchemaById", () => {
+  it("always fetches, even when the schema is already in state", async () => {
+    useManualSchemasStore.setState({ schemas: [makeSchema({ version: 0 })] });
+    mockApiFetch.mockResolvedValueOnce(makeSchema({ version: 1 }));
+
+    const result = await useManualSchemasStore.getState().loadManualSchemaById("proj-1", "ms-01");
+
+    expect(mockApiFetch).toHaveBeenCalledWith("/api/v1/projects/proj-1/manual-schemas/ms-01");
+    expect(result.version).toBe(1);
+    expect(useManualSchemasStore.getState().schemas[0].version).toBe(1);
+  });
+});
+
 describe("createManualSchema", () => {
   it("POSTs and prepends the new schema", async () => {
     mockApiFetch.mockResolvedValueOnce(makeSchema({ id: "ms-new", name: "New one" }));
@@ -95,6 +110,24 @@ describe("createManualSchema", () => {
     );
     expect(created.id).toBe("ms-new");
     expect(useManualSchemasStore.getState().schemas[0].id).toBe("ms-new");
+  });
+});
+
+describe("updateManualSchema", () => {
+  it("PUTs and replaces the schema in the list", async () => {
+    useManualSchemasStore.setState({ schemas: [makeSchema({ version: 0 })] });
+    mockApiFetch.mockResolvedValueOnce(makeSchema({ name: "Renamed", version: 1 }));
+
+    const updated = await useManualSchemasStore
+      .getState()
+      .updateManualSchema("proj-1", "ms-01", { name: "Renamed", nodes: [] });
+
+    expect(mockApiFetch).toHaveBeenCalledWith(
+      "/api/v1/projects/proj-1/manual-schemas/ms-01",
+      expect.objectContaining({ method: "PUT" }),
+    );
+    expect(updated.name).toBe("Renamed");
+    expect(useManualSchemasStore.getState().schemas[0].name).toBe("Renamed");
   });
 });
 

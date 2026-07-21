@@ -1,11 +1,11 @@
 /**
- * Tests for ManualSchemasPage (UI-489).
+ * Tests for ManualSchemasPage (UI-489/UI-490).
  *
  * Covers:
  * - loadManualSchemas is called on mount
  * - list renders name/protocol/variable-count
- * - create dialog calls createManualSchema (no navigation yet — the detail/editor
- *   route lands in UI-490; a row isn't clickable until that page exists)
+ * - create dialog calls createManualSchema and navigates to the new schema's editor
+ * - a row click navigates to that schema's editor
  * - duplicate dialog calls duplicateManualSchema
  * - delete confirmation calls deleteManualSchema
  */
@@ -14,6 +14,13 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ManualSchemasPage } from "./manual-schemas-page";
+
+const { mockNavigate } = vi.hoisted(() => ({ mockNavigate: vi.fn() }));
+
+vi.mock("react-router-dom", async () => {
+  const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
+  return { ...actual, useNavigate: () => mockNavigate };
+});
 
 const {
   mockLoadManualSchemas,
@@ -84,7 +91,7 @@ describe("ManualSchemasPage (UI-489)", () => {
     expect(screen.getByText("OPC UA")).not.toBeNull();
   });
 
-  it("creates a schema", async () => {
+  it("creates a schema and navigates to its editor", async () => {
     mockCreateManualSchema.mockResolvedValueOnce({ ...schema, id: "ms-new" });
     renderPage();
 
@@ -100,6 +107,13 @@ describe("ManualSchemasPage (UI-489)", () => {
         expect.objectContaining({ protocol: "OPC_UA", name: "New schema" }),
       );
     });
+    expect(mockNavigate).toHaveBeenCalledWith("/manual-schemas/ms-new");
+  });
+
+  it("navigates to the editor when a row is clicked", () => {
+    renderPage();
+    fireEvent.click(screen.getByText("Boiler layout"));
+    expect(mockNavigate).toHaveBeenCalledWith("/manual-schemas/ms-1");
   });
 
   it("duplicates a schema with the entered name", async () => {
