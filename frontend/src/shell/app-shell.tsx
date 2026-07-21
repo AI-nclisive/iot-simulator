@@ -10,6 +10,7 @@ const topLevelNav = [
   { to: "/overview", label: "Overview" },
   { to: "/data-sources", label: "Data Sources" },
   { to: "/recordings", label: "Recordings" },
+  { to: "/manual-schemas", label: "Manual Schemas" },
   { to: "/scenarios", label: "Scenarios" },
   { to: "/evidence", label: "Evidence" },
   { to: "/settings", label: "Settings" },

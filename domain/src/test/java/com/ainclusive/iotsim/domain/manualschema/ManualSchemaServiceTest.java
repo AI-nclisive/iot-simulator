@@ -57,6 +57,33 @@ class ManualSchemaServiceTest {
     }
 
     @Test
+    void listPagedReturnsSchemasInProject() {
+        service.create(PROJECT, "OPC_UA", "Boiler", null, sampleNodes(), "it");
+        service.create(PROJECT, "OPC_UA", "Pump", null, sampleNodes(), "it");
+
+        var page = service.listPaged(PROJECT, null, null);
+
+        assertThat(page.items()).hasSize(2);
+        assertThat(page.items()).extracting(ManualSchema::name).containsExactlyInAnyOrder("Boiler", "Pump");
+        assertThat(page.nextCursor()).isNull();
+    }
+
+    @Test
+    void listPagedSecondPageContinuesFromCursor() {
+        service.create(PROJECT, "OPC_UA", "A", null, sampleNodes(), "it");
+        service.create(PROJECT, "OPC_UA", "B", null, sampleNodes(), "it");
+        service.create(PROJECT, "OPC_UA", "C", null, sampleNodes(), "it");
+
+        var page1 = service.listPaged(PROJECT, null, 2);
+        assertThat(page1.items()).extracting(ManualSchema::name).containsExactly("C", "B");
+        assertThat(page1.nextCursor()).isNotNull();
+
+        var page2 = service.listPaged(PROJECT, page1.nextCursor(), 2);
+        assertThat(page2.items()).extracting(ManualSchema::name).containsExactly("A");
+        assertThat(page2.nextCursor()).isNull();
+    }
+
+    @Test
     void createWithInvalidProtocolIsRejected() {
         assertThatThrownBy(() -> service.create(PROJECT, "NOT_A_PROTOCOL", "X", null, sampleNodes(), "it"))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -128,11 +155,15 @@ class ManualSchemaServiceTest {
 
     private static final class InMemoryManualSchemaRepository implements ManualSchemaRepository {
         private final Map<String, ManualSchemaRow> rows = new HashMap<>();
+        // Strictly-increasing offset so rows created within the same test get distinct,
+        // deterministically ordered createdAt values regardless of system clock resolution —
+        // needed for findByProjectPaged's keyset ordering/tie-break to be exercised reliably.
+        private long sequence = 0;
 
         @Override
         public ManualSchemaRow create(String projectId, String protocol, String name, String description,
                 String nodesJson, String createdBy) {
-            OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+            OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC).plusNanos(sequence++);
             ManualSchemaRow row = new ManualSchemaRow(
                     Ids.newId(), projectId, protocol, name, description, nodesJson, now, now, createdBy, 0);
             rows.put(row.id(), row);
@@ -142,6 +173,22 @@ class ManualSchemaServiceTest {
         @Override
         public List<ManualSchemaRow> findByProject(String projectId) {
             return rows.values().stream().filter(r -> r.projectId().equals(projectId)).toList();
+        }
+
+        /** Mirrors JooqManualSchemaRepository's keyset semantics: created_at DESC, id DESC. */
+        @Override
+        public List<ManualSchemaRow> findByProjectPaged(String projectId, OffsetDateTime afterAt,
+                String afterId, int limit) {
+            return findByProject(projectId).stream()
+                    .filter(r -> afterAt == null
+                            || r.createdAt().isBefore(afterAt)
+                            || (r.createdAt().isEqual(afterAt) && r.id().compareTo(afterId) < 0))
+                    .sorted((a, b) -> {
+                        int cmp = b.createdAt().compareTo(a.createdAt());
+                        return cmp != 0 ? cmp : b.id().compareTo(a.id());
+                    })
+                    .limit(limit)
+                    .toList();
         }
 
         @Override

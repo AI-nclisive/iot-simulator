@@ -4,6 +4,7 @@ import com.ainclusive.iotsim.api.error.PreconditionRequiredException;
 import com.ainclusive.iotsim.api.security.Permission;
 import com.ainclusive.iotsim.domain.manualschema.ManualSchema;
 import com.ainclusive.iotsim.domain.manualschema.ManualSchemaService;
+import com.ainclusive.iotsim.domain.support.Page;
 import com.ainclusive.iotsim.protocolmodel.Access;
 import com.ainclusive.iotsim.protocolmodel.DataType;
 import com.ainclusive.iotsim.protocolmodel.NodeKind;
@@ -24,6 +25,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -52,11 +54,15 @@ public class ManualSchemaController {
         this.manualSchemas = manualSchemas;
     }
 
-    @Operation(summary = "List manual schemas", description = "Returns every manual schema in the project.")
+    @Operation(summary = "List manual schemas",
+            description = "Returns a page of manual schemas in the project using cursor-based pagination.")
     @GetMapping
     @PreAuthorize(OBSERVE)
-    public List<ManualSchemaResponse> list(@PathVariable String projectId) {
-        return manualSchemas.list(projectId).stream().map(ManualSchemaResponse::from).toList();
+    public Page<ManualSchemaResponse> list(
+            @PathVariable String projectId,
+            @RequestParam(required = false) String cursor,
+            @RequestParam(required = false) Integer limit) {
+        return manualSchemas.listPaged(projectId, cursor, limit).map(ManualSchemaResponse::from);
     }
 
     @Operation(

@@ -3,10 +3,13 @@ package com.ainclusive.iotsim.domain.manualschema;
 import com.ainclusive.iotsim.domain.common.ConcurrencyConflictException;
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.domain.datasource.Protocol;
+import com.ainclusive.iotsim.domain.support.Page;
+import com.ainclusive.iotsim.domain.support.PageCursor;
 import com.ainclusive.iotsim.persistence.manualschema.ManualSchemaRepository;
 import com.ainclusive.iotsim.persistence.manualschema.ManualSchemaRow;
 import com.ainclusive.iotsim.persistence.project.ProjectRepository;
 import com.ainclusive.iotsim.protocolmodel.SchemaNode;
+import java.time.OffsetDateTime;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -38,9 +41,20 @@ public class ManualSchemaService {
         this.json = json;
     }
 
-    public List<ManualSchema> list(String projectId) {
+    public Page<ManualSchema> listPaged(String projectId, String cursor, Integer limit) {
         requireProject(projectId);
-        return manualSchemas.findByProject(projectId).stream().map(this::map).toList();
+        int size = PageCursor.clamp(limit);
+        PageCursor.Parts after = PageCursor.decode(cursor);
+        OffsetDateTime afterAt = after != null ? after.at() : null;
+        String afterId = after != null ? after.id() : null;
+        List<ManualSchemaRow> rows = manualSchemas.findByProjectPaged(projectId, afterAt, afterId, size + 1);
+        String nextCursor = null;
+        if (rows.size() > size) {
+            rows = rows.subList(0, size);
+            ManualSchemaRow last = rows.get(rows.size() - 1);
+            nextCursor = PageCursor.encode(last.createdAt(), last.id());
+        }
+        return new Page<>(rows.stream().map(this::map).toList(), nextCursor, size);
     }
 
     public ManualSchema get(String projectId, String id) {

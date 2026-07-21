@@ -19,6 +19,7 @@ import com.ainclusive.iotsim.domain.common.ConcurrencyConflictException;
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.domain.manualschema.ManualSchema;
 import com.ainclusive.iotsim.domain.manualschema.ManualSchemaService;
+import com.ainclusive.iotsim.domain.support.Page;
 import com.ainclusive.iotsim.protocolmodel.Access;
 import com.ainclusive.iotsim.protocolmodel.DataType;
 import com.ainclusive.iotsim.protocolmodel.NodeKind;
@@ -51,10 +52,11 @@ class ManualSchemaControllerTest {
 
     @Test
     void listReturnsSchemas() {
-        given(service.list("p1")).willReturn(List.of(sample(0)));
-        List<ManualSchemaResponse> resp = controller.list("p1");
-        assertThat(resp).hasSize(1);
-        assertThat(resp.get(0).name()).isEqualTo("Boiler");
+        given(service.listPaged("p1", null, null)).willReturn(new Page<>(List.of(sample(0)), null, 50));
+        Page<ManualSchemaResponse> resp = controller.list("p1", null, null);
+        assertThat(resp.items()).hasSize(1);
+        assertThat(resp.items().get(0).name()).isEqualTo("Boiler");
+        assertThat(resp.nextCursor()).isNull();
     }
 
     @Test

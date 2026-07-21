@@ -47,6 +47,20 @@ public class JooqManualSchemaRepository implements ManualSchemaRepository {
     }
 
     @Override
+    public List<ManualSchemaRow> findByProjectPaged(String projectId,
+            OffsetDateTime afterAt, String afterId, int limit) {
+        var q = dsl.selectFrom(MANUAL_SCHEMAS).where(MANUAL_SCHEMAS.PROJECT_ID.eq(projectId));
+        if (afterAt != null) {
+            q = q.and(MANUAL_SCHEMAS.CREATED_AT.lt(afterAt)
+                    .or(MANUAL_SCHEMAS.CREATED_AT.eq(afterAt).and(MANUAL_SCHEMAS.ID.lt(afterId))));
+        }
+        return q.orderBy(MANUAL_SCHEMAS.CREATED_AT.desc(), MANUAL_SCHEMAS.ID.desc())
+                .limit(limit)
+                .fetch()
+                .map(this::map);
+    }
+
+    @Override
     public Optional<ManualSchemaRow> findById(String id) {
         return dsl.selectFrom(MANUAL_SCHEMAS).where(MANUAL_SCHEMAS.ID.eq(id)).fetchOptional().map(this::map);
     }
