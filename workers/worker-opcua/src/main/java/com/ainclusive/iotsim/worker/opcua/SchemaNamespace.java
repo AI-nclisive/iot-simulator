@@ -9,6 +9,7 @@ import org.eclipse.milo.opcua.sdk.server.OpcUaServer;
 import org.eclipse.milo.opcua.sdk.server.api.DataItem;
 import org.eclipse.milo.opcua.sdk.server.api.ManagedNamespaceWithLifecycle;
 import org.eclipse.milo.opcua.sdk.server.api.MonitoredItem;
+import org.eclipse.milo.opcua.sdk.server.nodes.UaObjectNode;
 import org.eclipse.milo.opcua.sdk.server.nodes.UaVariableNode;
 import org.eclipse.milo.opcua.sdk.server.util.SubscriptionModel;
 import org.eclipse.milo.opcua.stack.core.Identifiers;
@@ -27,6 +28,7 @@ final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
 
     private final List<VarDef> variables;
     private final Map<String, UaVariableNode> nodes = new ConcurrentHashMap<>();
+    private final Map<String, org.eclipse.milo.opcua.stack.core.types.builtin.NodeId> hierarchy = new ConcurrentHashMap<>();
     private final SubscriptionModel subscriptionModel;
 
     SchemaNamespace(OpcUaServer server, List<VarDef> variables) {
@@ -58,7 +60,42 @@ final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
     }
 
     private void createNodes() {
+        // Folders are built first, repeatedly, so an out-of-order schema still
+        // materializes correctly. A missing parent is rejected rather than flattened.
+        int remaining = (int) variables.stream().filter(def -> "FOLDER".equals(def.kind())).count();
+        while (remaining > 0) {
+            int created = 0;
+            for (VarDef def : variables) {
+                if (!"FOLDER".equals(def.kind())
+                        || hierarchy.containsKey(def.nodeId())
+                        || (def.parentId() != null && !hierarchy.containsKey(def.parentId()))) {
+                    continue;
+                }
+                var nodeId = newNodeId(def.nodeId());
+                UaObjectNode node = UaObjectNode.builder(getNodeContext())
+                        .setNodeId(nodeId)
+                        .setBrowseName(newQualifiedName(def.name()))
+                        .setDisplayName(LocalizedText.english(def.name()))
+                        .setTypeDefinition(Identifiers.FolderType)
+                        .build();
+                getNodeManager().addNode(node);
+                var parent = def.parentId() == null ? Identifiers.ObjectsFolder : hierarchy.get(def.parentId());
+                node.addReference(new Reference(nodeId, Identifiers.Organizes, parent.expanded(), false));
+                hierarchy.put(def.nodeId(), nodeId);
+                created++;
+            }
+            if (created == 0) {
+                throw new IllegalArgumentException("Schema contains a folder with a missing or cyclic parent");
+            }
+            remaining -= created;
+        }
         for (VarDef def : variables) {
+            if (!"VARIABLE".equals(def.kind())) {
+                continue;
+            }
+            if (def.parentId() != null && !hierarchy.containsKey(def.parentId())) {
+                throw new IllegalArgumentException("Variable has a missing or non-folder parent: " + def.nodeId());
+            }
             UaVariableNode node = UaVariableNode.builder(getNodeContext())
                     .setNodeId(newNodeId(def.nodeId()))
                     .setAccessLevel(AccessLevel.CurrentRead, AccessLevel.CurrentWrite)
@@ -69,11 +106,9 @@ final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
                     .build();
             node.setValue(new DataValue(new Variant(OpcUaTypes.defaultValue(def.dataType()))));
             getNodeManager().addNode(node);
-            // Inverse Organizes (ObjectsFolder -> node) so the variable is browseable
-            // as a child of the Objects folder — how edge devices and create-from-scan
-            // discover the address space. isForward=false is the canonical Milo pattern.
+            var parent = def.parentId() == null ? Identifiers.ObjectsFolder : hierarchy.get(def.parentId());
             node.addReference(new Reference(
-                    node.getNodeId(), Identifiers.Organizes, Identifiers.ObjectsFolder.expanded(), false));
+                    node.getNodeId(), Identifiers.Organizes, parent.expanded(), false));
             nodes.put(def.nodeId(), node);
         }
     }
