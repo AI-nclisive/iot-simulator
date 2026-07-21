@@ -64,6 +64,21 @@ describe("loadManualSchemas", () => {
     expect(useManualSchemasStore.getState().error).toBe("Server error");
     expect(useManualSchemasStore.getState().isLoading).toBe(false);
   });
+
+  it("follows nextCursor to load every page instead of truncating", async () => {
+    mockApiFetch
+      .mockResolvedValueOnce({ items: [makeSchema({ id: "ms-01" })], nextCursor: "c1", limit: 1 })
+      .mockResolvedValueOnce({ items: [makeSchema({ id: "ms-02" })], nextCursor: null, limit: 1 });
+
+    await useManualSchemasStore.getState().loadManualSchemas("proj-1");
+
+    expect(mockApiFetch).toHaveBeenNthCalledWith(1, "/api/v1/projects/proj-1/manual-schemas");
+    expect(mockApiFetch).toHaveBeenNthCalledWith(
+      2,
+      "/api/v1/projects/proj-1/manual-schemas?cursor=c1",
+    );
+    expect(useManualSchemasStore.getState().schemas.map((s) => s.id)).toEqual(["ms-01", "ms-02"]);
+  });
 });
 
 describe("createManualSchema", () => {

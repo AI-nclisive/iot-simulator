@@ -42,12 +42,26 @@ export const useManualSchemasStore = create<ManualSchemasState>((set) => ({
   isLoading: false,
   error: null,
 
+  // Manual schemas are a hand-authored library expected to stay small, but the
+  // endpoint is still cursor-paginated like every other collection (backend-specs/05
+  // "Collections" convention) — so a project with more than one page must not
+  // silently truncate. Follows nextCursor to the end instead of a "Load more" control,
+  // capped so a runaway backend cursor can't spin this into an infinite loop.
   loadManualSchemas: async (projectId: string) => {
     set({ isLoading: true, error: null });
     try {
-      const { items } = await apiFetch<Page<ManualSchemaResponse>>(
-        `/api/v1/projects/${projectId}/manual-schemas`,
-      );
+      const items: ManualSchemaResponse[] = [];
+      let cursor: string | null = null;
+      let pages = 0;
+      const MAX_PAGES = 50;
+      do {
+        const page: Page<ManualSchemaResponse> = await apiFetch<Page<ManualSchemaResponse>>(
+          `/api/v1/projects/${projectId}/manual-schemas${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
+        );
+        items.push(...page.items);
+        cursor = page.nextCursor;
+        pages += 1;
+      } while (cursor && pages < MAX_PAGES);
       set({ schemas: items, isLoading: false });
     } catch (err) {
       const message = err instanceof ApiError ? err.title : "Failed to load manual schemas";
