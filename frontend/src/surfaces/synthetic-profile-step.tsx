@@ -501,6 +501,7 @@ export function SyntheticProfileStep({
             className="shell-field"
             inputMode="numeric"
             placeholder="Random each run"
+            step="any"
             type="number"
             value={seed}
             onChange={(e) => onSeedChange(e.target.value)}
@@ -650,6 +651,7 @@ export function SyntheticProfileStep({
                             Min
                             <input
                               className="shell-field"
+                              step="any"
                               type="number"
                               value={d.min}
                               onChange={(e) => patchDraft(node.nodeId, { min: e.target.value })}
@@ -659,6 +661,7 @@ export function SyntheticProfileStep({
                             Max
                             <input
                               className="shell-field"
+                              step="any"
                               type="number"
                               value={d.max}
                               onChange={(e) => patchDraft(node.nodeId, { max: e.target.value })}
@@ -672,6 +675,7 @@ export function SyntheticProfileStep({
                           Period (ms)
                           <input
                             className="shell-field"
+                            step="any"
                             type="number"
                             value={d.periodMs}
                             onChange={(e) => patchDraft(node.nodeId, { periodMs: e.target.value })}
@@ -684,6 +688,7 @@ export function SyntheticProfileStep({
                           Volatility
                           <input
                             className="shell-field"
+                            step="any"
                             type="number"
                             value={d.volatility}
                             onChange={(e) => patchDraft(node.nodeId, { volatility: e.target.value })}
@@ -695,6 +700,7 @@ export function SyntheticProfileStep({
                         Update rate (ms)
                         <input
                           className="shell-field"
+                          step="any"
                           type="number"
                           value={d.updateRateMs}
                           onChange={(e) => patchDraft(node.nodeId, { updateRateMs: e.target.value })}
