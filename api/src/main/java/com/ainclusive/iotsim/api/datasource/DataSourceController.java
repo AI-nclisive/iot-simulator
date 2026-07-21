@@ -246,7 +246,7 @@ public class DataSourceController {
             @PathVariable String projectId, @PathVariable String id, @PathVariable String jobId,
             @RequestBody ApplyRescanRequest req) {
         DataSource ds = scans.applyRescan(projectId, id, jobId,
-                ScanController.toResolutions(req == null ? null : req.typeResolutions()));
+                ScanController.toResolutions(req.typeResolutions()));
         int paramCount = schemas.countVariableNodes(ds.id());
         return ResponseEntity.ok().eTag(etag(ds.version())).body(DataSourceResponse.from(ds, paramCount));
     }
