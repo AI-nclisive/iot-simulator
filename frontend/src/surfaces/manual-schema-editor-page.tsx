@@ -58,7 +58,7 @@ export function validateManualSchemaNodes(nodes: NodeDto[]): ValidationIssue[] {
   for (const node of nodes) {
     const name = node.name.trim();
     if (!name) issues.push({ nodeId: node.nodeId, message: "A node needs a browse name." });
-    else if (/[\\/]/.test(name)) issues.push({ nodeId: node.nodeId, message: "A browse name cannot contain a slash." });
+    else if (/[\\/]/.test(name)) issues.push({ nodeId: node.nodeId, message: "A browse name cannot contain a slash or backslash." });
     if (node.parentId) {
       const parent = byId.get(node.parentId);
       if (!parent) issues.push({ nodeId: node.nodeId, message: "Its parent no longer exists." });

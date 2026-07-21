@@ -299,9 +299,17 @@ describe("validateManualSchemaNodes", () => {
       { nodeId: "duplicate", parentId: "parent", path: "/Parent/Bad2", name: "Bad/Name", kind: "VARIABLE" as const, dataType: "FLOAT64", valueRank: "SCALAR", access: "READ", unit: null, description: null },
     ]);
     expect(issues.map((issue) => issue.message)).toEqual(expect.arrayContaining([
-      "A browse name cannot contain a slash.",
+      "A browse name cannot contain a slash or backslash.",
       "Only a folder can contain another node.",
       "Sibling nodes must have unique browse names.",
     ]));
+  });
+
+  it("rejects a backslash in a browse name", () => {
+    const issues = validateManualSchemaNodes([
+      { nodeId: "backslash", parentId: null, path: "/Bad", name: "Bad\\Name", kind: "VARIABLE" as const, dataType: "FLOAT64", valueRank: "SCALAR", access: "READ", unit: null, description: null },
+    ]);
+
+    expect(issues).toEqual([{ nodeId: "backslash", message: "A browse name cannot contain a slash or backslash." }]);
   });
 });
