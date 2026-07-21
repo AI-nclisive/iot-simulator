@@ -11,7 +11,7 @@ import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -86,7 +86,12 @@ public final class OpcUaNodeSetImporter {
         }
         List<SchemaNode> nodes = new ArrayList<>();
         for (RawNode raw : rawNodes) {
-            String path = pathOf(raw.nodeId, rawNodes, parents, new HashSet<>());
+            String path = pathOf(raw.nodeId, byId, parents, new LinkedHashSet<>());
+            if (path == null) {
+                diagnostics.add(Diagnostic.unsupported("node", raw.nodeId,
+                        "Cyclic hierarchical references; node and its descendants were skipped"));
+                continue;
+            }
             List<SchemaReference> references = raw.references.stream()
                     .filter(reference -> byId.containsKey(reference.target))
                     .map(reference -> new SchemaReference(reference.target, referenceType(reference.type), reference.forward))
@@ -94,16 +99,27 @@ public final class OpcUaNodeSetImporter {
             nodes.add(new SchemaNode(raw.nodeId, parents.get(raw.nodeId), path, raw.name, raw.kind, raw.dataType,
                     raw.valueRank, raw.access, null, null, List.of(), null, references));
         }
+        Set<String> importedIds = nodes.stream().map(SchemaNode::nodeId).collect(java.util.stream.Collectors.toSet());
+        nodes = nodes.stream().map(node -> new SchemaNode(
+                node.nodeId(), node.parentId(), node.path(), node.name(), node.kind(), node.dataType(),
+                node.valueRank(), node.access(), node.unit(), node.description(), node.arrayDimensions(),
+                node.typeDefinition(), node.references().stream()
+                        .filter(reference -> importedIds.contains(reference.targetNodeId()))
+                        .toList())).toList();
         return new Result(List.copyOf(nodes), List.copyOf(diagnostics));
     }
 
-    private static String pathOf(String id, List<RawNode> rawNodes, Map<String, String> parents, Set<String> seen) {
+    private static String pathOf(String id, Map<String, RawNode> byId, Map<String, String> parents, Set<String> seen) {
         if (!seen.add(id)) {
-            throw new IllegalArgumentException("NodeSet has cyclic hierarchical references at " + id);
+            return null;
         }
-        RawNode node = rawNodes.stream().filter(candidate -> candidate.nodeId.equals(id)).findFirst().orElseThrow();
+        RawNode node = byId.get(id);
         String parent = parents.get(id);
-        return parent == null ? node.name : pathOf(parent, rawNodes, parents, seen) + "/" + node.name;
+        if (parent == null) {
+            return node.name;
+        }
+        String parentPath = pathOf(parent, byId, parents, seen);
+        return parentPath == null ? null : parentPath + "/" + node.name;
     }
 
     private static List<RawReference> references(Element element, String nodeId, List<Diagnostic> diagnostics) {
@@ -113,8 +129,8 @@ public final class OpcUaNodeSetImporter {
             Element reference = (Element) referenceElements.item(i);
             String target = reference.getTextContent().trim();
             String type = shortReferenceType(reference.getAttribute("ReferenceType"));
-            if (target.isBlank() || type == null) {
-                diagnostics.add(Diagnostic.unsupported("reference", nodeId, "Reference target or type is missing"));
+            if (target.isBlank()) {
+                diagnostics.add(Diagnostic.unsupported("reference", nodeId, "Reference target is missing"));
                 continue;
             }
             result.add(new RawReference(target, type, !"false".equalsIgnoreCase(reference.getAttribute("IsForward"))));

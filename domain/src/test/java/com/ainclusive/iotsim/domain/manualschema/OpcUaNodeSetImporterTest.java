@@ -56,4 +56,22 @@ class OpcUaNodeSetImporterTest {
         assertThat(result.diagnostics()).extracting(OpcUaNodeSetImporter.Diagnostic::subject)
                 .containsExactlyInAnyOrder("node", "variable");
     }
+
+    @Test
+    void reportsAndSkipsCyclicHierarchyInsteadOfFailingTheWholeImport() {
+        var result = OpcUaNodeSetImporter.importXml("""
+                <UANodeSet xmlns="http://opcfoundation.org/UA/2011/03/UANodeSet.xsd">
+                  <UAObject NodeId="ns=2;s=A" BrowseName="2:A"><References>
+                    <Reference ReferenceType="Organizes">ns=2;s=B</Reference></References></UAObject>
+                  <UAObject NodeId="ns=2;s=B" BrowseName="2:B"><References>
+                    <Reference ReferenceType="Organizes">ns=2;s=A</Reference>
+                    <Reference ReferenceType="HasComponent">ns=2;s=C</Reference></References></UAObject>
+                  <UAVariable NodeId="ns=2;s=C" BrowseName="2:C" DataType="i=11"><References>
+                    <Reference ReferenceType="HasComponent" IsForward="false">ns=2;s=B</Reference></References></UAVariable>
+                </UANodeSet>""");
+
+        assertThat(result.nodes()).isEmpty();
+        assertThat(result.diagnostics()).extracting(OpcUaNodeSetImporter.Diagnostic::message)
+                .allMatch(message -> message.contains("Cyclic hierarchical references"));
+    }
 }
