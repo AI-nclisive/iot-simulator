@@ -375,6 +375,17 @@ export function SyntheticProfileStep({
     });
   }
 
+  // Bulk-apply a pattern to every currently-selected (enabled) row in one action, e.g.
+  // "set Random for all". Constant-only types (IS-168) can't take another pattern, so they're
+  // left untouched. Reuses changePattern's per-node suggestion re-apply logic per row.
+  function setPatternForSelected(type: PatternType) {
+    for (const node of variableNodes) {
+      if (!drafts[node.nodeId]?.enabled) continue;
+      if (CONSTANT_ONLY_TYPES.has(node.dataType ?? "")) continue;
+      changePattern(node.nodeId, type);
+    }
+  }
+
   // Derive patterns from a recording's captured values (POST /recordings/{id}/derive-synthetic)
   // and map them onto the matching measurement rows by nodeId. Rows whose nodeId isn't in the
   // recording are left untouched (the recording must share this source's schema to match).
@@ -581,6 +592,24 @@ export function SyntheticProfileStep({
               />
               Select all
             </label>
+            <select
+              aria-label="Set pattern for selected"
+              className="shell-field"
+              disabled={enabledCount === 0}
+              value=""
+              onChange={(e) => {
+                const type = e.target.value as PatternType;
+                if (type) setPatternForSelected(type);
+                e.target.value = "";
+              }}
+            >
+              <option value="">Set pattern for selected…</option>
+              {PATTERN_TYPES.map((p) => (
+                <option key={p.value} value={p.value}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
           </div>
 
           <ul className="space-y-2">
