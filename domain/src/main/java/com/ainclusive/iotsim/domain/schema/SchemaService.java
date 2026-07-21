@@ -7,6 +7,7 @@ import com.ainclusive.iotsim.persistence.datasource.DataSourceRow;
 import com.ainclusive.iotsim.persistence.schema.SchemaRepository;
 import com.ainclusive.iotsim.persistence.schema.SchemaWithNodes;
 import com.ainclusive.iotsim.protocolmodel.SchemaNode;
+import com.ainclusive.iotsim.protocolmodel.SchemaNodeValidator;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -137,16 +138,7 @@ public class SchemaService {
     }
 
     private static void validate(List<SchemaNode> nodes) {
-        Set<String> paths = new HashSet<>();
-        Set<String> ids = new HashSet<>();
-        for (SchemaNode n : nodes) {
-            if (!ids.add(n.nodeId())) {
-                throw new IllegalArgumentException("duplicate nodeId: " + n.nodeId());
-            }
-            if (!paths.add(n.path())) {
-                throw new IllegalArgumentException("duplicate node path: " + n.path());
-            }
-        }
+        SchemaNodeValidator.validate(nodes);
     }
 
     private Schema map(SchemaWithNodes s) {

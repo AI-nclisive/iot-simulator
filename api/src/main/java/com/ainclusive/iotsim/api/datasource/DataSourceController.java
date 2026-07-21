@@ -15,7 +15,9 @@ import com.ainclusive.iotsim.domain.support.Page;
 import com.ainclusive.iotsim.protocolmodel.Access;
 import com.ainclusive.iotsim.protocolmodel.DataType;
 import com.ainclusive.iotsim.protocolmodel.NodeKind;
+import com.ainclusive.iotsim.protocolmodel.ReferenceType;
 import com.ainclusive.iotsim.protocolmodel.SchemaNode;
+import com.ainclusive.iotsim.protocolmodel.SchemaReference;
 import com.ainclusive.iotsim.protocolmodel.ValueRank;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -268,7 +270,8 @@ public class DataSourceController {
             }
             nodes.add(new SchemaNode(
                     d.nodeId(), d.parentId(), d.path(), d.name(),
-                    kind, dataType, valueRank, access, d.unit(), d.description()));
+                    kind, dataType, valueRank, access, d.unit(), d.description(), d.arrayDimensions(),
+                    d.typeDefinition(), references(d.references())));
         }
         return nodes;
     }
@@ -316,7 +319,22 @@ public class DataSourceController {
 
     public record NodeDto(
             String nodeId, String parentId, String path, String name, String kind,
-            String dataType, String valueRank, String access, String unit, String description) {}
+            String dataType, String valueRank, String access, String unit, String description,
+            List<Integer> arrayDimensions, String typeDefinition, List<ReferenceDto> references) {
+        public NodeDto(String nodeId, String parentId, String path, String name, String kind,
+                String dataType, String valueRank, String access, String unit, String description) {
+            this(nodeId, parentId, path, name, kind, dataType, valueRank, access, unit, description,
+                    List.of(), null, List.of());
+        }
+    }
+
+    public record ReferenceDto(String targetNodeId, String type, boolean forward) {}
+
+    private static List<SchemaReference> references(List<ReferenceDto> dtos) {
+        if (dtos == null) return List.of();
+        return dtos.stream().map(d -> new SchemaReference(d.targetNodeId(),
+                parseEnum(ReferenceType.class, d.type(), "reference.type"), d.forward())).toList();
+    }
 
     public record CreateDataSourceRequest(
             String name, String protocol, String basis, Integer simulatorPort,

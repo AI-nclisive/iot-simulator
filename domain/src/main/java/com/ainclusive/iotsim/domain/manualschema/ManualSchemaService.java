@@ -9,10 +9,9 @@ import com.ainclusive.iotsim.persistence.manualschema.ManualSchemaRepository;
 import com.ainclusive.iotsim.persistence.manualschema.ManualSchemaRow;
 import com.ainclusive.iotsim.persistence.project.ProjectRepository;
 import com.ainclusive.iotsim.protocolmodel.SchemaNode;
+import com.ainclusive.iotsim.protocolmodel.SchemaNodeValidator;
 import java.time.OffsetDateTime;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import org.springframework.stereotype.Service;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
@@ -113,19 +112,7 @@ public class ManualSchemaService {
 
     /** Mirrors {@code SchemaService.validate}: rejects duplicate nodeIds or paths. */
     private static void validateNodes(List<SchemaNode> nodes) {
-        if (nodes == null) {
-            throw new IllegalArgumentException("nodes are required");
-        }
-        Set<String> paths = new HashSet<>();
-        Set<String> ids = new HashSet<>();
-        for (SchemaNode n : nodes) {
-            if (!ids.add(n.nodeId())) {
-                throw new IllegalArgumentException("duplicate nodeId: " + n.nodeId());
-            }
-            if (!paths.add(n.path())) {
-                throw new IllegalArgumentException("duplicate node path: " + n.path());
-            }
-        }
+        SchemaNodeValidator.validate(nodes);
     }
 
     private ManualSchema map(ManualSchemaRow r) {
