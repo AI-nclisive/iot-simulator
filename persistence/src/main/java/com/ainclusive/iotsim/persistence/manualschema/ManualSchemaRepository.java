@@ -1,5 +1,6 @@
 package com.ainclusive.iotsim.persistence.manualschema;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -10,6 +11,9 @@ public interface ManualSchemaRepository {
             String nodesJson, String createdBy);
 
     List<ManualSchemaRow> findByProject(String projectId);
+
+    /** Cursor-paged list (IS-074). Sort: {@code created_at DESC, id DESC}. */
+    List<ManualSchemaRow> findByProjectPaged(String projectId, OffsetDateTime afterAt, String afterId, int limit);
 
     Optional<ManualSchemaRow> findById(String id);
 
