@@ -887,6 +887,41 @@ describe("CreateDataSourceWizardPage — IMPORT recording picker name fallback (
   });
 });
 
+describe("CreateDataSourceWizardPage — IMPORT recording picker shows time, not just date (UI-485)", () => {
+  afterEach(() => {
+    artifactsStoreState.artifacts = [];
+    dataSourcesStoreState.dataSources = [];
+  });
+
+  it("formats the recording's createdAt with a time component", async () => {
+    artifactsStoreState.artifacts = [
+      { id: "rec-1", createdAt: new Date("2026-07-20T15:30:00Z").toISOString(), sourceId: "src-1" },
+    ];
+    dataSourcesStoreState.dataSources = [{ id: "src-1", name: "Press Line A" }];
+
+    render(
+      <MemoryRouter>
+        <CreateDataSourceWizardPage />
+      </MemoryRouter>,
+    );
+
+    await userEvent.click(screen.getByText("OPC UA"));
+    await userEvent.click(screen.getAllByRole("button", { name: "Next" })[0]);
+    await userEvent.click(screen.getByText("Prepared data"));
+    await userEvent.click(screen.getAllByRole("button", { name: "Next" })[0]);
+
+    const expected = new Date("2026-07-20T15:30:00Z").toLocaleString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+    expect(screen.getByText(expected)).toBeTruthy();
+  });
+});
+
 describe("CreateDataSourceWizardPage — IMPORT schema copy (UI-466)", () => {
   afterEach(() => {
     artifactsStoreState.artifacts = [];
