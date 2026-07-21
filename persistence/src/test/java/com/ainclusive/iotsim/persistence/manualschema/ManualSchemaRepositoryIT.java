@@ -97,6 +97,28 @@ class ManualSchemaRepositoryIT {
     }
 
     @Test
+    void findByProjectPagedReturnsBatchNewestFirst() {
+        ManualSchemaRow a = manualSchemas.create(projectId, "OPC_UA", "Paged-A", null, "[]", "it");
+        ManualSchemaRow b = manualSchemas.create(projectId, "OPC_UA", "Paged-B", null, "[]", "it");
+        ManualSchemaRow c = manualSchemas.create(projectId, "OPC_UA", "Paged-C", null, "[]", "it");
+
+        List<ManualSchemaRow> page1 = manualSchemas.findByProjectPaged(projectId, null, null, 2);
+        assertThat(page1).hasSize(2);
+        assertThat(page1.get(0).id()).isEqualTo(c.id());
+        assertThat(page1.get(1).id()).isEqualTo(b.id());
+
+        ManualSchemaRow last = page1.get(page1.size() - 1);
+        List<ManualSchemaRow> page2 = manualSchemas.findByProjectPaged(
+                projectId, last.createdAt(), last.id(), 2);
+        assertThat(page2).extracting(ManualSchemaRow::id).contains(a.id());
+        assertThat(page2).extracting(ManualSchemaRow::id).doesNotContain(b.id(), c.id());
+
+        manualSchemas.deleteById(a.id());
+        manualSchemas.deleteById(b.id());
+        manualSchemas.deleteById(c.id());
+    }
+
+    @Test
     void duplicateOnMissingSourceReturnsEmpty() {
         assertThat(manualSchemas.duplicate("no-such-id", "Copy", "it")).isEmpty();
     }
