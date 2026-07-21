@@ -117,6 +117,25 @@ class OpcUaDiscoveryIT {
     }
 
     @Test
+    void scanPreservesImportedObjectHierarchy() throws Exception {
+        int port = freePort();
+        OpcUaServerRuntime runtime = new OpcUaServerRuntime(port, List.of(
+                new VarDef("plant", null, "Plant", "OBJECT", null),
+                new VarDef("temperature", "plant", "Temperature", "VARIABLE", "FLOAT64")));
+        runtime.start();
+        try {
+            OpcUaDiscovery.ScanOutcome outcome = OpcUaDiscovery.scan(
+                    runtime.endpointUrl(), ANON, 0, () -> { }, soFar -> { });
+
+            Map<String, SchemaNodeMsg> byName = outcome.nodes().stream()
+                    .collect(Collectors.toMap(SchemaNodeMsg::getName, Function.identity()));
+            assertThat(byName.get("Temperature").getParentId()).isEqualTo(byName.get("Plant").getNodeId());
+        } finally {
+            runtime.stop();
+        }
+    }
+
+    @Test
     void testConnectionSucceedsAgainstRunningServer() throws Exception {
         int port = freePort();
         OpcUaServerRuntime runtime = new OpcUaServerRuntime(

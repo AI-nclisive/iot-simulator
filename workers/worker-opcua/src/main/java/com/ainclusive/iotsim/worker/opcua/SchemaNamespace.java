@@ -62,11 +62,12 @@ final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
     private void createNodes() {
         // Folders are built first, repeatedly, so an out-of-order schema still
         // materializes correctly. A missing parent is rejected rather than flattened.
-        int remaining = (int) variables.stream().filter(def -> "FOLDER".equals(def.kind())).count();
+        int remaining = (int) variables.stream()
+                .filter(def -> "FOLDER".equals(def.kind()) || "OBJECT".equals(def.kind())).count();
         while (remaining > 0) {
             int created = 0;
             for (VarDef def : variables) {
-                if (!"FOLDER".equals(def.kind())
+                if (!("FOLDER".equals(def.kind()) || "OBJECT".equals(def.kind()))
                         || hierarchy.containsKey(def.nodeId())
                         || (def.parentId() != null && !hierarchy.containsKey(def.parentId()))) {
                     continue;
@@ -76,7 +77,9 @@ final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
                         .setNodeId(nodeId)
                         .setBrowseName(newQualifiedName(def.name()))
                         .setDisplayName(LocalizedText.english(def.name()))
-                        .setTypeDefinition(Identifiers.FolderType)
+                        .setTypeDefinition("FOLDER".equals(def.kind())
+                                ? Identifiers.FolderType
+                                : Identifiers.BaseObjectType)
                         .build();
                 getNodeManager().addNode(node);
                 var parent = def.parentId() == null ? Identifiers.ObjectsFolder : hierarchy.get(def.parentId());
@@ -85,7 +88,7 @@ final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
                 created++;
             }
             if (created == 0) {
-                throw new IllegalArgumentException("Schema contains a folder with a missing or cyclic parent");
+                throw new IllegalArgumentException("Schema contains an object or folder with a missing or cyclic parent");
             }
             remaining -= created;
         }

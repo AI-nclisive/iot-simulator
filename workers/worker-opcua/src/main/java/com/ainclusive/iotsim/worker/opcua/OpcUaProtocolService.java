@@ -108,7 +108,8 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
         List<VarDef> variables = new ArrayList<>();
         nodeDataTypes.clear();
         for (SchemaNodeMsg node : request.getSchema().getNodesList()) {
-            if ("VARIABLE".equals(node.getKind()) || "FOLDER".equals(node.getKind())) {
+            if ("VARIABLE".equals(node.getKind()) || "FOLDER".equals(node.getKind())
+                    || "OBJECT".equals(node.getKind())) {
                 variables.add(new VarDef(node.getNodeId(), node.getParentId().isBlank() ? null : node.getParentId(),
                         node.getName(), node.getKind(), node.getDataType()));
             }
