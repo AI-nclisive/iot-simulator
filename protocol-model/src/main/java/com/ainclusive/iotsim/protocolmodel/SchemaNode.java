@@ -42,7 +42,7 @@ public record SchemaNode(
             if (valueRank == ValueRank.SCALAR && !arrayDimensions.isEmpty()) {
                 throw new IllegalArgumentException("arrayDimensions require ARRAY valueRank");
             }
-            if (arrayDimensions.stream().anyMatch(dimension -> dimension == null || dimension < 0)) {
+            if (arrayDimensions.stream().anyMatch(dimension -> dimension < 0)) {
                 throw new IllegalArgumentException("arrayDimensions must be non-negative");
             }
         } else if (!arrayDimensions.isEmpty()) {

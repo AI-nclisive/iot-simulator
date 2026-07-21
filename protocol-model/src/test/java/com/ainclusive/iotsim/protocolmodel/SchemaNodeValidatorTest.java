@@ -32,6 +32,24 @@ class SchemaNodeValidatorTest {
                 .hasMessageContaining("reference target does not exist");
     }
 
+    @Test
+    void rejectsMissingParentAndNonContainerParents() {
+        SchemaNode orphan = node("child", "ghost", NodeKind.OBJECT);
+        assertThatThrownBy(() -> SchemaNodeValidator.validate(List.of(orphan)))
+                .hasMessageContaining("parent does not exist");
+
+        SchemaNode variable = new SchemaNode("variable", null, "Variable", "Variable", NodeKind.VARIABLE,
+                DataType.FLOAT64, ValueRank.SCALAR, Access.READ, null, null);
+        SchemaNode variableChild = node("variable-child", "variable", NodeKind.OBJECT);
+        assertThatThrownBy(() -> SchemaNodeValidator.validate(List.of(variable, variableChild)))
+                .hasMessageContaining("parent must be a FOLDER or OBJECT");
+
+        SchemaNode method = node("method", null, NodeKind.METHOD);
+        SchemaNode methodChild = node("method-child", "method", NodeKind.OBJECT);
+        assertThatThrownBy(() -> SchemaNodeValidator.validate(List.of(method, methodChild)))
+                .hasMessageContaining("parent must be a FOLDER or OBJECT");
+    }
+
     private static SchemaNode node(String id, String parentId, NodeKind kind) {
         return new SchemaNode(id, parentId, id, id, kind, null, null, null, null, null);
     }
