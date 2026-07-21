@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { ApiError } from "../api";
 import { resolveAccess } from "../shell/access-policy";
 import { useManualSchemasStore, type ManualSchemaResponse } from "../shell/manual-schemas-store";
@@ -20,6 +21,7 @@ export function ManualSchemasPage() {
   const sharedRole = useShellStore((s) => s.sharedRole);
   const currentProjectId = useShellStore((s) => s.currentProjectId);
   const access = resolveAccess(accessMode, sharedRole);
+  const navigate = useNavigate();
 
   const schemas = useManualSchemasStore((s) => s.schemas);
   const isLoading = useManualSchemasStore((s) => s.isLoading);
@@ -55,13 +57,13 @@ export function ManualSchemasPage() {
     if (!name || !currentProjectId) return;
     setIsCreating(true);
     try {
-      await createManualSchema(currentProjectId, {
+      const schema = await createManualSchema(currentProjectId, {
         protocol: createProtocol,
         name,
       });
       setCreateOpen(false);
       setCreateName("");
-      push({ tone: "success", title: `Created "${name}".` });
+      navigate(`/manual-schemas/${schema.id}`);
     } catch (err) {
       const title =
         err instanceof ApiError ? (err.detail ?? err.title) : "Failed to create manual schema";
@@ -168,8 +170,12 @@ export function ManualSchemasPage() {
               <ul className="divide-y divide-shell-line">
                 {filtered.map((schema) => (
                   <li key={schema.id} className="relative">
-                    <div className="w-full px-4 py-4 pr-32">
-                      <div className="flex flex-wrap items-start justify-between gap-2">
+                    <button
+                      className="w-full px-4 py-4 text-left transition hover:bg-shell-base/50"
+                      type="button"
+                      onClick={() => navigate(`/manual-schemas/${schema.id}`)}
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-2 pr-32">
                         <div className="min-w-0">
                           <p className="font-medium text-sm text-shell-ink">{schema.name}</p>
                           {schema.description ? (
@@ -187,7 +193,7 @@ export function ManualSchemasPage() {
                           <dd className="mt-1 text-shell-ink">{variableCount(schema)}</dd>
                         </div>
                       </dl>
-                    </div>
+                    </button>
                     {access.isAdmin ? (
                       <div className="absolute right-4 top-4 flex gap-3">
                         <button
