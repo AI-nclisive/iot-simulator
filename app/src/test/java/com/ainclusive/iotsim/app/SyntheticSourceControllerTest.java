@@ -56,10 +56,10 @@ class SyntheticSourceControllerTest {
 
     @Test
     void createReturns201WithBody() {
-        given(service.create(eq(PROJECT), eq("Gen"), eq("OPC_UA"), any(), any(), any(), eq("local")))
+        given(service.create(eq(PROJECT), eq("Gen"), eq("OPC_UA"), any(), any(), any(), any(), eq("local")))
                 .willReturn(sample());
         ResponseEntity<DataSourceResponse> resp = controller.create(
-                PROJECT, new CreateSyntheticSourceRequest("Gen", "OPC_UA", null, config(), null));
+                PROJECT, new CreateSyntheticSourceRequest("Gen", "OPC_UA", null, config(), null, null));
         assertThat(resp.getStatusCode().value()).isEqualTo(201);
         assertThat(resp.getHeaders().getETag()).isEqualTo("\"0\"");
         assertThat(resp.getBody()).isNotNull();
@@ -68,24 +68,33 @@ class SyntheticSourceControllerTest {
 
     @Test
     void createPassesSchemaFromSourceIdThrough() {
-        given(service.create(eq(PROJECT), eq("Twin"), eq("OPC_UA"), any(), any(), eq("src1"), eq("local")))
+        given(service.create(eq(PROJECT), eq("Twin"), eq("OPC_UA"), any(), any(), eq("src1"), any(), eq("local")))
                 .willReturn(sample());
         ResponseEntity<DataSourceResponse> resp = controller.create(
-                PROJECT, new CreateSyntheticSourceRequest("Twin", "OPC_UA", null, config(), "src1"));
+                PROJECT, new CreateSyntheticSourceRequest("Twin", "OPC_UA", null, config(), "src1", null));
+        assertThat(resp.getStatusCode().value()).isEqualTo(201);
+    }
+
+    @Test
+    void createPassesManualSchemaIdThrough() {
+        given(service.create(eq(PROJECT), eq("Twin"), eq("OPC_UA"), any(), any(), any(), eq("ms1"), eq("local")))
+                .willReturn(sample());
+        ResponseEntity<DataSourceResponse> resp = controller.create(
+                PROJECT, new CreateSyntheticSourceRequest("Twin", "OPC_UA", null, config(), null, "ms1"));
         assertThat(resp.getStatusCode().value()).isEqualTo(201);
     }
 
     @Test
     void blankNameRejected() {
         assertThatThrownBy(() -> controller.create(
-                PROJECT, new CreateSyntheticSourceRequest(" ", "OPC_UA", null, config(), null)))
+                PROJECT, new CreateSyntheticSourceRequest(" ", "OPC_UA", null, config(), null, null)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void missingConfigRejected() {
         assertThatThrownBy(() -> controller.create(
-                PROJECT, new CreateSyntheticSourceRequest("Gen", "OPC_UA", null, null, null)))
+                PROJECT, new CreateSyntheticSourceRequest("Gen", "OPC_UA", null, null, null, null)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("config is required");
     }

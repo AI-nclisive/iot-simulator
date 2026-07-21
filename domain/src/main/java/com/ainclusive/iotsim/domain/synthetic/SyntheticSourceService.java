@@ -2,7 +2,7 @@ package com.ainclusive.iotsim.domain.synthetic;
 
 import com.ainclusive.iotsim.domain.datasource.DataSource;
 import com.ainclusive.iotsim.domain.datasource.DataSourceService;
-import com.ainclusive.iotsim.domain.schema.Schema;
+import com.ainclusive.iotsim.domain.manualschema.ManualSchemaService;
 import com.ainclusive.iotsim.domain.schema.SchemaService;
 import com.ainclusive.iotsim.protocolmodel.Access;
 import com.ainclusive.iotsim.protocolmodel.NodeKind;
@@ -21,13 +21,18 @@ import tools.jackson.databind.ObjectMapper;
  * generated twin of {@code ScanService.createFromScan} (SPEC "Generate Synthetic Data" /
  * "Manually Create Data Source Schemas").
  *
- * <p>Two schema origins (IS-145):
+ * <p>Three schema origins (IS-145, IS-173):
  * <ul>
  *   <li><b>derive</b> (default): one VARIABLE node per config variable, schema built from the
  *       variables themselves;
- *   <li><b>reuse</b> ({@code schemaFromSourceId} set): copy an existing source's full schema
- *       verbatim (names/paths/units/hierarchy) and only drive the nodes named by the config —
- *       so a synthetic twin looks identical to the scanned/imported source it mirrors.
+ *   <li><b>reuse an existing source</b> ({@code schemaFromSourceId} set): copy an existing
+ *       source's full schema verbatim (names/paths/units/hierarchy) and only drive the nodes
+ *       named by the config — so a synthetic twin looks identical to the scanned/imported
+ *       source it mirrors;
+ *   <li><b>reuse a manual schema</b> ({@code manualSchemaId} set): same copy-by-snapshot
+ *       behavior, sourced from a standalone {@code ManualSchema} instead of another source's
+ *       live schema — a later edit to the manual schema never affects this already-created
+ *       source. Mutually exclusive with {@code schemaFromSourceId}.
  * </ul>
  */
 @Service
@@ -35,23 +40,38 @@ public class SyntheticSourceService {
 
     private final DataSourceService dataSources;
     private final SchemaService schemas;
+    private final ManualSchemaService manualSchemas;
     private final ObjectMapper json;
 
-    public SyntheticSourceService(DataSourceService dataSources, SchemaService schemas, ObjectMapper json) {
+    public SyntheticSourceService(DataSourceService dataSources, SchemaService schemas,
+            ManualSchemaService manualSchemas, ObjectMapper json) {
         this.dataSources = dataSources;
         this.schemas = schemas;
+        this.manualSchemas = manualSchemas;
         this.json = json;
     }
 
     public DataSource create(String projectId, String name, String protocol, Integer simulatorPort,
-            SyntheticConfig config, String schemaFromSourceId, String actor) {
+            SyntheticConfig config, String schemaFromSourceId, String manualSchemaId, String actor) {
         if (config == null) {
             throw new IllegalArgumentException("config is required");
         }
+        boolean reuseSource = schemaFromSourceId != null && !schemaFromSourceId.isBlank();
+        boolean reuseManualSchema = manualSchemaId != null && !manualSchemaId.isBlank();
+        if (reuseSource && reuseManualSchema) {
+            throw new IllegalArgumentException("schemaFromSourceId and manualSchemaId are mutually exclusive");
+        }
         // Validate the whole config up front (patterns, types, rates) before any write.
         SyntheticConfigMapper.toVariables(config);
-        boolean reuse = schemaFromSourceId != null && !schemaFromSourceId.isBlank();
-        List<SchemaNode> nodes = reuse ? copiedSchemaNodes(projectId, schemaFromSourceId, config) : schemaNodes(config);
+        List<SchemaNode> nodes;
+        if (reuseSource) {
+            nodes = copiedSchemaNodes(schemas.get(projectId, schemaFromSourceId).nodes(), schemaFromSourceId, config);
+        } else if (reuseManualSchema) {
+            nodes = copiedSchemaNodes(
+                    manualSchemas.get(projectId, manualSchemaId).nodes(), manualSchemaId, config);
+        } else {
+            nodes = schemaNodes(config);
+        }
         // initialNodes=null: keep the two-step (create, then save schema) like ScanService;
         // DataSourceService.create gained an atomic initialNodes arg (IS-067) we don't use here.
         DataSource created = dataSources.create(
@@ -73,15 +93,18 @@ public class SyntheticSourceService {
     }
 
     /**
-     * Full copy of an existing source's schema (IS-145). Every config variable must name a
-     * VARIABLE node in that schema and match its data type; the returned node list is the source
-     * schema verbatim (all nodes, so hierarchy/parent links stay intact).
+     * Full copy of an existing schema's nodes (IS-145, IS-173) — from either a data source's live
+     * schema or a standalone {@code ManualSchema}. Every config variable must name a VARIABLE node
+     * in that node set and match its data type; the returned node list is the source verbatim (all
+     * nodes, so hierarchy/parent links stay intact).
+     *
+     * @param sourceLabel identifies the schema origin in error messages (a data-source id or a
+     *     manual-schema id)
      */
-    private List<SchemaNode> copiedSchemaNodes(String projectId, String schemaFromSourceId, SyntheticConfig config) {
-        // Throws ResourceNotFoundException if the source or its schema is absent.
-        Schema source = schemas.get(projectId, schemaFromSourceId);
+    private static List<SchemaNode> copiedSchemaNodes(
+            List<SchemaNode> sourceNodes, String sourceLabel, SyntheticConfig config) {
         Map<String, SchemaNode> variablesById = new LinkedHashMap<>();
-        for (SchemaNode node : source.nodes()) {
+        for (SchemaNode node : sourceNodes) {
             if (node.kind() == NodeKind.VARIABLE) {
                 variablesById.put(node.nodeId(), node);
             }
@@ -90,8 +113,8 @@ public class SyntheticSourceService {
             SchemaNode node = variablesById.get(v.nodeId());
             if (node == null) {
                 throw new IllegalArgumentException(
-                        "variable nodeId '" + v.nodeId() + "' is not a VARIABLE node in the schema of source "
-                                + schemaFromSourceId);
+                        "variable nodeId '" + v.nodeId() + "' is not a VARIABLE node in the schema of "
+                                + sourceLabel);
             }
             if (node.dataType() != v.dataType()) {
                 throw new IllegalArgumentException(
@@ -99,6 +122,6 @@ public class SyntheticSourceService {
                                 + " does not match schema node type " + node.dataType());
             }
         }
-        return source.nodes();
+        return sourceNodes;
     }
 }
