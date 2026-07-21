@@ -15,6 +15,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch } from "../api";
+import { useManualSchemasStore } from "../shell/manual-schemas-store";
 import { useNotificationStore } from "../shell/notification-store";
 import type { DataSourceRow } from "../shell/data-sources-store";
 import type {
@@ -122,6 +123,7 @@ export type NodeDraft = {
 
 export type SyntheticProfileValue = {
   schemaFromSourceId: string | null;
+  manualSchemaId: string | null;
   config: SyntheticConfig | null;
   valid: boolean;
   measurementCount: number;
@@ -280,7 +282,13 @@ export function SyntheticProfileStep({
   onChange: (value: SyntheticProfileValue) => void;
 }) {
   const push = useNotificationStore((s) => s.push);
+  // A schema source is either an existing data source's schema (schemaFromSourceId) or a
+  // standalone Manual Schema (manualSchemaId) — a schema is required to get any parameters
+  // to drive, so exactly one of these two pickers is active at a time (IS-173/UI-491).
+  const [schemaKind, setSchemaKind] = useState<"source" | "manual">("source");
   const [sourceId, setSourceId] = useState<string>("");
+  const manualSchemas = useManualSchemasStore((s) => s.schemas);
+  const [manualSchemaId, setManualSchemaId] = useState<string>("");
   const [nodes, setNodes] = useState<SchemaNodeDto[]>([]);
   const [drafts, setDrafts] = useState<Record<string, NodeDraft>>({});
   const [loading, setLoading] = useState(false);
@@ -323,7 +331,17 @@ export function SyntheticProfileStep({
     };
   }, [projectId]);
 
+  function applyNodes(schemaNodes: SchemaNodeDto[], emptyMessage: string) {
+    const vars = schemaNodes.filter((n) => n.kind === "VARIABLE");
+    if (vars.length === 0) {
+      setLoadError(emptyMessage);
+    }
+    setNodes(schemaNodes);
+    setDrafts(Object.fromEntries(vars.map((n) => [n.nodeId, defaultDraft(n.dataType)])));
+  }
+
   async function pickSource(id: string) {
+    setManualSchemaId("");
     setSourceId(id);
     setNodes([]);
     setDrafts({});
@@ -335,17 +353,25 @@ export function SyntheticProfileStep({
       const schema = await apiFetch<SchemaResponse>(
         `/api/v1/projects/${projectId}/data-sources/${id}/schema`,
       );
-      const vars = schema.nodes.filter((n) => n.kind === "VARIABLE");
-      if (vars.length === 0) {
-        setLoadError("This source's schema has no measurements to drive.");
-      }
-      setNodes(schema.nodes);
-      setDrafts(Object.fromEntries(vars.map((n) => [n.nodeId, defaultDraft(n.dataType)])));
+      applyNodes(schema.nodes, "This source's schema has no measurements to drive.");
     } catch {
       setLoadError("This source has no schema yet. Pick a scanned, imported, or edited source.");
     } finally {
       setLoading(false);
     }
+  }
+
+  function pickManualSchema(id: string) {
+    setSourceId("");
+    setManualSchemaId(id);
+    setNodes([]);
+    setDrafts({});
+    setLoadError(null);
+    setPrefilledNodeIds(new Set());
+    if (!id) return;
+    const schema = manualSchemas.find((s) => s.id === id);
+    if (!schema) return;
+    applyNodes(schema.nodes, "This manual schema has no variables to drive.");
   }
 
   function patchDraft(nodeId: string, patch: Partial<NodeDraft>) {
@@ -483,15 +509,17 @@ export function SyntheticProfileStep({
         updateRateMs: rate,
       });
     }
-    valid = valid && anyEnabled && !!sourceId;
+    const hasSchema = !!sourceId || !!manualSchemaId;
+    valid = valid && anyEnabled && hasSchema;
     const seedNum = num(seed);
     onChange({
       schemaFromSourceId: sourceId || null,
-      config: sourceId ? { seed: seedNum, variables } : null,
+      manualSchemaId: manualSchemaId || null,
+      config: hasSchema ? { seed: seedNum, variables } : null,
       valid,
       measurementCount: variables.length,
     });
-  }, [drafts, variableNodes, sourceId, seed, onChange]);
+  }, [drafts, variableNodes, sourceId, manualSchemaId, seed, onChange]);
 
   useEffect(() => {
     emit();
@@ -504,24 +532,76 @@ export function SyntheticProfileStep({
   return (
     <div className="space-y-5">
       <div className="grid gap-4 sm:grid-cols-2">
-        <label className="flex flex-col gap-2 text-sm text-shell-muted">
-          Reuse schema from source
-          <select
-            className="shell-field"
-            value={sourceId}
-            onChange={(e) => void pickSource(e.target.value)}
-          >
-            <option value="">Select a source…</option>
-            {sources.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-          <span className="text-xs text-shell-muted">
-            The synthetic device copies this source's measurements, names, and units.
-          </span>
-        </label>
+        <div className="flex flex-col gap-2 text-sm text-shell-muted">
+          <span>Parameter source</span>
+          <div className="flex gap-4 text-sm text-shell-ink">
+            <label className="flex items-center gap-1.5">
+              <input
+                checked={schemaKind === "source"}
+                name="schema-kind"
+                type="radio"
+                onChange={() => {
+                  setSchemaKind("source");
+                  pickManualSchema("");
+                }}
+              />
+              Existing source
+            </label>
+            <label className="flex items-center gap-1.5">
+              <input
+                checked={schemaKind === "manual"}
+                name="schema-kind"
+                type="radio"
+                onChange={() => {
+                  setSchemaKind("manual");
+                  void pickSource("");
+                }}
+              />
+              Manual schema
+            </label>
+          </div>
+          {schemaKind === "source" ? (
+            <label className="flex flex-col gap-2">
+              Reuse schema from source
+              <select
+                className="shell-field"
+                value={sourceId}
+                onChange={(e) => void pickSource(e.target.value)}
+              >
+                <option value="">Select a source…</option>
+                {sources.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+              <span className="text-xs text-shell-muted">
+                The synthetic device copies this source's measurements, names, and units.
+              </span>
+            </label>
+          ) : (
+            <label className="flex flex-col gap-2">
+              Reuse a manual schema
+              <select
+                className="shell-field"
+                value={manualSchemaId}
+                onChange={(e) => pickManualSchema(e.target.value)}
+              >
+                <option value="">
+                  {manualSchemas.length === 0 ? "No manual schemas in this project" : "Select a manual schema…"}
+                </option>
+                {manualSchemas.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+              <span className="text-xs text-shell-muted">
+                The synthetic device copies this manual schema's structure, names, and units.
+              </span>
+            </label>
+          )}
+        </div>
         <label className="flex flex-col gap-2 text-sm text-shell-muted">
           Seed (optional)
           <input

@@ -86,6 +86,8 @@ type CreateSyntheticInput = {
   config: SyntheticConfig;
   /** Reuse an existing source's schema verbatim (IS-145); omit to derive from the config. */
   schemaFromSourceId?: string | null;
+  /** Reuse a standalone Manual Schema's nodes verbatim (IS-173); mutually exclusive with schemaFromSourceId. */
+  manualSchemaId?: string | null;
 };
 
 type UpdateSourceConfigInput = {
@@ -165,7 +167,15 @@ export const useDataSourcesStore = create<DataSourcesState>((set, get) => ({
     return row.id;
   },
 
-  createSyntheticSource: async ({ projectId, name, protocol, simulatorPort, config, schemaFromSourceId }) => {
+  createSyntheticSource: async ({
+    projectId,
+    name,
+    protocol,
+    simulatorPort,
+    config,
+    schemaFromSourceId,
+    manualSchemaId,
+  }) => {
     const data = await apiFetch<DataSourceResponse>(
       `/api/v1/projects/${projectId}/data-sources/synthetic`,
       {
@@ -176,6 +186,7 @@ export const useDataSourcesStore = create<DataSourcesState>((set, get) => ({
           simulatorPort,
           config,
           ...(schemaFromSourceId ? { schemaFromSourceId } : {}),
+          ...(manualSchemaId ? { manualSchemaId } : {}),
         }),
       },
     );

@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { resolveAccess } from "../shell/access-policy";
 import { useArtifactsStore } from "../shell/artifacts-store";
 import { useDataSourcesStore } from "../shell/data-sources-store";
+import { useManualSchemasStore } from "../shell/manual-schemas-store";
 import { useShellStore } from "../shell/shell-store";
 import { useNotificationStore } from "../shell/notification-store";
 import { ApiError, apiFetch } from "../api";
@@ -451,8 +452,8 @@ function configureValidationMessage(form: WizardFormState, synthetic: SyntheticP
   ) {
     return "Enter a valid simulator port (1–65535).";
   }
-  if (!synthetic.schemaFromSourceId) {
-    return "Pick an existing source whose schema you want to reuse.";
+  if (!synthetic.schemaFromSourceId && !synthetic.manualSchemaId) {
+    return "Pick an existing source or a manual schema whose structure you want to reuse.";
   }
   if (!synthetic.valid) {
     return "Configure at least one measurement with a valid pattern.";
@@ -543,6 +544,8 @@ export function CreateDataSourceWizardPage() {
   const dataSources = useDataSourcesStore((state) => state.dataSources);
   const loadDataSources = useDataSourcesStore((state) => state.loadDataSources);
   const createSyntheticSource = useDataSourcesStore((state) => state.createSyntheticSource);
+  const manualSchemas = useManualSchemasStore((state) => state.schemas);
+  const loadManualSchemas = useManualSchemasStore((state) => state.loadManualSchemas);
 
   const [scanJobId, setScanJobId] = useState<string | null>(null);
   const [scanStatus, setScanStatus] = useState<ScanStepStatus>("idle");
@@ -582,6 +585,7 @@ export function CreateDataSourceWizardPage() {
 
   const [synthetic, setSynthetic] = useState<SyntheticProfileValue>({
     schemaFromSourceId: null,
+    manualSchemaId: null,
     config: null,
     valid: false,
     measurementCount: 0,
@@ -646,10 +650,15 @@ export function CreateDataSourceWizardPage() {
     () => artifacts.find((a) => a.id === form.importSelectedRecordingId) ?? null,
     [artifacts, form.importSelectedRecordingId],
   );
-  const syntheticSchemaSourceName = useMemo(
-    () => (dataSources ?? []).find((s) => s.id === synthetic.schemaFromSourceId)?.name ?? "-",
-    [dataSources, synthetic.schemaFromSourceId],
-  );
+  const syntheticSchemaSourceName = useMemo(() => {
+    if (synthetic.schemaFromSourceId) {
+      return (dataSources ?? []).find((s) => s.id === synthetic.schemaFromSourceId)?.name ?? "-";
+    }
+    if (synthetic.manualSchemaId) {
+      return (manualSchemas ?? []).find((s) => s.id === synthetic.manualSchemaId)?.name ?? "-";
+    }
+    return "-";
+  }, [dataSources, manualSchemas, synthetic.schemaFromSourceId, synthetic.manualSchemaId]);
   const reviewItems = useMemo(
     () =>
       reviewLines(
@@ -668,8 +677,9 @@ export function CreateDataSourceWizardPage() {
     }
     if (form.basis === "synthetic" && currentProjectId) {
       void loadDataSources(currentProjectId);
+      void loadManualSchemas(currentProjectId);
     }
-  }, [form.basis, currentProjectId, loadRecordings, loadDataSources]);
+  }, [form.basis, currentProjectId, loadRecordings, loadDataSources, loadManualSchemas]);
 
   // Synthetic sources serve their own OPC UA/Modbus port; the per-protocol default (4840/502)
   // collides with any source already using it. Once sources load, bump an empty/default port to
@@ -1013,6 +1023,7 @@ export function CreateDataSourceWizardPage() {
           simulatorPort: Number(form.simulatorPort),
           config: synthetic.config,
           schemaFromSourceId: synthetic.schemaFromSourceId,
+          manualSchemaId: synthetic.manualSchemaId,
         });
         navigate(`/data-sources/${createdId}`);
       } catch (err) {
