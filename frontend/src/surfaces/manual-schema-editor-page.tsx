@@ -10,16 +10,40 @@ import { StatusBadge } from "../ui/status-badge";
 import { buildTree, type NodeDto } from "./data-source-schema-editor";
 
 const DATA_TYPES = [
-  "FLOAT64",
-  "FLOAT32",
-  "INT32",
-  "INT64",
-  "UINT32",
-  "INT16",
-  "BOOL",
-  "STRING",
-  "DATETIME",
+  "BOOL", "INT8", "UINT8", "INT16", "UINT16", "INT32", "UINT32", "INT64", "UINT64",
+  "FLOAT32", "FLOAT64", "STRING", "BYTES", "DATETIME", "LOCALIZED_TEXT", "GUID",
+  "STATUS_CODE", "QUALIFIED_NAME", "NODE_ID", "EXPANDED_NODE_ID", "XML_ELEMENT",
 ] as const;
+
+const SUGGESTED_VARIABLES = [
+  { group: "Measurements", name: "Temperature", dataType: "FLOAT64", unit: "°C", description: "Process temperature" },
+  { group: "Measurements", name: "Pressure", dataType: "FLOAT64", unit: "bar", description: "Process pressure" },
+  { group: "Measurements", name: "FlowRate", dataType: "FLOAT64", unit: "m³/h", description: "Volumetric flow rate" },
+  { group: "Measurements", name: "Level", dataType: "FLOAT64", unit: "%", description: "Tank or vessel level" },
+  { group: "Measurements", name: "Speed", dataType: "FLOAT64", unit: "rpm", description: "Rotational speed" },
+  { group: "Measurements", name: "Voltage", dataType: "FLOAT64", unit: "V", description: "Electrical voltage" },
+  { group: "Measurements", name: "Current", dataType: "FLOAT64", unit: "A", description: "Electrical current" },
+  { group: "Measurements", name: "Power", dataType: "FLOAT64", unit: "kW", description: "Active power" },
+  { group: "Measurements", name: "Energy", dataType: "FLOAT64", unit: "kWh", description: "Accumulated energy" },
+  { group: "Control", name: "Setpoint", dataType: "FLOAT64", unit: null, description: "Requested target value" },
+  { group: "Control", name: "Enabled", dataType: "BOOL", unit: null, description: "Whether the component is enabled" },
+  { group: "Control", name: "Mode", dataType: "STRING", unit: null, description: "Selected operating mode" },
+  { group: "Control", name: "Start", dataType: "BOOL", unit: null, description: "Start command" },
+  { group: "Control", name: "Stop", dataType: "BOOL", unit: null, description: "Stop command" },
+  { group: "Control", name: "Reset", dataType: "BOOL", unit: null, description: "Reset command" },
+  { group: "Device information", name: "Status", dataType: "UINT16", unit: null, description: "Device status code" },
+  { group: "Device information", name: "DeviceId", dataType: "STRING", unit: null, description: "Device identifier" },
+  { group: "Device information", name: "SerialNumber", dataType: "STRING", unit: null, description: "Device serial number" },
+  { group: "Device information", name: "Manufacturer", dataType: "STRING", unit: null, description: "Device manufacturer" },
+  { group: "Device information", name: "FirmwareVersion", dataType: "STRING", unit: null, description: "Installed firmware version" },
+  { group: "Device information", name: "Timestamp", dataType: "DATETIME", unit: null, description: "Time of the last update" },
+  { group: "Limits & diagnostics", name: "HighLimit", dataType: "FLOAT64", unit: null, description: "Configured upper operating limit" },
+  { group: "Limits & diagnostics", name: "LowLimit", dataType: "FLOAT64", unit: null, description: "Configured lower operating limit" },
+  { group: "Limits & diagnostics", name: "Quality", dataType: "STATUS_CODE", unit: null, description: "Quality of the current value" },
+  { group: "Limits & diagnostics", name: "DiagnosticMessage", dataType: "LOCALIZED_TEXT", unit: null, description: "Human-readable diagnostic information" },
+] as const;
+
+const PARAMETER_GROUPS = ["Measurements", "Control", "Device information", "Limits & diagnostics"] as const;
 
 function newNodeId(): string {
   return `node-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -77,6 +101,13 @@ export function ManualSchemaEditorPage() {
   const [addKind, setAddKind] = useState<"FOLDER" | "VARIABLE" | null>(null);
   const [addName, setAddName] = useState("");
   const [addType, setAddType] = useState<string>("FLOAT64");
+  const [addUnit, setAddUnit] = useState("");
+  const [addDescription, setAddDescription] = useState("");
+  const [selectedSuggestion, setSelectedSuggestion] = useState("");
+  const [addParentId, setAddParentId] = useState<string | null>(null);
+  const [batchNodes, setBatchNodes] = useState("");
+  const [showLibrary, setShowLibrary] = useState(false);
+  const [showBatch, setShowBatch] = useState(false);
   const [saveMode, setSaveMode] = useState<SaveMode | null>(null);
   const [saveAsName, setSaveAsName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -115,6 +146,9 @@ export function ManualSchemaEditorPage() {
   const treeRoots = useMemo(() => buildTree(nodes), [nodes]);
   const selectedNode = nodes.find((n) => n.nodeId === selectedId) ?? null;
   const variableCount = nodes.filter((n) => n.kind === "VARIABLE").length;
+  const folders = nodes.filter((n) => n.kind === "FOLDER");
+  const isEmpty = nodes.length === 0;
+  const catalogParentId = selectedNode?.kind === "FOLDER" ? selectedNode.nodeId : null;
 
   function toggleExpand(id: string) {
     setExpandedIds((prev) => {
@@ -168,7 +202,7 @@ export function ManualSchemaEditorPage() {
   function handleAddNode() {
     const trimmed = addName.trim();
     if (!trimmed || !addKind) return;
-    const parentId = selectedNode?.kind === "FOLDER" ? selectedNode.nodeId : null;
+    const parentId = addParentId;
     const node: NodeDto = {
       nodeId: newNodeId(),
       parentId,
@@ -178,13 +212,66 @@ export function ManualSchemaEditorPage() {
       dataType: addKind === "VARIABLE" ? addType : null,
       valueRank: addKind === "VARIABLE" ? "SCALAR" : null,
       access: addKind === "VARIABLE" ? "READ" : null,
-      unit: null,
-      description: null,
+      unit: addKind === "VARIABLE" ? addUnit || null : null,
+      description: addDescription || null,
     };
     setNodes((prev) => [...prev, node]);
     if (parentId) setExpandedIds((prev) => new Set(prev).add(parentId));
+    if (addKind === "FOLDER") setSelectedId(node.nodeId);
     setAddName("");
+    setAddUnit("");
+    setAddDescription("");
     setAddKind(null);
+  }
+
+  function applySuggestedVariable(name: string) {
+    const suggestion = SUGGESTED_VARIABLES.find((variable) => variable.name === name);
+    if (!suggestion) return;
+    setAddName(suggestion.name);
+    setAddType(suggestion.dataType);
+    setAddUnit(suggestion.unit ?? "");
+    setAddDescription(suggestion.description);
+    setSelectedSuggestion("");
+  }
+
+  function openAdd(kind: "FOLDER" | "VARIABLE") {
+    setAddKind(kind);
+    setAddParentId(selectedNode?.kind === "FOLDER" ? selectedNode.nodeId : null);
+  }
+
+  function addSuggestedVariable(variable: (typeof SUGGESTED_VARIABLES)[number]) {
+    const parentId = catalogParentId;
+    if (!parentId) return;
+    const node: NodeDto = {
+      nodeId: newNodeId(), parentId, path: pathFor(parentId, variable.name),
+      name: variable.name, kind: "VARIABLE", dataType: variable.dataType, valueRank: "SCALAR",
+      access: "READ", unit: variable.unit, description: variable.description,
+    };
+    setNodes((prev) => [...prev, node]);
+    setExpandedIds((prev) => new Set(prev).add(parentId));
+  }
+
+  function addBatchNodes() {
+    const knownTypes = new Set<string>(DATA_TYPES);
+    const lines = batchNodes.split("\n").filter((line) => line.trim());
+    const parsed = lines.flatMap((line) => {
+      const [rawName, rawType] = line.split(/[\t,]/, 2).map((part) => part.trim());
+      return rawName && rawType && knownTypes.has(rawType)
+        ? [{ name: rawName, dataType: rawType }]
+        : [];
+    });
+    if (parsed.length === 0) return;
+    const created: NodeDto[] = parsed.map(({ name: nodeName, dataType }) => ({
+      nodeId: newNodeId(), parentId: addParentId, path: pathFor(addParentId, nodeName), name: nodeName,
+      kind: "VARIABLE", dataType, valueRank: "SCALAR", access: "READ", unit: null, description: null,
+    }));
+    setNodes((prev) => [...prev, ...created]);
+    if (addParentId) setExpandedIds((prev) => new Set(prev).add(addParentId));
+    setBatchNodes("");
+    const rejected = lines.length - parsed.length;
+    if (rejected > 0) {
+      push({ tone: "warning", title: `${rejected} row${rejected === 1 ? " was" : "s were"} skipped because the type is not supported.` });
+    }
   }
 
   function handleDeleteNode(nodeId: string) {
@@ -316,18 +403,30 @@ export function ManualSchemaEditorPage() {
 
       <section className="shell-panel px-5 py-5">
         {access.isAdmin ? (
-          <div className="mb-4 flex flex-wrap items-center gap-2">
+          <div className="mb-4 rounded-md border border-shell-line bg-shell-base/30 px-4 py-4">
+            <p className="text-sm font-medium text-shell-ink">
+              {isEmpty ? "Create your OPC UA server structure" : "Continue building this server structure"}
+            </p>
+            <p className="mt-1 text-sm text-shell-muted">
+              A <strong>folder</strong> groups items clients can browse (for example, “Tank 1”). A <strong>variable</strong> is a value clients can read or write (for example, Temperature).
+            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button className="shell-action" type="button" onClick={() => openAdd("FOLDER")}>
+              {isEmpty ? "Start: create a folder" : "Add folder"}
+            </button>
+            {folders.length > 0 ? (
+              <button className="shell-action" type="button" onClick={() => openAdd("VARIABLE")}>
+                Add variable
+              </button>
+            ) : null}
             <span className="text-xs text-shell-muted">
               {selectedNode?.kind === "FOLDER"
-                ? `Adding under "${selectedNode.name}"`
-                : "Adding at root — select a folder to nest under it"}
+                ? `New items will be placed inside ${selectedNode.path}.`
+                : isEmpty
+                  ? "Step 1: create the first folder (for example, Tank 1)."
+                  : "Select a folder in the tree to add items inside it."}
             </span>
-            <button className="shell-action" type="button" onClick={() => setAddKind("FOLDER")}>
-              + Add folder
-            </button>
-            <button className="shell-action" type="button" onClick={() => setAddKind("VARIABLE")}>
-              + Add variable
-            </button>
+            </div>
           </div>
         ) : null}
 
@@ -337,6 +436,20 @@ export function ManualSchemaEditorPage() {
               New {addKind === "FOLDER" ? "folder" : "variable"}
             </p>
             <div className="grid gap-3 sm:grid-cols-3">
+              <label className="flex flex-col gap-1.5 text-sm text-shell-muted">
+                Parent
+                <select
+                  aria-label="Parent folder for new node"
+                  className="shell-field"
+                  value={addParentId ?? ""}
+                  onChange={(e) => setAddParentId(e.target.value || null)}
+                >
+                  <option value="">Top level of server</option>
+                  {folders.map((folder) => (
+                    <option key={folder.nodeId} value={folder.nodeId}>{folder.path}</option>
+                  ))}
+                </select>
+              </label>
               <label className="flex flex-col gap-1.5 text-sm text-shell-muted">
                 Name
                 <input
@@ -351,22 +464,46 @@ export function ManualSchemaEditorPage() {
                 />
               </label>
               {addKind === "VARIABLE" ? (
-                <label className="flex flex-col gap-1.5 text-sm text-shell-muted">
-                  Type
-                  <select
-                    className="shell-field"
-                    value={addType}
-                    onChange={(e) => setAddType(e.target.value)}
-                  >
-                    {DATA_TYPES.map((t) => (
-                      <option key={t} value={t}>
-                        {typeLabel(t)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <>
+                  <label className="flex flex-col gap-1.5 text-sm text-shell-muted">
+                    Suggested parameter
+                    <select
+                      className="shell-field"
+                      value={selectedSuggestion}
+                      onChange={(e) => {
+                        setSelectedSuggestion(e.target.value);
+                        applySuggestedVariable(e.target.value);
+                      }}
+                    >
+                      <option value="">Choose a common parameter…</option>
+                      {SUGGESTED_VARIABLES.map((variable) => (
+                        <option key={variable.name} value={variable.name}>
+                          {variable.name} — {variable.dataType}{variable.unit ? ` (${variable.unit})` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-1.5 text-sm text-shell-muted">
+                    Type
+                    <select className="shell-field" value={addType} onChange={(e) => setAddType(e.target.value)}>
+                      {DATA_TYPES.map((t) => <option key={t} value={t}>{typeLabel(t)}</option>)}
+                    </select>
+                  </label>
+                </>
               ) : null}
             </div>
+            {addKind === "VARIABLE" ? (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="flex flex-col gap-1.5 text-sm text-shell-muted">
+                  Unit (optional)
+                  <input className="shell-field" value={addUnit} onChange={(e) => setAddUnit(e.target.value)} />
+                </label>
+                <label className="flex flex-col gap-1.5 text-sm text-shell-muted">
+                  Description (optional)
+                  <input className="shell-field" value={addDescription} onChange={(e) => setAddDescription(e.target.value)} />
+                </label>
+              </div>
+            ) : null}
             <div className="flex gap-2">
               <button
                 className="shell-action"
@@ -390,13 +527,99 @@ export function ManualSchemaEditorPage() {
           </div>
         ) : null}
 
+        {access.isAdmin && folders.length > 0 ? (
+          <div className="mb-4 flex flex-wrap gap-2">
+            <button className="shell-text-action" type="button" onClick={() => setShowLibrary((open) => !open)}>
+              {showLibrary ? "Hide parameter catalog" : "Choose from parameter catalog"}
+            </button>
+            <button className="shell-text-action" type="button" onClick={() => setShowBatch((open) => !open)}>
+              {showBatch ? "Hide batch add" : "Add several variables"}
+            </button>
+          </div>
+        ) : null}
+
+        {access.isAdmin && folders.length > 0 && showLibrary ? (
+          <section className="mb-4 rounded-md border border-shell-line bg-shell-base/30 px-4 py-4">
+            <div>
+              <div>
+                <p className="text-sm font-medium text-shell-ink">Choose a parameter to add</p>
+                <p className="mt-1 text-xs text-shell-muted">
+                  {catalogParentId
+                    ? `Add a parameter inside ${folders.find((folder) => folder.nodeId === catalogParentId)?.path}.`
+                    : "Select the folder that should contain this parameter."}
+                </p>
+              </div>
+              <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                {PARAMETER_GROUPS.map((group) => (
+                  <section key={group} className="rounded-md border border-shell-line bg-white p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-shell-muted">{group}</p>
+                    <div className="mt-2 space-y-2">
+                      {SUGGESTED_VARIABLES.filter((variable) => variable.group === group).map((variable) => (
+                        <button
+                          key={variable.name}
+                          className="w-full rounded border border-shell-line px-3 py-2 text-left text-sm disabled:cursor-not-allowed disabled:opacity-45 hover:border-shell-accent"
+                          disabled={!catalogParentId}
+                          type="button"
+                          onClick={() => addSuggestedVariable(variable)}
+                        >
+                          <span className="block font-medium text-shell-ink">{variable.name}</span>
+                          <span className="block text-xs text-shell-muted">{variable.dataType}{variable.unit ? ` · ${variable.unit}` : ""} — {variable.description}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        {access.isAdmin && folders.length > 0 && showBatch ? (
+          <section className="mb-4 rounded-md border border-shell-line bg-white px-4 py-4">
+            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_16rem]">
+              <div>
+                <p className="text-sm font-medium text-shell-ink">Add several variables</p>
+                <p className="mt-1 text-xs text-shell-muted">
+                  Paste one variable per line as <code>Name, TYPE</code> or <code>Name[TAB]TYPE</code>.
+                </p>
+                <textarea
+                  aria-label="Variables to add"
+                  className="shell-field mt-3 min-h-28 w-full font-mono text-sm"
+                  placeholder={"Temperature, FLOAT64\nEnabled, BOOL"}
+                  value={batchNodes}
+                  onChange={(e) => setBatchNodes(e.target.value)}
+                />
+              </div>
+              <div className="flex flex-col gap-3">
+                <label className="flex flex-col gap-1.5 text-sm text-shell-muted">
+                  Parent
+                  <select
+                    aria-label="Parent folder for several variables"
+                    className="shell-field"
+                    value={addParentId ?? ""}
+                    onChange={(e) => setAddParentId(e.target.value || null)}
+                  >
+                    <option value="">Top level of server</option>
+                    {folders.map((folder) => (
+                      <option key={folder.nodeId} value={folder.nodeId}>{folder.path}</option>
+                    ))}
+                  </select>
+                </label>
+                <button className="shell-action" disabled={!batchNodes.trim()} type="button" onClick={addBatchNodes}>
+                  + Add variables
+                </button>
+              </div>
+            </div>
+          </section>
+        ) : null}
+
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(18rem,1fr)]">
           <div className="space-y-3">
             <span className="text-sm text-shell-muted">{variableCount} variables</span>
             <div className="overflow-hidden rounded-md border border-shell-line bg-white max-h-[32rem] overflow-y-auto">
               {treeRoots.length === 0 ? (
                 <p className="px-4 py-6 text-center text-sm text-shell-muted">
-                  No nodes yet. Add a folder or variable to get started.
+                  Step 1: create a folder. Give it a device or area name, such as “Tank 1” or “Pump”.
                 </p>
               ) : (
                 <ManualSchemaTree
