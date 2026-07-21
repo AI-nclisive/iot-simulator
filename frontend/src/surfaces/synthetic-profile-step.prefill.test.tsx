@@ -80,7 +80,6 @@ describe("SyntheticProfileStep — Prefill marks only the measurements it actual
     // No badges before prefill.
     expect(screen.queryByText("Prefilled")).toBeNull();
 
-    const recordingSelect = screen.getByRole("combobox", { name: "" }) ?? undefined;
     // Select the only recording option (label contains its id since name is null).
     const selects = screen.getAllByRole("combobox");
     const recordingCombo = selects.find((el) =>
