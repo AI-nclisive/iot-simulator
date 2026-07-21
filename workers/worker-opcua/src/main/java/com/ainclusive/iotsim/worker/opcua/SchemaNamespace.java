@@ -66,23 +66,33 @@ final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
         while (remaining > 0) {
             int created = 0;
             for (VarDef def : variables) {
-                if (!"FOLDER".equals(def.kind()) || hierarchy.containsKey(def.nodeId())
-                        || (def.parentId() != null && !hierarchy.containsKey(def.parentId()))) continue;
+                if (!"FOLDER".equals(def.kind())
+                        || hierarchy.containsKey(def.nodeId())
+                        || (def.parentId() != null && !hierarchy.containsKey(def.parentId()))) {
+                    continue;
+                }
                 var nodeId = newNodeId(def.nodeId());
                 UaObjectNode node = UaObjectNode.builder(getNodeContext())
-                        .setNodeId(nodeId).setBrowseName(newQualifiedName(def.name()))
-                        .setDisplayName(LocalizedText.english(def.name())).setTypeDefinition(Identifiers.FolderType).build();
+                        .setNodeId(nodeId)
+                        .setBrowseName(newQualifiedName(def.name()))
+                        .setDisplayName(LocalizedText.english(def.name()))
+                        .setTypeDefinition(Identifiers.FolderType)
+                        .build();
                 getNodeManager().addNode(node);
                 var parent = def.parentId() == null ? Identifiers.ObjectsFolder : hierarchy.get(def.parentId());
                 node.addReference(new Reference(nodeId, Identifiers.Organizes, parent.expanded(), false));
                 hierarchy.put(def.nodeId(), nodeId);
                 created++;
             }
-            if (created == 0) throw new IllegalArgumentException("Schema contains a folder with a missing or cyclic parent");
+            if (created == 0) {
+                throw new IllegalArgumentException("Schema contains a folder with a missing or cyclic parent");
+            }
             remaining -= created;
         }
         for (VarDef def : variables) {
-            if (!"VARIABLE".equals(def.kind())) continue;
+            if (!"VARIABLE".equals(def.kind())) {
+                continue;
+            }
             if (def.parentId() != null && !hierarchy.containsKey(def.parentId())) {
                 throw new IllegalArgumentException("Variable has a missing or non-folder parent: " + def.nodeId());
             }
