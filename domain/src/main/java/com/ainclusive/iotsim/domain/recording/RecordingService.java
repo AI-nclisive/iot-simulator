@@ -100,7 +100,11 @@ public class RecordingService {
         if (trimmedName != null && trimmedName.length() > 255) {
             throw new IllegalArgumentException("Recording name must not exceed 255 characters");
         }
-        String safeName = trimmedName;
+        // IS-169: no caller of this path passes a name today (the "Create Recording" wizard has
+        // no name field), so every scan-created recording got name=null and fell back to
+        // indistinguishable text (the source's name) on every list/picker screen. Defaults the
+        // same way IS-167 already does for live-capture recordings.
+        String safeName = trimmedName != null ? trimmedName : defaultRecordingName(source.name());
         // Capture the source's current schema snapshot with the recording (IS-161) so
         // schema-serving never depends on a live lookup against dataSourceId later.
         String schemaNodesJson = schemas.findCurrent(dataSourceId)
@@ -154,7 +158,7 @@ public class RecordingService {
             String schemaNodesJson = json.writeValueAsString(schema.nodes());
             Recording recording = map(recordings.create(
                     projectId, dsId, source.protocol(), schema.version(), "SCAN_RECORD",
-                    ScanType.SCHEMA_AND_DATA.name(), defaultCaptureName(source.name()), actor,
+                    ScanType.SCHEMA_AND_DATA.name(), defaultRecordingName(source.name()), actor,
                     schemaNodesJson));
             CaptureSpec spec = new CaptureSpec(source.protocol(), source.realDeviceEndpoint(),
                     credentials.find(dsId).orElse(null), schema.version(), schema.nodes());
@@ -174,13 +178,13 @@ public class RecordingService {
             DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm", Locale.ENGLISH).withZone(ZoneOffset.UTC);
 
     /**
-     * A default name for a capture-started recording (IS-167): recordings had no name
-     * at all before this, so every list/picker screen fell back to something else
-     * (the source's name, a truncated id, ...) and two captures from the same source
-     * were indistinguishable. Mirrors the date format the frontend already uses
-     * elsewhere (e.g. {@code 20 Jul 2026, 15:30}).
+     * A default name for a recording with no caller-supplied name (IS-167, extended to the
+     * scan-create path by IS-169): recordings had no name at all before this, so every
+     * list/picker screen fell back to something else (the source's name, a truncated id, ...)
+     * and multiple recordings from the same source were indistinguishable. Mirrors the date
+     * format the frontend already uses elsewhere (e.g. {@code 20 Jul 2026, 15:30}).
      */
-    private static String defaultCaptureName(String sourceName) {
+    private static String defaultRecordingName(String sourceName) {
         return sourceName + " — " + DEFAULT_NAME_TIMESTAMP.format(Instant.now());
     }
 
