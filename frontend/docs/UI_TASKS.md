@@ -1153,6 +1153,20 @@ Parallel execution:
   Depends: none.
   Done when: every numeric pattern field accepts a decimal value (e.g. 36.6); typecheck + vitest + build green.
 
+- [x] `UI-487` ✅ Select-all / deselect-all for synthetic measurement rows
+  Goal: the synthetic pattern editor's measurement list has a per-row "enabled" checkbox but no way to select/deselect all rows at once — with schemas of 200+ measurements, toggling each row individually is impractical.
+  Surface: `Create Data Source Wizard` (synthetic basis)
+  Work includes: `synthetic-profile-step.tsx` gained a master "Select all" checkbox above the measurement list (`setAllEnabled`, `enabledCount`/`allEnabled`/`someEnabled` derived from `drafts`), with an indeterminate visual state when some but not all rows are enabled.
+  Depends: none.
+  Done when: the master checkbox checks/unchecks every row at once and shows indeterminate when partially selected; typecheck + vitest + build green.
+
+- [x] `UI-488` ✅ Bulk-apply a pattern to selected synthetic measurement rows
+  Goal: there was no way to set the same pattern (e.g. Random) for many synthetic measurement rows at once — the user had to change each row's Pattern select individually, even after selecting multiple rows via UI-487's select-all.
+  Surface: `Create Data Source Wizard` (synthetic basis)
+  Work includes: `synthetic-profile-step.tsx` gained a "Set pattern for selected…" control next to UI-487's select-all checkbox; `setPatternForSelected` applies the chosen pattern to every currently-enabled row, skipping `CONSTANT_ONLY_TYPES` (IS-168) nodes, reusing `changePattern`'s per-node recording-suggestion re-apply logic.
+  Depends: UI-487.
+  Done when: the bulk control applies a pattern to every enabled row and leaves deselected rows untouched; typecheck + vitest + build green.
+
 ## Recommended Sequence
 
 1. Complete the P0 shell and shared-pattern tasks first.

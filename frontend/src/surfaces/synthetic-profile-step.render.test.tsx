@@ -68,10 +68,16 @@ describe("SyntheticProfileStep — Pattern select progressive disclosure (UI-483
     return user;
   }
 
-  /** The Pattern <select> is the only combobox whose options include "Fixed value". */
+  /**
+   * The per-row Pattern <select> is the combobox whose options include "Fixed value" —
+   * scoped to the measurement list so the bulk "Set pattern for selected…" control
+   * (which lists the same pattern options) isn't picked up instead.
+   */
   function patternSelect(): HTMLSelectElement | null {
+    const list = screen.queryByRole("list");
+    if (!list) return null;
     return (
-      screen
+      within(list)
         .queryAllByRole("combobox")
         .find((el) => within(el).queryByText("Fixed value") != null) as HTMLSelectElement | undefined
     ) ?? null;
@@ -226,5 +232,104 @@ describe("SyntheticProfileStep — decimal number fields (UI-486)", () => {
     await user.type(minInput, "36.6");
     expect(minInput.value).toBe("36.6");
     expect(minInput.validity.valid).toBe(true);
+  });
+});
+
+describe("SyntheticProfileStep — select-all / deselect-all (UI-487)", () => {
+  async function renderWithTwoMeasurements() {
+    mockApiFetch.mockReset();
+    mockApiFetch.mockImplementation(async (path: string) => {
+      if (path.includes("/recordings")) return { items: [] };
+      if (path.endsWith("/schema")) {
+        return {
+          id: "schema1",
+          dataSourceId: "s1",
+          version: 1,
+          nodes: [
+            { nodeId: "n1", path: "n1", name: "Temperature", kind: "VARIABLE", dataType: "FLOAT64", unit: null },
+            { nodeId: "n2", path: "n2", name: "Pressure", kind: "VARIABLE", dataType: "FLOAT64", unit: null },
+          ],
+        };
+      }
+      throw new Error(`unexpected apiFetch: ${path}`);
+    });
+
+    render(
+      <SyntheticProfileStep
+        projectId="p1"
+        sources={sources}
+        seed=""
+        onSeedChange={() => {}}
+        onChange={() => {}}
+      />,
+    );
+
+    const user = userEvent.setup();
+    await user.selectOptions(screen.getByLabelText(/Reuse schema from source/i), "s1");
+    await waitFor(() => expect(rowCheckboxes()).toHaveLength(2));
+    return user;
+  }
+
+  function rowCheckboxes(): HTMLInputElement[] {
+    const list = screen.getByRole("list");
+    return within(list).getAllByRole("checkbox") as HTMLInputElement[];
+  }
+
+  function selectAllCheckbox(): HTMLInputElement {
+    return screen.getByRole("checkbox", { name: /Select all/i }) as HTMLInputElement;
+  }
+
+  it("both rows start enabled, so Select all starts checked", async () => {
+    await renderWithTwoMeasurements();
+    expect(rowCheckboxes().every((c) => c.checked)).toBe(true);
+    expect(selectAllCheckbox().checked).toBe(true);
+  });
+
+  it("Select all deselects every row, and re-checking selects every row again", async () => {
+    const user = await renderWithTwoMeasurements();
+    await user.click(selectAllCheckbox());
+    expect(rowCheckboxes().every((c) => !c.checked)).toBe(true);
+
+    await user.click(selectAllCheckbox());
+    expect(rowCheckboxes().every((c) => c.checked)).toBe(true);
+  });
+
+  it("unchecking one row leaves Select all indeterminate, not checked", async () => {
+    const user = await renderWithTwoMeasurements();
+    await user.click(rowCheckboxes()[0]);
+    expect(selectAllCheckbox().checked).toBe(false);
+    expect(selectAllCheckbox().indeterminate).toBe(true);
+  });
+
+  function bulkPatternSelect(): HTMLSelectElement {
+    return screen.getByRole("combobox", { name: /Set pattern for selected/i }) as HTMLSelectElement;
+  }
+
+  function rowPatternSelects(): HTMLSelectElement[] {
+    const list = screen.getByRole("list");
+    return within(list)
+      .getAllByRole("combobox")
+      .filter((el) => within(el).queryByText("Fixed value") != null) as HTMLSelectElement[];
+  }
+
+  it("bulk pattern select applies the chosen pattern to every currently-selected row (UI-488)", async () => {
+    const user = await renderWithTwoMeasurements();
+    await user.selectOptions(bulkPatternSelect(), "Random");
+    expect(rowPatternSelects().every((s) => s.value === "RANDOM_UNIFORM")).toBe(true);
+  });
+
+  it("bulk pattern select skips rows that were deselected first (UI-488)", async () => {
+    const user = await renderWithTwoMeasurements();
+    // Deselect the second row — collapses its detail section (including its Pattern select).
+    await user.click(rowCheckboxes()[1]);
+    expect(rowPatternSelects()).toHaveLength(1);
+
+    await user.selectOptions(bulkPatternSelect(), "Random");
+    expect(rowPatternSelects()[0].value).toBe("RANDOM_UNIFORM");
+
+    // Re-select the second row and confirm its pattern was left at its untouched default
+    // (not overwritten by the bulk apply while it was deselected).
+    await user.click(rowCheckboxes()[1]);
+    expect(rowPatternSelects()[1].value).not.toBe("RANDOM_UNIFORM");
   });
 });

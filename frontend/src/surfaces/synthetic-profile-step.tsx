@@ -363,6 +363,29 @@ export function SyntheticProfileStep({
     }
   }
 
+  // Select-all/deselect-all: toggles every measurement's "enabled" checkbox at once,
+  // instead of clicking through each row.
+  function setAllEnabled(enabled: boolean) {
+    setDrafts((cur) => {
+      const next = { ...cur };
+      for (const node of variableNodes) {
+        next[node.nodeId] = { ...(next[node.nodeId] ?? defaultDraft(node.dataType)), enabled };
+      }
+      return next;
+    });
+  }
+
+  // Bulk-apply a pattern to every currently-selected (enabled) row in one action, e.g.
+  // "set Random for all". Constant-only types (IS-168) can't take another pattern, so they're
+  // left untouched. Reuses changePattern's per-node suggestion re-apply logic per row.
+  function setPatternForSelected(type: PatternType) {
+    for (const node of variableNodes) {
+      if (!drafts[node.nodeId]?.enabled) continue;
+      if (CONSTANT_ONLY_TYPES.has(node.dataType ?? "")) continue;
+      changePattern(node.nodeId, type);
+    }
+  }
+
   // Derive patterns from a recording's captured values (POST /recordings/{id}/derive-synthetic)
   // and map them onto the matching measurement rows by nodeId. Rows whose nodeId isn't in the
   // recording are left untouched (the recording must share this source's schema to match).
@@ -474,6 +497,10 @@ export function SyntheticProfileStep({
     emit();
   }, [emit]);
 
+  const enabledCount = variableNodes.filter((n) => drafts[n.nodeId]?.enabled).length;
+  const allEnabled = variableNodes.length > 0 && enabledCount === variableNodes.length;
+  const someEnabled = enabledCount > 0 && !allEnabled;
+
   return (
     <div className="space-y-5">
       <div className="grid gap-4 sm:grid-cols-2">
@@ -552,6 +579,38 @@ export function SyntheticProfileStep({
             measurement it has captured data for — measurements the recording doesn't cover keep
             their current settings.
           </p>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="flex items-center gap-2 text-sm text-shell-ink">
+              <input
+                checked={allEnabled}
+                ref={(el) => {
+                  if (el) el.indeterminate = someEnabled;
+                }}
+                type="checkbox"
+                onChange={(e) => setAllEnabled(e.target.checked)}
+              />
+              Select all
+            </label>
+            <select
+              aria-label="Set pattern for selected"
+              className="shell-field"
+              disabled={enabledCount === 0}
+              value=""
+              onChange={(e) => {
+                const type = e.target.value as PatternType;
+                if (type) setPatternForSelected(type);
+                e.target.value = "";
+              }}
+            >
+              <option value="">Set pattern for selected…</option>
+              {PATTERN_TYPES.map((p) => (
+                <option key={p.value} value={p.value}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </div>
 
           <ul className="space-y-2">
             {variableNodes.map((node) => {
