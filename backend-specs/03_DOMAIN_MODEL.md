@@ -13,6 +13,7 @@ optimistic concurrency — D4).
 
 ```
 Project 1─* DataSource 1─1 Schema (versioned) 1─* SchemaNode
+Project 1─* ManualSchema (reusable, not bound to a DataSource)
 Project 1─* Recording 1─* Sample
 Project 1─* Scenario 1─* ScenarioStep
 Project 1─* Run 1─0..1 Evidence
@@ -54,6 +55,20 @@ A simulated instrument source.
 The protocol-neutral structure of a data-source. Versioned; immutable once a
 recording references a version (`01_…`). `SchemaNode` per `01_…` §1. A schema
 belongs to one data-source (reuse across sources happens via import/duplicate).
+
+### ManualSchema
+A project-scoped, protocol-scoped, standalone reusable structure artifact
+(folders + typed variables, no values) — symmetric to `Recording`, but for
+structure instead of values (SPEC "Manually Create Data Source Schemas").
+- `name`, `description`, `protocol`, `nodes[]` (`SchemaNode` per `01_…` §1).
+- Not bound to a data-source. Consumed only as the parameter set for a
+  **synthetic** source: its nodes are copied by snapshot into the new source's
+  own `Schema` at create time (mirrors the existing `schemaFromSourceId` copy
+  path — `IS-145`), so a later edit to the `ManualSchema` never affects an
+  already-created source.
+- Save model: **save-in-place or save-as-new**, prompted whenever the editor
+  has unsaved changes — no monotonic version chain like `Schema`.
+- Lifecycle: create, edit (full schema editor), duplicate (save-as), delete.
 
 ### Recording
 Captured real data over time.
