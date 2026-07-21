@@ -110,4 +110,63 @@ describe("SyntheticProfileStep — Pattern select progressive disclosure (UI-483
     expect(optionsAfter).toHaveLength(6);
     expect(screen.queryByRole("button", { name: /Show more patterns/i })).toBeNull();
   });
+
+  it("auto-expands a row whose pattern was already advanced without the user ever clicking Show more", async () => {
+    // A pattern can arrive already-advanced without any interactive pattern selection —
+    // e.g. "Prefill from recording" (IS-146) applying a RAMP-recommended suggestion. The
+    // row must render expanded immediately, not require the user to discover "Show more".
+    mockApiFetch.mockReset();
+    mockApiFetch.mockImplementation(async (path: string) => {
+      if (path.includes("/derive-synthetic")) {
+        return {
+          measurements: [
+            {
+              nodeId: "n1",
+              dataType: "FLOAT64",
+              updateRateMs: 1000,
+              recommended: "RAMP",
+              suggestions: { RAMP: { type: "RAMP", min: 0, max: 10, periodMs: 5000 } },
+            },
+          ],
+        };
+      }
+      if (path.includes("/recordings")) return { items: [{ id: "rec1", name: null, valueCount: 5 }] };
+      if (path.endsWith("/schema")) {
+        return {
+          id: "schema1",
+          dataSourceId: "s1",
+          version: 1,
+          nodes: [
+            { nodeId: "n1", path: "n1", name: "Temperature", kind: "VARIABLE", dataType: "FLOAT64", unit: null },
+          ],
+        };
+      }
+      throw new Error(`unexpected apiFetch: ${path}`);
+    });
+
+    render(
+      <SyntheticProfileStep
+        projectId="p1"
+        sources={sources}
+        seed=""
+        onSeedChange={() => {}}
+        onChange={() => {}}
+      />,
+    );
+
+    const user = userEvent.setup();
+    await user.selectOptions(screen.getByLabelText(/Reuse schema from source/i), "s1");
+    await waitFor(() => expect(patternSelect()).not.toBeNull());
+
+    const recordingCombo = screen
+      .getAllByRole("combobox")
+      .find((el) => within(el).queryByText(/5 values/) != null)!;
+    await user.selectOptions(recordingCombo, "rec1");
+    await user.click(screen.getByRole("button", { name: /^Prefill$/ }));
+
+    await waitFor(() => expect(patternSelect()!.value).toBe("RAMP"));
+    const options = within(patternSelect()!).getAllByRole("option").map((o) => o.textContent);
+    expect(options).toHaveLength(6);
+    expect(screen.queryByRole("button", { name: /Show more patterns/i })).toBeNull();
+  });
 });
