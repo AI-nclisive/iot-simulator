@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { apiFetch, ApiError, mapProtocol, mapRuntimeStateToStatus, mapRuntimeStateToHealth } from "../api";
 import type { DataSourceRow } from "../surfaces/mock-data-sources";
+import type { TypeResolutionEntry } from "../surfaces/create-data-source-wizard-page";
 import type { BackendProtocol, BackendRuntimeState, Page } from "../api";
 
 // Backend response shape from GET/POST/PUT /api/v1/projects/{pid}/data-sources (IS-127 shape)
@@ -105,6 +106,13 @@ type DataSourcesState = {
   deleteDataSource: (rowId: string, projectId?: string) => Promise<void>;
   duplicateDataSource: (rowId: string, projectId?: string) => Promise<void>;
   stopDataSource: (rowId: string, projectId?: string) => Promise<void>;
+  /** Applies a completed rescan job (POST /{id}/rescan/{jobId}/apply) as a new schema version. */
+  applyRescan: (
+    rowId: string,
+    jobId: string,
+    typeResolutions: TypeResolutionEntry[],
+    projectId?: string,
+  ) => Promise<void>;
   updateSourceConfiguration: (
     rowId: string,
     input: UpdateSourceConfigInput,
@@ -232,6 +240,18 @@ export const useDataSourcesStore = create<DataSourcesState>((set, get) => ({
     const data = await apiFetch<DataSourceResponse>(
       `/api/v1/projects/${pid}/data-sources/${rowId}/stop`,
       { method: "POST" },
+    );
+    const updated = mapDataSource(data);
+    set((state) => ({
+      dataSources: state.dataSources.map((row) => (row.id === rowId ? updated : row)),
+    }));
+  },
+
+  applyRescan: async (rowId, jobId, typeResolutions, projectId) => {
+    const pid = projectId ?? get().currentProjectId;
+    const data = await apiFetch<DataSourceResponse>(
+      `/api/v1/projects/${pid}/data-sources/${rowId}/rescan/${jobId}/apply`,
+      { method: "POST", body: JSON.stringify({ typeResolutions }) },
     );
     const updated = mapDataSource(data);
     set((state) => ({

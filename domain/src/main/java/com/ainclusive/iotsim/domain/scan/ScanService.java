@@ -4,6 +4,7 @@ import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.domain.datasource.DataSource;
 import com.ainclusive.iotsim.domain.datasource.DataSourceService;
 import com.ainclusive.iotsim.domain.datasource.Protocol;
+import com.ainclusive.iotsim.domain.datasource.SourceBasis;
 import com.ainclusive.iotsim.domain.schema.SchemaService;
 import com.ainclusive.iotsim.domain.support.Page;
 import com.ainclusive.iotsim.domain.support.PageCursor;
@@ -15,6 +16,7 @@ import com.ainclusive.iotsim.platform.scan.ScanResult;
 import com.ainclusive.iotsim.platform.scan.ScanSpec;
 import com.ainclusive.iotsim.platform.scan.SourceScanner;
 import com.ainclusive.iotsim.platform.secret.ConnectionCredentials;
+import com.ainclusive.iotsim.platform.secret.CredentialStore;
 import com.ainclusive.iotsim.protocolmodel.Access;
 import com.ainclusive.iotsim.protocolmodel.DataType;
 import com.ainclusive.iotsim.protocolmodel.NodeKind;
@@ -57,6 +59,7 @@ public class ScanService implements DisposableBean {
     private final ProjectRepository projects;
     private final DataSourceService dataSources;
     private final SchemaService schemas;
+    private final CredentialStore credentials;
     private final Map<String, ScanJob> jobs = new ConcurrentHashMap<>();
     // Tracks the in-flight scan thread + a cancel-requested flag per job so a
     // running scan can be stopped early (IS-164): cancelScan interrupts the
@@ -78,11 +81,12 @@ public class ScanService implements DisposableBean {
 
     @Autowired
     public ScanService(SourceScanner scanner, ProjectRepository projects,
-            DataSourceService dataSources, SchemaService schemas) {
+            DataSourceService dataSources, SchemaService schemas, CredentialStore credentials) {
         this.scanner = scanner;
         this.projects = projects;
         this.dataSources = dataSources;
         this.schemas = schemas;
+        this.credentials = credentials;
         AtomicInteger seq = new AtomicInteger();
         this.ownedPool = Executors.newFixedThreadPool(2, r -> {
             Thread t = new Thread(r, "scan-worker-" + seq.incrementAndGet());
@@ -94,11 +98,12 @@ public class ScanService implements DisposableBean {
 
     /** Test seam: run scans on a caller-supplied executor (e.g. synchronous). */
     ScanService(SourceScanner scanner, ProjectRepository projects, DataSourceService dataSources,
-            SchemaService schemas, Executor executor) {
+            SchemaService schemas, CredentialStore credentials, Executor executor) {
         this.scanner = scanner;
         this.projects = projects;
         this.dataSources = dataSources;
         this.schemas = schemas;
+        this.credentials = credentials;
         this.executor = executor;
         this.ownedPool = null;
     }
@@ -272,6 +277,52 @@ public class ScanService implements DisposableBean {
         schemas.save(projectId, created.id(), nodes);
         // Re-read so the response carries the linked schemaId/schemaVersion.
         return dataSources.get(projectId, created.id());
+    }
+
+    /**
+     * Starts a re-scan of an already-created (basis=SCAN) data source's real endpoint,
+     * reusing its stored protocol, real-device endpoint, and connection credentials —
+     * the same reuse RecordingService.startCapture makes to reconnect for a live
+     * capture. Poll and apply the result the same way as a create-time scan.
+     *
+     * @throws IllegalArgumentException if the source isn't SCAN-basis or has no endpoint
+     */
+    public ScanJob startRescan(String projectId, String dataSourceId) {
+        DataSource source = dataSources.get(projectId, dataSourceId);
+        if (source.basis() != SourceBasis.SCAN) {
+            throw new IllegalArgumentException("only a SCAN-basis data source can be rescanned");
+        }
+        if (source.realDeviceEndpoint() == null || source.realDeviceEndpoint().isBlank()) {
+            throw new IllegalArgumentException("data source has no real-device endpoint to rescan");
+        }
+        ConnectionCredentials creds = credentials.find(dataSourceId).orElse(null);
+        return startScan(projectId, source.protocol().name(), source.realDeviceEndpoint(), creds, 0);
+    }
+
+    /**
+     * Applies a completed rescan job's discovered structure onto an existing data
+     * source, saving it as a new schema version (IS-094 breaking-impact guard applies
+     * the same as any other manual schema edit). Unlike {@link #createFromScan}, no
+     * new data source is created — the existing id keeps its identity, runtime state,
+     * and credentials.
+     *
+     * @param resolutions user decisions for unknown-typed nodes; may be {@code null}/empty
+     */
+    public DataSource applyRescan(String projectId, String dataSourceId, String jobId,
+            List<TypeResolution> resolutions) {
+        ScanJob job = getScan(projectId, jobId);
+        if (job.isRunning()) {
+            throw new IllegalArgumentException("scan job is still running: " + jobId);
+        }
+        if (job.result() == null || job.result().nodes().isEmpty()) {
+            throw new IllegalArgumentException("scan job has no discovered structure to apply");
+        }
+        List<SchemaNode> nodes = populateSchema(job.result().nodes(), resolutions);
+        if (nodes.isEmpty()) {
+            throw new IllegalArgumentException("scan produced an empty schema after resolution");
+        }
+        schemas.save(projectId, dataSourceId, nodes);
+        return dataSources.get(projectId, dataSourceId);
     }
 
     /**
