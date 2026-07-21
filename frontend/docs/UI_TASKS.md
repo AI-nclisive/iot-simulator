@@ -1146,6 +1146,13 @@ Parallel execution:
   Depends: none (complements IS-169, backend, merged).
   Done when: the picker's date/time subtitle includes a time component matching the Recordings page's format; typecheck + vitest + build green.
 
+- [x] `UI-486` ✅ Allow decimal values in synthetic pattern number fields
+  Goal: the synthetic pattern editor's numeric fields (Min, Max, Period, Volatility, Update rate, Seed) rejected decimal input — the backend already stores these as `Double` (`PatternSpec`), but the `<input type="number">` elements had no `step` attribute, so the browser's default integer-only step semantics applied.
+  Surface: `Create Data Source Wizard` (synthetic basis)
+  Work includes: `synthetic-profile-step.tsx` — added `step="any"` to every numeric pattern field (Seed, Min, Max, Period, Volatility, Update rate). No backend or parsing change needed; `num()` already accepts decimals via `Number(s)`.
+  Depends: none.
+  Done when: every numeric pattern field accepts a decimal value (e.g. 36.6); typecheck + vitest + build green.
+
 ## Recommended Sequence
 
 1. Complete the P0 shell and shared-pattern tasks first.

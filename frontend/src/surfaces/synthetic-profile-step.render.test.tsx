@@ -170,3 +170,61 @@ describe("SyntheticProfileStep — Pattern select progressive disclosure (UI-483
     expect(screen.queryByRole("button", { name: /Show more patterns/i })).toBeNull();
   });
 });
+
+// UI-486: the pattern editor's numeric fields must accept decimal values — the backend
+// already stores min/max/period/volatility/updateRate as Double, so nothing but a missing
+// `step` attribute (defaulting the browser to integer-only step semantics) was blocking it.
+describe("SyntheticProfileStep — decimal number fields (UI-486)", () => {
+  async function renderWithOneMeasurement() {
+    mockApiFetch.mockReset();
+    mockApiFetch.mockImplementation(async (path: string) => {
+      if (path.includes("/recordings")) return { items: [] };
+      if (path.endsWith("/schema")) {
+        return {
+          id: "schema1",
+          dataSourceId: "s1",
+          version: 1,
+          nodes: [
+            { nodeId: "n1", path: "n1", name: "Temperature", kind: "VARIABLE", dataType: "FLOAT64", unit: null },
+          ],
+        };
+      }
+      throw new Error(`unexpected apiFetch: ${path}`);
+    });
+
+    render(
+      <SyntheticProfileStep
+        projectId="p1"
+        sources={sources}
+        seed=""
+        onSeedChange={() => {}}
+        onChange={() => {}}
+      />,
+    );
+
+    const user = userEvent.setup();
+    await user.selectOptions(screen.getByLabelText(/Reuse schema from source/i), "s1");
+    await waitFor(() => expect(screen.queryByRole("list")).not.toBeNull());
+    return user;
+  }
+
+  function numberInputs(): HTMLInputElement[] {
+    return [...document.querySelectorAll('input[type="number"]')] as HTMLInputElement[];
+  }
+
+  it("every numeric pattern field allows decimals (step=any)", async () => {
+    await renderWithOneMeasurement();
+    const inputs = numberInputs();
+    expect(inputs.length).toBeGreaterThan(0);
+    expect(inputs.every((el) => el.getAttribute("step") === "any")).toBe(true);
+  });
+
+  it("accepts a decimal value typed into Min and reports it as valid", async () => {
+    const user = await renderWithOneMeasurement();
+    const minInput = screen.getByLabelText(/^Min$/i) as HTMLInputElement;
+    await user.clear(minInput);
+    await user.type(minInput, "36.6");
+    expect(minInput.value).toBe("36.6");
+    expect(minInput.validity.valid).toBe(true);
+  });
+});
