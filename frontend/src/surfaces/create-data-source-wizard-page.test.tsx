@@ -918,7 +918,7 @@ describe("CreateDataSourceWizardPage — IMPORT recording picker shows time, not
       minute: "2-digit",
       hour12: false,
     });
-    expect(screen.getByText(expected)).toBeTruthy();
+    screen.getByText(expected);
   });
 });
 
