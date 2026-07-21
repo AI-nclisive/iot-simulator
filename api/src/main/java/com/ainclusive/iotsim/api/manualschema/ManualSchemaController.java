@@ -96,6 +96,7 @@ public class ManualSchemaController {
     public ResponseEntity<ImportNodeSetResponse> importNodeSet(
             @PathVariable String projectId, @RequestBody ImportNodeSetRequest req) {
         require(req != null && notBlank(req.name()), "name is required");
+        require(notBlank(req.xml()), "xml is required");
         OpcUaNodeSetImporter.Result imported = OpcUaNodeSetImporter.importXml(req.xml());
         ManualSchema schema = manualSchemas.create(
                 projectId, "OPC_UA", req.name(), req.description(), imported.nodes(), "local");
