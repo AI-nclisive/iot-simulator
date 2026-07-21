@@ -1146,22 +1146,22 @@ Parallel execution:
   Depends: none (complements IS-169, backend, merged).
   Done when: the picker's date/time subtitle includes a time component matching the Recordings page's format; typecheck + vitest + build green.
 
-- [ ] `UI-486` Manual Schemas list page (nav/list)
+- [ ] `UI-489` Manual Schemas list page (nav/list)
   Goal: a new "Manual Schemas" section (project-scoped) listing reusable, standalone structure artifacts — name, protocol, variable count, updated date — with create/duplicate/delete actions, modeled on `recordings-page.tsx`.
   Surface: new `Manual Schemas` list page + nav entry.
-  Depends: IS-170, IS-171 (backend).
+  Depends: IS-171, IS-172 (backend).
   Done when: list loads/paginates from `GET /manual-schemas`; create/duplicate/delete wired; empty and loading states; typecheck + vitest + build green.
 
-- [ ] `UI-487` Standalone Manual Schema editor with Save / Save As
+- [ ] `UI-490` Standalone Manual Schema editor with Save / Save As
   Goal: reuse the existing Full Schema Editor (`data-source-schema-editor.tsx`) in a standalone mode bound to a `ManualSchema` instead of a data source's schema. On Save with unsaved changes, prompt the user to choose: save into this schema, or save as a new one (no monotonic version chain, per `03_DOMAIN_MODEL.md` §ManualSchema).
   Surface: `Manual Schemas` — editor.
-  Depends: UI-486, IS-171.
+  Depends: UI-489, IS-172.
   Done when: structural edits at any depth, types, unit/description all work standalone; Save/Save-As dialog appears only when there are unsaved changes; typecheck + vitest + build green.
 
-- [ ] `UI-488` Synthetic wizard — pick a Manual Schema as parameter source
+- [ ] `UI-491` Synthetic wizard — pick a Manual Schema as parameter source
   Goal: in the Create Data Source wizard's Synthetic "Configure profile" step (`synthetic-profile-step.tsx`), add "Manual schema" as a parameter-source option alongside the existing "existing source's schema" and "prefill from recording" options — a schema is required to get any parameters to drive.
   Surface: `Create Data Source Wizard` (synthetic basis).
-  Depends: IS-172, UI-486.
+  Depends: IS-173, UI-489.
   Done when: picking a Manual Schema populates the per-measurement pattern editor from its nodes; `manualSchemaId` sent to `POST .../data-sources/synthetic`; mutually exclusive with picking an existing source; typecheck + vitest + build green.
 
 ## Recommended Sequence
