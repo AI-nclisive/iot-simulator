@@ -64,7 +64,7 @@ export function validateManualSchemaNodes(nodes: NodeDto[]): ValidationIssue[] {
       if (!parent) issues.push({ nodeId: node.nodeId, message: "Its parent no longer exists." });
       else if (parent.kind !== "FOLDER") issues.push({ nodeId: node.nodeId, message: "Only a folder can contain another node." });
     }
-    const key = `${node.parentId ?? "__top_level__"}:${name.toLocaleLowerCase()}`;
+    const key = `${node.parentId ?? "__top_level__"}:${name}`;
     const ids = siblingNames.get(key) ?? new Set<string>();
     ids.add(node.nodeId);
     siblingNames.set(key, ids);

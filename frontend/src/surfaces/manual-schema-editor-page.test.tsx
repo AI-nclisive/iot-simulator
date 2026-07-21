@@ -283,6 +283,15 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
 });
 
 describe("validateManualSchemaNodes", () => {
+  it("allows case-sensitive sibling browse names", () => {
+    const issues = validateManualSchemaNodes([
+      { nodeId: "upper", parentId: null, path: "/Temp", name: "Temp", kind: "VARIABLE" as const, dataType: "FLOAT64", valueRank: "SCALAR", access: "READ", unit: null, description: null },
+      { nodeId: "lower", parentId: null, path: "/temp", name: "temp", kind: "VARIABLE" as const, dataType: "FLOAT64", valueRank: "SCALAR", access: "READ", unit: null, description: null },
+    ]);
+
+    expect(issues).toEqual([]);
+  });
+
   it("reports duplicate names and a node under a variable", () => {
     const issues = validateManualSchemaNodes([
       { nodeId: "parent", parentId: null, path: "/Parent", name: "Parent", kind: "VARIABLE" as const, dataType: "FLOAT64", valueRank: "SCALAR", access: "READ", unit: null, description: null },
