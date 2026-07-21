@@ -228,3 +228,70 @@ describe("SyntheticProfileStep — decimal number fields (UI-486)", () => {
     expect(minInput.validity.valid).toBe(true);
   });
 });
+
+describe("SyntheticProfileStep — select-all / deselect-all (UI-487)", () => {
+  async function renderWithTwoMeasurements() {
+    mockApiFetch.mockReset();
+    mockApiFetch.mockImplementation(async (path: string) => {
+      if (path.includes("/recordings")) return { items: [] };
+      if (path.endsWith("/schema")) {
+        return {
+          id: "schema1",
+          dataSourceId: "s1",
+          version: 1,
+          nodes: [
+            { nodeId: "n1", path: "n1", name: "Temperature", kind: "VARIABLE", dataType: "FLOAT64", unit: null },
+            { nodeId: "n2", path: "n2", name: "Pressure", kind: "VARIABLE", dataType: "FLOAT64", unit: null },
+          ],
+        };
+      }
+      throw new Error(`unexpected apiFetch: ${path}`);
+    });
+
+    render(
+      <SyntheticProfileStep
+        projectId="p1"
+        sources={sources}
+        seed=""
+        onSeedChange={() => {}}
+        onChange={() => {}}
+      />,
+    );
+
+    const user = userEvent.setup();
+    await user.selectOptions(screen.getByLabelText(/Reuse schema from source/i), "s1");
+    await waitFor(() => expect(rowCheckboxes()).toHaveLength(2));
+    return user;
+  }
+
+  function rowCheckboxes(): HTMLInputElement[] {
+    const list = screen.getByRole("list");
+    return within(list).getAllByRole("checkbox") as HTMLInputElement[];
+  }
+
+  function selectAllCheckbox(): HTMLInputElement {
+    return screen.getByRole("checkbox", { name: /Select all/i }) as HTMLInputElement;
+  }
+
+  it("both rows start enabled, so Select all starts checked", async () => {
+    await renderWithTwoMeasurements();
+    expect(rowCheckboxes().every((c) => c.checked)).toBe(true);
+    expect(selectAllCheckbox().checked).toBe(true);
+  });
+
+  it("Select all deselects every row, and re-checking selects every row again", async () => {
+    const user = await renderWithTwoMeasurements();
+    await user.click(selectAllCheckbox());
+    expect(rowCheckboxes().every((c) => !c.checked)).toBe(true);
+
+    await user.click(selectAllCheckbox());
+    expect(rowCheckboxes().every((c) => c.checked)).toBe(true);
+  });
+
+  it("unchecking one row leaves Select all indeterminate, not checked", async () => {
+    const user = await renderWithTwoMeasurements();
+    await user.click(rowCheckboxes()[0]);
+    expect(selectAllCheckbox().checked).toBe(false);
+    expect(selectAllCheckbox().indeterminate).toBe(true);
+  });
+});

@@ -1153,6 +1153,13 @@ Parallel execution:
   Depends: none.
   Done when: every numeric pattern field accepts a decimal value (e.g. 36.6); typecheck + vitest + build green.
 
+- [x] `UI-487` ✅ Select-all / deselect-all for synthetic measurement rows
+  Goal: the synthetic pattern editor's measurement list has a per-row "enabled" checkbox but no way to select/deselect all rows at once — with schemas of 200+ measurements, toggling each row individually is impractical.
+  Surface: `Create Data Source Wizard` (synthetic basis)
+  Work includes: `synthetic-profile-step.tsx` gained a master "Select all" checkbox above the measurement list (`setAllEnabled`, `enabledCount`/`allEnabled`/`someEnabled` derived from `drafts`), with an indeterminate visual state when some but not all rows are enabled.
+  Depends: none.
+  Done when: the master checkbox checks/unchecks every row at once and shows indeterminate when partially selected; typecheck + vitest + build green.
+
 ## Recommended Sequence
 
 1. Complete the P0 shell and shared-pattern tasks first.
