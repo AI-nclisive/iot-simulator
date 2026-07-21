@@ -23,6 +23,8 @@ import com.ainclusive.iotsim.domain.datasource.DataSourceService;
 import com.ainclusive.iotsim.domain.datasource.Protocol;
 import com.ainclusive.iotsim.domain.datasource.RuntimeState;
 import com.ainclusive.iotsim.domain.datasource.SourceBasis;
+import com.ainclusive.iotsim.domain.scan.ScanJob;
+import com.ainclusive.iotsim.domain.scan.ScanService;
 import com.ainclusive.iotsim.domain.schema.SchemaService;
 import com.ainclusive.iotsim.domain.support.Page;
 import com.ainclusive.iotsim.platform.secret.ConnectionCredentials;
@@ -42,16 +44,18 @@ class DataSourceControllerTest {
 
     private DataSourceService service;
     private SchemaService schemaService;
+    private ScanService scanService;
     private DataSourceController controller;
 
     @BeforeEach
     void setUp() {
         service = mock(DataSourceService.class);
         schemaService = mock(SchemaService.class);
+        scanService = mock(ScanService.class);
         // Default: countVariableNodes returns 0 for any single id or collection.
         given(schemaService.countVariableNodes(anyString())).willReturn(0);
         given(schemaService.countVariableNodes(any(Collection.class))).willReturn(Map.of());
-        controller = new DataSourceController(service, schemaService);
+        controller = new DataSourceController(service, schemaService, scanService);
     }
 
     private static DataSource sample(long version, RuntimeState state) {
@@ -298,6 +302,47 @@ class DataSourceControllerTest {
                 .willThrow(new ResourceNotFoundException("DataSource", "missing"));
         assertThatThrownBy(() -> controller.duplicate(PROJECT, "missing"))
                 .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void rescanReturns202WithJobIdAndLocationHeader() {
+        Instant now = Instant.now();
+        ScanJob job = new ScanJob("job1", PROJECT, "OPC_UA", "opc.tcp://real-device:4840", "RUNNING",
+                com.ainclusive.iotsim.platform.scan.ScanPhase.CONNECTING, 0, null, "scan in progress", now, now);
+        given(scanService.startRescan(PROJECT, "ds1")).willReturn(job);
+
+        var response = controller.rescan(PROJECT, "ds1");
+
+        assertThat(response.getStatusCode().value()).isEqualTo(202);
+        assertThat(response.getHeaders().getLocation()).isNotNull();
+        assertThat(response.getHeaders().getLocation().toString())
+                .isEqualTo("/api/v1/projects/" + PROJECT + "/data-sources/scan/job1");
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().jobId()).isEqualTo("job1");
+        assertThat(response.getBody().status()).isEqualTo("RUNNING");
+    }
+
+    @Test
+    void rescanPropagatesNotFoundWhenSourceMissing() {
+        given(scanService.startRescan(PROJECT, "missing"))
+                .willThrow(new ResourceNotFoundException("DataSource", "missing"));
+        assertThatThrownBy(() -> controller.rescan(PROJECT, "missing"))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void applyRescanReturns200WithUpdatedSchemaVersion() {
+        DataSource updated = sample(2, RuntimeState.STOPPED);
+        given(scanService.applyRescan(eq(PROJECT), eq("ds1"), eq("job1"), any())).willReturn(updated);
+        given(schemaService.countVariableNodes("ds1")).willReturn(3);
+
+        var resp = controller.applyRescan(PROJECT, "ds1", "job1",
+                new DataSourceController.ApplyRescanRequest(List.of()));
+
+        assertThat(resp.getStatusCode().value()).isEqualTo(200);
+        assertThat(resp.getHeaders().getETag()).isEqualTo("\"2\"");
+        assertThat(resp.getBody()).isNotNull();
+        assertThat(resp.getBody().parameterCount()).isEqualTo(3);
     }
 
     @Test

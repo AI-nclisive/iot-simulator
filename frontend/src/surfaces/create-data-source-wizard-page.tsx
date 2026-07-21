@@ -77,7 +77,10 @@ type DiscoveredNodesPage = {
 // 5000 pages * 200/page = 1M nodes — far past any real address space.
 const MAX_SCAN_NODE_PAGES = 5000;
 
-async function fetchAllScanNodes(projectId: string, jobId: string): Promise<DiscoveredNodeResponse[]> {
+export async function fetchAllScanNodes(
+  projectId: string,
+  jobId: string,
+): Promise<DiscoveredNodeResponse[]> {
   const nodes: DiscoveredNodeResponse[] = [];
   let cursor: string | null = null;
   for (let page = 0; page < MAX_SCAN_NODE_PAGES; page++) {
@@ -93,7 +96,7 @@ async function fetchAllScanNodes(projectId: string, jobId: string): Promise<Disc
 }
 
 const UNKNOWN_NODE_ROW_HEIGHT = 68;
-const UNKNOWN_NODE_TYPE_OPTIONS = ["FLOAT64", "INT32", "BOOL", "STRING"] as const;
+export const UNKNOWN_NODE_TYPE_OPTIONS = ["FLOAT64", "INT32", "BOOL", "STRING"] as const;
 
 /**
  * Renders unknown-typed discovered nodes for type resolution. Virtualized (IS-165
@@ -101,7 +104,7 @@ const UNKNOWN_NODE_TYPE_OPTIONS = ["FLOAT64", "INT32", "BOOL", "STRING"] as cons
  * unknown-typed nodes) — only rows scrolled into view are ever mounted, so the DOM
  * stays bounded regardless of how many nodes a scan discovers.
  */
-function UnknownNodesList({
+export function UnknownNodesList({
   nodes,
   typeResolutionsByNodeId,
   onChange,

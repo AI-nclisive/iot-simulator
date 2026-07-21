@@ -1,12 +1,15 @@
 package com.ainclusive.iotsim.api.datasource;
 
 import com.ainclusive.iotsim.api.error.PreconditionRequiredException;
+import com.ainclusive.iotsim.api.scan.ScanController;
 import com.ainclusive.iotsim.api.security.Permission;
 import com.ainclusive.iotsim.api.support.ConnectionConfigRequest;
 import com.ainclusive.iotsim.api.support.CredentialRequests;
 import com.ainclusive.iotsim.domain.datasource.DataSource;
 import com.ainclusive.iotsim.domain.datasource.DataSourceService;
 import com.ainclusive.iotsim.domain.datasource.SecurityConfigRedactor;
+import com.ainclusive.iotsim.domain.scan.ScanJob;
+import com.ainclusive.iotsim.domain.scan.ScanService;
 import com.ainclusive.iotsim.domain.schema.SchemaService;
 import com.ainclusive.iotsim.domain.support.Page;
 import com.ainclusive.iotsim.protocolmodel.Access;
@@ -64,10 +67,12 @@ public class DataSourceController {
 
     private final DataSourceService dataSources;
     private final SchemaService schemas;
+    private final ScanService scans;
 
-    public DataSourceController(DataSourceService dataSources, SchemaService schemas) {
+    public DataSourceController(DataSourceService dataSources, SchemaService schemas, ScanService scans) {
         this.dataSources = dataSources;
         this.schemas = schemas;
+        this.scans = scans;
     }
 
     @Operation(
@@ -205,6 +210,47 @@ public class DataSourceController {
         return ResponseEntity.ok().eTag(etag(ds.version())).body(DataSourceResponse.from(ds, paramCount));
     }
 
+    /**
+     * Re-scans an already-created (basis=SCAN) data source's real endpoint, reusing its
+     * stored protocol, endpoint, and connection credentials — no re-entry of connection
+     * details needed. Starts an async job just like create-from-scan; poll it via the
+     * existing {@code GET /data-sources/scan/{jobId}} endpoint.
+     */
+    @Operation(
+            summary = "Rescan a data source's real endpoint",
+            description = "Starts an asynchronous rescan of an existing SCAN-basis data source's real"
+                    + " endpoint, reusing its stored connection details. Returns 202 Accepted with a"
+                    + " Location header and the job id to poll via the scan job endpoint.")
+    @PostMapping("/{id}/rescan")
+    @PreAuthorize(SOURCE_EDIT)
+    public ResponseEntity<ScanController.StartScanResponse> rescan(
+            @PathVariable String projectId, @PathVariable String id) {
+        ScanJob job = scans.startRescan(projectId, id);
+        URI location = URI.create("/api/v1/projects/" + projectId + "/data-sources/scan/" + job.jobId());
+        return ResponseEntity.accepted().location(location)
+                .body(new ScanController.StartScanResponse(job.jobId(), job.state()));
+    }
+
+    /**
+     * Applies a completed rescan job's discovered structure onto the existing data source
+     * as a new schema version. Unknown-typed nodes must be addressed via {@code typeResolutions}
+     * the same way create-from-scan requires.
+     */
+    @Operation(
+            summary = "Apply a completed rescan",
+            description = "Saves a completed rescan job's discovered structure as a new schema version on"
+                    + " the existing data source, applying type resolutions for unknown-typed nodes.")
+    @PostMapping("/{id}/rescan/{jobId}/apply")
+    @PreAuthorize(SOURCE_EDIT)
+    public ResponseEntity<DataSourceResponse> applyRescan(
+            @PathVariable String projectId, @PathVariable String id, @PathVariable String jobId,
+            @RequestBody ApplyRescanRequest req) {
+        DataSource ds = scans.applyRescan(projectId, id, jobId,
+                ScanController.toResolutions(req.typeResolutions()));
+        int paramCount = schemas.countVariableNodes(ds.id());
+        return ResponseEntity.ok().eTag(etag(ds.version())).body(DataSourceResponse.from(ds, paramCount));
+    }
+
     private static List<SchemaNode> toNodes(List<NodeDto> dtos) {
         List<SchemaNode> nodes = new ArrayList<>(dtos.size());
         for (NodeDto d : dtos) {
@@ -280,6 +326,8 @@ public class DataSourceController {
     public record UpdateDataSourceRequest(
             String name, Integer simulatorPort, String realDeviceEndpoint, String runtimeConfig,
             String securityConfig, Boolean enabled, ConnectionConfigRequest connectionConfig) {}
+
+    public record ApplyRescanRequest(List<ScanController.TypeResolutionRequest> typeResolutions) {}
 
     public record DataSourceResponse(
             String id, String projectId, String name, String protocol, String basis,
