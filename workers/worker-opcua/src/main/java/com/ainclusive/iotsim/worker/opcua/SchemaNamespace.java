@@ -10,7 +10,7 @@ import org.eclipse.milo.opcua.sdk.server.api.DataItem;
 import org.eclipse.milo.opcua.sdk.server.api.ManagedNamespaceWithLifecycle;
 import org.eclipse.milo.opcua.sdk.server.api.MonitoredItem;
 import org.eclipse.milo.opcua.sdk.server.nodes.UaVariableNode;
-import org.eclipse.milo.opcua.sdk.server.nodes.UaFolderNode;
+import org.eclipse.milo.opcua.sdk.server.nodes.UaObjectNode;
 import org.eclipse.milo.opcua.sdk.server.util.SubscriptionModel;
 import org.eclipse.milo.opcua.stack.core.Identifiers;
 import org.eclipse.milo.opcua.stack.core.types.builtin.DataValue;
@@ -69,7 +69,7 @@ final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
                 if (!"FOLDER".equals(def.kind()) || hierarchy.containsKey(def.nodeId())
                         || (def.parentId() != null && !hierarchy.containsKey(def.parentId()))) continue;
                 var nodeId = newNodeId(def.nodeId());
-                UaFolderNode node = UaFolderNode.builder(getNodeContext())
+                UaObjectNode node = UaObjectNode.builder(getNodeContext())
                         .setNodeId(nodeId).setBrowseName(newQualifiedName(def.name()))
                         .setDisplayName(LocalizedText.english(def.name())).setTypeDefinition(Identifiers.FolderType).build();
                 getNodeManager().addNode(node);
