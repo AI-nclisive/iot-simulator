@@ -11,7 +11,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ManualSchemaEditorPage } from "./manual-schema-editor-page";
+import { ManualSchemaEditorPage, validateManualSchemaNodes } from "./manual-schema-editor-page";
 
 const { mockNavigate } = vi.hoisted(() => ({ mockNavigate: vi.fn() }));
 
@@ -259,5 +259,57 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
         }),
       );
     });
+  });
+
+  it("edits a variable's value shape and client access", async () => {
+    mockLoadManualSchemaById.mockResolvedValueOnce(schema);
+    mockUpdateManualSchema.mockResolvedValueOnce(schema);
+    renderPage();
+
+    await waitFor(() => screen.getByText("Level"));
+    fireEvent.click(screen.getByText("Level"));
+    fireEvent.change(screen.getByLabelText("Value shape"), { target: { value: "ARRAY" } });
+    fireEvent.change(screen.getByLabelText("Client access"), { target: { value: "READ_WRITE" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByLabelText(/Save in this schema/));
+    fireEvent.click(screen.getAllByRole("button", { name: "Save" })[1]);
+
+    await waitFor(() => expect(mockUpdateManualSchema).toHaveBeenCalledWith(
+      "proj-1", "ms-1", expect.objectContaining({ nodes: expect.arrayContaining([
+        expect.objectContaining({ nodeId: "v1", valueRank: "ARRAY", access: "READ_WRITE" }),
+      ]) }),
+    ));
+  });
+});
+
+describe("validateManualSchemaNodes", () => {
+  it("allows case-sensitive sibling browse names", () => {
+    const issues = validateManualSchemaNodes([
+      { nodeId: "upper", parentId: null, path: "/Temp", name: "Temp", kind: "VARIABLE" as const, dataType: "FLOAT64", valueRank: "SCALAR", access: "READ", unit: null, description: null },
+      { nodeId: "lower", parentId: null, path: "/temp", name: "temp", kind: "VARIABLE" as const, dataType: "FLOAT64", valueRank: "SCALAR", access: "READ", unit: null, description: null },
+    ]);
+
+    expect(issues).toEqual([]);
+  });
+
+  it("reports duplicate names and a node under a variable", () => {
+    const issues = validateManualSchemaNodes([
+      { nodeId: "parent", parentId: null, path: "/Parent", name: "Parent", kind: "VARIABLE" as const, dataType: "FLOAT64", valueRank: "SCALAR", access: "READ", unit: null, description: null },
+      { nodeId: "child", parentId: "parent", path: "/Parent/Bad", name: "Bad/Name", kind: "VARIABLE" as const, dataType: "FLOAT64", valueRank: "SCALAR", access: "READ", unit: null, description: null },
+      { nodeId: "duplicate", parentId: "parent", path: "/Parent/Bad2", name: "Bad/Name", kind: "VARIABLE" as const, dataType: "FLOAT64", valueRank: "SCALAR", access: "READ", unit: null, description: null },
+    ]);
+    expect(issues.map((issue) => issue.message)).toEqual(expect.arrayContaining([
+      "A browse name cannot contain a slash or backslash.",
+      "Only a folder can contain another node.",
+      "Sibling nodes must have unique browse names.",
+    ]));
+  });
+
+  it("rejects a backslash in a browse name", () => {
+    const issues = validateManualSchemaNodes([
+      { nodeId: "backslash", parentId: null, path: "/Bad", name: "Bad\\Name", kind: "VARIABLE" as const, dataType: "FLOAT64", valueRank: "SCALAR", access: "READ", unit: null, description: null },
+    ]);
+
+    expect(issues).toEqual([{ nodeId: "backslash", message: "A browse name cannot contain a slash or backslash." }]);
   });
 });

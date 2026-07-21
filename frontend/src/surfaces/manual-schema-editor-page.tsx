@@ -45,6 +45,36 @@ const SUGGESTED_VARIABLES = [
 
 const PARAMETER_GROUPS = ["Measurements", "Control", "Device information", "Limits & diagnostics"] as const;
 
+const VALUE_RANKS = ["SCALAR", "ARRAY"] as const;
+const ACCESS_LEVELS = ["READ", "READ_WRITE"] as const;
+const UPCOMING_NODE_CLASSES = ["Object", "Method", "Reference", "DataType"] as const;
+
+type ValidationIssue = { nodeId: string; message: string };
+
+export function validateManualSchemaNodes(nodes: NodeDto[]): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  const byId = new Map(nodes.map((node) => [node.nodeId, node]));
+  const siblingNames = new Map<string, Set<string>>();
+  for (const node of nodes) {
+    const name = node.name.trim();
+    if (!name) issues.push({ nodeId: node.nodeId, message: "A node needs a browse name." });
+    else if (/[\\/]/.test(name)) issues.push({ nodeId: node.nodeId, message: "A browse name cannot contain a slash or backslash." });
+    if (node.parentId) {
+      const parent = byId.get(node.parentId);
+      if (!parent) issues.push({ nodeId: node.nodeId, message: "Its parent no longer exists." });
+      else if (parent.kind !== "FOLDER") issues.push({ nodeId: node.nodeId, message: "Only a folder can contain another node." });
+    }
+    const key = `${node.parentId ?? "__top_level__"}:${name}`;
+    const ids = siblingNames.get(key) ?? new Set<string>();
+    ids.add(node.nodeId);
+    siblingNames.set(key, ids);
+  }
+  for (const ids of siblingNames.values()) {
+    if (ids.size > 1) ids.forEach((nodeId) => issues.push({ nodeId, message: "Sibling nodes must have unique browse names." }));
+  }
+  return issues;
+}
+
 function newNodeId(): string {
   return `node-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
@@ -101,6 +131,8 @@ export function ManualSchemaEditorPage() {
   const [addKind, setAddKind] = useState<"FOLDER" | "VARIABLE" | null>(null);
   const [addName, setAddName] = useState("");
   const [addType, setAddType] = useState<string>("FLOAT64");
+  const [addValueRank, setAddValueRank] = useState<string>("SCALAR");
+  const [addAccess, setAddAccess] = useState<string>("READ");
   const [addUnit, setAddUnit] = useState("");
   const [addDescription, setAddDescription] = useState("");
   const [selectedSuggestion, setSelectedSuggestion] = useState("");
@@ -149,6 +181,8 @@ export function ManualSchemaEditorPage() {
   const folders = nodes.filter((n) => n.kind === "FOLDER");
   const isEmpty = nodes.length === 0;
   const catalogParentId = selectedNode?.kind === "FOLDER" ? selectedNode.nodeId : null;
+  const validationIssues = useMemo(() => validateManualSchemaNodes(nodes), [nodes]);
+  const selectedIssues = selectedId ? validationIssues.filter((issue) => issue.nodeId === selectedId) : [];
 
   function toggleExpand(id: string) {
     setExpandedIds((prev) => {
@@ -210,8 +244,8 @@ export function ManualSchemaEditorPage() {
       name: trimmed,
       kind: addKind,
       dataType: addKind === "VARIABLE" ? addType : null,
-      valueRank: addKind === "VARIABLE" ? "SCALAR" : null,
-      access: addKind === "VARIABLE" ? "READ" : null,
+      valueRank: addKind === "VARIABLE" ? addValueRank : null,
+      access: addKind === "VARIABLE" ? addAccess : null,
       unit: addKind === "VARIABLE" ? addUnit || null : null,
       description: addDescription || null,
     };
@@ -290,7 +324,7 @@ export function ManualSchemaEditorPage() {
   }
 
   function openSaveDialog() {
-    if (!hasUnsavedChanges) return;
+    if (!hasUnsavedChanges || validationIssues.length > 0) return;
     setSaveAsName(`${name} (copy)`);
     setSaveMode("in-place");
   }
@@ -389,7 +423,7 @@ export function ManualSchemaEditorPage() {
               {access.isAdmin ? (
                 <button
                   className="shell-action"
-                  disabled={!hasUnsavedChanges}
+                  disabled={!hasUnsavedChanges || validationIssues.length > 0}
                   type="button"
                   onClick={openSaveDialog}
                 >
@@ -432,9 +466,22 @@ export function ManualSchemaEditorPage() {
 
         {addKind ? (
           <div className="mb-4 space-y-3 rounded-md border border-shell-line bg-white px-4 py-4">
-            <p className="text-sm font-medium text-shell-ink">
-              New {addKind === "FOLDER" ? "folder" : "variable"}
-            </p>
+            <fieldset>
+              <legend className="text-sm font-medium text-shell-ink">Choose a node class</legend>
+              <p className="mt-1 text-xs text-shell-muted">Folders organize the server tree. Variables hold values clients can read or write.</p>
+              <div className="mt-3 flex flex-wrap gap-2" role="radiogroup" aria-label="Node class">
+                {(["FOLDER", "VARIABLE"] as const).map((kind) => (
+                  <label key={kind} className={`cursor-pointer rounded-md border px-3 py-2 text-sm ${addKind === kind ? "border-shell-accent bg-shell-accent/5 text-shell-ink" : "border-shell-line text-shell-muted"}`}>
+                    <input checked={addKind === kind} className="sr-only" name="node-class" type="radio" value={kind} onChange={() => setAddKind(kind)} />
+                    <span className="font-medium">{kind === "FOLDER" ? "Folder" : "Variable"}</span>
+                    <span className="block text-xs">{kind === "FOLDER" ? "Contains nodes" : "Stores a value"}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            <div className="rounded-md bg-shell-base/60 px-3 py-2 text-xs text-shell-muted">
+              <span className="font-medium text-shell-ink">Not available yet: </span>{UPCOMING_NODE_CLASSES.join(", ")}. These classes will be enabled when the address-space model is available.
+            </div>
             <div className="grid gap-3 sm:grid-cols-3">
               <label className="flex flex-col gap-1.5 text-sm text-shell-muted">
                 Parent
@@ -484,9 +531,21 @@ export function ManualSchemaEditorPage() {
                     </select>
                   </label>
                   <label className="flex flex-col gap-1.5 text-sm text-shell-muted">
-                    Type
+                    Data type
                     <select className="shell-field" value={addType} onChange={(e) => setAddType(e.target.value)}>
                       {DATA_TYPES.map((t) => <option key={t} value={t}>{typeLabel(t)}</option>)}
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-1.5 text-sm text-shell-muted">
+                    Value shape
+                    <select className="shell-field" value={addValueRank} onChange={(e) => setAddValueRank(e.target.value)}>
+                      {VALUE_RANKS.map((rank) => <option key={rank} value={rank}>{rank === "SCALAR" ? "One value" : "Array"}</option>)}
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-1.5 text-sm text-shell-muted">
+                    Client access
+                    <select className="shell-field" value={addAccess} onChange={(e) => setAddAccess(e.target.value)}>
+                      {ACCESS_LEVELS.map((accessLevel) => <option key={accessLevel} value={accessLevel}>{accessLevel.replace("_", " + ")}</option>)}
                     </select>
                   </label>
                 </>
@@ -613,6 +672,19 @@ export function ManualSchemaEditorPage() {
           </section>
         ) : null}
 
+        {validationIssues.length > 0 ? (
+          <section aria-live="polite" className="mb-4 rounded-md border border-shell-danger/40 bg-shell-danger/5 px-4 py-3">
+            <p className="text-sm font-semibold text-shell-ink">Fix {validationIssues.length} {validationIssues.length === 1 ? "issue" : "issues"} before saving</p>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-shell-muted">
+              {validationIssues.slice(0, 4).map((issue, index) => {
+                const node = nodes.find((candidate) => candidate.nodeId === issue.nodeId);
+                return <li key={`${issue.nodeId}-${index}`}><span className="font-medium text-shell-ink">{node?.name || "Unnamed node"}:</span> {issue.message}</li>;
+              })}
+              {validationIssues.length > 4 ? <li>And {validationIssues.length - 4} more issues.</li> : null}
+            </ul>
+          </section>
+        ) : null}
+
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(18rem,1fr)]">
           <div className="space-y-3">
             <span className="text-sm text-shell-muted">{variableCount} variables</span>
@@ -667,7 +739,7 @@ export function ManualSchemaEditorPage() {
                 {selectedNode.kind === "VARIABLE" ? (
                   <>
                     <label className="flex flex-col gap-2 text-sm text-shell-muted">
-                      Type
+                      Data type
                       <select
                         className="shell-field"
                         disabled={!access.isAdmin}
@@ -679,6 +751,18 @@ export function ManualSchemaEditorPage() {
                             {typeLabel(t)}
                           </option>
                         ))}
+                      </select>
+                    </label>
+                    <label className="flex flex-col gap-2 text-sm text-shell-muted">
+                      Value shape
+                      <select className="shell-field" disabled={!access.isAdmin} value={selectedNode.valueRank ?? "SCALAR"} onChange={(e) => updateSelectedNode({ valueRank: e.target.value })}>
+                        {VALUE_RANKS.map((rank) => <option key={rank} value={rank}>{rank === "SCALAR" ? "One value" : "Array"}</option>)}
+                      </select>
+                    </label>
+                    <label className="flex flex-col gap-2 text-sm text-shell-muted">
+                      Client access
+                      <select className="shell-field" disabled={!access.isAdmin} value={selectedNode.access ?? "READ"} onChange={(e) => updateSelectedNode({ access: e.target.value })}>
+                        {ACCESS_LEVELS.map((accessLevel) => <option key={accessLevel} value={accessLevel}>{accessLevel.replace("_", " + ")}</option>)}
                       </select>
                     </label>
                     <label className="flex flex-col gap-2 text-sm text-shell-muted">
@@ -703,6 +787,11 @@ export function ManualSchemaEditorPage() {
                     onChange={(e) => updateSelectedNode({ description: e.target.value || null })}
                   />
                 </label>
+                {selectedIssues.length > 0 ? (
+                  <div className="rounded-md border border-shell-danger/30 bg-shell-danger/5 px-3 py-2 text-xs text-shell-muted">
+                    {selectedIssues.map((issue, index) => <p key={`${issue.message}-${index}`}>{issue.message}</p>)}
+                  </div>
+                ) : null}
               </div>
             </section>
           ) : (

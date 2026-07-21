@@ -1191,6 +1191,13 @@ Parallel execution:
   Depends: UI-490; runtime hierarchy materialization in IS-175.
   Done when: editor labels are English; users can add multiple sibling folders/variables under an explicitly chosen parent; batch input adds valid `Name, TYPE` rows; the node library inserts typed structures from public OPC UA definitions; tests cover parent selection, batch insertion, and library insertion; typecheck + vitest + build green.
 
+- [x] `UI-493` ✅ Manual Schema — address-space editor foundation
+  Goal: make the Manual Schema editor communicate the current OPC UA address-space model clearly while preparing users for the richer node classes delivered by IS-176.
+  Surface: `Manual Schemas` — editor.
+  Work includes: explicit node-class selection for supported folders and variables; a primary structured add-variable form with name, data type, optional unit/description, explicit selected parent and Add action; complete editable variable details (type, scalar/array shape and access); and inline structural validation that explains what must be corrected before saving. Multiline `Name, TYPE` or tab-delimited entry is an advanced import/paste action only. Unsupported OPC UA node classes must be visibly identified as unavailable rather than silently represented as folders.
+  Depends: UI-492; IS-176 for persistent Objects, Methods, References and NodeSet XML import.
+  Done when: users can choose a supported node class knowingly, add one variable through a structured form with an explicit destination, inspect and edit supported node details, and see actionable duplicate/invalid-name/invalid-parent validation; typecheck + vitest + build green.
+
 ## Recommended Sequence
 
 1. Complete the P0 shell and shared-pattern tasks first.
