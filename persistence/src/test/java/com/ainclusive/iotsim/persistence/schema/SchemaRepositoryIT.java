@@ -7,7 +7,9 @@ import com.ainclusive.iotsim.persistence.project.JooqProjectRepository;
 import com.ainclusive.iotsim.protocolmodel.Access;
 import com.ainclusive.iotsim.protocolmodel.DataType;
 import com.ainclusive.iotsim.protocolmodel.NodeKind;
+import com.ainclusive.iotsim.protocolmodel.ReferenceType;
 import com.ainclusive.iotsim.protocolmodel.SchemaNode;
+import com.ainclusive.iotsim.protocolmodel.SchemaReference;
 import com.ainclusive.iotsim.protocolmodel.ValueRank;
 import java.util.List;
 import java.util.Map;
@@ -80,6 +82,37 @@ class SchemaRepositoryIT {
         assertThat(found).isPresent();
         assertThat(found.get().version()).isEqualTo(saved.version());
         assertThat(found.get().nodes()).hasSize(2);
+    }
+
+    @Test
+    void roundTripsExtendedAddressSpaceNodesInCurrentAndHistoricalVersions() {
+        String sourceId = dataSources
+                .insert(projectId, "Address space", "OPC_UA", "MANUAL", 4840, null, null, null, "it")
+                .id();
+        SchemaNode object = new SchemaNode("pump", null, "Pump", "Pump", NodeKind.OBJECT,
+                null, null, null, null, null, List.of(), "ns=0;i=58",
+                List.of(new SchemaReference("measurements", ReferenceType.HAS_COMPONENT, true)));
+        SchemaNode measurements = new SchemaNode("measurements", "pump", "Pump/Measurements", "Measurements",
+                NodeKind.VARIABLE, DataType.FLOAT64, ValueRank.ARRAY, Access.READ, "bar", null,
+                List.of(16), "ns=0;i=63", List.of());
+
+        SchemaWithNodes saved = schemas.saveNewVersion(sourceId, List.of(object, measurements));
+
+        assertExtendedNodeValues(schemas.findCurrent(sourceId).orElseThrow(), saved.version());
+        assertExtendedNodeValues(schemas.findByVersion(sourceId, saved.version()).orElseThrow(), saved.version());
+    }
+
+    private static void assertExtendedNodeValues(SchemaWithNodes schema, int expectedVersion) {
+        assertThat(schema.version()).isEqualTo(expectedVersion);
+        SchemaNode object = schema.nodes().stream().filter(n -> n.nodeId().equals("pump")).findFirst().orElseThrow();
+        SchemaNode measurements = schema.nodes().stream()
+                .filter(n -> n.nodeId().equals("measurements")).findFirst().orElseThrow();
+        assertThat(object.kind()).isEqualTo(NodeKind.OBJECT);
+        assertThat(object.typeDefinition()).isEqualTo("ns=0;i=58");
+        assertThat(object.references()).containsExactly(
+                new SchemaReference("measurements", ReferenceType.HAS_COMPONENT, true));
+        assertThat(measurements.arrayDimensions()).containsExactly(16);
+        assertThat(measurements.typeDefinition()).isEqualTo("ns=0;i=63");
     }
 
     @Test

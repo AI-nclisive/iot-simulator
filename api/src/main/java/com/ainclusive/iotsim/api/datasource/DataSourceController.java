@@ -2,6 +2,8 @@ package com.ainclusive.iotsim.api.datasource;
 
 import com.ainclusive.iotsim.api.error.PreconditionRequiredException;
 import com.ainclusive.iotsim.api.scan.ScanController;
+import com.ainclusive.iotsim.api.schema.ReferenceDto;
+import com.ainclusive.iotsim.api.schema.SchemaReferenceMapper;
 import com.ainclusive.iotsim.api.security.Permission;
 import com.ainclusive.iotsim.api.support.ConnectionConfigRequest;
 import com.ainclusive.iotsim.api.support.CredentialRequests;
@@ -15,9 +17,7 @@ import com.ainclusive.iotsim.domain.support.Page;
 import com.ainclusive.iotsim.protocolmodel.Access;
 import com.ainclusive.iotsim.protocolmodel.DataType;
 import com.ainclusive.iotsim.protocolmodel.NodeKind;
-import com.ainclusive.iotsim.protocolmodel.ReferenceType;
 import com.ainclusive.iotsim.protocolmodel.SchemaNode;
-import com.ainclusive.iotsim.protocolmodel.SchemaReference;
 import com.ainclusive.iotsim.protocolmodel.ValueRank;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -271,7 +271,7 @@ public class DataSourceController {
             nodes.add(new SchemaNode(
                     d.nodeId(), d.parentId(), d.path(), d.name(),
                     kind, dataType, valueRank, access, d.unit(), d.description(), d.arrayDimensions(),
-                    d.typeDefinition(), references(d.references())));
+                    d.typeDefinition(), SchemaReferenceMapper.toModel(d.references())));
         }
         return nodes;
     }
@@ -328,15 +328,6 @@ public class DataSourceController {
         }
     }
 
-    public record ReferenceDto(String targetNodeId, String type, boolean forward) {}
-
-    private static List<SchemaReference> references(List<ReferenceDto> dtos) {
-        if (dtos == null) {
-            return List.of();
-        }
-        return dtos.stream().map(d -> new SchemaReference(d.targetNodeId(),
-                parseEnum(ReferenceType.class, d.type(), "reference.type"), d.forward())).toList();
-    }
 
     public record CreateDataSourceRequest(
             String name, String protocol, String basis, Integer simulatorPort,

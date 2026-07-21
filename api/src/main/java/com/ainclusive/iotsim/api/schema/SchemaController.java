@@ -6,9 +6,7 @@ import com.ainclusive.iotsim.domain.schema.SchemaService;
 import com.ainclusive.iotsim.protocolmodel.Access;
 import com.ainclusive.iotsim.protocolmodel.DataType;
 import com.ainclusive.iotsim.protocolmodel.NodeKind;
-import com.ainclusive.iotsim.protocolmodel.ReferenceType;
 import com.ainclusive.iotsim.protocolmodel.SchemaNode;
-import com.ainclusive.iotsim.protocolmodel.SchemaReference;
 import com.ainclusive.iotsim.protocolmodel.ValueRank;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -94,7 +92,7 @@ public class SchemaController {
             }
             nodes.add(new SchemaNode(d.nodeId(), d.parentId(), d.path(), d.name(),
                     kind, dataType, valueRank, access, d.unit(), d.description(), d.arrayDimensions(),
-                    d.typeDefinition(), references(d.references())));
+                    d.typeDefinition(), SchemaReferenceMapper.toModel(d.references())));
         }
         return nodes;
     }
@@ -133,20 +131,6 @@ public class SchemaController {
                     n.unit(), n.description(), n.arrayDimensions(), n.typeDefinition(),
                     n.references().stream().map(ReferenceDto::from).toList());
         }
-    }
-
-    public record ReferenceDto(String targetNodeId, String type, boolean forward) {
-        static ReferenceDto from(SchemaReference reference) {
-            return new ReferenceDto(reference.targetNodeId(), reference.type().name(), reference.forward());
-        }
-    }
-
-    private static List<SchemaReference> references(List<ReferenceDto> dtos) {
-        if (dtos == null) {
-            return List.of();
-        }
-        return dtos.stream().map(d -> new SchemaReference(d.targetNodeId(),
-                parseEnum(ReferenceType.class, d.type(), "reference.type"), d.forward())).toList();
     }
 
     public record SaveSchemaRequest(List<NodeDto> nodes) {}
