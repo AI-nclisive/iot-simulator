@@ -143,6 +143,9 @@ assigned in schema order; surfaced in scan/review so the user can adjust.
 
 - **Recording**: captures neutral values into a timeline.
 - **Replay**: streams a timeline back through a worker (which re-projects).
+- **ManualSchema**: authors a reusable node tree by hand (no scan), independent of
+  any data-source; consumed as the structure basis for a synthetic source (see
+  `03_DOMAIN_MODEL.md` §ManualSchema).
 - **Synthetic**: generates neutral values from patterns + seed.
 - **Scenarios**: sequence replay/synthetic/fault/timing over the neutral model.
 - **Faults**: applied at the neutral layer and/or mapped to protocol-specific

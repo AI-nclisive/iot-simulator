@@ -37,6 +37,14 @@ API layer enforces authz) and decisions D6 (SSE-only) and D7 (`/api/v1`).
   no bare `start` — the two runtime actions are Capture and Simulate below)
 - Schema: `GET …/{id}/schema` · `PUT …/{id}/schema` (full editor save)
 
+### Manual schemas (reusable structure library)
+- `GET/POST /projects/{pid}/manual-schemas` · `GET …/{id}` · `PUT …/{id}`
+  (save-in-place) · `DELETE …/{id}` · `POST …/{id}/duplicate` (save-as-new)
+- Not bound to a data-source (`03_DOMAIN_MODEL.md` §ManualSchema); consumed only
+  via `POST …/data-sources/synthetic`'s `manualSchemaId` (mutually exclusive
+  with the existing `schemaFromSourceId`), which copies the schema's nodes by
+  snapshot into the new source, the same way `schemaFromSourceId` does today
+
 ### Scan (create-from-real-source)
 - `POST …/data-sources/scan/test-connection` → reachability/auth result
 - `POST …/data-sources/scan` → starts a scan job; returns `jobId`
