@@ -328,7 +328,6 @@ public class DataSourceController {
         }
     }
 
-
     public record CreateDataSourceRequest(
             String name, String protocol, String basis, Integer simulatorPort,
             String realDeviceEndpoint, String runtimeConfig, String securityConfig,

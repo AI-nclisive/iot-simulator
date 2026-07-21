@@ -6,6 +6,7 @@ import com.ainclusive.iotsim.api.schema.SchemaReferenceMapper;
 import com.ainclusive.iotsim.api.security.Permission;
 import com.ainclusive.iotsim.domain.manualschema.ManualSchema;
 import com.ainclusive.iotsim.domain.manualschema.ManualSchemaService;
+import com.ainclusive.iotsim.domain.manualschema.OpcUaNodeSetImporter;
 import com.ainclusive.iotsim.domain.support.Page;
 import com.ainclusive.iotsim.protocolmodel.Access;
 import com.ainclusive.iotsim.protocolmodel.DataType;
@@ -84,6 +85,25 @@ public class ManualSchemaController {
                         URI.create("/api/v1/projects/" + projectId + "/manual-schemas/" + schema.id()))
                 .eTag(etag(schema.version()))
                 .body(ManualSchemaResponse.from(schema));
+    }
+
+    @Operation(summary = "Import an OPC UA NodeSet XML file",
+            description = "Imports supported Objects, Variables, Methods and references into a reusable manual"
+                    + " schema. Unsupported definitions are returned as explicit diagnostics and are never"
+                    + " silently flattened.")
+    @PostMapping("/import-nodeset")
+    @PreAuthorize(SCHEMA_EDIT)
+    public ResponseEntity<ImportNodeSetResponse> importNodeSet(
+            @PathVariable String projectId, @RequestBody ImportNodeSetRequest req) {
+        require(req != null && notBlank(req.name()), "name is required");
+        require(notBlank(req.xml()), "xml is required");
+        OpcUaNodeSetImporter.Result imported = OpcUaNodeSetImporter.importXml(req.xml());
+        ManualSchema schema = manualSchemas.create(
+                projectId, "OPC_UA", req.name(), req.description(), imported.nodes(), "local");
+        return ResponseEntity.created(
+                        URI.create("/api/v1/projects/" + projectId + "/manual-schemas/" + schema.id()))
+                .eTag(etag(schema.version()))
+                .body(new ImportNodeSetResponse(ManualSchemaResponse.from(schema), imported.diagnostics()));
     }
 
     @Operation(summary = "Get a manual schema", description = "Returns a single manual schema by id, with its"
@@ -227,8 +247,12 @@ public class ManualSchemaController {
         }
     }
 
-
     public record CreateManualSchemaRequest(String protocol, String name, String description, List<NodeDto> nodes) {}
+
+    public record ImportNodeSetRequest(String name, String description, String xml) {}
+
+    public record ImportNodeSetResponse(
+            ManualSchemaResponse schema, List<OpcUaNodeSetImporter.Diagnostic> diagnostics) {}
 
     public record UpdateManualSchemaRequest(String name, String description, List<NodeDto> nodes) {}
 
