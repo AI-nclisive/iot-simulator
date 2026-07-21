@@ -1125,6 +1125,13 @@ Parallel execution:
   Depends: IS-168 (backend, merged).
   Done when: a structural/identifier node's Pattern select is locked to Constant with a sensible default value; creating a Synthetic source reusing a schema with a NODE_ID (or other structural type) node succeeds end-to-end; typecheck + vitest + build green.
 
+- [x] `UI-483` ✅ Create Data Source wizard (Synthetic) — simplify Pattern choice with plain-language labels + progressive disclosure
+  Goal: the per-measurement Pattern select showed all 6 pattern types flat and unconditionally, using signal-processing jargon ("Sine wave", "Random walk" vs "Random (uniform)") a non-technical user can't map to what the generated data will look like.
+  Surface: `Create Data Source Wizard` (synthetic basis)
+  Work includes: `synthetic-profile-step.tsx` splits `PATTERN_TYPES` into `SIMPLE_PATTERN_TYPES` (Fixed value / Smooth (rises & falls) / Random — CONSTANT/SINE/RANDOM_UNIFORM, shown by default) and `ADVANCED_PATTERN_TYPES` (Rising ramp (resets) / Alternating (on/off) / Random (drifting) — RAMP/SQUARE/RANDOM_WALK, hidden behind a new "Show more patterns" button per row); a row auto-expands if its current pattern is already one of the advanced three (e.g. loaded from a saved config or a recording-derived suggestion). No change to the underlying pattern set, serialization, or the CONSTANT-only lock (UI-482).
+  Depends: none.
+  Done when: the Pattern select shows only the 3 plain-language options by default; "Show more patterns" reveals all 6; a row with an already-selected advanced pattern starts expanded; typecheck + vitest + build green.
+
 - [x] `UI-484` ✅ Synthetic wizard — clarify Prefill from recording (purpose text + mark which measurements changed)
   Goal: "Prefill from recording" (IS-146) works correctly, but a schema can have far more measurements than a recording actually captured (e.g. 250 vs. 10 matched); after a successful prefill the toast says "Prefilled N measurements" but nothing in a long list shows which rows changed, so a user scrolling to an unmatched row could reasonably conclude prefill did nothing.
   Surface: `Create Data Source Wizard` (synthetic basis)

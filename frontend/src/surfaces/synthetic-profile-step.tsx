@@ -35,14 +35,24 @@ type SchemaResponse = { id: string; dataSourceId: string; version: number; nodes
 
 type PatternType = SyntheticPatternSpec["type"];
 
-const PATTERN_TYPES: { value: PatternType; label: string }[] = [
-  { value: "SINE", label: "Sine wave" },
-  { value: "RANDOM_WALK", label: "Random walk" },
-  { value: "RAMP", label: "Ramp" },
-  { value: "SQUARE", label: "Square wave" },
-  { value: "RANDOM_UNIFORM", label: "Random (uniform)" },
-  { value: "CONSTANT", label: "Constant" },
+/**
+ * UI-483: the Pattern select shows only these 3 plain-language options by default —
+ * the signal-processing names (Sine, Random walk vs Random uniform, ...) weren't
+ * meaningful to a non-technical user. "Show more patterns" reveals ADVANCED_PATTERN_TYPES.
+ */
+const SIMPLE_PATTERN_TYPES: { value: PatternType; label: string }[] = [
+  { value: "CONSTANT", label: "Fixed value" },
+  { value: "SINE", label: "Smooth (rises & falls)" },
+  { value: "RANDOM_UNIFORM", label: "Random" },
 ];
+
+const ADVANCED_PATTERN_TYPES: { value: PatternType; label: string }[] = [
+  { value: "RAMP", label: "Rising ramp (resets)" },
+  { value: "SQUARE", label: "Alternating (on/off)" },
+  { value: "RANDOM_WALK", label: "Random (drifting)" },
+];
+
+const PATTERN_TYPES = [...SIMPLE_PATTERN_TYPES, ...ADVANCED_PATTERN_TYPES];
 
 /**
  * IS-168: structural/identifier types have no natural dynamic-signal semantics —
@@ -283,6 +293,9 @@ export function SyntheticProfileStep({
   const [suggestions, setSuggestions] = useState<
     Record<string, { updateRateMs: number; byType: Record<string, SyntheticPatternSpec> }>
   >({});
+  // UI-483: nodeIds whose Pattern select has been expanded to show the "advanced" options
+  // (Ramp/Square/Random walk), via "Show more patterns" or because the loaded pattern is one of them.
+  const [expandedPatternRows, setExpandedPatternRows] = useState<Set<string>>(new Set());
   // UI-484: nodeIds actually updated by the last successful prefill, so those rows can be
   // visually marked — a recording rarely covers every schema measurement, and without this
   // a user scrolling to an unmatched row could reasonably conclude prefill did nothing.
@@ -547,6 +560,9 @@ export function SyntheticProfileStep({
               const showPeriod = d.pattern === "SINE" || d.pattern === "RAMP" || d.pattern === "SQUARE";
               const isBytes = node.dataType === "BYTES";
               const valueInputType = isTextConstantType(node.dataType) || isBytes ? "text" : "number";
+              const isAdvancedPattern = ADVANCED_PATTERN_TYPES.some((p) => p.value === d.pattern);
+              const showAdvancedPatterns = isAdvancedPattern || expandedPatternRows.has(node.nodeId);
+              const visiblePatternTypes = showAdvancedPatterns ? PATTERN_TYPES : SIMPLE_PATTERN_TYPES;
               const wasPrefilled = prefilledNodeIds.has(node.nodeId);
               return (
                 <li
@@ -588,17 +604,30 @@ export function SyntheticProfileStep({
                             <option value="CONSTANT">Constant (required for {node.dataType})</option>
                           </select>
                         ) : (
-                          <select
-                            className="shell-field"
-                            value={d.pattern}
-                            onChange={(e) => changePattern(node.nodeId, e.target.value as PatternType)}
-                          >
-                            {PATTERN_TYPES.map((p) => (
-                              <option key={p.value} value={p.value}>
-                                {p.label}
-                              </option>
-                            ))}
-                          </select>
+                          <>
+                            <select
+                              className="shell-field"
+                              value={d.pattern}
+                              onChange={(e) => changePattern(node.nodeId, e.target.value as PatternType)}
+                            >
+                              {visiblePatternTypes.map((p) => (
+                                <option key={p.value} value={p.value}>
+                                  {p.label}
+                                </option>
+                              ))}
+                            </select>
+                            {!showAdvancedPatterns ? (
+                              <button
+                                className="text-left text-xs font-normal normal-case text-shell-accent underline"
+                                type="button"
+                                onClick={() =>
+                                  setExpandedPatternRows((prev) => new Set(prev).add(node.nodeId))
+                                }
+                              >
+                                Show more patterns
+                              </button>
+                            ) : null}
+                          </>
                         )}
                       </label>
 
