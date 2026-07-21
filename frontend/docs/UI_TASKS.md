@@ -1132,6 +1132,13 @@ Parallel execution:
   Depends: none.
   Done when: the Prefill control explains its purpose; every row actually updated by the last prefill is visually marked; the view scrolls to the first affected row after a successful prefill; typecheck + vitest + build green.
 
+- [x] `UI-485` ✅ Import Data wizard recording picker — show time, not just date
+  Goal: the Import Data wizard's recording picker formatted `createdAt` via `toLocaleDateString` (date only), unlike the Recordings page (date+time via `toLocaleString`); combined with recordings that share a fallback name (any recording created before IS-169, or an unnamed import), multiple recordings from the same source on the same day were indistinguishable in this picker.
+  Surface: `Create Data Source Wizard` (import basis)
+  Work includes: `create-data-source-wizard-page.tsx`'s recording picker now formats `createdAt` with `toLocaleString` including `hour`/`minute`/`hour12: false`, matching `recordings-page.tsx`'s `formatDate`.
+  Depends: none (complements IS-169, backend, merged).
+  Done when: the picker's date/time subtitle includes a time component matching the Recordings page's format; typecheck + vitest + build green.
+
 ## Recommended Sequence
 
 1. Complete the P0 shell and shared-pattern tasks first.
