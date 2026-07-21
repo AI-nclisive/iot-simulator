@@ -1185,6 +1185,12 @@ Parallel execution:
   Depends: IS-173 (merged), UI-489.
   Done when: picking a Manual Schema populates the per-measurement pattern editor from its nodes; `manualSchemaId` sent to `POST .../data-sources/synthetic`; mutually exclusive with picking an existing source; typecheck + vitest + build green.
 
+- [ ] `UI-492` Manual Schema — OPC UA node library and multi-node structure editor
+  Goal: let users compose a reusable OPC UA server address-space structure, rather than manually adding one node at a time. The editor must offer documented node structures, complete supported type selection, explicit placement under any folder, and batch insertion of typed variables. It authors schema only; it does not model OPC UA Alarm & Condition runtime behaviour.
+  Surface: `Manual Schemas` — editor.
+  Depends: UI-490; runtime hierarchy materialization in IS-175.
+  Done when: editor labels are English; users can add multiple sibling folders/variables under an explicitly chosen parent; batch input adds valid `Name, TYPE` rows; the node library inserts typed structures from public OPC UA definitions; tests cover parent selection, batch insertion, and library insertion; typecheck + vitest + build green.
+
 ## Recommended Sequence
 
 1. Complete the P0 shell and shared-pattern tasks first.
@@ -1197,4 +1203,3 @@ Parallel execution:
 
 The task order above already follows this sequence. The section is kept only as
 the short executive summary.
-

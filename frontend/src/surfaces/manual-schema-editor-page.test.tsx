@@ -164,4 +164,100 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
       );
     });
   });
+
+  it("adds a typed variable from the parameter catalog into the selected folder", async () => {
+    mockLoadManualSchemaById.mockResolvedValueOnce(schemaWithFolder);
+    renderPage();
+
+    await waitFor(() => screen.getByText("Reactor"));
+    fireEvent.click(screen.getByText("Reactor"));
+    fireEvent.click(screen.getByRole("button", { name: /Choose from parameter catalog/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Temperature.*Process temperature/i }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByLabelText(/Save in this schema/));
+    fireEvent.click(screen.getAllByRole("button", { name: "Save" })[1]);
+
+    await waitFor(() => {
+      expect(mockUpdateManualSchema).toHaveBeenCalledWith(
+        "proj-1",
+        "ms-1",
+        expect.objectContaining({
+          nodes: expect.arrayContaining([
+            expect.objectContaining({ name: "Temperature", parentId: "f1", dataType: "FLOAT64", unit: "°C" }),
+          ]),
+        }),
+      );
+    });
+  });
+
+  it("lets a new node be placed under any folder, not only the selected tree node", async () => {
+    mockLoadManualSchemaById.mockResolvedValueOnce(schemaWithFolder);
+    renderPage();
+
+    await waitFor(() => screen.getByText("Reactor"));
+    fireEvent.click(screen.getByRole("button", { name: "Add variable" }));
+    fireEvent.change(screen.getByLabelText("Parent folder for new node"), { target: { value: "f1" } });
+    fireEvent.change(screen.getAllByLabelText("Name").at(-1)!, { target: { value: "Pressure" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByLabelText(/Save in this schema/));
+    fireEvent.click(screen.getAllByRole("button", { name: "Save" })[1]);
+
+    await waitFor(() => {
+      expect(mockUpdateManualSchema).toHaveBeenCalledWith(
+        "proj-1",
+        "ms-1",
+        expect.objectContaining({
+          nodes: expect.arrayContaining([
+            expect.objectContaining({ name: "Pressure", parentId: "f1", path: "/Reactor/Pressure" }),
+          ]),
+        }),
+      );
+    });
+  });
+
+  it("fills a new variable from the suggested parameter catalog", async () => {
+    mockLoadManualSchemaById.mockResolvedValueOnce(schemaWithFolder);
+    renderPage();
+
+    await waitFor(() => screen.getByText("Reactor"));
+    fireEvent.click(screen.getByRole("button", { name: "Add variable" }));
+    fireEvent.change(screen.getByLabelText("Suggested parameter"), { target: { value: "Temperature" } });
+
+    expect(screen.getAllByDisplayValue("Temperature").length).toBeGreaterThan(0);
+    expect(screen.getByDisplayValue("°C")).not.toBeNull();
+    expect(screen.getByDisplayValue("Process temperature")).not.toBeNull();
+  });
+
+  it("adds several typed sibling variables from pasted rows", async () => {
+    mockLoadManualSchemaById.mockResolvedValueOnce(schemaWithFolder);
+    renderPage();
+
+    await waitFor(() => screen.getByText("Reactor"));
+    fireEvent.click(screen.getByRole("button", { name: /Add several variables/i }));
+    fireEvent.change(screen.getByLabelText("Parent folder for several variables"), { target: { value: "f1" } });
+    fireEvent.change(screen.getByLabelText("Variables to add"), {
+      target: { value: "Pressure, FLOAT64\nEnabled, BOOL" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Add variables/i }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByLabelText(/Save in this schema/));
+    fireEvent.click(screen.getAllByRole("button", { name: "Save" })[1]);
+
+    await waitFor(() => {
+      expect(mockUpdateManualSchema).toHaveBeenCalledWith(
+        "proj-1",
+        "ms-1",
+        expect.objectContaining({
+          nodes: expect.arrayContaining([
+            expect.objectContaining({ name: "Pressure", parentId: "f1", dataType: "FLOAT64" }),
+            expect.objectContaining({ name: "Enabled", parentId: "f1", dataType: "BOOL" }),
+          ]),
+        }),
+      );
+    });
+  });
 });
