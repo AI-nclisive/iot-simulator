@@ -103,6 +103,7 @@ export function ManualSchemaEditorPage() {
   const [addType, setAddType] = useState<string>("FLOAT64");
   const [addUnit, setAddUnit] = useState("");
   const [addDescription, setAddDescription] = useState("");
+  const [selectedSuggestion, setSelectedSuggestion] = useState("");
   const [addParentId, setAddParentId] = useState<string | null>(null);
   const [batchNodes, setBatchNodes] = useState("");
   const [showLibrary, setShowLibrary] = useState(false);
@@ -230,6 +231,7 @@ export function ManualSchemaEditorPage() {
     setAddType(suggestion.dataType);
     setAddUnit(suggestion.unit ?? "");
     setAddDescription(suggestion.description);
+    setSelectedSuggestion("");
   }
 
   function openAdd(kind: "FOLDER" | "VARIABLE") {
@@ -251,7 +253,8 @@ export function ManualSchemaEditorPage() {
 
   function addBatchNodes() {
     const knownTypes = new Set<string>(DATA_TYPES);
-    const parsed = batchNodes.split("\n").flatMap((line) => {
+    const lines = batchNodes.split("\n").filter((line) => line.trim());
+    const parsed = lines.flatMap((line) => {
       const [rawName, rawType] = line.split(/[\t,]/, 2).map((part) => part.trim());
       return rawName && rawType && knownTypes.has(rawType)
         ? [{ name: rawName, dataType: rawType }]
@@ -265,6 +268,10 @@ export function ManualSchemaEditorPage() {
     setNodes((prev) => [...prev, ...created]);
     if (addParentId) setExpandedIds((prev) => new Set(prev).add(addParentId));
     setBatchNodes("");
+    const rejected = lines.length - parsed.length;
+    if (rejected > 0) {
+      push({ tone: "warning", title: `${rejected} row${rejected === 1 ? " was" : "s were"} skipped because the type is not supported.` });
+    }
   }
 
   function handleDeleteNode(nodeId: string) {
@@ -460,7 +467,14 @@ export function ManualSchemaEditorPage() {
                 <>
                   <label className="flex flex-col gap-1.5 text-sm text-shell-muted">
                     Suggested parameter
-                    <select className="shell-field" defaultValue="" onChange={(e) => applySuggestedVariable(e.target.value)}>
+                    <select
+                      className="shell-field"
+                      value={selectedSuggestion}
+                      onChange={(e) => {
+                        setSelectedSuggestion(e.target.value);
+                        applySuggestedVariable(e.target.value);
+                      }}
+                    >
                       <option value="">Choose a common parameter…</option>
                       {SUGGESTED_VARIABLES.map((variable) => (
                         <option key={variable.name} value={variable.name}>
