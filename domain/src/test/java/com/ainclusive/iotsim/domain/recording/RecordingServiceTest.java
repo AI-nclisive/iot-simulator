@@ -387,17 +387,20 @@ class RecordingServiceTest {
     }
 
     @Test
-    void createWithNullNameReturnsNullName() {
+    void createWithNullNameGeneratesADefaultNameFromTheSourceName() {
+        // IS-169: mirrors startCapture's IS-167 default — two scan-created recordings from
+        // the same source get distinct names since the default includes a timestamp; this
+        // only asserts the source name is present.
         Recording r = service.create(PROJECT, SOURCE,
                 com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_ONLY, null, "bob");
-        assertThat(r.name()).isNull();
+        assertThat(r.name()).contains("src");
     }
 
     @Test
-    void createWithBlankNameReturnsNullName() {
+    void createWithBlankNameGeneratesADefaultNameFromTheSourceName() {
         Recording r = service.create(PROJECT, SOURCE,
                 com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_ONLY, "   ", "bob");
-        assertThat(r.name()).isNull();
+        assertThat(r.name()).contains("src");
     }
 
     @Test
