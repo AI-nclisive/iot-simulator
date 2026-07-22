@@ -12,6 +12,7 @@ import com.ainclusive.iotsim.persistence.datasource.DataSourceRepository;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRow;
 import com.ainclusive.iotsim.persistence.run.RunRepository;
 import com.ainclusive.iotsim.persistence.run.RunRow;
+import com.ainclusive.iotsim.persistence.runtimeevent.RuntimeEventRepository;
 import com.ainclusive.iotsim.persistence.scenario.ScenarioRepository;
 import com.ainclusive.iotsim.platform.runtime.RuntimeController;
 import com.ainclusive.iotsim.platform.runtime.SourceHealth;
@@ -38,6 +39,7 @@ public class RunService {
     private final DataSourceRepository dataSources;
     private final ScenarioRepository scenarios;
     private final RuntimeController runtime;
+    private final RuntimeEventRepository events;
     private final ReplayService replay;                   // batch primitive (scenario REPLAY steps)
     private final ReplayLiveRunService replayLive;        // live standalone replay (IS-140)
     private final SyntheticRunService synthetic;          // batch primitive (scenarios)
@@ -45,13 +47,14 @@ public class RunService {
     private final ScenarioLiveRunService scenarioLive;    // async scenario engine (IS-141)
 
     public RunService(RunRepository runs, DataSourceRepository dataSources, ScenarioRepository scenarios,
-            RuntimeController runtime, ReplayService replay, ReplayLiveRunService replayLive,
-            SyntheticRunService synthetic, SyntheticLiveRunService syntheticLive,
-            ScenarioLiveRunService scenarioLive) {
+            RuntimeController runtime, RuntimeEventRepository events, ReplayService replay,
+            ReplayLiveRunService replayLive, SyntheticRunService synthetic,
+            SyntheticLiveRunService syntheticLive, ScenarioLiveRunService scenarioLive) {
         this.runs = runs;
         this.dataSources = dataSources;
         this.scenarios = scenarios;
         this.runtime = runtime;
+        this.events = events;
         this.replay = replay;
         this.replayLive = replayLive;
         this.synthetic = synthetic;
@@ -91,13 +94,20 @@ public class RunService {
 
     public RunView stop(String projectId, String id) {
         RunRow run = require(projectId, id);
-        replayLive.stopIfLive(id);                    // no-op unless it is a live replay run
-        syntheticLive.stopIfLive(id);                 // no-op unless it is a live synthetic run
-        scenarioLive.stopIfLive(id);                  // no-op unless it is an async scenario run
+        boolean wasLiveReplay = replayLive.stopIfLive(id);     // no-op unless it is a live replay run
+        boolean wasLiveSynthetic = syntheticLive.stopIfLive(id); // no-op unless it is a live synthetic run
+        scenarioLive.stopIfLive(id);                  // no-op unless it is an async scenario run; owns its own STOPPED event
         run.sourceIds().forEach(runtime::stop);
         RunRow after = TERMINAL.contains(run.state())
                 ? run
                 : runs.end(id, "STOPPED", OffsetDateTime.now(ZoneOffset.UTC));
+        // IS-182: only stamp here for the two live services that don't own their own STOPPED
+        // write (scenario's background thread already appends its own terminal event).
+        if (!TERMINAL.contains(run.state()) && (wasLiveReplay || wasLiveSynthetic)) {
+            String dataSourceId = run.sourceIds().isEmpty() ? null : run.sourceIds().get(0);
+            RunCompletionEvents.appendTerminal(events, projectId, dataSourceId, id, "STOPPED",
+                    OffsetDateTime.now(ZoneOffset.UTC));
+        }
         return view(after, sourceNames(projectId));
     }
 
