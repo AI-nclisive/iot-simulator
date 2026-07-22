@@ -120,9 +120,12 @@ class RunServiceTest {
     void stopReplayCancelsLiveFeedAndEndsRunStopped() {
         when(runs.findById("run-r")).thenReturn(Optional.of(row("run-r", "REPLAY", "RUNNING", List.of("ds1"))));
         when(runs.end(eq("run-r"), eq("STOPPED"), any())).thenReturn(row("run-r", "REPLAY", "STOPPED", List.of("ds1")));
+        when(replayLive.stopIfLive("run-r")).thenReturn(true);
         service.stop(PROJECT, "run-r");
         verify(replayLive).stopIfLive("run-r");
         verify(runs).end(eq("run-r"), eq("STOPPED"), any());
+        // IS-182: manual stop of a live replay is mirrored into runtime_events.
+        verify(events).append(eq(PROJECT), eq("ds1"), eq("run-r"), eq("RUN_STOPPED"), any(), any());
     }
 
     @Test
@@ -166,9 +169,12 @@ class RunServiceTest {
     void stopSyntheticCancelsLiveFeedAndEndsRunStopped() {
         when(runs.findById("run-9")).thenReturn(Optional.of(row("run-9", "SYNTHETIC", "RUNNING", List.of("ds1"))));
         when(runs.end(eq("run-9"), eq("STOPPED"), any())).thenReturn(row("run-9", "SYNTHETIC", "STOPPED", List.of("ds1")));
+        when(syntheticLive.stopIfLive("run-9")).thenReturn(true);
         service.stop(PROJECT, "run-9");
         verify(syntheticLive).stopIfLive("run-9");
         verify(runs).end(eq("run-9"), eq("STOPPED"), any());
+        // IS-182: manual stop of a live synthetic run is mirrored into runtime_events.
+        verify(events).append(eq(PROJECT), eq("ds1"), eq("run-9"), eq("RUN_STOPPED"), any(), any());
     }
 
     // ---- SCENARIO routing ----
