@@ -272,6 +272,7 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
     fireEvent.change(screen.getByLabelText("Variable 1 name"), { target: { value: "Pressure" } });
     fireEvent.change(screen.getByLabelText("Variable 2 name"), { target: { value: "Enabled" } });
     fireEvent.change(screen.getByLabelText("Variable 2 type"), { target: { value: "BOOL" } });
+    fireEvent.change(screen.getByLabelText("Variable 1 description"), { target: { value: "Process pressure" } });
     fireEvent.click(screen.getByRole("button", { name: "Add variables" }));
 
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
@@ -284,7 +285,7 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
         "ms-1",
         expect.objectContaining({
           nodes: expect.arrayContaining([
-            expect.objectContaining({ name: "Pressure", parentId: "f1", dataType: "FLOAT64" }),
+            expect.objectContaining({ name: "Pressure", parentId: "f1", dataType: "FLOAT64", description: "Process pressure" }),
             expect.objectContaining({ name: "Enabled", parentId: "f1", dataType: "BOOL" }),
           ]),
         }),

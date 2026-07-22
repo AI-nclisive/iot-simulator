@@ -684,14 +684,16 @@ export function ManualSchemaEditorPage() {
                 />
               </label>
               <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                {PARAMETER_GROUPS.map((group) => (
-                  <section key={group} className="rounded-md border border-shell-line bg-white p-3">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-shell-muted">{group}</p>
-                    <div className="mt-2 space-y-2">
-                      {SUGGESTED_VARIABLES.filter((variable) => {
-                        const query = catalogQuery.trim().toLowerCase();
-                        return variable.group === group && (!query || `${variable.name} ${variable.dataType} ${variable.description}`.toLowerCase().includes(query));
-                      }).map((variable) => (
+                {PARAMETER_GROUPS.map((group) => {
+                  const query = catalogQuery.trim().toLowerCase();
+                  const matches = SUGGESTED_VARIABLES.filter((variable) => variable.group === group
+                    && (!query || `${variable.name} ${variable.dataType} ${variable.description}`.toLowerCase().includes(query)));
+                  if (matches.length === 0) return null;
+                  return (
+                    <section key={group} className="rounded-md border border-shell-line bg-white p-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-shell-muted">{group}</p>
+                      <div className="mt-2 space-y-2">
+                      {matches.map((variable) => (
                         <button
                           key={variable.name}
                           className="w-full rounded border border-shell-line px-3 py-2 text-left text-sm disabled:cursor-not-allowed disabled:opacity-45 hover:border-shell-accent"
@@ -703,9 +705,10 @@ export function ManualSchemaEditorPage() {
                           <span className="block text-xs text-shell-muted">{variable.dataType}{variable.unit ? ` · ${variable.unit}` : ""} — {variable.description}</span>
                         </button>
                       ))}
-                    </div>
-                  </section>
-                ))}
+                      </div>
+                    </section>
+                  );
+                })}
               </div>
               <div className="mt-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-shell-muted">Reusable structures</p>
@@ -770,6 +773,10 @@ export function ManualSchemaEditorPage() {
                   <label className="text-xs text-shell-muted">Unit <span className="font-normal">(optional)</span>
                     <input aria-label={`Variable ${index + 1} unit`} className="shell-field mt-1 w-full" value={row.unit}
                       onChange={(e) => setBatchRows((prev) => prev.map((candidate) => candidate.id === row.id ? { ...candidate, unit: e.target.value } : candidate))} />
+                  </label>
+                  <label className="text-xs text-shell-muted">Description <span className="font-normal">(optional)</span>
+                    <input aria-label={`Variable ${index + 1} description`} className="shell-field mt-1 w-full" value={row.description}
+                      onChange={(e) => setBatchRows((prev) => prev.map((candidate) => candidate.id === row.id ? { ...candidate, description: e.target.value } : candidate))} />
                   </label>
                   <button className="shell-text-action self-end" type="button" onClick={() => setBatchRows((prev) => prev.filter((candidate) => candidate.id !== row.id))}>Remove</button>
                 </div>
