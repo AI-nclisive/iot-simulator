@@ -617,7 +617,6 @@ export function SyntheticProfileStep({
             <label className="mt-2 flex max-w-sm flex-col gap-2 text-sm text-shell-muted">
               Repeatable results (optional)
               <input
-                aria-label="Repeatable results seed"
                 className="shell-field"
                 inputMode="numeric"
                 placeholder="Leave empty for a new sequence each run"

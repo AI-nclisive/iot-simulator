@@ -323,10 +323,10 @@ describe("SyntheticProfileStep — select-all / deselect-all (UI-487)", () => {
 
   it("keeps repeatable-results settings out of the main form until requested", async () => {
     const user = await renderWithTwoMeasurements();
-    expect(screen.queryByLabelText("Repeatable results seed")).toBeNull();
+    expect(screen.queryByRole("spinbutton", { name: /Repeatable results/i })).toBeNull();
 
     await user.click(screen.getByRole("button", { name: "Advanced generation settings" }));
-    expect(screen.getByLabelText("Repeatable results seed")).not.toBeNull();
+    expect(screen.getByRole("spinbutton", { name: /Repeatable results/i })).not.toBeNull();
   });
 
   it("bulk pattern select applies the chosen pattern to every currently-selected row (UI-488)", async () => {
