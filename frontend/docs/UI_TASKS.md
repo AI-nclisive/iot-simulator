@@ -1219,7 +1219,7 @@ Parallel execution:
   Depends: UI-488.
   Done when: the default bulk list has Fixed value, Wave, and Random; advanced patterns appear after More patterns; repeatable-results settings stay hidden until requested; typecheck + vitest + build green.
 
-- [ ] `UI-498` ⬜ Synthetic profile — make bulk patterns type-aware
+- [x] `UI-498` ✅ Synthetic profile — make bulk patterns type-aware
   Goal: applying a bulk numeric pattern to mixed parameter types can leave STRING or BOOL rows on an unsupported pattern, making the row Pattern select appear blank and showing irrelevant Min/Max fields.
   Surface: `Create Data Source Wizard` — Synthetic profile.
   Work includes: map bulk Random to each selected type's supported random pattern; apply Wave and other numeric-only bulk patterns only to compatible numeric rows; preserve valid per-type controls and cover mixed-type selection.
