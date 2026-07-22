@@ -82,6 +82,11 @@ const INTEGER_LIMITS: Record<string, [number, number]> = {
   // JavaScript cannot represent every 64-bit integer exactly. Keep the editor within safe integers.
   INT64: [-Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER], UINT64: [0, Number.MAX_SAFE_INTEGER],
 };
+let nextListValueId = 0;
+
+function newListValueIds(count: number): string[] {
+  return Array.from({ length: count }, () => `value-${nextListValueId++}`);
+}
 
 function isIntegerType(dataType: string | null): boolean {
   return INTEGER_TYPES.has(dataType ?? "");
@@ -163,6 +168,7 @@ export type NodeDraft = {
   volatility: string;
   value: string;
   values: string[];
+  valueIds: string[];
   updateRateMs: string;
 };
 
@@ -183,6 +189,7 @@ export function defaultDraft(dataType: string | null = null): NodeDraft {
     volatility: "1",
     value: "0",
     values: ["Idle", "Running", "Alarm"],
+    valueIds: newListValueIds(3),
     updateRateMs: "1000",
   };
   if (CONSTANT_ONLY_TYPES.has(dataType ?? "") || dataType === "DATETIME") {
@@ -325,7 +332,10 @@ export function draftFromPattern(pattern: SyntheticPatternSpec, updateRateMs: nu
     }
     case "ENUM_CYCLE":
     case "RANDOM_CHOICE":
-      return { ...rate, pattern: pattern.type, values: (pattern.values ?? []).map(String) };
+      {
+        const values = (pattern.values ?? []).map(String);
+        return { ...rate, pattern: pattern.type, values, valueIds: newListValueIds(values.length) };
+      }
     case "RANDOM_WALK":
       return {
         ...rate,
@@ -911,7 +921,7 @@ export function SyntheticProfileStep({
                           Values
                           <div className="space-y-2">
                             {d.values.map((value, index) => (
-                              <div className="flex gap-2" key={`${node.nodeId}-${index}`}>
+                              <div className="flex gap-2" key={d.valueIds[index] ?? `${node.nodeId}-value-${index}`}>
                                 {booleanType ? (
                                   <select
                                     aria-label={`Value ${index + 1}`}
@@ -935,12 +945,18 @@ export function SyntheticProfileStep({
                                   className="shell-text-action"
                                   type="button"
                                   disabled={d.values.length === 1}
-                                  onClick={() => patchDraft(node.nodeId, { values: d.values.filter((_, i) => i !== index) })}
+                                  onClick={() => patchDraft(node.nodeId, {
+                                    values: d.values.filter((_, i) => i !== index),
+                                    valueIds: d.valueIds.filter((_, i) => i !== index),
+                                  })}
                                 >Remove</button>
                               </div>
                             ))}
                           </div>
-                          <button className="w-fit text-left text-xs font-normal normal-case text-shell-accent underline" type="button" onClick={() => patchDraft(node.nodeId, { values: [...d.values, booleanType ? "false" : ""] })}>
+                          <button className="w-fit text-left text-xs font-normal normal-case text-shell-accent underline" type="button" onClick={() => patchDraft(node.nodeId, {
+                            values: [...d.values, booleanType ? "false" : ""],
+                            valueIds: [...d.valueIds, ...newListValueIds(1)],
+                          })}>
                             Add value
                           </button>
                         </div>
