@@ -63,6 +63,39 @@ const SUGGESTED_VARIABLES = [
 
 const PARAMETER_GROUPS = ["Measurements", "Control", "Device information", "Limits & diagnostics", "Simulation", "Static data", "Analog & data items", "State & access"] as const;
 
+const STRUCTURE_TEMPLATES = [
+  {
+    group: "Simulation", name: "Simulation signals", description: "A folder with common generated signals.",
+    variables: [
+      { name: "Counter", dataType: "FLOAT64", description: "Monotonically increasing simulated value" },
+      { name: "Random", dataType: "FLOAT64", description: "Random simulated value" },
+      { name: "Sinusoid", dataType: "FLOAT64", description: "Sinusoidal simulated signal" },
+      { name: "Square", dataType: "FLOAT64", description: "Square-wave simulated signal" },
+      { name: "Triangle", dataType: "FLOAT64", description: "Triangle-wave simulated signal" },
+    ],
+  },
+  {
+    group: "Device information", name: "Device identity", description: "A folder with common device identity and status values.",
+    variables: [
+      { name: "DeviceId", dataType: "STRING", description: "Device identifier" },
+      { name: "SerialNumber", dataType: "STRING", description: "Device serial number" },
+      { name: "Manufacturer", dataType: "STRING", description: "Device manufacturer" },
+      { name: "FirmwareVersion", dataType: "STRING", description: "Installed firmware version" },
+      { name: "Status", dataType: "UINT16", description: "Device status code" },
+      { name: "Timestamp", dataType: "DATETIME", description: "Time of the last update" },
+    ],
+  },
+  {
+    group: "Analog & data items", name: "Analog item", description: "A folder with a value and engineering-range metadata.",
+    variables: [
+      { name: "Value", dataType: "FLOAT64", description: "Measured analog value" },
+      { name: "EURangeLow", dataType: "FLOAT64", description: "Engineering range lower bound" },
+      { name: "EURangeHigh", dataType: "FLOAT64", description: "Engineering range upper bound" },
+      { name: "EngineeringUnits", dataType: "STRING", description: "Engineering units label" },
+    ],
+  },
+] as const;
+
 const VALUE_RANKS = ["SCALAR", "ARRAY"] as const;
 const ACCESS_LEVELS = ["READ", "READ_WRITE"] as const;
 const UPCOMING_NODE_CLASSES = ["Object", "Method", "Reference", "DataType"] as const;
@@ -159,6 +192,7 @@ export function ManualSchemaEditorPage() {
   const [batchRows, setBatchRows] = useState<BatchVariableRow[]>([]);
   const [showLibrary, setShowLibrary] = useState(false);
   const [showBatch, setShowBatch] = useState(false);
+  const [catalogQuery, setCatalogQuery] = useState("");
   const [saveMode, setSaveMode] = useState<SaveMode | null>(null);
   const [saveAsName, setSaveAsName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -302,6 +336,24 @@ export function ManualSchemaEditorPage() {
     };
     setNodes((prev) => [...prev, node]);
     setExpandedIds((prev) => new Set(prev).add(parentId));
+  }
+
+  function addStructureTemplate(template: (typeof STRUCTURE_TEMPLATES)[number]) {
+    const parentId = catalogParentId;
+    if (!parentId) return;
+    const folderId = newNodeId();
+    const folderPath = pathFor(parentId, template.name);
+    const folder: NodeDto = {
+      nodeId: folderId, parentId, path: folderPath, name: template.name, kind: "FOLDER",
+      dataType: null, valueRank: null, access: null, unit: null, description: template.description,
+    };
+    const variables: NodeDto[] = template.variables.map((variable) => ({
+      nodeId: newNodeId(), parentId: folderId, path: `${folderPath}/${variable.name}`, name: variable.name,
+      kind: "VARIABLE", dataType: variable.dataType, valueRank: "SCALAR", access: "READ",
+      unit: null, description: variable.description,
+    }));
+    setNodes((prev) => [...prev, folder, ...variables]);
+    setExpandedIds((prev) => new Set([...prev, parentId, folderId]));
   }
 
   function appendBatchRow() {
@@ -621,12 +673,25 @@ export function ManualSchemaEditorPage() {
                     : "Select the folder that should contain this parameter."}
                 </p>
               </div>
+              <label className="mt-4 block max-w-xl text-sm text-shell-muted">
+                Search known parameters and structures
+                <input
+                  aria-label="Search parameter catalog"
+                  className="shell-field mt-1 w-full"
+                  placeholder="For example: simulation, analog, status"
+                  value={catalogQuery}
+                  onChange={(event) => setCatalogQuery(event.target.value)}
+                />
+              </label>
               <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 {PARAMETER_GROUPS.map((group) => (
                   <section key={group} className="rounded-md border border-shell-line bg-white p-3">
                     <p className="text-xs font-semibold uppercase tracking-wide text-shell-muted">{group}</p>
                     <div className="mt-2 space-y-2">
-                      {SUGGESTED_VARIABLES.filter((variable) => variable.group === group).map((variable) => (
+                      {SUGGESTED_VARIABLES.filter((variable) => {
+                        const query = catalogQuery.trim().toLowerCase();
+                        return variable.group === group && (!query || `${variable.name} ${variable.dataType} ${variable.description}`.toLowerCase().includes(query));
+                      }).map((variable) => (
                         <button
                           key={variable.name}
                           className="w-full rounded border border-shell-line px-3 py-2 text-left text-sm disabled:cursor-not-allowed disabled:opacity-45 hover:border-shell-accent"
@@ -641,6 +706,27 @@ export function ManualSchemaEditorPage() {
                     </div>
                   </section>
                 ))}
+              </div>
+              <div className="mt-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-shell-muted">Reusable structures</p>
+                <div className="mt-2 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {STRUCTURE_TEMPLATES.filter((template) => {
+                    const query = catalogQuery.trim().toLowerCase();
+                    return !query || `${template.group} ${template.name} ${template.description} ${template.variables.map((variable) => variable.name).join(" ")}`.toLowerCase().includes(query);
+                  }).map((template) => (
+                    <button
+                      key={template.name}
+                      className="rounded border border-shell-line px-3 py-3 text-left text-sm disabled:cursor-not-allowed disabled:opacity-45 hover:border-shell-accent"
+                      disabled={!catalogParentId}
+                      type="button"
+                      onClick={() => addStructureTemplate(template)}
+                    >
+                      <span className="block font-medium text-shell-ink">{template.name}</span>
+                      <span className="mt-1 block text-xs text-shell-muted">{template.description}</span>
+                      <span className="mt-2 block text-xs text-shell-muted">Adds a folder and {template.variables.length} variables.</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </section>

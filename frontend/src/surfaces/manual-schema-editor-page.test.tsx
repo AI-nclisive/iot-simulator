@@ -191,6 +191,35 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
     });
   });
 
+  it("filters the catalog and inserts a reusable simulation structure", async () => {
+    mockLoadManualSchemaById.mockResolvedValueOnce(schemaWithFolder);
+    renderPage();
+
+    await waitFor(() => screen.getByText("Reactor"));
+    fireEvent.click(screen.getByText("Reactor"));
+    fireEvent.click(screen.getByRole("button", { name: /Choose from parameter catalog/i }));
+    fireEvent.change(screen.getByLabelText("Search parameter catalog"), { target: { value: "simulation" } });
+    fireEvent.click(screen.getByRole("button", { name: /Simulation signals.*folder with common generated signals/i }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByLabelText(/Save in this schema/));
+    fireEvent.click(screen.getAllByRole("button", { name: "Save" })[1]);
+
+    await waitFor(() => {
+      expect(mockUpdateManualSchema).toHaveBeenCalledWith(
+        "proj-1",
+        "ms-1",
+        expect.objectContaining({
+          nodes: expect.arrayContaining([
+            expect.objectContaining({ name: "Simulation signals", parentId: "f1", kind: "FOLDER" }),
+            expect.objectContaining({ name: "Counter", dataType: "FLOAT64" }),
+            expect.objectContaining({ name: "Sinusoid", dataType: "FLOAT64" }),
+          ]),
+        }),
+      );
+    });
+  });
+
   it("lets a new node be placed under any folder, not only the selected tree node", async () => {
     mockLoadManualSchemaById.mockResolvedValueOnce(schemaWithFolder);
     renderPage();
