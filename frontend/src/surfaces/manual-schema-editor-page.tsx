@@ -1025,7 +1025,7 @@ export function ManualSchemaEditorPage() {
               </p>
             </div>
             <div className="space-y-3 px-5 py-4">
-              <label className="flex items-start gap-2 text-sm text-shell-ink">
+              <label className="grid grid-cols-[1.25rem_minmax(0,1fr)] items-start gap-x-2 text-sm text-shell-ink">
                 <input
                   checked={saveMode === "in-place"}
                   className="mt-1"
@@ -1033,14 +1033,14 @@ export function ManualSchemaEditorPage() {
                   type="radio"
                   onChange={() => setSaveMode("in-place")}
                 />
-                <span>
-                  <span className="font-medium">Save in this schema</span>
+                <span className="min-w-0">
+                  <span className="block font-medium">Save in this schema</span>
                   <span className="block text-xs text-shell-muted">
                     Overwrites "{savedSnapshot.name}". Data sources already created from it are unaffected.
                   </span>
                 </span>
               </label>
-              <label className="flex items-start gap-2 text-sm text-shell-ink">
+              <label className="grid grid-cols-[1.25rem_minmax(0,1fr)] items-start gap-x-2 text-sm text-shell-ink">
                 <input
                   checked={saveMode === "save-as"}
                   className="mt-1"
@@ -1048,10 +1048,10 @@ export function ManualSchemaEditorPage() {
                   type="radio"
                   onChange={() => setSaveMode("save-as")}
                 />
-                <span className="flex-1">
-                  <span className="font-medium">Save as a new schema</span>
+                <span className="min-w-0">
+                  <span className="block font-medium">Save as a new schema</span>
                   <input
-                    className="shell-field mt-2"
+                    className="shell-field mt-2 block w-full"
                     disabled={saveMode !== "save-as"}
                     type="text"
                     value={saveAsName}
