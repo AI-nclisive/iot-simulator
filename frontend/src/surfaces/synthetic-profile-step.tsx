@@ -91,7 +91,7 @@ function patternTypesFor(dataType: string | null): { value: PatternType; label: 
  * rows untouched instead of putting them in an invalid state.
  */
 export function bulkPatternFor(dataType: string | null, pattern: PatternType): PatternType | null {
-  if (CONSTANT_ONLY_TYPES.has(dataType ?? "") && dataType !== "GUID") return null;
+  if (CONSTANT_ONLY_TYPES.has(dataType ?? "")) return null;
   if (dataType === "DATETIME" && pattern !== "CONSTANT" && pattern !== "RANDOM_UNIFORM") return null;
   if (dataType === "GUID") {
     return pattern === "RANDOM_UNIFORM" ? "RANDOM_UUID" : pattern === "CONSTANT" ? "CONSTANT" : null;
@@ -137,13 +137,14 @@ function isBooleanType(dataType: string | null): boolean {
 
 /**
  * IS-168: structural/identifier types have no natural dynamic-signal semantics —
- * a real device wouldn't vary a NodeId reference or a GUID over time either,
- * they're structural OPC UA plumbing, not measured values. The backend only
- * accepts a CONSTANT for these; the wizard locks the pattern choice to match
- * instead of letting the user pick a pattern that will always be rejected.
+ * a real device wouldn't vary a NodeId reference over time either, they're
+ * structural OPC UA plumbing, not measured values. The backend only accepts a
+ * CONSTANT for these; the wizard locks the pattern choice to match instead of
+ * letting the user pick a pattern that will always be rejected. GUID is the
+ * one identifier type with a real dynamic pattern (RANDOM_UUID, IS-181) so it's
+ * handled separately rather than living in this set.
  */
 const CONSTANT_ONLY_TYPES = new Set([
-  "GUID",
   "STATUS_CODE",
   "QUALIFIED_NAME",
   "NODE_ID",
@@ -222,14 +223,14 @@ export function defaultDraft(dataType: string | null = null): NodeDraft {
     valueIds: newListValueIds(3),
     updateRateMs: "1000",
   };
-  if (CONSTANT_ONLY_TYPES.has(dataType ?? "") && dataType !== "GUID") {
+  if (dataType === "GUID") return { ...base, pattern: "RANDOM_UUID", value: defaultConstantValue(dataType) };
+  if (CONSTANT_ONLY_TYPES.has(dataType ?? "")) {
     return {
       ...base,
       pattern: "CONSTANT",
       value: defaultConstantValue(dataType),
     };
   }
-  if (dataType === "GUID") return { ...base, pattern: "RANDOM_UUID", value: defaultConstantValue(dataType) };
   if (dataType === "DATETIME") {
     const now = new Date();
     const yearAgo = new Date(now);
@@ -397,6 +398,8 @@ export function draftFromPattern(pattern: SyntheticPatternSpec, updateRateMs: nu
         min: pattern.dateTimeMin ?? String(pattern.min ?? 0),
         max: pattern.dateTimeMax ?? String(pattern.max ?? 0),
       };
+    case "RANDOM_UUID":
+      return { ...rate, pattern: "RANDOM_UUID" };
     default:
       // SINE / RAMP / SQUARE
       return {
@@ -862,7 +865,7 @@ export function SyntheticProfileStep({
           <ul className="space-y-2">
             {variableNodes.map((node) => {
               const d = drafts[node.nodeId] ?? defaultDraft(node.dataType);
-              const constantOnly = CONSTANT_ONLY_TYPES.has(node.dataType ?? "") && node.dataType !== "GUID";
+              const constantOnly = CONSTANT_ONLY_TYPES.has(node.dataType ?? "");
               const textType = isTextType(node.dataType);
               const booleanType = isBooleanType(node.dataType);
               const integerType = isIntegerType(node.dataType);
