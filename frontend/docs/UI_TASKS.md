@@ -1233,6 +1233,12 @@ Parallel execution:
   Depends: UI-494.
   Done when: every listed template is searchable and inserts an editable folder with typed variables under the selected parent; representative template and discoverability tests pass; typecheck + vitest + build green.
 
+- [x] `UI-499` ✅ Synthetic profile — BOOL random/alternating pattern shows a useless values-list editor
+  Goal: `ENUM_CYCLE`/`RANDOM_CHOICE` for a BOOL node currently reuses the generic Add/Remove values-list editor, letting the user "curate" an arbitrary list when a boolean only ever has two possible values.
+  Surface: `Synthetic profile` step — per-node pattern editor.
+  Work includes: for boolean nodes, drop the Add/Remove list machinery for `ENUM_CYCLE`/`RANDOM_CHOICE` (mirroring the existing simple True/False `<select>` already used for `CONSTANT`), while non-boolean value-list types keep their current editor unchanged.
+  Done when: BOOL nodes no longer show Add/Remove controls for alternating/random patterns; wire format (`values: ["true","false"]`) is unchanged; typecheck + vitest + build green.
+
 ## Recommended Sequence
 
 1. Complete the P0 shell and shared-pattern tasks first.
