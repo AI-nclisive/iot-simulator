@@ -41,7 +41,8 @@ function mapDataSource(d: DataSourceResponse): DataSourceRow {
     endpoint: d.serveUrl ?? "",
     parameterCount: d.parameterCount ?? 0, // IS-149: VARIABLE node count from backend
     status: mapRuntimeStateToStatus(d.runtimeState),
-    health: mapRuntimeStateToHealth(d.runtimeState) ?? "Healthy",
+    // Health only makes sense for an active run — STOPPED/STARTING map to null (see mapRuntimeStateToHealth).
+    health: mapRuntimeStateToHealth(d.runtimeState),
   };
 }
 

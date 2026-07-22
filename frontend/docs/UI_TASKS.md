@@ -1239,6 +1239,12 @@ Parallel execution:
   Work includes: for boolean nodes, drop the Add/Remove list machinery for `ENUM_CYCLE`/`RANDOM_CHOICE` (mirroring the existing simple True/False `<select>` already used for `CONSTANT`), while non-boolean value-list types keep their current editor unchanged.
   Done when: BOOL nodes no longer show Add/Remove controls for alternating/random patterns; wire format (`values: ["true","false"]`) is unchanged; typecheck + vitest + build green.
 
+- [ ] `UI-500` Data Sources — don't show "Healthy" for a stopped source
+  Goal: a disabled/stopped data source showed a green "Healthy" health badge on the Data Sources list and on the source detail pages, because `mapDataSource()` defaulted an absent health signal (`null`, returned for `STOPPED`/`STARTING` runtime state) to `"Healthy"`. Health only means something for an active run; a stopped source should show no health verdict instead of a misleading green one.
+  Surface: `Data Sources` list page; `Data Source Detail` — overview tab and preview header.
+  Work includes: make `DataSourceRow.health` nullable end-to-end; drop the `?? "Healthy"` fallback in `data-sources-store.ts`; render an em dash instead of a badge when health is `null` on the list page and both detail surfaces.
+  Done when: a stopped/disabled source shows no health badge (or "—") anywhere, a running source keeps its real Healthy/Warning/Error badge unchanged, and typecheck + vitest are green.
+
 ## Recommended Sequence
 
 1. Complete the P0 shell and shared-pattern tasks first.

@@ -6,7 +6,7 @@ function stateLabel(source: DataSourceRow) {
 }
 
 function healthGuidanceText(source: DataSourceRow) {
-  if (source.health === "Healthy") {
+  if (source.health === "Healthy" || source.health === null) {
     return null;
   }
 
@@ -45,7 +45,7 @@ export function DataSourceDetailOverviewTab({
     <div className="space-y-5">
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         <SummaryBlock label="State" value={stateLabel(source)} />
-        <SummaryBlock label="Health" value={source.health} />
+        <SummaryBlock label="Health" value={source.health ?? "—"} />
         <SummaryBlock
           label="Parameters"
           value={`${source.parameterCount.toLocaleString()} in Schema`}

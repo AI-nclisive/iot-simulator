@@ -60,9 +60,9 @@ function currentTabId(searchValue: string | null): DetailTabId {
 
 function healthDiagnosticCopy(source: {
   endpoint: string;
-  health: "Healthy" | "Warning" | "Error";
+  health: "Healthy" | "Warning" | "Error" | null;
 }) {
-  if (source.health === "Healthy") {
+  if (source.health === "Healthy" || source.health === null) {
     return null;
   }
 
@@ -318,7 +318,7 @@ export function DataSourceDetailPreviewPage() {
             ) : (
               <StatusBadge label={activeState.label} tone={activeState.tone} />
             )}
-            {activeSource.health !== "Healthy" ? (
+            {activeSource.health && activeSource.health !== "Healthy" ? (
               <StatusBadge label={activeSource.health} tone={healthTone(activeSource.health)} />
             ) : null}
           </div>
