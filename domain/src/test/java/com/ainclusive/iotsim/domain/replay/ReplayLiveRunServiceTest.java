@@ -194,6 +194,8 @@ class ReplayLiveRunServiceTest {
         assertThat(evidence.byId.get(summary.evidenceId()).manifestJson())
                 .doesNotContain("\"endedAt\":null")
                 .contains("\"endedAt\":\"" + wall.instant() + "\"");
+        // IS-182: auto-completion is mirrored into runtime_events.
+        assertThat(events.appended).extracting("type").containsExactly("RUN_COMPLETED");
 
         // A subsequent tick is a no-op — removed from registry.
         svc.tickAll();
@@ -269,6 +271,8 @@ class ReplayLiveRunServiceTest {
 
         assertThat(runs.byId.values()).singleElement()
                 .extracting(RunRow::state).isEqualTo("FAILED");
+        // IS-182: start failure is mirrored into runtime_events.
+        assertThat(events.appended).extracting("type").containsExactly("RUN_FAILED");
     }
 
     @Test
@@ -311,6 +315,8 @@ class ReplayLiveRunServiceTest {
         assertThat(runs.byId.get(summary.runId()).state()).isEqualTo("COMPLETED");
         // Runtime must be stopped — no leak for the empty-timeline path.
         assertThat(runtime.state(SOURCE)).isEqualTo("STOPPED");
+        // IS-182: immediate auto-completion is mirrored into runtime_events.
+        assertThat(events.appended).extracting("type").containsExactly("RUN_COMPLETED");
         // Nothing in registry — tick is a no-op.
         svc.tickAll();
         assertThat(runtime.applied).isEmpty();
