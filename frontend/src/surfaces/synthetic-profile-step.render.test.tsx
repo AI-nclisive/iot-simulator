@@ -87,7 +87,7 @@ describe("SyntheticProfileStep — Pattern select progressive disclosure (UI-483
     await renderWithOneMeasurement();
     const select = patternSelect()!;
     const options = within(select).getAllByRole("option").map((o) => o.textContent);
-    expect(options).toEqual(["Fixed value", "Smooth (rises & falls)", "Random"]);
+    expect(options).toEqual(["Fixed value", "Wave (rises and falls repeatedly)", "Random"]);
   });
 
   it("reveals the advanced options after clicking Show more patterns", async () => {
@@ -97,11 +97,11 @@ describe("SyntheticProfileStep — Pattern select progressive disclosure (UI-483
     const options = within(select).getAllByRole("option").map((o) => o.textContent);
     expect(options).toEqual([
       "Fixed value",
-      "Smooth (rises & falls)",
+      "Wave (rises and falls repeatedly)",
       "Random",
-      "Rising ramp (resets)",
-      "Alternating (on/off)",
-      "Random (drifting)",
+      "Rising ramp (returns to start)",
+      "Alternating (low/high)",
+      "Random drift",
     ]);
     expect(screen.queryByRole("button", { name: /Show more patterns/i })).toBeNull();
   });
@@ -110,7 +110,7 @@ describe("SyntheticProfileStep — Pattern select progressive disclosure (UI-483
     const user = await renderWithOneMeasurement();
     await user.click(screen.getByRole("button", { name: /Show more patterns/i }));
     const select = patternSelect()!;
-    await user.selectOptions(select, "Rising ramp (resets)");
+    await user.selectOptions(select, "Rising ramp (returns to start)");
     // Still expanded (6 options, no "Show more" button) after re-render.
     const optionsAfter = within(patternSelect()!).getAllByRole("option").map((o) => o.textContent);
     expect(optionsAfter).toHaveLength(6);
@@ -311,6 +311,23 @@ describe("SyntheticProfileStep — select-all / deselect-all (UI-487)", () => {
       .getAllByRole("combobox")
       .filter((el) => within(el).queryByText("Fixed value") != null) as HTMLSelectElement[];
   }
+
+  it("keeps advanced bulk patterns out of the default dropdown", async () => {
+    const user = await renderWithTwoMeasurements();
+    const options = within(bulkPatternSelect()).getAllByRole("option").map((option) => option.textContent);
+    expect(options).toEqual(["Set pattern for selected…", "Fixed value", "Wave (rises and falls repeatedly)", "Random"]);
+
+    await user.click(screen.getByRole("button", { name: "More patterns…" }));
+    expect(within(bulkPatternSelect()).getAllByRole("option").map((option) => option.textContent)).toContain("Random drift");
+  });
+
+  it("keeps repeatable-results settings out of the main form until requested", async () => {
+    const user = await renderWithTwoMeasurements();
+    expect(screen.queryByRole("spinbutton", { name: /Repeatable results/i })).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "Advanced generation settings" }));
+    expect(screen.getByRole("spinbutton", { name: /Repeatable results/i })).not.toBeNull();
+  });
 
   it("bulk pattern select applies the chosen pattern to every currently-selected row (UI-488)", async () => {
     const user = await renderWithTwoMeasurements();

@@ -43,14 +43,14 @@ type PatternType = SyntheticPatternSpec["type"];
  */
 const SIMPLE_PATTERN_TYPES: { value: PatternType; label: string }[] = [
   { value: "CONSTANT", label: "Fixed value" },
-  { value: "SINE", label: "Smooth (rises & falls)" },
+  { value: "SINE", label: "Wave (rises and falls repeatedly)" },
   { value: "RANDOM_UNIFORM", label: "Random" },
 ];
 
 const ADVANCED_PATTERN_TYPES: { value: PatternType; label: string }[] = [
-  { value: "RAMP", label: "Rising ramp (resets)" },
-  { value: "SQUARE", label: "Alternating (on/off)" },
-  { value: "RANDOM_WALK", label: "Random (drifting)" },
+  { value: "RAMP", label: "Rising ramp (returns to start)" },
+  { value: "SQUARE", label: "Alternating (low/high)" },
+  { value: "RANDOM_WALK", label: "Random drift" },
 ];
 
 const PATTERN_TYPES = [...SIMPLE_PATTERN_TYPES, ...ADVANCED_PATTERN_TYPES];
@@ -304,6 +304,8 @@ export function SyntheticProfileStep({
   // UI-483: nodeIds whose Pattern select has been expanded to show the "advanced" options
   // (Ramp/Square/Random walk), via "Show more patterns" or because the loaded pattern is one of them.
   const [expandedPatternRows, setExpandedPatternRows] = useState<Set<string>>(new Set());
+  const [showAdvancedBulkPatterns, setShowAdvancedBulkPatterns] = useState(false);
+  const [showAdvancedGenerationSettings, setShowAdvancedGenerationSettings] = useState(false);
   // UI-484: nodeIds actually updated by the last successful prefill, so those rows can be
   // visually marked — a recording rarely covers every schema measurement, and without this
   // a user scrolling to an unmatched row could reasonably conclude prefill did nothing.
@@ -531,7 +533,7 @@ export function SyntheticProfileStep({
 
   return (
     <div className="space-y-5">
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="space-y-3">
         <div className="flex flex-col gap-2 text-sm text-shell-muted">
           <span>Parameter source</span>
           <div className="flex gap-4 text-sm text-shell-ink">
@@ -602,21 +604,33 @@ export function SyntheticProfileStep({
             </label>
           )}
         </div>
-        <label className="flex flex-col gap-2 text-sm text-shell-muted">
-          Seed (optional)
-          <input
-            className="shell-field"
-            inputMode="numeric"
-            placeholder="Random each run"
-            step="any"
-            type="number"
-            value={seed}
-            onChange={(e) => onSeedChange(e.target.value)}
-          />
-          <span className="text-xs text-shell-muted">
-            Fix the seed for a reproducible value sequence.
-          </span>
-        </label>
+        <div>
+          <button
+            aria-expanded={showAdvancedGenerationSettings}
+            className="shell-text-action"
+            type="button"
+            onClick={() => setShowAdvancedGenerationSettings((shown) => !shown)}
+          >
+            {showAdvancedGenerationSettings ? "Hide advanced generation settings" : "Advanced generation settings"}
+          </button>
+          {showAdvancedGenerationSettings ? (
+            <label className="mt-2 flex max-w-sm flex-col gap-2 text-sm text-shell-muted">
+              Repeatable results (optional)
+              <input
+                className="shell-field"
+                inputMode="numeric"
+                placeholder="Leave empty for a new sequence each run"
+                step="any"
+                type="number"
+                value={seed}
+                onChange={(e) => onSeedChange(e.target.value)}
+              />
+              <span className="text-xs text-shell-muted">
+                Enter a number only when you need the same generated values every time.
+              </span>
+            </label>
+          ) : null}
+        </div>
       </div>
 
       {loading ? <p className="text-sm text-shell-muted">Loading schema…</p> : null}
@@ -689,12 +703,17 @@ export function SyntheticProfileStep({
               }}
             >
               <option value="">Set pattern for selected…</option>
-              {PATTERN_TYPES.map((p) => (
+              {(showAdvancedBulkPatterns ? PATTERN_TYPES : SIMPLE_PATTERN_TYPES).map((p) => (
                 <option key={p.value} value={p.value}>
                   {p.label}
                 </option>
               ))}
             </select>
+            {!showAdvancedBulkPatterns ? (
+              <button className="shell-text-action" type="button" onClick={() => setShowAdvancedBulkPatterns(true)}>
+                More patterns…
+              </button>
+            ) : null}
           </div>
 
           <ul className="space-y-2">

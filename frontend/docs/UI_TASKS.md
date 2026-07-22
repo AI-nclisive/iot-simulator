@@ -1212,6 +1212,13 @@ Parallel execution:
   Depends: UI-491.
   Done when: Manual Schema shows only its selected structure and pattern controls; Existing source retains recording prefill; typecheck + vitest + build green.
 
+- [x] `UI-497` ✅ Synthetic profile — simplify pattern and seed controls
+  Goal: make the Synthetic profile easier to scan by keeping common patterns and core choices visible while moving technical generation settings behind explicit disclosure.
+  Surface: `Create Data Source Wizard` — Synthetic profile.
+  Work includes: a short default bulk-pattern list; plain-language pattern labels; and a collapsed Advanced generation settings section for repeatable results.
+  Depends: UI-488.
+  Done when: the default bulk list has Fixed value, Wave, and Random; advanced patterns appear after More patterns; repeatable-results settings stay hidden until requested; typecheck + vitest + build green.
+
 - [x] `UI-495` ✅ Manual Schema — expand reusable OPC UA structure catalog
   Goal: expand the Manual Schema catalog with realistic, editable starter structures so users can build an OPC UA server from familiar equipment and data patterns instead of starting from empty folders.
   Surface: `Manual Schemas` — editor catalog.
