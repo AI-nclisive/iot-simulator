@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultDraft, draftFromPattern, toPattern, type NodeDraft } from "./synthetic-profile-step";
+import { bulkPatternFor, defaultDraft, draftFromPattern, toPattern, type NodeDraft } from "./synthetic-profile-step";
 
 function draft(overrides: Partial<NodeDraft>): NodeDraft {
   return { ...defaultDraft(), ...overrides };
@@ -136,6 +136,22 @@ describe("defaultDraft — CONSTANT_ONLY_TYPES locking (IS-168 / UI-482)", () =>
     expect(guidDraft.value).toMatch(/^[0-9a-f-]{36}$/i);
     expect(defaultDraft("DATETIME")).toMatchObject({ pattern: "CONSTANT" });
     expect(defaultDraft("DATETIME").value).toMatch(/^\d{4}-\d{2}-\d{2}T.*Z$/);
+  });
+});
+
+describe("bulkPatternFor — type-aware bulk choices (UI-498)", () => {
+  it("maps Random to a valid random pattern for every dynamic type family", () => {
+    expect(bulkPatternFor("FLOAT64", "RANDOM_UNIFORM")).toBe("RANDOM_UNIFORM");
+    expect(bulkPatternFor("INT32", "RANDOM_UNIFORM")).toBe("RANDOM_UNIFORM");
+    expect(bulkPatternFor("STRING", "RANDOM_UNIFORM")).toBe("RANDOM_CHOICE");
+    expect(bulkPatternFor("LOCALIZED_TEXT", "RANDOM_UNIFORM")).toBe("RANDOM_CHOICE");
+    expect(bulkPatternFor("BOOL", "RANDOM_UNIFORM")).toBe("RANDOM_CHOICE");
+  });
+
+  it("does not apply Wave to nonnumeric or constant-only rows", () => {
+    expect(bulkPatternFor("STRING", "SINE")).toBeNull();
+    expect(bulkPatternFor("BOOL", "SINE")).toBeNull();
+    expect(bulkPatternFor("DATETIME", "SINE")).toBeNull();
   });
 });
 

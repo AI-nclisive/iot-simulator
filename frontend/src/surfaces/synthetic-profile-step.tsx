@@ -73,6 +73,21 @@ function patternTypesFor(dataType: string | null): { value: PatternType; label: 
   return PATTERN_TYPES;
 }
 
+/**
+ * Translate a generic bulk choice to the closest valid pattern for this row's
+ * data type. Numeric-only choices intentionally leave text/boolean/structural
+ * rows untouched instead of putting them in an invalid state.
+ */
+export function bulkPatternFor(dataType: string | null, pattern: PatternType): PatternType | null {
+  if (CONSTANT_ONLY_TYPES.has(dataType ?? "")) return null;
+  if (pattern === "CONSTANT") return "CONSTANT";
+  if (pattern === "RANDOM_UNIFORM") {
+    return isTextType(dataType) || isBooleanType(dataType) ? "RANDOM_CHOICE" : pattern;
+  }
+  if (isTextType(dataType) || isBooleanType(dataType)) return null;
+  return pattern;
+}
+
 const INTEGER_TYPES = new Set(["INT8", "UINT8", "INT16", "UINT16", "INT32", "UINT32", "INT64", "UINT64"]);
 const FLOAT_TYPES = new Set(["FLOAT32", "FLOAT64"]);
 const TEXT_TYPES = new Set(["STRING", "LOCALIZED_TEXT"]);
@@ -501,8 +516,8 @@ export function SyntheticProfileStep({
   function setPatternForSelected(type: PatternType) {
     for (const node of variableNodes) {
       if (!drafts[node.nodeId]?.enabled) continue;
-      if (CONSTANT_ONLY_TYPES.has(node.dataType ?? "")) continue;
-      changePattern(node.nodeId, type);
+      const pattern = bulkPatternFor(node.dataType, type);
+      if (pattern) changePattern(node.nodeId, pattern);
     }
   }
 
