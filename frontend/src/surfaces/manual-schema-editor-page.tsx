@@ -63,7 +63,63 @@ const SUGGESTED_VARIABLES = [
 
 const PARAMETER_GROUPS = ["Measurements", "Control", "Device information", "Limits & diagnostics", "Simulation", "Static data", "Analog & data items", "State & access"] as const;
 
+type StructureTemplate = {
+  group: string;
+  name: string;
+  description: string;
+  variables: Array<{ name: string; dataType: string; description: string; unit?: string }>;
+};
+
 const STRUCTURE_TEMPLATES = [
+  {
+    group: "Process equipment", name: "Tank / vessel", description: "A vessel with level, process measurements, limits, and status.",
+    variables: [
+      { name: "Level", dataType: "FLOAT64", unit: "%", description: "Tank or vessel level" },
+      { name: "Temperature", dataType: "FLOAT64", unit: "°C", description: "Process temperature" },
+      { name: "Pressure", dataType: "FLOAT64", unit: "bar", description: "Process pressure" },
+      { name: "HighLimit", dataType: "FLOAT64", description: "Configured upper operating limit" },
+      { name: "LowLimit", dataType: "FLOAT64", description: "Configured lower operating limit" },
+      { name: "Status", dataType: "UINT16", description: "Vessel status code" },
+    ],
+  },
+  {
+    group: "Process equipment", name: "Pump", description: "A pump with commands, operating state, speed, pressure, and flow.",
+    variables: [
+      { name: "Enabled", dataType: "BOOL", description: "Whether the pump is enabled" },
+      { name: "Running", dataType: "BOOL", description: "Whether the pump is running" },
+      { name: "Start", dataType: "BOOL", description: "Start command" },
+      { name: "Stop", dataType: "BOOL", description: "Stop command" },
+      { name: "Speed", dataType: "FLOAT64", unit: "rpm", description: "Pump speed" },
+      { name: "Pressure", dataType: "FLOAT64", unit: "bar", description: "Pump discharge pressure" },
+      { name: "FlowRate", dataType: "FLOAT64", unit: "m³/h", description: "Pump flow rate" },
+      { name: "Status", dataType: "UINT16", description: "Pump status code" },
+    ],
+  },
+  {
+    group: "Process equipment", name: "Motor", description: "A motor with control, operating state, and electrical measurements.",
+    variables: [
+      { name: "Enabled", dataType: "BOOL", description: "Whether the motor is enabled" },
+      { name: "Running", dataType: "BOOL", description: "Whether the motor is running" },
+      { name: "Start", dataType: "BOOL", description: "Start command" },
+      { name: "Stop", dataType: "BOOL", description: "Stop command" },
+      { name: "Speed", dataType: "FLOAT64", unit: "rpm", description: "Rotational speed" },
+      { name: "Current", dataType: "FLOAT64", unit: "A", description: "Motor current" },
+      { name: "Voltage", dataType: "FLOAT64", unit: "V", description: "Motor voltage" },
+      { name: "Power", dataType: "FLOAT64", unit: "kW", description: "Motor power" },
+      { name: "Temperature", dataType: "FLOAT64", unit: "°C", description: "Motor temperature" },
+    ],
+  },
+  {
+    group: "Process equipment", name: "Valve", description: "A valve with position feedback, a target position, commands, and status.",
+    variables: [
+      { name: "Position", dataType: "FLOAT64", unit: "%", description: "Actual valve position" },
+      { name: "Setpoint", dataType: "FLOAT64", unit: "%", description: "Requested valve position" },
+      { name: "Open", dataType: "BOOL", description: "Open command" },
+      { name: "Close", dataType: "BOOL", description: "Close command" },
+      { name: "Enabled", dataType: "BOOL", description: "Whether the valve is enabled" },
+      { name: "Status", dataType: "UINT16", description: "Valve status code" },
+    ],
+  },
   {
     group: "Simulation", name: "Simulation signals", description: "A folder with common generated signals.",
     variables: [
@@ -94,7 +150,39 @@ const STRUCTURE_TEMPLATES = [
       { name: "EngineeringUnits", dataType: "STRING", description: "Engineering units label" },
     ],
   },
-] as const;
+  {
+    group: "Conditions", name: "Condition values", description: "Common condition state, severity, acknowledgement, and message values.",
+    variables: [
+      { name: "ActiveState", dataType: "LOCALIZED_TEXT", description: "Current active state" },
+      { name: "AckedState", dataType: "LOCALIZED_TEXT", description: "Current acknowledgement state" },
+      { name: "EnabledState", dataType: "LOCALIZED_TEXT", description: "Current enabled state" },
+      { name: "Severity", dataType: "UINT16", description: "Current condition severity" },
+      { name: "LastSeverity", dataType: "UINT16", description: "Previous condition severity" },
+      { name: "Message", dataType: "LOCALIZED_TEXT", description: "Operator-facing condition message" },
+      { name: "Comment", dataType: "LOCALIZED_TEXT", description: "Operator comment" },
+    ],
+  },
+  {
+    group: "Static data", name: "Static data", description: "Reusable scalar examples for fixed or slowly changing values.",
+    variables: [
+      { name: "BooleanValue", dataType: "BOOL", description: "Static Boolean value" },
+      { name: "StringValue", dataType: "STRING", description: "Static text value" },
+      { name: "DateTimeValue", dataType: "DATETIME", description: "Static date and time value" },
+      { name: "NodeIdValue", dataType: "NODE_ID", description: "Static OPC UA NodeId value" },
+      { name: "Quality", dataType: "STATUS_CODE", description: "Quality of the static values" },
+    ],
+  },
+  {
+    group: "State & access", name: "Access and state", description: "State values, access flags, and alias examples for a server branch.",
+    variables: [
+      { name: "State", dataType: "UINT32", description: "Multi-state value" },
+      { name: "AccessLevel", dataType: "UINT8", description: "OPC UA access-level flags" },
+      { name: "UserAccessLevel", dataType: "UINT8", description: "User-specific access-level flags" },
+      { name: "Alias", dataType: "NODE_ID", description: "Alias target NodeId" },
+      { name: "Enabled", dataType: "BOOL", description: "Whether the branch is enabled" },
+    ],
+  },
+] as const satisfies readonly StructureTemplate[];
 
 const VALUE_RANKS = ["SCALAR", "ARRAY"] as const;
 const ACCESS_LEVELS = ["READ", "READ_WRITE"] as const;
@@ -338,7 +426,7 @@ export function ManualSchemaEditorPage() {
     setExpandedIds((prev) => new Set(prev).add(parentId));
   }
 
-  function addStructureTemplate(template: (typeof STRUCTURE_TEMPLATES)[number]) {
+  function addStructureTemplate(template: StructureTemplate) {
     const parentId = catalogParentId;
     if (!parentId) return;
     const folderId = newNodeId();
@@ -350,7 +438,7 @@ export function ManualSchemaEditorPage() {
     const variables: NodeDto[] = template.variables.map((variable) => ({
       nodeId: newNodeId(), parentId: folderId, path: `${folderPath}/${variable.name}`, name: variable.name,
       kind: "VARIABLE", dataType: variable.dataType, valueRank: "SCALAR", access: "READ",
-      unit: null, description: variable.description,
+      unit: variable.unit ?? null, description: variable.description,
     }));
     setNodes((prev) => [...prev, folder, ...variables]);
     setExpandedIds((prev) => new Set([...prev, parentId, folderId]));
@@ -545,7 +633,7 @@ export function ManualSchemaEditorPage() {
               </div>
             </fieldset>
             <div className="rounded-md bg-shell-base/60 px-3 py-2 text-xs text-shell-muted">
-              <span className="font-medium text-shell-ink">Not available yet: </span>{UPCOMING_NODE_CLASSES.join(", ")}. These classes will be enabled when the address-space model is available.
+              <span className="font-medium text-shell-ink">Coming soon: </span>{UPCOMING_NODE_CLASSES.join(", ")}. For now, create folders and variables to build your server structure.
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
               <label className="flex flex-col gap-1.5 text-sm text-shell-muted">

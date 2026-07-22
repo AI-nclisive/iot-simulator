@@ -220,6 +220,47 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
     });
   });
 
+  it("finds and inserts a reusable pump structure with typed operational variables", async () => {
+    mockLoadManualSchemaById.mockResolvedValueOnce(schemaWithFolder);
+    renderPage();
+
+    await waitFor(() => screen.getByText("Reactor"));
+    fireEvent.click(screen.getByText("Reactor"));
+    fireEvent.click(screen.getByRole("button", { name: /Choose from parameter catalog/i }));
+    fireEvent.change(screen.getByLabelText("Search parameter catalog"), { target: { value: "pump" } });
+    fireEvent.click(screen.getByRole("button", { name: /Pump.*operating state, speed, pressure, and flow/i }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByLabelText(/Save in this schema/));
+    fireEvent.click(screen.getAllByRole("button", { name: "Save" })[1]);
+
+    await waitFor(() => {
+      expect(mockUpdateManualSchema).toHaveBeenCalledWith(
+        "proj-1",
+        "ms-1",
+        expect.objectContaining({
+          nodes: expect.arrayContaining([
+            expect.objectContaining({ name: "Pump", parentId: "f1", kind: "FOLDER" }),
+            expect.objectContaining({ name: "Running", dataType: "BOOL" }),
+            expect.objectContaining({ name: "FlowRate", dataType: "FLOAT64", unit: "m³/h" }),
+          ]),
+        }),
+      );
+    });
+  });
+
+  it("uses plain language for node classes that are not available yet", async () => {
+    mockLoadManualSchemaById.mockResolvedValueOnce(schemaWithFolder);
+    renderPage();
+
+    await waitFor(() => screen.getByText("Reactor"));
+    fireEvent.click(screen.getByRole("button", { name: "Add variable" }));
+
+    expect(screen.getByText("Coming soon:")).toBeTruthy();
+    expect(screen.getByText(/For now, create folders and variables/i)).toBeTruthy();
+    expect(screen.queryByText(/address-space model/i)).toBeNull();
+  });
+
   it("lets a new node be placed under any folder, not only the selected tree node", async () => {
     mockLoadManualSchemaById.mockResolvedValueOnce(schemaWithFolder);
     renderPage();
