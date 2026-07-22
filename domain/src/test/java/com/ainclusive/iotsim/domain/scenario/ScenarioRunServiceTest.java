@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import tools.jackson.databind.ObjectMapper;
 
 class ScenarioRunServiceTest {
@@ -157,6 +158,12 @@ class ScenarioRunServiceTest {
         verify(dataSources).stop(eq(PROJECT), eq(SOURCE), anyString());
         verify(replay).replay(eq(PROJECT), eq(SOURCE), eq(RECORDING), any(), eq(false), eq("run-parent"));
         verify(runs).end(eq("run-parent"), eq("COMPLETED"), any());
+
+        ArgumentCaptor<String> manifests = ArgumentCaptor.forClass(String.class);
+        verify(evidence, times(2)).updateManifest(eq("ev-1"), manifests.capture());
+        assertThat(manifests.getAllValues().get(0)).contains("\"endedAt\":null");
+        assertThat(manifests.getAllValues().get(1)).doesNotContain("\"endedAt\":null");
+        assertThat(manifests.getAllValues().get(1)).contains("\"kind\":\"SCENARIO\"");
     }
 
     @Test
@@ -226,5 +233,9 @@ class ScenarioRunServiceTest {
                 .isInstanceOf(RuntimeException.class);
         verify(runs).end(eq("run-parent"), eq("FAILED"), any());
         verify(dataSources, never()).stop(eq(PROJECT), eq(SOURCE), anyString());
+
+        ArgumentCaptor<String> manifests = ArgumentCaptor.forClass(String.class);
+        verify(evidence, times(2)).updateManifest(eq("ev-1"), manifests.capture());
+        assertThat(manifests.getAllValues().get(1)).doesNotContain("\"endedAt\":null");
     }
 }

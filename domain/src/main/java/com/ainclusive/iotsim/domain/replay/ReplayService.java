@@ -21,8 +21,8 @@ import com.ainclusive.iotsim.protocolmodel.NeutralValue;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.ObjectMapper;
 
@@ -117,32 +117,63 @@ public class ReplayService {
                 : DeterministicSettings.withRandomSeed(Instant.now());
 
         RunRow run = runs.create(projectId, "REPLAY", trigger, initiator, List.of(dataSourceId), null, parentRunId);
+        Instant startedAt = Instant.now();
+        EvidenceRow evidenceRow = null;
         // Everything after the run exists is guarded: any failure (evidence setup, worker
         // launch, value streaming) must end the run FAILED rather than leave it RUNNING.
         try {
             runs.start(run.id(), now());
-            EvidenceRow evidenceRow = evidence.create(projectId, run.id(), "local");
+            evidenceRow = evidence.create(projectId, run.id(), "local");
             runs.linkEvidence(run.id(), evidenceRow.id());
-            evidence.updateManifest(evidenceRow.id(), seed(recordingId, settings));
+            evidence.updateManifest(evidenceRow.id(), manifest(run.id(), trigger, initiator, dataSourceId,
+                    startedAt, null, recordingId, settings, 0));
 
             RuntimeStartSpec startSpec = RuntimeStartSpecs.of(schemas, source, settings);
             List<NeutralValue> values = timeline.readAll(recordingId);
             runtime.start(dataSourceId, startSpec);
             long applied = runtime.applyValues(dataSourceId, values);
+            evidence.updateManifest(evidenceRow.id(), manifest(run.id(), trigger, initiator, dataSourceId,
+                    startedAt, Instant.now(), recordingId, settings, applied));
             runs.end(run.id(), "COMPLETED", now());
             return new ReplaySummary(recordingId, dataSourceId, applied, run.id(), evidenceRow.id(), settings);
         } catch (RuntimeException e) {
+            stampFailure(evidenceRow, run.id(), trigger, initiator, dataSourceId, startedAt, recordingId, settings);
             runs.end(run.id(), "FAILED", now());
             throw e;
         }
     }
 
-    /** Evidence manifest: recording ref + deterministic settings for run reproducibility. */
-    private String seed(String recordingId, DeterministicSettings settings) {
-        return json.writeValueAsString(Map.of(
-                "recordingId", recordingId,
-                "seed", settings.seed(),
-                "startTime", settings.startTime().toString()));
+    /** Best-effort endedAt stamp so a failed run still shows its end time in evidence. */
+    private void stampFailure(EvidenceRow evidenceRow, String runId, String trigger, String initiator,
+            String dataSourceId, Instant startedAt, String recordingId, DeterministicSettings settings) {
+        if (evidenceRow == null) {
+            return;
+        }
+        try {
+            evidence.updateManifest(evidenceRow.id(), manifest(runId, trigger, initiator, dataSourceId,
+                    startedAt, Instant.now(), recordingId, settings, 0));
+        } catch (RuntimeException ignored) {
+            // advisory only; must not mask the original failure
+        }
+    }
+
+    /** Evidence manifest: full run metadata + recording ref + deterministic settings. */
+    private String manifest(String runId, String trigger, String initiator, String dataSourceId,
+            Instant startedAt, Instant endedAt, String recordingId,
+            DeterministicSettings settings, long valueCount) {
+        LinkedHashMap<String, Object> m = new LinkedHashMap<>();
+        m.put("kind", "REPLAY");
+        m.put("runId", runId);
+        m.put("trigger", trigger);
+        m.put("initiator", initiator);
+        m.put("startedAt", startedAt.toString());
+        m.put("endedAt", endedAt != null ? endedAt.toString() : null);
+        m.put("sourceIds", List.of(dataSourceId));
+        m.put("scenarioId", null);
+        m.put("recordingId", recordingId);
+        m.put("seed", settings.seed());
+        m.put("valueCount", valueCount);
+        return json.writeValueAsString(m);
     }
 
     private static OffsetDateTime now() {
