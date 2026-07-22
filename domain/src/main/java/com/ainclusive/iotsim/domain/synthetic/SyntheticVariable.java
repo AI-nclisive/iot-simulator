@@ -45,6 +45,14 @@ public record SyntheticVariable(String nodeId, DataType dataType, SyntheticPatte
             throw new IllegalArgumentException(
                     "synthetic generation only supports a constant value for " + dataType + " (v1)");
         }
+        if (dataType == DataType.DATETIME
+                && !(pattern instanceof SyntheticPattern.Constant || pattern instanceof SyntheticPattern.RandomUniform)) {
+            throw new IllegalArgumentException("synthetic generation only supports constant or random values for DATETIME");
+        }
+        if (dataType == DataType.GUID
+                && !(pattern instanceof SyntheticPattern.Constant || pattern instanceof SyntheticPattern.RandomUuid)) {
+            throw new IllegalArgumentException("synthetic generation only supports constant or random UUID values for GUID");
+        }
     }
 
     /** Creates a run-scoped generator that emits this variable's series under {@code context}. */
