@@ -41,15 +41,67 @@ const SUGGESTED_VARIABLES = [
   { group: "Limits & diagnostics", name: "LowLimit", dataType: "FLOAT64", unit: null, description: "Configured lower operating limit" },
   { group: "Limits & diagnostics", name: "Quality", dataType: "STATUS_CODE", unit: null, description: "Quality of the current value" },
   { group: "Limits & diagnostics", name: "DiagnosticMessage", dataType: "LOCALIZED_TEXT", unit: null, description: "Human-readable diagnostic information" },
+  { group: "Simulation", name: "Counter", dataType: "FLOAT64", unit: null, description: "Monotonically increasing simulated value" },
+  { group: "Simulation", name: "Random", dataType: "FLOAT64", unit: null, description: "Random simulated value" },
+  { group: "Simulation", name: "Sawtooth", dataType: "FLOAT64", unit: null, description: "Sawtooth simulated signal" },
+  { group: "Simulation", name: "Sinusoid", dataType: "FLOAT64", unit: null, description: "Sinusoidal simulated signal" },
+  { group: "Simulation", name: "Square", dataType: "FLOAT64", unit: null, description: "Square-wave simulated signal" },
+  { group: "Simulation", name: "Triangle", dataType: "FLOAT64", unit: null, description: "Triangle-wave simulated signal" },
+  { group: "Static data", name: "BooleanValue", dataType: "BOOL", unit: null, description: "Static Boolean value" },
+  { group: "Static data", name: "StringValue", dataType: "STRING", unit: null, description: "Static text value" },
+  { group: "Static data", name: "DateTimeValue", dataType: "DATETIME", unit: null, description: "Static date and time value" },
+  { group: "Static data", name: "NodeIdValue", dataType: "NODE_ID", unit: null, description: "Static OPC UA NodeId value" },
+  { group: "Analog & data items", name: "EngineeringUnits", dataType: "STRING", unit: null, description: "Engineering units label" },
+  { group: "Analog & data items", name: "EURangeLow", dataType: "FLOAT64", unit: null, description: "Engineering range lower bound" },
+  { group: "Analog & data items", name: "EURangeHigh", dataType: "FLOAT64", unit: null, description: "Engineering range upper bound" },
+  { group: "Analog & data items", name: "Definition", dataType: "STRING", unit: null, description: "Data item definition" },
+  { group: "State & access", name: "State", dataType: "UINT32", unit: null, description: "Multi-state value" },
+  { group: "State & access", name: "AccessLevel", dataType: "UINT8", unit: null, description: "OPC UA access-level flags" },
+  { group: "State & access", name: "UserAccessLevel", dataType: "UINT8", unit: null, description: "User-specific access-level flags" },
+  { group: "State & access", name: "Alias", dataType: "NODE_ID", unit: null, description: "Alias target NodeId" },
 ] as const;
 
-const PARAMETER_GROUPS = ["Measurements", "Control", "Device information", "Limits & diagnostics"] as const;
+const PARAMETER_GROUPS = ["Measurements", "Control", "Device information", "Limits & diagnostics", "Simulation", "Static data", "Analog & data items", "State & access"] as const;
+
+const STRUCTURE_TEMPLATES = [
+  {
+    group: "Simulation", name: "Simulation signals", description: "A folder with common generated signals.",
+    variables: [
+      { name: "Counter", dataType: "FLOAT64", description: "Monotonically increasing simulated value" },
+      { name: "Random", dataType: "FLOAT64", description: "Random simulated value" },
+      { name: "Sinusoid", dataType: "FLOAT64", description: "Sinusoidal simulated signal" },
+      { name: "Square", dataType: "FLOAT64", description: "Square-wave simulated signal" },
+      { name: "Triangle", dataType: "FLOAT64", description: "Triangle-wave simulated signal" },
+    ],
+  },
+  {
+    group: "Device information", name: "Device identity", description: "A folder with common device identity and status values.",
+    variables: [
+      { name: "DeviceId", dataType: "STRING", description: "Device identifier" },
+      { name: "SerialNumber", dataType: "STRING", description: "Device serial number" },
+      { name: "Manufacturer", dataType: "STRING", description: "Device manufacturer" },
+      { name: "FirmwareVersion", dataType: "STRING", description: "Installed firmware version" },
+      { name: "Status", dataType: "UINT16", description: "Device status code" },
+      { name: "Timestamp", dataType: "DATETIME", description: "Time of the last update" },
+    ],
+  },
+  {
+    group: "Analog & data items", name: "Analog item", description: "A folder with a value and engineering-range metadata.",
+    variables: [
+      { name: "Value", dataType: "FLOAT64", description: "Measured analog value" },
+      { name: "EURangeLow", dataType: "FLOAT64", description: "Engineering range lower bound" },
+      { name: "EURangeHigh", dataType: "FLOAT64", description: "Engineering range upper bound" },
+      { name: "EngineeringUnits", dataType: "STRING", description: "Engineering units label" },
+    ],
+  },
+] as const;
 
 const VALUE_RANKS = ["SCALAR", "ARRAY"] as const;
 const ACCESS_LEVELS = ["READ", "READ_WRITE"] as const;
 const UPCOMING_NODE_CLASSES = ["Object", "Method", "Reference", "DataType"] as const;
 
 type ValidationIssue = { nodeId: string; message: string };
+type BatchVariableRow = { id: string; name: string; dataType: string; unit: string; description: string };
 
 export function validateManualSchemaNodes(nodes: NodeDto[]): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
@@ -137,9 +189,10 @@ export function ManualSchemaEditorPage() {
   const [addDescription, setAddDescription] = useState("");
   const [selectedSuggestion, setSelectedSuggestion] = useState("");
   const [addParentId, setAddParentId] = useState<string | null>(null);
-  const [batchNodes, setBatchNodes] = useState("");
+  const [batchRows, setBatchRows] = useState<BatchVariableRow[]>([]);
   const [showLibrary, setShowLibrary] = useState(false);
   const [showBatch, setShowBatch] = useState(false);
+  const [catalogQuery, setCatalogQuery] = useState("");
   const [saveMode, setSaveMode] = useState<SaveMode | null>(null);
   const [saveAsName, setSaveAsName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -285,27 +338,39 @@ export function ManualSchemaEditorPage() {
     setExpandedIds((prev) => new Set(prev).add(parentId));
   }
 
+  function addStructureTemplate(template: (typeof STRUCTURE_TEMPLATES)[number]) {
+    const parentId = catalogParentId;
+    if (!parentId) return;
+    const folderId = newNodeId();
+    const folderPath = pathFor(parentId, template.name);
+    const folder: NodeDto = {
+      nodeId: folderId, parentId, path: folderPath, name: template.name, kind: "FOLDER",
+      dataType: null, valueRank: null, access: null, unit: null, description: template.description,
+    };
+    const variables: NodeDto[] = template.variables.map((variable) => ({
+      nodeId: newNodeId(), parentId: folderId, path: `${folderPath}/${variable.name}`, name: variable.name,
+      kind: "VARIABLE", dataType: variable.dataType, valueRank: "SCALAR", access: "READ",
+      unit: null, description: variable.description,
+    }));
+    setNodes((prev) => [...prev, folder, ...variables]);
+    setExpandedIds((prev) => new Set([...prev, parentId, folderId]));
+  }
+
+  function appendBatchRow() {
+    setBatchRows((prev) => [...prev, { id: newNodeId(), name: "", dataType: "FLOAT64", unit: "", description: "" }]);
+  }
+
   function addBatchNodes() {
-    const knownTypes = new Set<string>(DATA_TYPES);
-    const lines = batchNodes.split("\n").filter((line) => line.trim());
-    const parsed = lines.flatMap((line) => {
-      const [rawName, rawType] = line.split(/[\t,]/, 2).map((part) => part.trim());
-      return rawName && rawType && knownTypes.has(rawType)
-        ? [{ name: rawName, dataType: rawType }]
-        : [];
-    });
-    if (parsed.length === 0) return;
-    const created: NodeDto[] = parsed.map(({ name: nodeName, dataType }) => ({
-      nodeId: newNodeId(), parentId: addParentId, path: pathFor(addParentId, nodeName), name: nodeName,
-      kind: "VARIABLE", dataType, valueRank: "SCALAR", access: "READ", unit: null, description: null,
+    const completeRows = batchRows.filter((row) => row.name.trim());
+    if (completeRows.length === 0) return;
+    const created: NodeDto[] = completeRows.map((row) => ({
+      nodeId: newNodeId(), parentId: addParentId, path: pathFor(addParentId, row.name.trim()), name: row.name.trim(),
+      kind: "VARIABLE", dataType: row.dataType, valueRank: "SCALAR", access: "READ",
+      unit: row.unit.trim() || null, description: row.description.trim() || null,
     }));
     setNodes((prev) => [...prev, ...created]);
     if (addParentId) setExpandedIds((prev) => new Set(prev).add(addParentId));
-    setBatchNodes("");
-    const rejected = lines.length - parsed.length;
-    if (rejected > 0) {
-      push({ tone: "warning", title: `${rejected} row${rejected === 1 ? " was" : "s were"} skipped because the type is not supported.` });
-    }
+    setBatchRows([]);
   }
 
   function handleDeleteNode(nodeId: string) {
@@ -592,7 +657,7 @@ export function ManualSchemaEditorPage() {
               {showLibrary ? "Hide parameter catalog" : "Choose from parameter catalog"}
             </button>
             <button className="shell-text-action" type="button" onClick={() => setShowBatch((open) => !open)}>
-              {showBatch ? "Hide batch add" : "Add several variables"}
+              {showBatch ? "Hide multiple-variable form" : "Add multiple variables"}
             </button>
           </div>
         ) : null}
@@ -608,12 +673,27 @@ export function ManualSchemaEditorPage() {
                     : "Select the folder that should contain this parameter."}
                 </p>
               </div>
+              <label className="mt-4 block max-w-xl text-sm text-shell-muted">
+                Search known parameters and structures
+                <input
+                  aria-label="Search parameter catalog"
+                  className="shell-field mt-1 w-full"
+                  placeholder="For example: simulation, analog, status"
+                  value={catalogQuery}
+                  onChange={(event) => setCatalogQuery(event.target.value)}
+                />
+              </label>
               <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                {PARAMETER_GROUPS.map((group) => (
-                  <section key={group} className="rounded-md border border-shell-line bg-white p-3">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-shell-muted">{group}</p>
-                    <div className="mt-2 space-y-2">
-                      {SUGGESTED_VARIABLES.filter((variable) => variable.group === group).map((variable) => (
+                {PARAMETER_GROUPS.map((group) => {
+                  const query = catalogQuery.trim().toLowerCase();
+                  const matches = SUGGESTED_VARIABLES.filter((variable) => variable.group === group
+                    && (!query || `${variable.name} ${variable.dataType} ${variable.description}`.toLowerCase().includes(query)));
+                  if (matches.length === 0) return null;
+                  return (
+                    <section key={group} className="rounded-md border border-shell-line bg-white p-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-shell-muted">{group}</p>
+                      <div className="mt-2 space-y-2">
+                      {matches.map((variable) => (
                         <button
                           key={variable.name}
                           className="w-full rounded border border-shell-line px-3 py-2 text-left text-sm disabled:cursor-not-allowed disabled:opacity-45 hover:border-shell-accent"
@@ -625,9 +705,31 @@ export function ManualSchemaEditorPage() {
                           <span className="block text-xs text-shell-muted">{variable.dataType}{variable.unit ? ` · ${variable.unit}` : ""} — {variable.description}</span>
                         </button>
                       ))}
-                    </div>
-                  </section>
-                ))}
+                      </div>
+                    </section>
+                  );
+                })}
+              </div>
+              <div className="mt-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-shell-muted">Reusable structures</p>
+                <div className="mt-2 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {STRUCTURE_TEMPLATES.filter((template) => {
+                    const query = catalogQuery.trim().toLowerCase();
+                    return !query || `${template.group} ${template.name} ${template.description} ${template.variables.map((variable) => variable.name).join(" ")}`.toLowerCase().includes(query);
+                  }).map((template) => (
+                    <button
+                      key={template.name}
+                      className="rounded border border-shell-line px-3 py-3 text-left text-sm disabled:cursor-not-allowed disabled:opacity-45 hover:border-shell-accent"
+                      disabled={!catalogParentId}
+                      type="button"
+                      onClick={() => addStructureTemplate(template)}
+                    >
+                      <span className="block font-medium text-shell-ink">{template.name}</span>
+                      <span className="mt-1 block text-xs text-shell-muted">{template.description}</span>
+                      <span className="mt-2 block text-xs text-shell-muted">Adds a folder and {template.variables.length} variables.</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </section>
@@ -635,39 +737,54 @@ export function ManualSchemaEditorPage() {
 
         {access.isAdmin && folders.length > 0 && showBatch ? (
           <section className="mb-4 rounded-md border border-shell-line bg-white px-4 py-4">
-            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_16rem]">
+            <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <p className="text-sm font-medium text-shell-ink">Add several variables</p>
-                <p className="mt-1 text-xs text-shell-muted">
-                  Paste one variable per line as <code>Name, TYPE</code> or <code>Name[TAB]TYPE</code>.
-                </p>
-                <textarea
-                  aria-label="Variables to add"
-                  className="shell-field mt-3 min-h-28 w-full font-mono text-sm"
-                  placeholder={"Temperature, FLOAT64\nEnabled, BOOL"}
-                  value={batchNodes}
-                  onChange={(e) => setBatchNodes(e.target.value)}
-                />
+                <p className="text-sm font-medium text-shell-ink">Add multiple variables</p>
+                <p className="mt-1 text-xs text-shell-muted">Add one row per variable. Each name and type is entered separately.</p>
               </div>
-              <div className="flex flex-col gap-3">
-                <label className="flex flex-col gap-1.5 text-sm text-shell-muted">
-                  Parent
-                  <select
-                    aria-label="Parent folder for several variables"
-                    className="shell-field"
-                    value={addParentId ?? ""}
-                    onChange={(e) => setAddParentId(e.target.value || null)}
-                  >
-                    <option value="">Top level of server</option>
-                    {folders.map((folder) => (
-                      <option key={folder.nodeId} value={folder.nodeId}>{folder.path}</option>
-                    ))}
-                  </select>
-                </label>
-                <button className="shell-action" disabled={!batchNodes.trim()} type="button" onClick={addBatchNodes}>
-                  + Add variables
-                </button>
-              </div>
+              <label className="flex min-w-56 flex-col gap-1.5 text-sm text-shell-muted">
+                Parent
+                <select
+                  aria-label="Parent folder for multiple variables"
+                  className="shell-field"
+                  value={addParentId ?? ""}
+                  onChange={(e) => setAddParentId(e.target.value || null)}
+                >
+                  <option value="">Top level of server</option>
+                  {folders.map((folder) => (
+                    <option key={folder.nodeId} value={folder.nodeId}>{folder.path}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div className="mt-4 space-y-3">
+              {batchRows.map((row, index) => (
+                <div key={row.id} className="grid gap-2 rounded border border-shell-line p-3 md:grid-cols-[minmax(10rem,1fr)_11rem_minmax(8rem,1fr)_minmax(10rem,1fr)_auto]">
+                  <label className="text-xs text-shell-muted">Name
+                    <input aria-label={`Variable ${index + 1} name`} className="shell-field mt-1 w-full" value={row.name}
+                      onChange={(e) => setBatchRows((prev) => prev.map((candidate) => candidate.id === row.id ? { ...candidate, name: e.target.value } : candidate))} />
+                  </label>
+                  <label className="text-xs text-shell-muted">Type
+                    <select aria-label={`Variable ${index + 1} type`} className="shell-field mt-1 w-full" value={row.dataType}
+                      onChange={(e) => setBatchRows((prev) => prev.map((candidate) => candidate.id === row.id ? { ...candidate, dataType: e.target.value } : candidate))}>
+                      {DATA_TYPES.map((type) => <option key={type} value={type}>{typeLabel(type)}</option>)}
+                    </select>
+                  </label>
+                  <label className="text-xs text-shell-muted">Unit <span className="font-normal">(optional)</span>
+                    <input aria-label={`Variable ${index + 1} unit`} className="shell-field mt-1 w-full" value={row.unit}
+                      onChange={(e) => setBatchRows((prev) => prev.map((candidate) => candidate.id === row.id ? { ...candidate, unit: e.target.value } : candidate))} />
+                  </label>
+                  <label className="text-xs text-shell-muted">Description <span className="font-normal">(optional)</span>
+                    <input aria-label={`Variable ${index + 1} description`} className="shell-field mt-1 w-full" value={row.description}
+                      onChange={(e) => setBatchRows((prev) => prev.map((candidate) => candidate.id === row.id ? { ...candidate, description: e.target.value } : candidate))} />
+                  </label>
+                  <button className="shell-text-action self-end" type="button" onClick={() => setBatchRows((prev) => prev.filter((candidate) => candidate.id !== row.id))}>Remove</button>
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button className="shell-action" type="button" onClick={appendBatchRow}>+ Add row</button>
+              <button className="shell-action" disabled={!batchRows.some((row) => row.name.trim())} type="button" onClick={addBatchNodes}>Add variables</button>
             </div>
           </section>
         ) : null}

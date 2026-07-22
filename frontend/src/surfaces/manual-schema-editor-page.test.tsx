@@ -191,6 +191,35 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
     });
   });
 
+  it("filters the catalog and inserts a reusable simulation structure", async () => {
+    mockLoadManualSchemaById.mockResolvedValueOnce(schemaWithFolder);
+    renderPage();
+
+    await waitFor(() => screen.getByText("Reactor"));
+    fireEvent.click(screen.getByText("Reactor"));
+    fireEvent.click(screen.getByRole("button", { name: /Choose from parameter catalog/i }));
+    fireEvent.change(screen.getByLabelText("Search parameter catalog"), { target: { value: "simulation" } });
+    fireEvent.click(screen.getByRole("button", { name: /Simulation signals.*folder with common generated signals/i }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByLabelText(/Save in this schema/));
+    fireEvent.click(screen.getAllByRole("button", { name: "Save" })[1]);
+
+    await waitFor(() => {
+      expect(mockUpdateManualSchema).toHaveBeenCalledWith(
+        "proj-1",
+        "ms-1",
+        expect.objectContaining({
+          nodes: expect.arrayContaining([
+            expect.objectContaining({ name: "Simulation signals", parentId: "f1", kind: "FOLDER" }),
+            expect.objectContaining({ name: "Counter", dataType: "FLOAT64" }),
+            expect.objectContaining({ name: "Sinusoid", dataType: "FLOAT64" }),
+          ]),
+        }),
+      );
+    });
+  });
+
   it("lets a new node be placed under any folder, not only the selected tree node", async () => {
     mockLoadManualSchemaById.mockResolvedValueOnce(schemaWithFolder);
     renderPage();
@@ -231,17 +260,20 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
     expect(screen.getByDisplayValue("Process temperature")).not.toBeNull();
   });
 
-  it("adds several typed sibling variables from pasted rows", async () => {
+  it("adds several typed sibling variables from editable rows", async () => {
     mockLoadManualSchemaById.mockResolvedValueOnce(schemaWithFolder);
     renderPage();
 
     await waitFor(() => screen.getByText("Reactor"));
-    fireEvent.click(screen.getByRole("button", { name: /Add several variables/i }));
-    fireEvent.change(screen.getByLabelText("Parent folder for several variables"), { target: { value: "f1" } });
-    fireEvent.change(screen.getByLabelText("Variables to add"), {
-      target: { value: "Pressure, FLOAT64\nEnabled, BOOL" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: /Add variables/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Add multiple variables" }));
+    fireEvent.change(screen.getByLabelText("Parent folder for multiple variables"), { target: { value: "f1" } });
+    fireEvent.click(screen.getByRole("button", { name: "+ Add row" }));
+    fireEvent.click(screen.getByRole("button", { name: "+ Add row" }));
+    fireEvent.change(screen.getByLabelText("Variable 1 name"), { target: { value: "Pressure" } });
+    fireEvent.change(screen.getByLabelText("Variable 2 name"), { target: { value: "Enabled" } });
+    fireEvent.change(screen.getByLabelText("Variable 2 type"), { target: { value: "BOOL" } });
+    fireEvent.change(screen.getByLabelText("Variable 1 description"), { target: { value: "Process pressure" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add variables" }));
 
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     fireEvent.click(screen.getByLabelText(/Save in this schema/));
@@ -253,7 +285,7 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
         "ms-1",
         expect.objectContaining({
           nodes: expect.arrayContaining([
-            expect.objectContaining({ name: "Pressure", parentId: "f1", dataType: "FLOAT64" }),
+            expect.objectContaining({ name: "Pressure", parentId: "f1", dataType: "FLOAT64", description: "Process pressure" }),
             expect.objectContaining({ name: "Enabled", parentId: "f1", dataType: "BOOL" }),
           ]),
         }),
