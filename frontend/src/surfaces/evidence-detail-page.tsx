@@ -4,6 +4,7 @@ import { apiFetch, authHeaders } from "../api/client";
 import { resolveAccess } from "../shell/access-policy";
 import { useArtifactsStore } from "../shell/artifacts-store";
 import { useDataSourcesStore } from "../shell/data-sources-store";
+import { useScenariosStore } from "../shell/scenarios-store";
 import { useShellStore } from "../shell/shell-store";
 import { SharedStatePanel } from "../ui/shared-state-panel";
 import { StatusBadge } from "../ui/status-badge";
@@ -80,6 +81,8 @@ export function EvidenceDetailPage() {
   const access = resolveAccess(accessMode, sharedRole);
   const dataSources = useDataSourcesStore((state) => state.dataSources);
   const artifacts = useArtifactsStore((state) => state.artifacts);
+  const scenarios = useScenariosStore((state) => state.scenarios);
+  const loadScenarios = useScenariosStore((state) => state.loadScenarios);
 
   const [item, setItem] = useState<EvidenceItem | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -122,6 +125,10 @@ export function EvidenceDetailPage() {
       cancelled = true;
     };
   }, [currentProjectId, evidenceId]);
+
+  useEffect(() => {
+    if (currentProjectId) loadScenarios(currentProjectId);
+  }, [currentProjectId, loadScenarios]);
 
   // Trigger export dialog from URL param
   useEffect(() => {
@@ -374,9 +381,13 @@ export function EvidenceDetailPage() {
               <DetailRow label="Completeness" value={evidenceCompletenessLabel(item.completeness)} />
             ) : null}
             <DetailRow label="Run ID" value={item.runId} />
-            {item.scenarioId ? (
-              <DetailLinkRow label="Scenario" href={`/scenarios/${item.scenarioId}`} value={item.scenarioId} />
-            ) : null}
+            {item.scenarioId ? (() => {
+              const scenario = scenarios.find((s) => s.id === item.scenarioId);
+              const label = scenario?.name ?? item.scenarioId;
+              return (
+                <DetailLinkRow label="Scenario" href={`/scenarios/${item.scenarioId}`} value={label} />
+              );
+            })() : null}
             {item.recordingId ? (() => {
               const artifact = artifacts.find((a) => a.id === item.recordingId);
               const label = artifact?.name ?? item.recordingId;

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiFetch } from "../api/client";
 import { resolveAccess } from "../shell/access-policy";
+import { useDataSourcesStore } from "../shell/data-sources-store";
 import { useShellStore } from "../shell/shell-store";
 import { SharedStatePanel } from "../ui/shared-state-panel";
 import {
@@ -85,6 +86,8 @@ export function EvidenceListPage() {
   const sharedRole = useShellStore((state) => state.sharedRole);
   const currentProjectId = useShellStore((state) => state.currentProjectId);
   const access = resolveAccess(accessMode, sharedRole);
+  const dataSources = useDataSourcesStore((state) => state.dataSources);
+  const loadDataSources = useDataSourcesStore((state) => state.loadDataSources);
 
   const [items, setItems] = useState<EvidenceItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -128,6 +131,10 @@ export function EvidenceListPage() {
       cancelled = true;
     };
   }, [currentProjectId]);
+
+  useEffect(() => {
+    if (currentProjectId) loadDataSources(currentProjectId);
+  }, [currentProjectId, loadDataSources]);
 
   const initiatorOptions = [
     { label: "All initiators", value: "all" },
@@ -249,15 +256,9 @@ export function EvidenceListPage() {
       sortable: false,
       cell: (row) => {
         const ids = row.sourceIds ?? [];
-        return (
-          <span className="text-sm text-shell-ink">
-            {ids.length > 0
-              ? ids.length === 1
-                ? ids[0]
-                : `${ids.length} sources`
-              : "—"}
-          </span>
-        );
+        if (ids.length === 0) return <span className="text-sm text-shell-ink">—</span>;
+        const names = ids.map((id) => dataSources.find((d) => d.id === id)?.name ?? id);
+        return <span className="text-sm text-shell-ink">{names.join(", ")}</span>;
       },
       className: "w-[11rem]",
     },
