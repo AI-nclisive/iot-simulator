@@ -19,6 +19,7 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -76,23 +77,43 @@ public class ScenarioRunService {
 
         DeterministicSettings settings = parseSettings(scenario.deterministicSettings());
         RunRow run = runs.create(projectId, "SCENARIO", trig, actor, sourceIds, scenarioId, null);
+        Instant startedAt = Instant.now();
         List<StepOutcome> outcomes = new ArrayList<>();
+        EvidenceRow ev = null;
         try {
             runs.start(run.id(), now());
-            EvidenceRow ev = evidence.create(projectId, run.id(), actor);
+            ev = evidence.create(projectId, run.id(), actor);
             runs.linkEvidence(run.id(), ev.id());
-            evidence.updateManifest(ev.id(), manifest(scenario));
+            evidence.updateManifest(ev.id(),
+                    manifest(run.id(), trig, actor, sourceIds, scenario, startedAt, null));
 
             for (ScenarioStepRow step : scenario.steps()) {
                 events.append(projectId, step.targetSourceId(), run.id(), "SCENARIO_STEP", now(),
                         stepPayload(step));
                 outcomes.add(execute(projectId, step, run.id(), settings, actor));
             }
+            evidence.updateManifest(ev.id(),
+                    manifest(run.id(), trig, actor, sourceIds, scenario, startedAt, Instant.now()));
             RunRow ended = runs.end(run.id(), "COMPLETED", now());
             return new ScenarioRunSummary(run.id(), ev.id(), ended.state(), outcomes);
         } catch (RuntimeException e) {
+            stampFailure(ev, run.id(), trig, actor, sourceIds, scenario, startedAt);
             runs.end(run.id(), "FAILED", now());
             throw e;
+        }
+    }
+
+    /** Best-effort endedAt stamp so a failed run still shows its end time in evidence. */
+    private void stampFailure(EvidenceRow ev, String runId, String trigger, String actor,
+            List<String> sourceIds, ScenarioRow scenario, Instant startedAt) {
+        if (ev == null) {
+            return;
+        }
+        try {
+            evidence.updateManifest(ev.id(),
+                    manifest(runId, trigger, actor, sourceIds, scenario, startedAt, Instant.now()));
+        } catch (RuntimeException ignored) {
+            // advisory only; must not mask the original failure
         }
     }
 
@@ -150,12 +171,21 @@ public class ScenarioRunService {
         return new DeterministicSettings(seed, start);
     }
 
-    private String manifest(ScenarioRow scenario) {
-        return json.writeValueAsString(Map.of(
-                "scenario", true,
-                "scenarioId", scenario.id(),
-                "name", scenario.name(),
-                "stepCount", scenario.steps().size()));
+    private String manifest(String runId, String trigger, String initiator, List<String> sourceIds,
+            ScenarioRow scenario, Instant startedAt, Instant endedAt) {
+        LinkedHashMap<String, Object> m = new LinkedHashMap<>();
+        m.put("kind", "SCENARIO");
+        m.put("runId", runId);
+        m.put("trigger", trigger);
+        m.put("initiator", initiator);
+        m.put("startedAt", startedAt.toString());
+        m.put("endedAt", endedAt != null ? endedAt.toString() : null);
+        m.put("sourceIds", sourceIds);
+        m.put("scenarioId", scenario.id());
+        m.put("recordingId", null);
+        m.put("name", scenario.name());
+        m.put("stepCount", scenario.steps().size());
+        return json.writeValueAsString(m);
     }
 
     private String stepPayload(ScenarioStepRow step) {

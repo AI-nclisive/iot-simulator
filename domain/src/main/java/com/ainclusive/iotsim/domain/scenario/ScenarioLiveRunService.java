@@ -18,6 +18,7 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -119,11 +120,13 @@ public class ScenarioLiveRunService {
 
         DeterministicSettings settings = parseSettings(scenario.deterministicSettings());
         RunRow run = runs.create(projectId, "SCENARIO", trig, actor, sourceIds, scenarioId, null);
+        Instant startedAt = Instant.now();
         try {
             runs.start(run.id(), now());
             EvidenceRow ev = evidence.create(projectId, run.id(), actor);
             runs.linkEvidence(run.id(), ev.id());
-            evidence.updateManifest(ev.id(), manifest(scenario));
+            evidence.updateManifest(ev.id(),
+                    manifest(run.id(), trig, actor, sourceIds, scenario, startedAt, null));
 
             // Capture final locals for the lambda
             final String runId = run.id();
@@ -137,7 +140,8 @@ public class ScenarioLiveRunService {
             registry.put(runId, new ScenarioExecution(runId, evidenceId, null));
 
             Future<?> future = executor.submit(() ->
-                    executeSteps(projectId, runId, scenario, finalSettings, finalActor));
+                    executeSteps(projectId, runId, evidenceId, scenario, finalSettings, finalActor,
+                            trig, sourceIds, startedAt));
 
             // Replace the placeholder with the real future. If stopIfLive() removed the
             // placeholder between registry.put and here, cancel the just-submitted task.
@@ -148,8 +152,24 @@ public class ScenarioLiveRunService {
             }
             return new ScenarioLiveRunSummary(runId, evidenceId);
         } catch (RuntimeException e) {
+            stampFailure(run.id(), trig, actor, sourceIds, scenario, startedAt);
             runs.end(run.id(), "FAILED", now());
             throw e;
+        }
+    }
+
+    /** Best-effort endedAt stamp so a failed run still shows its end time in evidence. */
+    private void stampFailure(String runId, String trigger, String actor, List<String> sourceIds,
+            ScenarioRow scenario, Instant startedAt) {
+        try {
+            EvidenceRow ev = evidence.findByRun(runId).orElse(null);
+            if (ev == null) {
+                return;
+            }
+            evidence.updateManifest(ev.id(),
+                    manifest(runId, trigger, actor, sourceIds, scenario, startedAt, Instant.now()));
+        } catch (RuntimeException ignored) {
+            // advisory only; must not mask the original failure
         }
     }
 
@@ -178,8 +198,9 @@ public class ScenarioLiveRunService {
 
     // ---- background step execution ----
 
-    private void executeSteps(String projectId, String runId, ScenarioRow scenario,
-            DeterministicSettings settings, String actor) {
+    private void executeSteps(String projectId, String runId, String evidenceId, ScenarioRow scenario,
+            DeterministicSettings settings, String actor, String trigger, List<String> sourceIds,
+            Instant startedAt) {
         List<String> startedSources = new ArrayList<>();
         List<ActiveFault> startedFaults = new ArrayList<>();
         boolean completed = false;
@@ -188,7 +209,7 @@ public class ScenarioLiveRunService {
                 if (Thread.interrupted()) {
                     teardownFaults(startedFaults);
                     teardown(projectId, startedSources);
-                    safeEnd(runId, "STOPPED");
+                    safeEnd(runId, evidenceId, "STOPPED", trigger, actor, sourceIds, scenario, startedAt);
                     safeNotify(() -> stepListener.onRunFinished(projectId, runId, "STOPPED"));
                     registry.remove(runId);
                     return;
@@ -208,29 +229,36 @@ public class ScenarioLiveRunService {
             if (Thread.currentThread().isInterrupted() || e.getCause() instanceof InterruptedException) {
                 teardownFaults(startedFaults);
                 teardown(projectId, startedSources);
-                safeEnd(runId, "STOPPED");
+                safeEnd(runId, evidenceId, "STOPPED", trigger, actor, sourceIds, scenario, startedAt);
                 stepListener.onRunFinished(projectId, runId, "STOPPED");
             } else {
                 teardownFaults(startedFaults);
                 teardown(projectId, startedSources);
-                safeEnd(runId, "FAILED");
+                safeEnd(runId, evidenceId, "FAILED", trigger, actor, sourceIds, scenario, startedAt);
                 stepListener.onRunFinished(projectId, runId, "FAILED");
             }
         } catch (RuntimeException e) {
             teardownFaults(startedFaults);
             teardown(projectId, startedSources);
-            safeEnd(runId, "FAILED");
+            safeEnd(runId, evidenceId, "FAILED", trigger, actor, sourceIds, scenario, startedAt);
             stepListener.onRunFinished(projectId, runId, "FAILED");
         } finally {
             if (completed) {
-                safeEnd(runId, "COMPLETED");
+                safeEnd(runId, evidenceId, "COMPLETED", trigger, actor, sourceIds, scenario, startedAt);
                 stepListener.onRunFinished(projectId, runId, "COMPLETED");
             }
             registry.remove(runId);
         }
     }
 
-    private void safeEnd(String runId, String state) {
+    private void safeEnd(String runId, String evidenceId, String state, String trigger, String actor,
+            List<String> sourceIds, ScenarioRow scenario, Instant startedAt) {
+        try {
+            evidence.updateManifest(evidenceId,
+                    manifest(runId, trigger, actor, sourceIds, scenario, startedAt, Instant.now()));
+        } catch (RuntimeException ignored) {
+            // advisory only; must not block the terminal-state write below
+        }
         try {
             runs.end(runId, state, now());
         } catch (RuntimeException ignored) {
@@ -319,12 +347,21 @@ public class ScenarioLiveRunService {
         return new DeterministicSettings(seed, start);
     }
 
-    private String manifest(ScenarioRow scenario) {
-        return json.writeValueAsString(Map.of(
-                "scenario", true,
-                "scenarioId", scenario.id(),
-                "name", scenario.name(),
-                "stepCount", scenario.steps().size()));
+    private String manifest(String runId, String trigger, String initiator, List<String> sourceIds,
+            ScenarioRow scenario, Instant startedAt, Instant endedAt) {
+        LinkedHashMap<String, Object> m = new LinkedHashMap<>();
+        m.put("kind", "SCENARIO");
+        m.put("runId", runId);
+        m.put("trigger", trigger);
+        m.put("initiator", initiator);
+        m.put("startedAt", startedAt.toString());
+        m.put("endedAt", endedAt != null ? endedAt.toString() : null);
+        m.put("sourceIds", sourceIds);
+        m.put("scenarioId", scenario.id());
+        m.put("recordingId", null);
+        m.put("name", scenario.name());
+        m.put("stepCount", scenario.steps().size());
+        return json.writeValueAsString(m);
     }
 
     private String stepPayload(ScenarioStepRow step) {

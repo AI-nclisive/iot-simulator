@@ -79,6 +79,20 @@ class SyntheticRunServiceTest {
         assertThat(run.sourceIds()).containsExactly(SOURCE);
         EvidenceRow ev = evidence.byId.get(summary.evidenceId());
         assertThat(ev.manifestJson()).contains("\"seed\":5");
+        assertThat(ev.manifestJson()).contains("\"kind\":\"SYNTHETIC\"");
+        assertThat(ev.manifestJson()).contains("\"runId\":\"" + summary.runId() + "\"");
+        assertThat(ev.manifestJson()).doesNotContain("\"endedAt\":null");
+    }
+
+    @Test
+    void runtimeFailureStampsEndedAtOnEvidenceManifest() {
+        SyntheticRunService service = new SyntheticRunService(
+                new FakeDataSources("SYNTHETIC", json.writeValueAsString(config(1L))),
+                new EmptySchemas(), new ThrowingRuntime(), runs, evidence, json, FIXED);
+        assertThatThrownBy(() -> service.run(PROJECT, SOURCE, 1000))
+                .isInstanceOf(IllegalStateException.class);
+        EvidenceRow ev = evidence.byId.values().iterator().next();
+        assertThat(ev.manifestJson()).doesNotContain("\"endedAt\":null");
     }
 
     @Test

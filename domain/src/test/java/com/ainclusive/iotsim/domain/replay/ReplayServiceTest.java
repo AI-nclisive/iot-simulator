@@ -97,6 +97,8 @@ class ReplayServiceTest {
         // recordingId and seed are seeded so export assembly can reproduce the run.
         assertThat(ev.manifestJson()).contains("\"recordingId\":\"" + RECORDING + "\"");
         assertThat(ev.manifestJson()).contains("\"seed\":");
+        assertThat(ev.manifestJson()).contains("\"kind\":\"REPLAY\"");
+        assertThat(ev.manifestJson()).doesNotContain("\"endedAt\":null");
     }
 
     @Test
@@ -108,6 +110,8 @@ class ReplayServiceTest {
 
         assertThat(runs.byId.values()).singleElement()
                 .extracting(RunRow::state).isEqualTo("FAILED");
+        EvidenceRow ev = evidence.byId.values().iterator().next();
+        assertThat(ev.manifestJson()).doesNotContain("\"endedAt\":null");
     }
 
     @Test

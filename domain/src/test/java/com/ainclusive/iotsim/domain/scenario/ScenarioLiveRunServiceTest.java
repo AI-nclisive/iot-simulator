@@ -31,6 +31,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -181,6 +182,12 @@ class ScenarioLiveRunServiceTest {
         verify(runs).end(eq("run-1"), eq("COMPLETED"), any());
         verify(dataSources).start(eq(PROJECT), eq(SOURCE), anyString());
         verify(dataSources).stop(eq(PROJECT), eq(SOURCE), anyString());
+
+        ArgumentCaptor<String> manifests = ArgumentCaptor.forClass(String.class);
+        verify(evidence, times(2)).updateManifest(eq("ev-1"), manifests.capture());
+        assertThat(manifests.getAllValues().get(0)).contains("\"endedAt\":null");
+        assertThat(manifests.getAllValues().get(1)).doesNotContain("\"endedAt\":null");
+        assertThat(manifests.getAllValues().get(1)).contains("\"kind\":\"SCENARIO\"");
     }
 
     @Test
@@ -199,6 +206,10 @@ class ScenarioLiveRunServiceTest {
 
         assertThat(summary.runId()).isEqualTo("run-1");
         verify(runs).end(eq("run-1"), eq("FAILED"), any());
+
+        ArgumentCaptor<String> manifests = ArgumentCaptor.forClass(String.class);
+        verify(evidence, times(2)).updateManifest(eq("ev-1"), manifests.capture());
+        assertThat(manifests.getAllValues().get(1)).doesNotContain("\"endedAt\":null");
     }
 
     @Test

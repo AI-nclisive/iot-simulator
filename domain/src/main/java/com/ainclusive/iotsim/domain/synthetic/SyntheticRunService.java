@@ -14,12 +14,13 @@ import com.ainclusive.iotsim.protocolmodel.DeterminismContext;
 import com.ainclusive.iotsim.protocolmodel.DeterministicSettings;
 import com.ainclusive.iotsim.protocolmodel.NeutralValue;
 import java.time.Clock;
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import tools.jackson.core.JacksonException;
@@ -100,21 +101,41 @@ public class SyntheticRunService {
                 : new DeterministicSettings(config.seed(), clock.instant());
 
         RunRow run = runs.create(projectId, "SYNTHETIC", trigger, initiator, List.of(dataSourceId), null, parentRunId);
+        Instant startedAt = clock.instant();
+        EvidenceRow evidenceRow = null;
         try {
             runs.start(run.id(), now());
-            EvidenceRow evidenceRow = evidence.create(projectId, run.id(), "local");
+            evidenceRow = evidence.create(projectId, run.id(), "local");
             runs.linkEvidence(run.id(), evidenceRow.id());
+            evidence.updateManifest(evidenceRow.id(), manifest(run.id(), trigger, initiator, dataSourceId,
+                    startedAt, null, settings.seed(), 0));
 
             List<NeutralValue> values = generate(variables, settings, durationMs);
-            evidence.updateManifest(evidenceRow.id(), manifest(settings.seed(), values.size()));
 
             runtime.start(dataSourceId, RuntimeStartSpecs.of(schemas, source));
             long applied = runtime.applyValues(dataSourceId, values);
+            evidence.updateManifest(evidenceRow.id(), manifest(run.id(), trigger, initiator, dataSourceId,
+                    startedAt, clock.instant(), settings.seed(), values.size()));
             runs.end(run.id(), "COMPLETED", now());
             return new SyntheticRunSummary(dataSourceId, applied, settings.seed(), run.id(), evidenceRow.id());
         } catch (RuntimeException e) {
+            stampFailure(evidenceRow, run.id(), trigger, initiator, dataSourceId, startedAt, settings.seed());
             runs.end(run.id(), "FAILED", now());
             throw e;
+        }
+    }
+
+    /** Best-effort endedAt stamp so a failed run still shows its end time in evidence. */
+    private void stampFailure(EvidenceRow evidenceRow, String runId, String trigger, String initiator,
+            String dataSourceId, Instant startedAt, long seed) {
+        if (evidenceRow == null) {
+            return;
+        }
+        try {
+            evidence.updateManifest(evidenceRow.id(),
+                    manifest(runId, trigger, initiator, dataSourceId, startedAt, clock.instant(), seed, 0));
+        } catch (RuntimeException ignored) {
+            // advisory only; must not mask the original failure
         }
     }
 
@@ -138,9 +159,22 @@ public class SyntheticRunService {
         return values;
     }
 
-    /** Inspectable evidence seed: the effective seed + value count (no recordingId for synthetic). */
-    private String manifest(long seed, int valueCount) {
-        return json.writeValueAsString(Map.of("synthetic", true, "seed", seed, "valueCount", valueCount));
+    /** Full run metadata + effective seed/value count (no recordingId for synthetic). */
+    private String manifest(String runId, String trigger, String initiator, String dataSourceId,
+            Instant startedAt, Instant endedAt, long seed, long valueCount) {
+        LinkedHashMap<String, Object> m = new LinkedHashMap<>();
+        m.put("kind", "SYNTHETIC");
+        m.put("runId", runId);
+        m.put("trigger", trigger);
+        m.put("initiator", initiator);
+        m.put("startedAt", startedAt.toString());
+        m.put("endedAt", endedAt != null ? endedAt.toString() : null);
+        m.put("sourceIds", List.of(dataSourceId));
+        m.put("scenarioId", null);
+        m.put("recordingId", null);
+        m.put("seed", seed);
+        m.put("valueCount", valueCount);
+        return json.writeValueAsString(m);
     }
 
     private SyntheticConfig parseConfig(String runtimeConfig) {
