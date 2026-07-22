@@ -1238,6 +1238,11 @@ Parallel execution:
   Surface: `Synthetic profile` step — per-node pattern editor.
   Work includes: for boolean nodes, drop the Add/Remove list machinery for `ENUM_CYCLE`/`RANDOM_CHOICE` (mirroring the existing simple True/False `<select>` already used for `CONSTANT`), while non-boolean value-list types keep their current editor unchanged.
   Done when: BOOL nodes no longer show Add/Remove controls for alternating/random patterns; wire format (`values: ["true","false"]`) is unchanged; typecheck + vitest + build green.
+- [x] `UI-500` ✅ Evidence list — resolve source/scenario names instead of raw UUIDs
+  Goal: the Evidence list page shows a raw UUID for a single source and just a count ("N sources") for multiple, with no name resolution, unlike the Evidence detail page (IS-159) which already resolves sourceIds and recordingId to names.
+  Surface: `Evidence` — list page, plus the detail page's remaining raw `scenarioId`.
+  Work includes: resolve `sourceIds` to source names via `useDataSourcesStore` on the list page (listing all names for multi-source rows); resolve `scenarioId` to a scenario name on the detail page; raw ID remains an acceptable fallback when the referenced entity can't be found.
+  Done when: list and detail pages show human-readable names wherever the referenced entity still exists; typecheck + vitest + build green.
 
 ## Recommended Sequence
 

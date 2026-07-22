@@ -17,8 +17,9 @@ const SOURCE_ID = "src-001";
 
 // ── hoisted mocks ──────────────────────────────────────────────────────────────
 
-const { mockApiFetch } = vi.hoisted(() => ({
+const { mockApiFetch, mockScenarios } = vi.hoisted(() => ({
   mockApiFetch: vi.fn(),
+  mockScenarios: { current: [] as { id: string; name: string }[] },
 }));
 
 vi.mock("../api/client", () => ({
@@ -41,9 +42,19 @@ vi.mock("../shell/access-policy", () => ({
   }),
 }));
 
+// UI-500: scenarioId resolves to the scenario's name via useScenariosStore, mirroring
+// the existing source/recording name resolution — a plain, controllable fake here
+// keeps the fallback-to-raw-ID case (unmatched scenario) and the resolved-name case
+// both testable without pulling in the real store's fetch/state machinery.
+vi.mock("../shell/scenarios-store", () => ({
+  useScenariosStore: (selector: (s: Record<string, unknown>) => unknown) =>
+    selector({ scenarios: mockScenarios.current, loadScenarios: () => Promise.resolve() }),
+}));
+
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  mockScenarios.current = [];
 });
 
 let EvidenceDetailPage: typeof import("./evidence-detail-page").EvidenceDetailPage;
@@ -94,6 +105,17 @@ describe("EvidenceDetailPage — navigation links (UI-464)", () => {
 
     await waitFor(() => {
       const link = screen.getByRole("link", { name: SCENARIO_ID });
+      expect(link.getAttribute("href")).toBe(`/scenarios/${SCENARIO_ID}`);
+    });
+  });
+
+  it("resolves the scenario link text to its name when the scenario is known (UI-500)", async () => {
+    mockScenarios.current = [{ id: SCENARIO_ID, name: "Startup sequence" }];
+    mockApiFetch.mockResolvedValue(makeDto());
+    renderPage();
+
+    await waitFor(() => {
+      const link = screen.getByRole("link", { name: "Startup sequence" });
       expect(link.getAttribute("href")).toBe(`/scenarios/${SCENARIO_ID}`);
     });
   });
