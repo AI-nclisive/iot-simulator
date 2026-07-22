@@ -52,7 +52,7 @@ public record PatternSpec(
     /** Pre-IS-168 shape, for callers that never carry a non-numeric CONSTANT. */
     public PatternSpec(String type, Double value, Double min, Double max, Long periodMs,
             Double volatility, List<Object> values, List<StepSpec> steps) {
-        this(type, value, min, max, periodMs, volatility, values, steps, null, null, null, null);
+        this(type, value, min, max, periodMs, volatility, values, steps, null, null, null, null, null);
     }
 
     /** One step of a STEP_SEQUENCE: a value held for {@code holdMs} milliseconds. */
