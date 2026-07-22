@@ -166,6 +166,9 @@ class ReplayLiveRunServiceTest {
         svc.tickAll();
         assertThat(runtime.applied).hasSize(3);
         assertThat(runs.byId.get(summary.runId()).state()).isEqualTo("COMPLETED");
+        // IS-179: auto-completion must stamp a real endedAt, not null.
+        assertThat(evidence.byId.get(summary.evidenceId()).manifestJson())
+                .doesNotContain("\"endedAt\":null");
     }
 
     @Test
@@ -182,6 +185,10 @@ class ReplayLiveRunServiceTest {
         // Auto-complete must stop the runtime (unlike stopIfLive, which leaves it to RunService).
         assertThat(runtime.state(SOURCE)).isEqualTo("STOPPED");
         assertThat(evidence.byId.get(summary.evidenceId()).manifestJson()).contains("\"valueCount\":3");
+        // IS-179: auto-completion must stamp a real endedAt, not null.
+        assertThat(evidence.byId.get(summary.evidenceId()).manifestJson())
+                .doesNotContain("\"endedAt\":null")
+                .contains("\"endedAt\":\"" + wall.instant() + "\"");
 
         // A subsequent tick is a no-op — removed from registry.
         svc.tickAll();
@@ -197,11 +204,16 @@ class ReplayLiveRunServiceTest {
         svc.tickAll();
         assertThat(runtime.applied).hasSize(1);
 
+        wall.advance(Duration.ofMillis(1)); // so stop's endedAt is distinguishable from startedAt
         boolean wasLive = svc.stopIfLive(summary.runId());
 
         assertThat(wasLive).isTrue();
         // Evidence stamped with current cursor position.
         assertThat(evidence.byId.get(summary.evidenceId()).manifestJson()).contains("\"valueCount\":1");
+        // IS-179: manual stop must stamp the real endedAt, not null.
+        assertThat(evidence.byId.get(summary.evidenceId()).manifestJson())
+                .doesNotContain("\"endedAt\":null")
+                .contains("\"endedAt\":\"" + wall.instant() + "\"");
         // Run NOT ended here — RunService owns that on manual stop.
         assertThat(runs.byId.get(summary.runId()).state()).isEqualTo("RUNNING");
         // Runtime NOT stopped — RunService owns that too.

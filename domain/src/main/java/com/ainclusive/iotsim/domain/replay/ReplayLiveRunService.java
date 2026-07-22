@@ -191,7 +191,7 @@ public class ReplayLiveRunService {
         if (live == null) {
             return false;
         }
-        softStampEvidence(live);
+        softStampEvidence(live, wallClock.instant());
         return true;
     }
 
@@ -200,7 +200,7 @@ public class ReplayLiveRunService {
             return; // already finalized/stopped
         }
         runtime.stop(live.dataSourceId);
-        softStampEvidence(live);
+        softStampEvidence(live, wallClock.instant());
         runs.end(live.runId, terminalState, now());
     }
 
@@ -208,11 +208,11 @@ public class ReplayLiveRunService {
      * Best-effort evidence stamp. Swallowed on failure — the value count is advisory,
      * and a transient error must not block the terminal-state transition.
      */
-    private void softStampEvidence(LiveReplay live) {
+    private void softStampEvidence(LiveReplay live, Instant endedAt) {
         try {
             evidence.updateManifest(live.evidenceId,
                     manifest(live.runId, live.trigger, live.initiator, live.dataSourceId,
-                            live.startedAt, null, live.recordingId, live.settings, live.cursor));
+                            live.startedAt, endedAt, live.recordingId, live.settings, live.cursor));
         } catch (RuntimeException ignored) {
             // advisory count only
         }

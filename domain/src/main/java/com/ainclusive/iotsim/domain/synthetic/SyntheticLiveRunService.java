@@ -158,7 +158,7 @@ public class SyntheticLiveRunService {
         if (live == null) {
             return false;
         }
-        stampEvidence(live, null);
+        stampEvidence(live, wallClock.instant());
         return true;
     }
 

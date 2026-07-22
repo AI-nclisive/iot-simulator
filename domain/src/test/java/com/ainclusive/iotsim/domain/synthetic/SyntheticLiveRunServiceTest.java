@@ -148,10 +148,15 @@ class SyntheticLiveRunServiceTest {
         wall.advance(Duration.ofMillis(500));
         service.tickAll(); // 7 emitted
 
+        wall.advance(Duration.ofMillis(1)); // so stop's endedAt is distinguishable from startedAt
         boolean wasLive = service.stopIfLive(s.runId());
 
         assertThat(wasLive).isTrue();
         assertThat(evidence.byId.get(s.evidenceId()).manifestJson()).contains("\"valueCount\":7");
+        // IS-179: manual stop must stamp the real endedAt, not null.
+        assertThat(evidence.byId.get(s.evidenceId()).manifestJson())
+                .doesNotContain("\"endedAt\":null")
+                .contains("\"endedAt\":\"" + wall.instant() + "\"");
         // Run is NOT ended here (RunService owns that on manual stop): still RUNNING.
         assertThat(runs.byId.get(s.runId()).state()).isEqualTo("RUNNING");
         // Ticking after stop does nothing.
