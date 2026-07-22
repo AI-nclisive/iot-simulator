@@ -1205,6 +1205,13 @@ Parallel execution:
   Depends: UI-493; IS-176.
   Done when: known catalog items are discoverable and inserted under an explicit parent; several variables are added from independently editable rows; no user-facing comma/tab syntax remains; typecheck + vitest + build green.
 
+- [x] `UI-495` ✅ Manual Schema — expand reusable OPC UA structure catalog
+  Goal: expand the Manual Schema catalog with realistic, editable starter structures so users can build an OPC UA server from familiar equipment and data patterns instead of starting from empty folders.
+  Surface: `Manual Schemas` — editor catalog.
+  Work includes: Tank / vessel, Pump, Motor, Valve, Device identity, Simulation signals, Analog item, Condition values, Static data, and Access & state templates; clear English descriptions of each inserted structure; and user-facing copy that avoids internal technical terminology.
+  Depends: UI-494.
+  Done when: every listed template is searchable and inserts an editable folder with typed variables under the selected parent; representative template and discoverability tests pass; typecheck + vitest + build green.
+
 ## Recommended Sequence
 
 1. Complete the P0 shell and shared-pattern tasks first.
