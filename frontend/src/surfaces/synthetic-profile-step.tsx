@@ -56,6 +56,18 @@ const ADVANCED_PATTERN_TYPES: { value: PatternType; label: string }[] = [
 const PATTERN_TYPES = [...SIMPLE_PATTERN_TYPES, ...ADVANCED_PATTERN_TYPES];
 
 function patternTypesFor(dataType: string | null): { value: PatternType; label: string }[] {
+  if (dataType === "DATETIME") {
+    return [
+      { value: "CONSTANT", label: "Fixed date & time" },
+      { value: "RANDOM_UNIFORM", label: "Random date & time" },
+    ];
+  }
+  if (dataType === "GUID") {
+    return [
+      { value: "CONSTANT", label: "Fixed UUID" },
+      { value: "RANDOM_UUID", label: "Random UUID" },
+    ];
+  }
   if (isTextType(dataType)) {
     return [
       { value: "CONSTANT", label: "Fixed text" },
@@ -79,7 +91,11 @@ function patternTypesFor(dataType: string | null): { value: PatternType; label: 
  * rows untouched instead of putting them in an invalid state.
  */
 export function bulkPatternFor(dataType: string | null, pattern: PatternType): PatternType | null {
-  if (CONSTANT_ONLY_TYPES.has(dataType ?? "")) return null;
+  if (CONSTANT_ONLY_TYPES.has(dataType ?? "") && dataType !== "GUID") return null;
+  if (dataType === "DATETIME" && pattern !== "CONSTANT" && pattern !== "RANDOM_UNIFORM") return null;
+  if (dataType === "GUID") {
+    return pattern === "RANDOM_UNIFORM" ? "RANDOM_UUID" : pattern === "CONSTANT" ? "CONSTANT" : null;
+  }
   if (pattern === "CONSTANT") return "CONSTANT";
   if (pattern === "RANDOM_UNIFORM") {
     return isTextType(dataType) || isBooleanType(dataType) ? "RANDOM_CHOICE" : pattern;
@@ -134,7 +150,6 @@ const CONSTANT_ONLY_TYPES = new Set([
   "EXPANDED_NODE_ID",
   "XML_ELEMENT",
   "BYTES",
-  "DATETIME",
 ]);
 
 /** Whether this data type's CONSTANT value is free-text (not a plain number). */
@@ -207,12 +222,19 @@ export function defaultDraft(dataType: string | null = null): NodeDraft {
     valueIds: newListValueIds(3),
     updateRateMs: "1000",
   };
-  if (CONSTANT_ONLY_TYPES.has(dataType ?? "") || dataType === "DATETIME") {
+  if (CONSTANT_ONLY_TYPES.has(dataType ?? "") && dataType !== "GUID") {
     return {
       ...base,
       pattern: "CONSTANT",
       value: defaultConstantValue(dataType),
     };
+  }
+  if (dataType === "GUID") return { ...base, pattern: "RANDOM_UUID", value: defaultConstantValue(dataType) };
+  if (dataType === "DATETIME") {
+    const now = new Date();
+    const yearAgo = new Date(now);
+    yearAgo.setUTCFullYear(yearAgo.getUTCFullYear() - 1);
+    return { ...base, pattern: "RANDOM_UNIFORM", min: yearAgo.toISOString(), max: now.toISOString(), value: now.toISOString() };
   }
   if (isTextType(dataType)) return { ...base, pattern: "CONSTANT", value: "Sample text" };
   if (isBooleanType(dataType)) return { ...base, pattern: "CONSTANT", value: "true", values: ["true", "false"] };
@@ -309,10 +331,19 @@ export function toPattern(d: NodeDraft, dataType: string | null = null): Synthet
       return values == null ? null : { type: d.pattern, values };
     }
     case "RANDOM_UNIFORM": {
+      if (dataType === "DATETIME") {
+        const min = Date.parse(d.min);
+        const max = Date.parse(d.max);
+        return Number.isNaN(min) || Number.isNaN(max) || min > max
+          ? null
+          : { type: "RANDOM_UNIFORM", dateTimeMin: new Date(min).toISOString(), dateTimeMax: new Date(max).toISOString() };
+      }
       const mn = num(d.min);
       const mx = num(d.max);
       return mn == null || mx == null || mn > mx || (isIntegerType(dataType) && (!validInteger(mn, dataType) || !validInteger(mx, dataType))) ? null : { type: "RANDOM_UNIFORM", min: mn, max: mx };
     }
+    case "RANDOM_UUID":
+      return dataType === "GUID" ? { type: "RANDOM_UUID" } : null;
     case "RANDOM_WALK": {
       const mn = num(d.min);
       const mx = num(d.max);
@@ -360,7 +391,12 @@ export function draftFromPattern(pattern: SyntheticPatternSpec, updateRateMs: nu
         volatility: String(pattern.volatility ?? 1),
       };
     case "RANDOM_UNIFORM":
-      return { ...rate, pattern: "RANDOM_UNIFORM", min: String(pattern.min ?? 0), max: String(pattern.max ?? 0) };
+      return {
+        ...rate,
+        pattern: "RANDOM_UNIFORM",
+        min: pattern.dateTimeMin ?? String(pattern.min ?? 0),
+        max: pattern.dateTimeMax ?? String(pattern.max ?? 0),
+      };
     default:
       // SINE / RAMP / SQUARE
       return {
@@ -826,7 +862,7 @@ export function SyntheticProfileStep({
           <ul className="space-y-2">
             {variableNodes.map((node) => {
               const d = drafts[node.nodeId] ?? defaultDraft(node.dataType);
-              const constantOnly = CONSTANT_ONLY_TYPES.has(node.dataType ?? "") || node.dataType === "DATETIME";
+              const constantOnly = CONSTANT_ONLY_TYPES.has(node.dataType ?? "") && node.dataType !== "GUID";
               const textType = isTextType(node.dataType);
               const booleanType = isBooleanType(node.dataType);
               const integerType = isIntegerType(node.dataType);
@@ -835,7 +871,7 @@ export function SyntheticProfileStep({
               const isBytes = node.dataType === "BYTES";
               const valueInputType = isTextConstantType(node.dataType) || isBytes || textType || node.dataType === "DATETIME" ? "text" : "number";
               const isAdvancedPattern = ADVANCED_PATTERN_TYPES.some((p) => p.value === d.pattern);
-              const supportsNumericPatterns = !textType && !booleanType;
+              const supportsNumericPatterns = !textType && !booleanType && node.dataType !== "DATETIME" && node.dataType !== "GUID";
               const showAdvancedPatterns = isAdvancedPattern || expandedPatternRows.has(node.nodeId);
               const visiblePatternTypes = supportsNumericPatterns
                 ? (showAdvancedPatterns ? PATTERN_TYPES : SIMPLE_PATTERN_TYPES)
@@ -984,7 +1020,7 @@ export function SyntheticProfileStep({
                             <input
                               className="shell-field"
                               step={integerType ? "1" : "any"}
-                              type="number"
+                              type={node.dataType === "DATETIME" ? "text" : "number"}
                               value={d.min}
                               onChange={(e) => patchDraft(node.nodeId, { min: e.target.value })}
                             />
@@ -994,7 +1030,7 @@ export function SyntheticProfileStep({
                             <input
                               className="shell-field"
                               step={integerType ? "1" : "any"}
-                              type="number"
+                              type={node.dataType === "DATETIME" ? "text" : "number"}
                               value={d.max}
                               onChange={(e) => patchDraft(node.nodeId, { max: e.target.value })}
                             />

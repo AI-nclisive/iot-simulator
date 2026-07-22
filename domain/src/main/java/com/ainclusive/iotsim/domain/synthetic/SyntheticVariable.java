@@ -11,15 +11,17 @@ import java.util.Set;
  * {@link DataType}, driven by which pattern, sampled every {@code updateRateMs}
  * (per {@code backend-specs/06_ARTIFACT_FORMATS.md} "Synthetic generation model").
  *
- * <p>{@code BYTES}, {@code DATETIME}, and the identifier/structural types
- * ({@code GUID}, {@code STATUS_CODE}, {@code QUALIFIED_NAME}, {@code NODE_ID},
+ * <p>{@code BYTES} and the identifier/structural types
+ * ({@code STATUS_CODE}, {@code QUALIFIED_NAME}, {@code NODE_ID},
  * {@code EXPANDED_NODE_ID}, {@code XML_ELEMENT}) have no natural DYNAMIC
  * generated-signal semantics — a real device wouldn't vary a NodeId reference
  * or a GUID over time either, they're structural OPC UA plumbing, not measured
  * signals (IS-168). A dynamic pattern (ramp/sine/square/random/enum-cycle/
  * step-sequence) is therefore still rejected for them, but a {@link
  * SyntheticPattern.Constant} (fixed value) is allowed, since that's exactly
- * what these fields already are on a real device.
+ * what these fields already are on a real device. {@code DATETIME} and {@code GUID}
+ * are exceptions: a clock and per-sample correlation ID naturally vary, so they
+ * support their dedicated random patterns.
  *
  * @param nodeId       target variable node id
  * @param dataType     the node's neutral type; generated values are coerced to it
@@ -29,7 +31,7 @@ import java.util.Set;
 public record SyntheticVariable(String nodeId, DataType dataType, SyntheticPattern pattern, long updateRateMs) {
 
     private static final Set<DataType> CONSTANT_ONLY = EnumSet.of(
-            DataType.BYTES, DataType.DATETIME, DataType.GUID, DataType.STATUS_CODE,
+            DataType.BYTES, DataType.STATUS_CODE,
             DataType.QUALIFIED_NAME, DataType.NODE_ID, DataType.EXPANDED_NODE_ID, DataType.XML_ELEMENT);
 
     public SyntheticVariable {

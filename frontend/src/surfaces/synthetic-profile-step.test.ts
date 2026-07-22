@@ -104,6 +104,18 @@ describe("toPattern — draft → serialized pattern", () => {
       value: 0,
     });
   });
+
+  it("serializes a random DATETIME as an ISO-8601 range", () => {
+    expect(toPattern(draft({ pattern: "RANDOM_UNIFORM", min: "2026-07-01T00:00:00Z", max: "2026-07-31T00:00:00Z" }), "DATETIME")).toEqual({
+      type: "RANDOM_UNIFORM",
+      dateTimeMin: "2026-07-01T00:00:00.000Z",
+      dateTimeMax: "2026-07-31T00:00:00.000Z",
+    });
+  });
+
+  it("serializes a random GUID without numeric range fields", () => {
+    expect(toPattern(draft({ pattern: "RANDOM_UUID" }), "GUID")).toEqual({ type: "RANDOM_UUID" });
+  });
 });
 
 describe("defaultDraft — CONSTANT_ONLY_TYPES locking (IS-168 / UI-482)", () => {
@@ -132,10 +144,11 @@ describe("defaultDraft — CONSTANT_ONLY_TYPES locking (IS-168 / UI-482)", () =>
     expect(defaultDraft("STATUS_CODE")).toMatchObject({ pattern: "CONSTANT", value: "0" });
     expect(defaultDraft("BYTES")).toMatchObject({ pattern: "CONSTANT", value: "" });
     const guidDraft = defaultDraft("GUID");
-    expect(guidDraft.pattern).toBe("CONSTANT");
+    expect(guidDraft.pattern).toBe("RANDOM_UUID");
     expect(guidDraft.value).toMatch(/^[0-9a-f-]{36}$/i);
-    expect(defaultDraft("DATETIME")).toMatchObject({ pattern: "CONSTANT" });
-    expect(defaultDraft("DATETIME").value).toMatch(/^\d{4}-\d{2}-\d{2}T.*Z$/);
+    expect(defaultDraft("DATETIME")).toMatchObject({ pattern: "RANDOM_UNIFORM" });
+    expect(defaultDraft("DATETIME").min).toMatch(/^\d{4}-\d{2}-\d{2}T.*Z$/);
+    expect(defaultDraft("DATETIME").max).toMatch(/^\d{4}-\d{2}-\d{2}T.*Z$/);
   });
 });
 
@@ -146,6 +159,8 @@ describe("bulkPatternFor — type-aware bulk choices (UI-498)", () => {
     expect(bulkPatternFor("STRING", "RANDOM_UNIFORM")).toBe("RANDOM_CHOICE");
     expect(bulkPatternFor("LOCALIZED_TEXT", "RANDOM_UNIFORM")).toBe("RANDOM_CHOICE");
     expect(bulkPatternFor("BOOL", "RANDOM_UNIFORM")).toBe("RANDOM_CHOICE");
+    expect(bulkPatternFor("DATETIME", "RANDOM_UNIFORM")).toBe("RANDOM_UNIFORM");
+    expect(bulkPatternFor("GUID", "RANDOM_UNIFORM")).toBe("RANDOM_UUID");
   });
 
   it("does not apply Wave to nonnumeric or constant-only rows", () => {
