@@ -1,7 +1,9 @@
 package com.ainclusive.iotsim.domain.synthetic;
 
 import com.ainclusive.iotsim.domain.synthetic.SyntheticPattern.StepSequence.Step;
+import com.ainclusive.iotsim.protocolmodel.DataType;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
 
@@ -12,7 +14,10 @@ public final class SyntheticConfigMapper {
 
     public static List<SyntheticVariable> toVariables(SyntheticConfig config) {
         return config.variables().stream()
-                .map(v -> new SyntheticVariable(v.nodeId(), v.dataType(), toPattern(v.pattern()), v.updateRateMs()))
+                .map(v -> {
+                    validateForType(v.dataType(), v.pattern());
+                    return new SyntheticVariable(v.nodeId(), v.dataType(), toPattern(v.pattern()), v.updateRateMs());
+                })
                 .toList();
     }
 
@@ -30,12 +35,13 @@ public final class SyntheticConfigMapper {
             case "RANDOM_WALK" -> new SyntheticPattern.RandomWalk(
                     req(spec.min(), "min"), req(spec.max(), "max"), req(spec.volatility(), "volatility"));
             case "ENUM_CYCLE" -> new SyntheticPattern.EnumCycle(reqList(spec.values(), "values"));
+            case "RANDOM_CHOICE" -> new SyntheticPattern.RandomChoice(reqList(spec.values(), "values"));
             case "STEP_SEQUENCE" -> new SyntheticPattern.StepSequence(steps(spec));
             default -> throw new IllegalArgumentException("unknown pattern type: " + spec.type());
         };
     }
 
-    /** A CONSTANT's value arrives in exactly one of three shapes (IS-168). */
+    /** A CONSTANT's value arrives in one type-appropriate serialized shape. */
     private static Object constantValue(PatternSpec spec) {
         if (spec.value() != null) {
             return spec.value();
@@ -46,8 +52,86 @@ public final class SyntheticConfigMapper {
         if (spec.bytesValueBase64() != null) {
             return Base64.getDecoder().decode(spec.bytesValueBase64());
         }
+        if (spec.dateTimeValue() != null) {
+            try {
+                return Instant.parse(spec.dateTimeValue()).toEpochMilli();
+            } catch (RuntimeException e) {
+                throw new IllegalArgumentException("dateTimeValue must be an ISO-8601 instant", e);
+            }
+        }
         throw new IllegalArgumentException(
-                "one of value, stringValue, or bytesValueBase64 is required for the CONSTANT pattern");
+                "one of value, stringValue, bytesValueBase64, or dateTimeValue is required for the CONSTANT pattern");
+    }
+
+    private static void validateForType(DataType dataType, PatternSpec spec) {
+        if (spec == null || spec.type() == null) {
+            return; // toPattern supplies the standard required-field error
+        }
+        if (dataType == DataType.DATETIME && "CONSTANT".equals(spec.type())) {
+            if (spec.dateTimeValue() == null) {
+                throw new IllegalArgumentException("DATETIME CONSTANT requires dateTimeValue as an ISO-8601 instant");
+            }
+            if (spec.value() != null || spec.stringValue() != null || spec.bytesValueBase64() != null) {
+                throw new IllegalArgumentException("DATETIME CONSTANT must use only dateTimeValue");
+            }
+        }
+        if (dataType == DataType.STRING || dataType == DataType.LOCALIZED_TEXT) {
+            requireOneOf(spec.type(), dataType, "CONSTANT", "ENUM_CYCLE", "RANDOM_CHOICE");
+            if ("CONSTANT".equals(spec.type()) && spec.stringValue() == null) {
+                throw new IllegalArgumentException(dataType + " CONSTANT requires stringValue");
+            }
+            if (("ENUM_CYCLE".equals(spec.type()) || "RANDOM_CHOICE".equals(spec.type()))
+                    && reqList(spec.values(), "values").stream().anyMatch(v -> !(v instanceof String))) {
+                throw new IllegalArgumentException(dataType + " list values must all be strings");
+            }
+        }
+        if (dataType == DataType.BOOL) {
+            requireOneOf(spec.type(), dataType, "CONSTANT", "ENUM_CYCLE", "RANDOM_CHOICE");
+            if (("ENUM_CYCLE".equals(spec.type()) || "RANDOM_CHOICE".equals(spec.type()))
+                    && reqList(spec.values(), "values").stream().anyMatch(v -> !(v instanceof Boolean))) {
+                throw new IllegalArgumentException("BOOL list values must all be booleans");
+            }
+        }
+        if (isInteger(dataType)) {
+            requireIntegerFields(spec);
+        }
+    }
+
+    private static boolean isInteger(DataType type) {
+        return switch (type) {
+            case INT8, UINT8, INT16, UINT16, INT32, UINT32, INT64, UINT64 -> true;
+            default -> false;
+        };
+    }
+
+    private static void requireOneOf(String patternType, DataType dataType, String... allowed) {
+        for (String candidate : allowed) {
+            if (candidate.equals(patternType)) {
+                return;
+            }
+        }
+        throw new IllegalArgumentException(dataType + " only supports " + String.join(", ", allowed));
+    }
+
+    private static void requireIntegerFields(PatternSpec spec) {
+        requireWhole(spec.value(), "value");
+        requireWhole(spec.min(), "min");
+        requireWhole(spec.max(), "max");
+        requireWhole(spec.volatility(), "volatility");
+        if (spec.values() != null && spec.values().stream().anyMatch(v -> !(v instanceof Number n)
+                || !isWhole(n.doubleValue()))) {
+            throw new IllegalArgumentException("integer list values must be whole numbers");
+        }
+    }
+
+    private static void requireWhole(Double value, String name) {
+        if (value != null && !isWhole(value)) {
+            throw new IllegalArgumentException(name + " must be a whole number for an integer data type");
+        }
+    }
+
+    private static boolean isWhole(double value) {
+        return Double.isFinite(value) && value == Math.rint(value);
     }
 
     private static List<Step> steps(PatternSpec spec) {

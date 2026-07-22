@@ -6,7 +6,7 @@
 
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useLiveValues } from "./use-live-values";
+import { formatLiveValue, useLiveValues } from "./use-live-values";
 
 class FakeEventSource {
   static instances: FakeEventSource[] = [];
@@ -94,6 +94,28 @@ describe("useLiveValues", () => {
     expect(result.current.rows).toHaveLength(2); // updated, not appended
   });
 
+  it("applies every value in a batched values event", () => {
+    const { result } = renderHook(() => useLiveValues("src-01"));
+    act(() => {
+      FakeEventSource.latest().emitOpen();
+      FakeEventSource.latest().emit("values-snapshot", snapshotPayload());
+      FakeEventSource.latest().emit(
+        "values",
+        JSON.stringify([
+          { nodeId: "oven.temp", value: 190.125678, quality: "GOOD", qualityReason: null, sourceTime: "2026-06-30T09:41:20Z" },
+          { nodeId: "line.speed", value: 2.5, quality: "GOOD", qualityReason: null, sourceTime: "2026-06-30T09:41:20Z" },
+          { nodeId: "new.node", value: 1, quality: "GOOD", qualityReason: null, sourceTime: "2026-06-30T09:41:20Z" },
+        ]),
+      );
+    });
+    expect(result.current.rows).toHaveLength(3);
+    expect(result.current.rows.find((row) => row.path === "oven.temp")).toMatchObject({
+      currentValue: "190.1257",
+      exactValue: "190.125678",
+    });
+    expect(result.current.rows.find((row) => row.path === "line.speed")?.currentValue).toBe("2.5");
+  });
+
   it("appends a new node seen only in a delta", () => {
     const { result } = renderHook(() => useLiveValues("src-01"));
     act(() => {
@@ -145,5 +167,12 @@ describe("useLiveValues", () => {
   it("does not subscribe when disabled", () => {
     renderHook(() => useLiveValues("src-01", false));
     expect(FakeEventSource.instances).toHaveLength(0);
+  });
+});
+
+describe("formatLiveValue", () => {
+  it("formats numeric readings for scanning while retaining useful precision", () => {
+    expect(formatLiveValue(54.16166729261338)).toBe("54.1617");
+    expect(formatLiveValue(12000)).toBe("12,000");
   });
 });

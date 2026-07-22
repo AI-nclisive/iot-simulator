@@ -13,7 +13,8 @@ import java.util.List;
  * {@code stringValue} for the identifier/structural string-shaped types
  * ({@code GUID}, {@code QUALIFIED_NAME}, {@code NODE_ID},
  * {@code EXPANDED_NODE_ID}, {@code XML_ELEMENT}), or {@code bytesValueBase64}
- * (standard Base64) for {@code BYTES}.
+ * (standard Base64) for {@code BYTES}. {@code dateTimeValue} is an ISO-8601
+ * instant for {@code DATETIME}, for example {@code 2026-07-22T08:06:13.217Z}.
  */
 public record PatternSpec(
         String type,
@@ -25,7 +26,16 @@ public record PatternSpec(
         List<Object> values,
         List<StepSpec> steps,
         String stringValue,
-        String bytesValueBase64) {
+        String bytesValueBase64,
+        String dateTimeValue) {
+
+    /** IS-168 shape, before ISO-8601 DATETIME support was added. */
+    public PatternSpec(String type, Double value, Double min, Double max, Long periodMs,
+            Double volatility, List<Object> values, List<StepSpec> steps, String stringValue,
+            String bytesValueBase64) {
+        this(type, value, min, max, periodMs, volatility, values, steps, stringValue,
+                bytesValueBase64, null);
+    }
 
     /** Pre-IS-168 shape, for callers that never carry a non-numeric CONSTANT. */
     public PatternSpec(String type, Double value, Double min, Double max, Long periodMs,

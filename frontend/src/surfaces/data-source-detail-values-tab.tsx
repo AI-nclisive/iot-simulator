@@ -207,7 +207,7 @@ export function DataSourceDetailValuesTab({
         ...row,
         path: meta.path || meta.name || row.path,
         dataType: meta.dataType,
-        currentValue: meta.unit ? `${row.currentValue} ${meta.unit}` : row.currentValue,
+        unit: meta.unit,
       };
     });
     return applyPinnedIds(enriched, pinnedIds);
@@ -318,7 +318,7 @@ export function DataSourceDetailValuesTab({
               <PinIcon filled={row.pinned} />
             </button>
             <div className="min-w-0">
-              <p className="text-sm font-medium text-shell-ink">{row.path}</p>
+              <p className="truncate text-sm font-medium text-shell-ink" title={row.path}>{row.path}</p>
               {row.pinned ? (
                 <div className="mt-2">
                   <StatusBadge label="Pinned" tone="accent" />
@@ -339,11 +339,23 @@ export function DataSourceDetailValuesTab({
     },
     {
       id: "value",
-      header: "Current value",
+      header: "Value",
       sortable: true,
       sortValue: (row) => row.currentValue,
-      cell: (row) => <span className="text-sm text-shell-ink">{row.currentValue}</span>,
-      className: "w-[10rem]",
+      cell: (row) => (
+        <span className="block truncate font-mono text-sm text-shell-ink" title={row.exactValue}>
+          {row.currentValue}
+        </span>
+      ),
+      className: "w-[11rem] max-w-[16rem]",
+    },
+    {
+      id: "unit",
+      header: "Unit",
+      sortable: true,
+      sortValue: (row) => row.unit ?? "",
+      cell: (row) => <span className="text-sm text-shell-muted">{row.unit || "—"}</span>,
+      className: "w-[6rem]",
     },
     {
       id: "updatedAt",

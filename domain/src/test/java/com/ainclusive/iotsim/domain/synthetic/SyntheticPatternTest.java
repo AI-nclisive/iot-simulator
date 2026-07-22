@@ -23,6 +23,22 @@ import org.junit.jupiter.api.Test;
 
 class SyntheticPatternTest {
 
+    @Test
+    void randomChoiceUsesTheBoundRngAndOnlyEmitsConfiguredValues() {
+        var pattern = new SyntheticPattern.RandomChoice(List.of("Idle", "Running", "Alarm"));
+        var first = pattern.bind(rng());
+        var second = pattern.bind(rng());
+
+        List<Object> firstValues = java.util.stream.LongStream.range(0, 12)
+                .mapToObj(tick -> first.valueAt(tick, Duration.ZERO))
+                .toList();
+        List<Object> secondValues = java.util.stream.LongStream.range(0, 12)
+                .mapToObj(tick -> second.valueAt(tick, Duration.ZERO))
+                .toList();
+
+        assertThat(firstValues).containsOnly("Idle", "Running", "Alarm").isEqualTo(secondValues);
+    }
+
     private static RandomGenerator rng() {
         return SeededRng.withSeed(42L).stream("n");
     }

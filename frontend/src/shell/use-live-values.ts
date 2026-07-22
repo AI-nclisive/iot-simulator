@@ -28,9 +28,20 @@ function isStreamValue(x: unknown): x is StreamValue {
   return typeof x === "object" && x !== null && "nodeId" in x;
 }
 
-function formatValue(value: unknown): string {
+/**
+ * Keep live readings scannable without losing the source precision: the unrounded
+ * representation is retained in `exactValue` and exposed by the table as a title.
+ */
+export function formatLiveValue(value: unknown): string {
   if (value === null || value === undefined) return "—";
   if (typeof value === "boolean") return value ? "true" : "false";
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) return String(value);
+    return new Intl.NumberFormat("en-GB", {
+      maximumFractionDigits: Number.isInteger(value) ? 0 : 4,
+      useGrouping: true,
+    }).format(value);
+  }
   return String(value);
 }
 
@@ -50,7 +61,8 @@ function toRow(sourceId: string, v: StreamValue): SourceValueRow {
     // The stream does not carry a UI dataType; default to string and let a later
     // schema join refine it. Never fabricate a type we don't have.
     dataType: "string",
-    currentValue: formatValue(v.value),
+    currentValue: formatLiveValue(v.value),
+    exactValue: v.value === null || v.value === undefined ? undefined : String(v.value),
     updatedAt: formatTime(v.sourceTime),
     freshness: v.quality === "GOOD" ? "Live" : "No updates",
     pinned: false,
@@ -89,15 +101,29 @@ export function useLiveValues(sourceId: string, enabled = true): LiveValuesResul
           setRows(next);
           return;
         }
-        if (type === "values" && isStreamValue(data)) {
-          const id = `${sourceId}:${data.nodeId}`;
-          const row = toRow(sourceId, data);
+        if (type === "values") {
+          // Publishers batch changed nodes into one SSE event. Accepting a single
+          // value too keeps the consumer compatible with older workers.
+          const updates = Array.isArray(data)
+            ? data.filter(isStreamValue)
+            : isStreamValue(data)
+              ? [data]
+              : [];
+          if (updates.length === 0) return;
           setRows((prev) => {
-            const idx = prev.findIndex((r) => r.id === id);
-            if (idx === -1) return [...prev, row];
-            const copy = prev.slice();
-            copy[idx] = row;
-            return copy;
+            const next = prev.slice();
+            const indexById = new Map(next.map((row, index) => [row.id, index]));
+            for (const update of updates) {
+              const row = toRow(sourceId, update);
+              const index = indexById.get(row.id);
+              if (index === undefined) {
+                indexById.set(row.id, next.length);
+                next.push(row);
+              } else {
+                next[index] = row;
+              }
+            }
+            return next;
           });
         }
       },
