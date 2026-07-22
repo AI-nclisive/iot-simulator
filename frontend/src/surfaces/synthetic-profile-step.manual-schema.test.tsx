@@ -73,6 +73,8 @@ describe("SyntheticProfileStep — Manual Schema parameter source (UI-491)", () 
     await waitFor(() => {
       expect(screen.getByText("Level")).not.toBeNull();
     });
+    expect(screen.queryByLabelText("Prefill from recording")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Prefill" })).toBeNull();
     await waitFor(() => {
       expect(onChange).toHaveBeenCalledWith(
         expect.objectContaining({ manualSchemaId: "ms1", schemaFromSourceId: null }),

@@ -628,31 +628,34 @@ export function SyntheticProfileStep({
             <p className="text-sm font-medium text-shell-ink">
               {variableNodes.length} measurement{variableNodes.length === 1 ? "" : "s"}
             </p>
-            <div className="flex items-center gap-2">
-              <select
-                className="shell-field"
-                value={selectedRecordingId}
-                onChange={(e) => setSelectedRecordingId(e.target.value)}
-                disabled={recordings.length === 0}
-              >
-                <option value="">
-                  {recordings.length === 0 ? "No recordings with data" : "Prefill from recording…"}
-                </option>
-                {recordings.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {(r.name && r.name.trim()) || r.id.slice(0, 8)} · {r.valueCount} values
+            {schemaKind === "source" ? (
+              <div className="flex items-center gap-2">
+                <select
+                  aria-label="Prefill from recording"
+                  className="shell-field"
+                  value={selectedRecordingId}
+                  onChange={(e) => setSelectedRecordingId(e.target.value)}
+                  disabled={recordings.length === 0}
+                >
+                  <option value="">
+                    {recordings.length === 0 ? "No recordings with data" : "Prefill from recording…"}
                   </option>
-                ))}
-              </select>
-              <button
-                className="shell-action"
-                type="button"
-                disabled={!selectedRecordingId || prefilling}
-                onClick={() => void prefillFromRecording()}
-              >
-                {prefilling ? "Prefilling…" : "Prefill"}
-              </button>
-            </div>
+                  {recordings.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {(r.name && r.name.trim()) || r.id.slice(0, 8)} · {r.valueCount} values
+                    </option>
+                  ))}
+                </select>
+                <button
+                  className="shell-action"
+                  type="button"
+                  disabled={!selectedRecordingId || prefilling}
+                  onClick={() => void prefillFromRecording()}
+                >
+                  {prefilling ? "Prefilling…" : "Prefill"}
+                </button>
+              </div>
+            ) : null}
           </div>
           <p className="text-xs text-shell-muted">
             Copies realistic ranges and a suggested pattern from a real recording into any
