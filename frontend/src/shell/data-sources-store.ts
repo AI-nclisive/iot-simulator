@@ -54,16 +54,28 @@ type CreateDataSourceInput = {
 // ── Synthetic authoring (IS-145) — FE mirror of the backend SyntheticConfig ──────────────
 // Serialized shape of domain/synthetic/PatternSpec.java (only fields relevant to `type` are set).
 export type SyntheticPatternSpec = {
-  type: "CONSTANT" | "RAMP" | "SINE" | "SQUARE" | "RANDOM_UNIFORM" | "RANDOM_WALK";
+  type:
+    | "CONSTANT"
+    | "RAMP"
+    | "SINE"
+    | "SQUARE"
+    | "RANDOM_UNIFORM"
+    | "RANDOM_WALK"
+    | "ENUM_CYCLE"
+    | "RANDOM_CHOICE";
   value?: number;
   /** IS-168: a CONSTANT for a string-shaped structural/identifier type (GUID, NODE_ID, ...). */
   stringValue?: string;
+  /** ISO-8601 instant used by a DATETIME constant (IS-180). */
+  dateTimeValue?: string;
   /** IS-168: a CONSTANT for BYTES, standard Base64. */
   bytesValueBase64?: string;
   min?: number;
   max?: number;
   periodMs?: number;
   volatility?: number;
+  /** Values used by text/boolean cycling and random-choice patterns. */
+  values?: Array<string | boolean>;
 };
 
 export type SyntheticVariableConfig = {

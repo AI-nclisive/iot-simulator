@@ -14,7 +14,7 @@ import java.util.random.RandomGenerator;
  * stateful {@link Signal} for one run, bound to one node's RNG stream (from a
  * {@link com.ainclusive.iotsim.protocolmodel.DeterminismContext}); the same seed and
  * pattern therefore yield an identical series. Numeric patterns emit a {@code Double};
- * {@link EnumCycle}/{@link StepSequence} emit their configured element values. The
+ * {@link EnumCycle}, {@link RandomChoice}, and {@link StepSequence} emit their configured element values. The
  * generator coerces the raw value to the node's data type (see
  * {@link SyntheticValueCoercion}).
  */
@@ -145,6 +145,21 @@ public sealed interface SyntheticPattern {
         @Override
         public Signal bind(RandomGenerator rng) {
             return (tick, elapsed) -> values.get((int) Math.floorMod(tick, values.size()));
+        }
+    }
+
+    /** Chooses one configured value independently for each tick, using the run-scoped seeded RNG. */
+    record RandomChoice(List<Object> values) implements SyntheticPattern {
+        public RandomChoice {
+            values = List.copyOf(Objects.requireNonNull(values, "values"));
+            if (values.isEmpty()) {
+                throw new IllegalArgumentException("RandomChoice requires at least one value");
+            }
+        }
+
+        @Override
+        public Signal bind(RandomGenerator rng) {
+            return (tick, elapsed) -> values.get(rng.nextInt(values.size()));
         }
     }
 

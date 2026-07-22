@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.ainclusive.iotsim.protocolmodel.DataType;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
@@ -38,6 +39,29 @@ class SyntheticConfigMapperTest {
                 null, java.util.Base64.getEncoder().encodeToString(new byte[] {1, 2, 3}));
         var p = SyntheticConfigMapper.toPattern(bytesSpec);
         assertThat((byte[]) ((SyntheticPattern.Constant) p).value()).containsExactly(1, 2, 3);
+    }
+
+    @Test
+    void mapsIsoDateTimeConstantToEpochMillis() {
+        var p = SyntheticConfigMapper.toPattern(new PatternSpec("CONSTANT", null, null, null, null,
+                null, null, null, null, null, "2026-07-22T08:06:13.217Z"));
+        assertThat(p).isEqualTo(new SyntheticPattern.Constant(
+                Instant.parse("2026-07-22T08:06:13.217Z").toEpochMilli()));
+    }
+
+    @Test
+    void rejectsInvalidIsoDateTimeConstant() {
+        assertThatThrownBy(() -> SyntheticConfigMapper.toPattern(new PatternSpec("CONSTANT", null,
+                null, null, null, null, null, null, null, null, "22/07/2026")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("ISO-8601");
+    }
+
+    @Test
+    void mapsRandomChoiceList() {
+        var p = SyntheticConfigMapper.toPattern(spec("RANDOM_CHOICE", null, null, null, null, null,
+                List.of("Idle", "Running", "Alarm"), null));
+        assertThat(p).isEqualTo(new SyntheticPattern.RandomChoice(List.of("Idle", "Running", "Alarm")));
     }
 
     @Test
@@ -87,6 +111,65 @@ class SyntheticConfigMapperTest {
         List<SyntheticVariable> vars = SyntheticConfigMapper.toVariables(config);
         assertThat(vars).containsExactly(
                 new SyntheticVariable("n1", DataType.FLOAT64, new SyntheticPattern.Constant(1.0), 500));
+    }
+
+    @Test
+    void acceptsStringConstantAndListPatterns() {
+        var constant = new SyntheticVariableConfig("state", DataType.STRING,
+                new PatternSpec("CONSTANT", null, null, null, null, null, null, null,
+                        "Running", null), 500);
+        var random = new SyntheticVariableConfig("state2", DataType.LOCALIZED_TEXT,
+                spec("RANDOM_CHOICE", null, null, null, null, null, List.of("Idle", "Alarm"), null), 500);
+
+        assertThat(SyntheticConfigMapper.toVariables(new SyntheticConfig(7L, List.of(constant, random))))
+                .extracting(SyntheticVariable::pattern)
+                .containsExactly(new SyntheticPattern.Constant("Running"),
+                        new SyntheticPattern.RandomChoice(List.of("Idle", "Alarm")));
+    }
+
+    @Test
+    void rejectsNumericStringConstantAndNonStringListMembers() {
+        var numericConstant = new SyntheticVariableConfig("state", DataType.STRING,
+                spec("CONSTANT", 1.0, null, null, null, null, null, null), 500);
+        var mixedList = new SyntheticVariableConfig("state2", DataType.LOCALIZED_TEXT,
+                spec("ENUM_CYCLE", null, null, null, null, null, List.of("Idle", 1.0), null), 500);
+
+        assertThatThrownBy(() -> SyntheticConfigMapper.toVariables(new SyntheticConfig(7L, List.of(numericConstant))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("stringValue");
+        assertThatThrownBy(() -> SyntheticConfigMapper.toVariables(new SyntheticConfig(7L, List.of(mixedList))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("must all be strings");
+    }
+
+    @Test
+    void rejectsNumericSignalShapesForText() {
+        var variable = new SyntheticVariableConfig("state", DataType.STRING,
+                spec("RANDOM_UNIFORM", null, 0.0, 1.0, null, null, null, null), 500);
+
+        assertThatThrownBy(() -> SyntheticConfigMapper.toVariables(new SyntheticConfig(7L, List.of(variable))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("only supports");
+    }
+
+    @Test
+    void rejectsFractionalIntegerPatternParameters() {
+        var variable = new SyntheticVariableConfig("counter", DataType.INT32,
+                spec("RANDOM_UNIFORM", null, 0.5, 10.0, null, null, null, null), 500);
+
+        assertThatThrownBy(() -> SyntheticConfigMapper.toVariables(new SyntheticConfig(7L, List.of(variable))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("whole number");
+    }
+
+    @Test
+    void requiresIsoShapeForDateTimeVariable() {
+        var variable = new SyntheticVariableConfig("timestamp", DataType.DATETIME,
+                spec("CONSTANT", 1.0, null, null, null, null, null, null), 500);
+
+        assertThatThrownBy(() -> SyntheticConfigMapper.toVariables(new SyntheticConfig(7L, List.of(variable))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("dateTimeValue");
     }
 
     @Test

@@ -94,10 +94,10 @@ describe("toPattern — draft → serialized pattern", () => {
     expect(toPattern(draft({ pattern: "CONSTANT", value: "abc" }), "BYTES")).toBeNull();
   });
 
-  it("keeps numeric CONSTANT for STATUS_CODE/DATETIME", () => {
-    expect(toPattern(draft({ pattern: "CONSTANT", value: "1700000000000" }), "DATETIME")).toEqual({
+  it("serializes DATETIME constants as ISO-8601", () => {
+    expect(toPattern(draft({ pattern: "CONSTANT", value: "2026-07-22T08:06:13.217Z" }), "DATETIME")).toEqual({
       type: "CONSTANT",
-      value: 1700000000000,
+      dateTimeValue: "2026-07-22T08:06:13.217Z",
     });
     expect(toPattern(draft({ pattern: "CONSTANT", value: "0" }), "STATUS_CODE")).toEqual({
       type: "CONSTANT",
@@ -107,9 +107,24 @@ describe("toPattern — draft → serialized pattern", () => {
 });
 
 describe("defaultDraft — CONSTANT_ONLY_TYPES locking (IS-168 / UI-482)", () => {
-  it("defaults ordinary measurement types to SINE", () => {
-    expect(defaultDraft("FLOAT64").pattern).toBe("SINE");
-    expect(defaultDraft(null).pattern).toBe("SINE");
+  it("starts numeric measurements with an immediately useful Random range", () => {
+    expect(defaultDraft("FLOAT64")).toMatchObject({ pattern: "RANDOM_UNIFORM", min: "0.0", max: "100.0" });
+    expect(defaultDraft("INT16")).toMatchObject({ pattern: "RANDOM_UNIFORM", min: "0", max: "100" });
+  });
+
+  it("enforces whole, in-range values for integer measurements", () => {
+    expect(toPattern(draft({ pattern: "RANDOM_UNIFORM", min: "1.5", max: "3" }), "INT16")).toBeNull();
+    expect(toPattern(draft({ pattern: "CONSTANT", value: "256" }), "UINT8")).toBeNull();
+    expect(toPattern(draft({ pattern: "RANDOM_WALK", min: "0", max: "10", volatility: "0.5" }), "INT32")).toBeNull();
+  });
+
+  it("serializes text lists for cycling and random selection", () => {
+    expect(toPattern(draft({ pattern: "ENUM_CYCLE", values: ["Idle", "Running"] }), "STRING")).toEqual({
+      type: "ENUM_CYCLE", values: ["Idle", "Running"],
+    });
+    expect(toPattern(draft({ pattern: "RANDOM_CHOICE", values: ["Normal", "Alarm"] }), "LOCALIZED_TEXT")).toEqual({
+      type: "RANDOM_CHOICE", values: ["Normal", "Alarm"],
+    });
   });
 
   it("locks structural/identifier types to CONSTANT with a type-appropriate default value", () => {
@@ -119,6 +134,8 @@ describe("defaultDraft — CONSTANT_ONLY_TYPES locking (IS-168 / UI-482)", () =>
     const guidDraft = defaultDraft("GUID");
     expect(guidDraft.pattern).toBe("CONSTANT");
     expect(guidDraft.value).toMatch(/^[0-9a-f-]{36}$/i);
+    expect(defaultDraft("DATETIME")).toMatchObject({ pattern: "CONSTANT" });
+    expect(defaultDraft("DATETIME").value).toMatch(/^\d{4}-\d{2}-\d{2}T.*Z$/);
   });
 });
 

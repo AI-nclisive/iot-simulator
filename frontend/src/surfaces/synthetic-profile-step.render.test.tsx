@@ -218,11 +218,13 @@ describe("SyntheticProfileStep — decimal number fields (UI-486)", () => {
     return [...document.querySelectorAll('input[type="number"]')] as HTMLInputElement[];
   }
 
-  it("every numeric pattern field allows decimals (step=any)", async () => {
+  it("float range fields allow decimals while timing fields require whole milliseconds", async () => {
     await renderWithOneMeasurement();
     const inputs = numberInputs();
     expect(inputs.length).toBeGreaterThan(0);
-    expect(inputs.every((el) => el.getAttribute("step") === "any")).toBe(true);
+    expect((screen.getByLabelText(/^Min$/i) as HTMLInputElement).getAttribute("step")).toBe("any");
+    expect((screen.getByLabelText(/^Max$/i) as HTMLInputElement).getAttribute("step")).toBe("any");
+    expect((screen.getByLabelText(/Update rate/i) as HTMLInputElement).getAttribute("step")).toBe("1");
   });
 
   it("accepts a decimal value typed into Min and reports it as valid", async () => {
@@ -341,12 +343,12 @@ describe("SyntheticProfileStep — select-all / deselect-all (UI-487)", () => {
     await user.click(rowCheckboxes()[1]);
     expect(rowPatternSelects()).toHaveLength(1);
 
-    await user.selectOptions(bulkPatternSelect(), "Random");
-    expect(rowPatternSelects()[0].value).toBe("RANDOM_UNIFORM");
+    await user.selectOptions(bulkPatternSelect(), "Wave (rises and falls repeatedly)");
+    expect(rowPatternSelects()[0].value).toBe("SINE");
 
     // Re-select the second row and confirm its pattern was left at its untouched default
     // (not overwritten by the bulk apply while it was deselected).
     await user.click(rowCheckboxes()[1]);
-    expect(rowPatternSelects()[1].value).not.toBe("RANDOM_UNIFORM");
+    expect(rowPatternSelects()[1].value).toBe("RANDOM_UNIFORM");
   });
 });

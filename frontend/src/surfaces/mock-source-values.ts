@@ -4,6 +4,10 @@ export type SourceValueRow = {
   path: string;
   dataType: "float" | "int" | "bool" | "string";
   currentValue: string;
+  /** Unrounded live value, retained for the value cell's accessible exact-value hint. */
+  exactValue?: string;
+  /** Engineering unit supplied by the schema, rendered in its own table column. */
+  unit?: string | null;
   updatedAt: string;
   freshness: "Live" | "No updates";
   pinned: boolean;
