@@ -115,6 +115,7 @@ describe("defaultDraft — CONSTANT_ONLY_TYPES locking (IS-168 / UI-482)", () =>
   it("enforces whole, in-range values for integer measurements", () => {
     expect(toPattern(draft({ pattern: "RANDOM_UNIFORM", min: "1.5", max: "3" }), "INT16")).toBeNull();
     expect(toPattern(draft({ pattern: "CONSTANT", value: "256" }), "UINT8")).toBeNull();
+    expect(toPattern(draft({ pattern: "RANDOM_WALK", min: "0", max: "10", volatility: "0.5" }), "INT32")).toBeNull();
   });
 
   it("serializes text lists for cycling and random selection", () => {

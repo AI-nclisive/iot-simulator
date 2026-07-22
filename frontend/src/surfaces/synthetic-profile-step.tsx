@@ -295,7 +295,7 @@ export function toPattern(d: NodeDraft, dataType: string | null = null): Synthet
       const mn = num(d.min);
       const mx = num(d.max);
       const vol = num(d.volatility);
-      return mn == null || mx == null || vol == null || mn > mx || vol < 0 || (isIntegerType(dataType) && (!validInteger(mn, dataType) || !validInteger(mx, dataType)))
+      return mn == null || mx == null || vol == null || mn > mx || vol < 0 || (isIntegerType(dataType) && (!validInteger(mn, dataType) || !validInteger(mx, dataType) || !Number.isInteger(vol)))
         ? null
         : { type: "RANDOM_WALK", min: mn, max: mx, volatility: vol };
     }
