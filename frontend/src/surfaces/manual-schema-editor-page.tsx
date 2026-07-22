@@ -41,15 +41,34 @@ const SUGGESTED_VARIABLES = [
   { group: "Limits & diagnostics", name: "LowLimit", dataType: "FLOAT64", unit: null, description: "Configured lower operating limit" },
   { group: "Limits & diagnostics", name: "Quality", dataType: "STATUS_CODE", unit: null, description: "Quality of the current value" },
   { group: "Limits & diagnostics", name: "DiagnosticMessage", dataType: "LOCALIZED_TEXT", unit: null, description: "Human-readable diagnostic information" },
+  { group: "Simulation", name: "Counter", dataType: "FLOAT64", unit: null, description: "Monotonically increasing simulated value" },
+  { group: "Simulation", name: "Random", dataType: "FLOAT64", unit: null, description: "Random simulated value" },
+  { group: "Simulation", name: "Sawtooth", dataType: "FLOAT64", unit: null, description: "Sawtooth simulated signal" },
+  { group: "Simulation", name: "Sinusoid", dataType: "FLOAT64", unit: null, description: "Sinusoidal simulated signal" },
+  { group: "Simulation", name: "Square", dataType: "FLOAT64", unit: null, description: "Square-wave simulated signal" },
+  { group: "Simulation", name: "Triangle", dataType: "FLOAT64", unit: null, description: "Triangle-wave simulated signal" },
+  { group: "Static data", name: "BooleanValue", dataType: "BOOL", unit: null, description: "Static Boolean value" },
+  { group: "Static data", name: "StringValue", dataType: "STRING", unit: null, description: "Static text value" },
+  { group: "Static data", name: "DateTimeValue", dataType: "DATETIME", unit: null, description: "Static date and time value" },
+  { group: "Static data", name: "NodeIdValue", dataType: "NODE_ID", unit: null, description: "Static OPC UA NodeId value" },
+  { group: "Analog & data items", name: "EngineeringUnits", dataType: "STRING", unit: null, description: "Engineering units label" },
+  { group: "Analog & data items", name: "EURangeLow", dataType: "FLOAT64", unit: null, description: "Engineering range lower bound" },
+  { group: "Analog & data items", name: "EURangeHigh", dataType: "FLOAT64", unit: null, description: "Engineering range upper bound" },
+  { group: "Analog & data items", name: "Definition", dataType: "STRING", unit: null, description: "Data item definition" },
+  { group: "State & access", name: "State", dataType: "UINT32", unit: null, description: "Multi-state value" },
+  { group: "State & access", name: "AccessLevel", dataType: "UINT8", unit: null, description: "OPC UA access-level flags" },
+  { group: "State & access", name: "UserAccessLevel", dataType: "UINT8", unit: null, description: "User-specific access-level flags" },
+  { group: "State & access", name: "Alias", dataType: "NODE_ID", unit: null, description: "Alias target NodeId" },
 ] as const;
 
-const PARAMETER_GROUPS = ["Measurements", "Control", "Device information", "Limits & diagnostics"] as const;
+const PARAMETER_GROUPS = ["Measurements", "Control", "Device information", "Limits & diagnostics", "Simulation", "Static data", "Analog & data items", "State & access"] as const;
 
 const VALUE_RANKS = ["SCALAR", "ARRAY"] as const;
 const ACCESS_LEVELS = ["READ", "READ_WRITE"] as const;
 const UPCOMING_NODE_CLASSES = ["Object", "Method", "Reference", "DataType"] as const;
 
 type ValidationIssue = { nodeId: string; message: string };
+type BatchVariableRow = { id: string; name: string; dataType: string; unit: string; description: string };
 
 export function validateManualSchemaNodes(nodes: NodeDto[]): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
@@ -137,7 +156,7 @@ export function ManualSchemaEditorPage() {
   const [addDescription, setAddDescription] = useState("");
   const [selectedSuggestion, setSelectedSuggestion] = useState("");
   const [addParentId, setAddParentId] = useState<string | null>(null);
-  const [batchNodes, setBatchNodes] = useState("");
+  const [batchRows, setBatchRows] = useState<BatchVariableRow[]>([]);
   const [showLibrary, setShowLibrary] = useState(false);
   const [showBatch, setShowBatch] = useState(false);
   const [saveMode, setSaveMode] = useState<SaveMode | null>(null);
@@ -285,27 +304,21 @@ export function ManualSchemaEditorPage() {
     setExpandedIds((prev) => new Set(prev).add(parentId));
   }
 
+  function appendBatchRow() {
+    setBatchRows((prev) => [...prev, { id: newNodeId(), name: "", dataType: "FLOAT64", unit: "", description: "" }]);
+  }
+
   function addBatchNodes() {
-    const knownTypes = new Set<string>(DATA_TYPES);
-    const lines = batchNodes.split("\n").filter((line) => line.trim());
-    const parsed = lines.flatMap((line) => {
-      const [rawName, rawType] = line.split(/[\t,]/, 2).map((part) => part.trim());
-      return rawName && rawType && knownTypes.has(rawType)
-        ? [{ name: rawName, dataType: rawType }]
-        : [];
-    });
-    if (parsed.length === 0) return;
-    const created: NodeDto[] = parsed.map(({ name: nodeName, dataType }) => ({
-      nodeId: newNodeId(), parentId: addParentId, path: pathFor(addParentId, nodeName), name: nodeName,
-      kind: "VARIABLE", dataType, valueRank: "SCALAR", access: "READ", unit: null, description: null,
+    const completeRows = batchRows.filter((row) => row.name.trim());
+    if (completeRows.length === 0) return;
+    const created: NodeDto[] = completeRows.map((row) => ({
+      nodeId: newNodeId(), parentId: addParentId, path: pathFor(addParentId, row.name.trim()), name: row.name.trim(),
+      kind: "VARIABLE", dataType: row.dataType, valueRank: "SCALAR", access: "READ",
+      unit: row.unit.trim() || null, description: row.description.trim() || null,
     }));
     setNodes((prev) => [...prev, ...created]);
     if (addParentId) setExpandedIds((prev) => new Set(prev).add(addParentId));
-    setBatchNodes("");
-    const rejected = lines.length - parsed.length;
-    if (rejected > 0) {
-      push({ tone: "warning", title: `${rejected} row${rejected === 1 ? " was" : "s were"} skipped because the type is not supported.` });
-    }
+    setBatchRows([]);
   }
 
   function handleDeleteNode(nodeId: string) {
@@ -592,7 +605,7 @@ export function ManualSchemaEditorPage() {
               {showLibrary ? "Hide parameter catalog" : "Choose from parameter catalog"}
             </button>
             <button className="shell-text-action" type="button" onClick={() => setShowBatch((open) => !open)}>
-              {showBatch ? "Hide batch add" : "Add several variables"}
+              {showBatch ? "Hide multiple-variable form" : "Add multiple variables"}
             </button>
           </div>
         ) : null}
@@ -635,39 +648,50 @@ export function ManualSchemaEditorPage() {
 
         {access.isAdmin && folders.length > 0 && showBatch ? (
           <section className="mb-4 rounded-md border border-shell-line bg-white px-4 py-4">
-            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_16rem]">
+            <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <p className="text-sm font-medium text-shell-ink">Add several variables</p>
-                <p className="mt-1 text-xs text-shell-muted">
-                  Paste one variable per line as <code>Name, TYPE</code> or <code>Name[TAB]TYPE</code>.
-                </p>
-                <textarea
-                  aria-label="Variables to add"
-                  className="shell-field mt-3 min-h-28 w-full font-mono text-sm"
-                  placeholder={"Temperature, FLOAT64\nEnabled, BOOL"}
-                  value={batchNodes}
-                  onChange={(e) => setBatchNodes(e.target.value)}
-                />
+                <p className="text-sm font-medium text-shell-ink">Add multiple variables</p>
+                <p className="mt-1 text-xs text-shell-muted">Add one row per variable. Each name and type is entered separately.</p>
               </div>
-              <div className="flex flex-col gap-3">
-                <label className="flex flex-col gap-1.5 text-sm text-shell-muted">
-                  Parent
-                  <select
-                    aria-label="Parent folder for several variables"
-                    className="shell-field"
-                    value={addParentId ?? ""}
-                    onChange={(e) => setAddParentId(e.target.value || null)}
-                  >
-                    <option value="">Top level of server</option>
-                    {folders.map((folder) => (
-                      <option key={folder.nodeId} value={folder.nodeId}>{folder.path}</option>
-                    ))}
-                  </select>
-                </label>
-                <button className="shell-action" disabled={!batchNodes.trim()} type="button" onClick={addBatchNodes}>
-                  + Add variables
-                </button>
-              </div>
+              <label className="flex min-w-56 flex-col gap-1.5 text-sm text-shell-muted">
+                Parent
+                <select
+                  aria-label="Parent folder for multiple variables"
+                  className="shell-field"
+                  value={addParentId ?? ""}
+                  onChange={(e) => setAddParentId(e.target.value || null)}
+                >
+                  <option value="">Top level of server</option>
+                  {folders.map((folder) => (
+                    <option key={folder.nodeId} value={folder.nodeId}>{folder.path}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div className="mt-4 space-y-3">
+              {batchRows.map((row, index) => (
+                <div key={row.id} className="grid gap-2 rounded border border-shell-line p-3 md:grid-cols-[minmax(10rem,1fr)_11rem_minmax(8rem,1fr)_minmax(10rem,1fr)_auto]">
+                  <label className="text-xs text-shell-muted">Name
+                    <input aria-label={`Variable ${index + 1} name`} className="shell-field mt-1 w-full" value={row.name}
+                      onChange={(e) => setBatchRows((prev) => prev.map((candidate) => candidate.id === row.id ? { ...candidate, name: e.target.value } : candidate))} />
+                  </label>
+                  <label className="text-xs text-shell-muted">Type
+                    <select aria-label={`Variable ${index + 1} type`} className="shell-field mt-1 w-full" value={row.dataType}
+                      onChange={(e) => setBatchRows((prev) => prev.map((candidate) => candidate.id === row.id ? { ...candidate, dataType: e.target.value } : candidate))}>
+                      {DATA_TYPES.map((type) => <option key={type} value={type}>{typeLabel(type)}</option>)}
+                    </select>
+                  </label>
+                  <label className="text-xs text-shell-muted">Unit <span className="font-normal">(optional)</span>
+                    <input aria-label={`Variable ${index + 1} unit`} className="shell-field mt-1 w-full" value={row.unit}
+                      onChange={(e) => setBatchRows((prev) => prev.map((candidate) => candidate.id === row.id ? { ...candidate, unit: e.target.value } : candidate))} />
+                  </label>
+                  <button className="shell-text-action self-end" type="button" onClick={() => setBatchRows((prev) => prev.filter((candidate) => candidate.id !== row.id))}>Remove</button>
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button className="shell-action" type="button" onClick={appendBatchRow}>+ Add row</button>
+              <button className="shell-action" disabled={!batchRows.some((row) => row.name.trim())} type="button" onClick={addBatchNodes}>Add variables</button>
             </div>
           </section>
         ) : null}
