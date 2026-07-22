@@ -352,3 +352,69 @@ describe("SyntheticProfileStep — select-all / deselect-all (UI-487)", () => {
     expect(rowPatternSelects()[1].value).toBe("RANDOM_UNIFORM");
   });
 });
+
+// UI-499: a BOOL node's "Alternating true/false" / "Random true/false" patterns must not
+// show the generic Add/Remove values-list editor — a boolean only ever has two possible
+// values, so there is nothing for the user to curate.
+describe("SyntheticProfileStep — BOOL pattern editor (UI-499)", () => {
+  async function renderWithBoolMeasurement() {
+    mockApiFetch.mockReset();
+    mockApiFetch.mockImplementation(async (path: string) => {
+      if (path.includes("/recordings")) return { items: [] };
+      if (path.endsWith("/schema")) {
+        return {
+          id: "schema1",
+          dataSourceId: "s1",
+          version: 1,
+          nodes: [
+            { nodeId: "n1", path: "n1", name: "Running", kind: "VARIABLE", dataType: "BOOL", unit: null },
+          ],
+        };
+      }
+      throw new Error(`unexpected apiFetch: ${path}`);
+    });
+
+    render(
+      <SyntheticProfileStep
+        projectId="p1"
+        sources={sources}
+        seed=""
+        onSeedChange={() => {}}
+        onChange={() => {}}
+      />,
+    );
+
+    const user = userEvent.setup();
+    await user.selectOptions(screen.getByLabelText(/Reuse schema from source/i), "s1");
+    await waitFor(() => expect(screen.queryByText("Running")).not.toBeNull());
+    const list = screen.getByRole("list");
+    const select = within(list)
+      .getAllByRole("combobox")
+      .find((el) => within(el).queryByText("Fixed true/false") != null) as HTMLSelectElement;
+    return { user, select };
+  }
+
+  it("shows a description instead of Add/Remove controls for Alternating true/false", async () => {
+    const { user, select } = await renderWithBoolMeasurement();
+    await user.selectOptions(select, "Alternating true/false");
+
+    expect(screen.getByText("Alternates between True and False on every update.")).not.toBeNull();
+    expect(screen.queryByRole("button", { name: "Add value" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Remove value/ })).toBeNull();
+  });
+
+  it("shows a description instead of Add/Remove controls for Random true/false", async () => {
+    const { user, select } = await renderWithBoolMeasurement();
+    await user.selectOptions(select, "Random true/false");
+
+    expect(screen.getByText("Picks True or False at random on every update.")).not.toBeNull();
+    expect(screen.queryByRole("button", { name: "Add value" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Remove value/ })).toBeNull();
+  });
+
+  it("still keeps the fixed True/False select for the Fixed true/false (CONSTANT) pattern", async () => {
+    const { select } = await renderWithBoolMeasurement();
+    expect(select.value).toBe("CONSTANT");
+    expect(screen.queryByRole("button", { name: "Add value" })).toBeNull();
+  });
+});

@@ -970,30 +970,30 @@ export function SyntheticProfileStep({
                         </label>
                       ) : null}
 
-                      {d.pattern === "ENUM_CYCLE" || d.pattern === "RANDOM_CHOICE" ? (
+                      {(d.pattern === "ENUM_CYCLE" || d.pattern === "RANDOM_CHOICE") && booleanType ? (
+                        <div className="flex flex-col gap-1 text-xs uppercase tracking-wide text-shell-muted sm:col-span-2 lg:col-span-3">
+                          Values
+                          <p className="normal-case text-shell-ink">
+                            {d.pattern === "ENUM_CYCLE"
+                              ? "Alternates between True and False on every update."
+                              : "Picks True or False at random on every update."}
+                          </p>
+                        </div>
+                      ) : null}
+
+                      {(d.pattern === "ENUM_CYCLE" || d.pattern === "RANDOM_CHOICE") && !booleanType ? (
                         <div className="flex flex-col gap-1 text-xs uppercase tracking-wide text-shell-muted sm:col-span-2 lg:col-span-3">
                           Values
                           <div className="space-y-2">
                             {d.values.map((value, index) => (
                               <div className="flex gap-2" key={d.valueIds[index] ?? `${node.nodeId}-value-${index}`}>
-                                {booleanType ? (
-                                  <select
-                                    aria-label={`Value ${index + 1}`}
-                                    className="shell-field"
-                                    value={value}
-                                    onChange={(e) => patchDraft(node.nodeId, { values: d.values.map((v, i) => i === index ? e.target.value : v) })}
-                                  >
-                                    <option value="true">True</option><option value="false">False</option>
-                                  </select>
-                                ) : (
-                                  <input
-                                    aria-label={`Value ${index + 1}`}
-                                    className="shell-field"
-                                    type="text"
-                                    value={value}
-                                    onChange={(e) => patchDraft(node.nodeId, { values: d.values.map((v, i) => i === index ? e.target.value : v) })}
-                                  />
-                                )}
+                                <input
+                                  aria-label={`Value ${index + 1}`}
+                                  className="shell-field"
+                                  type="text"
+                                  value={value}
+                                  onChange={(e) => patchDraft(node.nodeId, { values: d.values.map((v, i) => i === index ? e.target.value : v) })}
+                                />
                                 <button
                                   aria-label={`Remove value ${index + 1}`}
                                   className="shell-text-action"
@@ -1008,7 +1008,7 @@ export function SyntheticProfileStep({
                             ))}
                           </div>
                           <button className="w-fit text-left text-xs font-normal normal-case text-shell-accent underline" type="button" onClick={() => patchDraft(node.nodeId, {
-                            values: [...d.values, booleanType ? "false" : ""],
+                            values: [...d.values, ""],
                             valueIds: [...d.valueIds, ...newListValueIds(1)],
                           })}>
                             Add value
