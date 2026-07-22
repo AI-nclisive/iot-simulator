@@ -1198,7 +1198,7 @@ Parallel execution:
   Depends: UI-492; IS-176 for persistent Objects, Methods, References and NodeSet XML import.
   Done when: users can choose a supported node class knowingly, add one variable through a structured form with an explicit destination, inspect and edit supported node details, and see actionable duplicate/invalid-name/invalid-parent validation; typecheck + vitest + build green.
 
-- [ ] `UI-494` ⬜ Manual Schema — expanded OPC UA catalog and multi-variable form
+- [x] `UI-494` ✅ Manual Schema — expanded OPC UA catalog and multi-variable form
   Goal: let users manually build a realistic OPC UA server structure from known, documented parameters and reusable structures, without a comma/tab-delimited entry syntax.
   Surface: `Manual Schemas` — editor.
   Work includes: expanded searchable OPC UA/Prosys-inspired parameter catalog; documented simulation, static-data, analog/data-item, state and access examples; and an editable multi-variable row form with separate Name and Type controls.
