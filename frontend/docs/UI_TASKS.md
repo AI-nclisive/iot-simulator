@@ -1205,6 +1205,13 @@ Parallel execution:
   Depends: UI-493; IS-176.
   Done when: known catalog items are discoverable and inserted under an explicit parent; several variables are added from independently editable rows; no user-facing comma/tab syntax remains; typecheck + vitest + build green.
 
+- [x] `UI-496` ✅ Synthetic wizard — hide recording prefill for Manual Schema
+  Goal: keep the Synthetic wizard focused when a Manual Schema provides the structure: users should not see an unrelated recording selector that can expose an unhelpful technical ID.
+  Surface: `Create Data Source Wizard` — Synthetic profile.
+  Work includes: hide the recording-prefill selector and action for Manual Schema; preserve it for Existing source; cover both paths with tests.
+  Depends: UI-491.
+  Done when: Manual Schema shows only its selected structure and pattern controls; Existing source retains recording prefill; typecheck + vitest + build green.
+
 - [x] `UI-495` ✅ Manual Schema — expand reusable OPC UA structure catalog
   Goal: expand the Manual Schema catalog with realistic, editable starter structures so users can build an OPC UA server from familiar equipment and data patterns instead of starting from empty folders.
   Surface: `Manual Schemas` — editor catalog.
