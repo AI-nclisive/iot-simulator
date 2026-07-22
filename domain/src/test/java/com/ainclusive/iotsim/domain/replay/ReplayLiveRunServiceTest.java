@@ -13,6 +13,9 @@ import com.ainclusive.iotsim.persistence.recording.RecordingRepository;
 import com.ainclusive.iotsim.persistence.recording.RecordingRow;
 import com.ainclusive.iotsim.persistence.run.RunRepository;
 import com.ainclusive.iotsim.persistence.run.RunRow;
+import com.ainclusive.iotsim.persistence.runtimeevent.RuntimeEventQuery;
+import com.ainclusive.iotsim.persistence.runtimeevent.RuntimeEventRepository;
+import com.ainclusive.iotsim.persistence.runtimeevent.RuntimeEventRow;
 import com.ainclusive.iotsim.persistence.schema.SchemaRepository;
 import com.ainclusive.iotsim.persistence.schema.SchemaWithNodes;
 import com.ainclusive.iotsim.persistence.timeline.ValueTimelineRepository;
@@ -45,6 +48,7 @@ class ReplayLiveRunServiceTest {
     private CapturingRuntime runtime;
     private FakeRuns runs;
     private FakeEvidence evidence;
+    private FakeEvents events;
     private FakeDataSources dataSources;
     private MutableClock wall;
 
@@ -53,6 +57,7 @@ class ReplayLiveRunServiceTest {
         runtime = new CapturingRuntime();
         runs = new FakeRuns();
         evidence = new FakeEvidence();
+        events = new FakeEvents();
         dataSources = new FakeDataSources(SOURCE, PROJECT);
         wall = MutableClock.at(T0, ZoneOffset.UTC);
     }
@@ -381,6 +386,38 @@ class ReplayLiveRunServiceTest {
     }
 
     // --- fakes ---
+
+    private static final class FakeEvents implements RuntimeEventRepository {
+        final List<RuntimeEventRow> appended = new ArrayList<>();
+        private long seq;
+
+        public RuntimeEventRow append(String projectId, String dataSourceId, String runId,
+                String type, OffsetDateTime at, String payloadJson) {
+            RuntimeEventRow row = new RuntimeEventRow(++seq, projectId, dataSourceId, runId, type, at, payloadJson);
+            appended.add(row);
+            return row;
+        }
+
+        public Optional<RuntimeEventRow> findById(long id) {
+            throw new UnsupportedOperationException();
+        }
+
+        public List<RuntimeEventRow> findByProject(String projectId) {
+            throw new UnsupportedOperationException();
+        }
+
+        public List<RuntimeEventRow> findByRun(String runId) {
+            return appended.stream().filter(r -> runId.equals(r.runId())).toList();
+        }
+
+        public List<RuntimeEventRow> findByDataSource(String dataSourceId) {
+            throw new UnsupportedOperationException();
+        }
+
+        public List<RuntimeEventRow> query(RuntimeEventQuery filter) {
+            throw new UnsupportedOperationException();
+        }
+    }
 
     private static class CapturingRuntime implements RuntimeController {
         final List<NeutralValue> applied = new ArrayList<>();
