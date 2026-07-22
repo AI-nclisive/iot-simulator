@@ -315,4 +315,24 @@ describe("mapDataSource (IS-127 field mapping)", () => {
     await useDataSourcesStore.getState().loadDataSources("proj-1");
     expect(useDataSourcesStore.getState().dataSources[0].parameterCount).toBe(0);
   });
+
+  it("maps null health for a non-RUNNING source (UI-501) instead of defaulting to Healthy", async () => {
+    mockApiFetch.mockResolvedValueOnce({
+      items: [makeDataSourceResponse({ runtimeState: "STOPPED" })],
+      nextCursor: null,
+      limit: 50,
+    });
+    await useDataSourcesStore.getState().loadDataSources("proj-1");
+    expect(useDataSourcesStore.getState().dataSources[0].health).toBeNull();
+  });
+
+  it("maps Healthy for a RUNNING source (UI-501)", async () => {
+    mockApiFetch.mockResolvedValueOnce({
+      items: [makeDataSourceResponse({ runtimeState: "RUNNING" })],
+      nextCursor: null,
+      limit: 50,
+    });
+    await useDataSourcesStore.getState().loadDataSources("proj-1");
+    expect(useDataSourcesStore.getState().dataSources[0].health).toBe("Healthy");
+  });
 });

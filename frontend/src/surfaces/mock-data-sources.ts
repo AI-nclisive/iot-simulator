@@ -14,7 +14,8 @@ export type DataSourceRow = {
   runtimeConfig?: string | null;
   parameterCount: number;
   status: "Active" | "Stopped";
-  health: "Healthy" | "Warning" | "Error";
+  /** null when the source isn't running — health only applies to an active run. */
+  health: "Healthy" | "Warning" | "Error" | null;
 };
 
 export const sourceRows: DataSourceRow[] = [
@@ -64,6 +65,6 @@ export const sourceRows: DataSourceRow[] = [
     endpoint: "localhost:503",
     parameterCount: 128,
     status: "Stopped",
-    health: "Error",
+    health: null,
   },
 ];

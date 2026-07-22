@@ -52,6 +52,10 @@ function healthTone(health: DataSourceRow["health"]) {
   return "accent";
 }
 
+function healthSortValue(health: DataSourceRow["health"]) {
+  return health ?? "";
+}
+
 function stateMeta(row: DataSourceRow) {
   if (row.status === "Active") {
     return { key: "run", label: "Run", tone: "accent" as const };
@@ -324,15 +328,18 @@ export function DataSourcesListPage() {
       id: "health",
       header: "Health",
       sortable: true,
-      sortValue: (row) => row.health,
-      cell: (row) => (
-        <div className="min-w-0">
-          <StatusBadge label={row.health} tone={healthTone(row.health)} />
-          {row.health === "Error" ? (
-            <p className="mt-1 text-xs text-shell-muted">See Events tab</p>
-          ) : null}
-        </div>
-      ),
+      sortValue: (row) => healthSortValue(row.health),
+      cell: (row) =>
+        row.health ? (
+          <div className="min-w-0">
+            <StatusBadge label={row.health} tone={healthTone(row.health)} />
+            {row.health === "Error" ? (
+              <p className="mt-1 text-xs text-shell-muted">See Events tab</p>
+            ) : null}
+          </div>
+        ) : (
+          <span className="text-sm text-shell-muted">—</span>
+        ),
       className: "w-[9rem]",
     },
   ];
