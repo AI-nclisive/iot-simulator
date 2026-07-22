@@ -188,6 +188,8 @@ class ScenarioLiveRunServiceTest {
         assertThat(manifests.getAllValues().get(0)).contains("\"endedAt\":null");
         assertThat(manifests.getAllValues().get(1)).doesNotContain("\"endedAt\":null");
         assertThat(manifests.getAllValues().get(1)).contains("\"kind\":\"SCENARIO\"");
+        // IS-182: scenario completion is mirrored into runtime_events (project-level, no single source).
+        verify(events).append(eq(PROJECT), eq((String) null), eq("run-1"), eq("RUN_COMPLETED"), any(), any());
     }
 
     @Test
@@ -210,6 +212,8 @@ class ScenarioLiveRunServiceTest {
         ArgumentCaptor<String> manifests = ArgumentCaptor.forClass(String.class);
         verify(evidence, times(2)).updateManifest(eq("ev-1"), manifests.capture());
         assertThat(manifests.getAllValues().get(1)).doesNotContain("\"endedAt\":null");
+        // IS-182: scenario failure is mirrored into runtime_events.
+        verify(events).append(eq(PROJECT), eq((String) null), eq("run-1"), eq("RUN_FAILED"), any(), any());
     }
 
     @Test
