@@ -4,6 +4,7 @@ import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.domain.common.ScenarioInvalidException;
 import com.ainclusive.iotsim.domain.datasource.DataSourceService;
 import com.ainclusive.iotsim.domain.replay.ReplayService;
+import com.ainclusive.iotsim.domain.run.RunCompletionEvents;
 import com.ainclusive.iotsim.domain.synthetic.SyntheticRunService;
 import com.ainclusive.iotsim.persistence.evidence.EvidenceRepository;
 import com.ainclusive.iotsim.persistence.evidence.EvidenceRow;
@@ -154,6 +155,7 @@ public class ScenarioLiveRunService {
         } catch (RuntimeException e) {
             stampFailure(run.id(), trig, actor, sourceIds, scenario, startedAt);
             runs.end(run.id(), "FAILED", now());
+            RunCompletionEvents.appendTerminal(events, projectId, null, run.id(), "FAILED", now());
             throw e;
         }
     }
@@ -209,7 +211,7 @@ public class ScenarioLiveRunService {
                 if (Thread.interrupted()) {
                     teardownFaults(startedFaults);
                     teardown(projectId, startedSources);
-                    safeEnd(runId, evidenceId, "STOPPED", trigger, actor, sourceIds, scenario, startedAt);
+                    safeEnd(projectId, runId, evidenceId, "STOPPED", trigger, actor, sourceIds, scenario, startedAt);
                     safeNotify(() -> stepListener.onRunFinished(projectId, runId, "STOPPED"));
                     registry.remove(runId);
                     return;
@@ -229,30 +231,30 @@ public class ScenarioLiveRunService {
             if (Thread.currentThread().isInterrupted() || e.getCause() instanceof InterruptedException) {
                 teardownFaults(startedFaults);
                 teardown(projectId, startedSources);
-                safeEnd(runId, evidenceId, "STOPPED", trigger, actor, sourceIds, scenario, startedAt);
+                safeEnd(projectId, runId, evidenceId, "STOPPED", trigger, actor, sourceIds, scenario, startedAt);
                 stepListener.onRunFinished(projectId, runId, "STOPPED");
             } else {
                 teardownFaults(startedFaults);
                 teardown(projectId, startedSources);
-                safeEnd(runId, evidenceId, "FAILED", trigger, actor, sourceIds, scenario, startedAt);
+                safeEnd(projectId, runId, evidenceId, "FAILED", trigger, actor, sourceIds, scenario, startedAt);
                 stepListener.onRunFinished(projectId, runId, "FAILED");
             }
         } catch (RuntimeException e) {
             teardownFaults(startedFaults);
             teardown(projectId, startedSources);
-            safeEnd(runId, evidenceId, "FAILED", trigger, actor, sourceIds, scenario, startedAt);
+            safeEnd(projectId, runId, evidenceId, "FAILED", trigger, actor, sourceIds, scenario, startedAt);
             stepListener.onRunFinished(projectId, runId, "FAILED");
         } finally {
             if (completed) {
-                safeEnd(runId, evidenceId, "COMPLETED", trigger, actor, sourceIds, scenario, startedAt);
+                safeEnd(projectId, runId, evidenceId, "COMPLETED", trigger, actor, sourceIds, scenario, startedAt);
                 stepListener.onRunFinished(projectId, runId, "COMPLETED");
             }
             registry.remove(runId);
         }
     }
 
-    private void safeEnd(String runId, String evidenceId, String state, String trigger, String actor,
-            List<String> sourceIds, ScenarioRow scenario, Instant startedAt) {
+    private void safeEnd(String projectId, String runId, String evidenceId, String state, String trigger,
+            String actor, List<String> sourceIds, ScenarioRow scenario, Instant startedAt) {
         try {
             evidence.updateManifest(evidenceId,
                     manifest(runId, trigger, actor, sourceIds, scenario, startedAt, Instant.now()));
@@ -264,6 +266,7 @@ public class ScenarioLiveRunService {
         } catch (RuntimeException ignored) {
             // intentionally swallowed — registry cleanup still happens in finally
         }
+        RunCompletionEvents.appendTerminal(events, projectId, null, runId, state, now());
     }
 
     private static void safeNotify(Runnable action) {

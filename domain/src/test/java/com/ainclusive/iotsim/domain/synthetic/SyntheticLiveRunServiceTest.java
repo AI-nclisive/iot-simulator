@@ -8,6 +8,9 @@ import com.ainclusive.iotsim.persistence.evidence.EvidenceRepository;
 import com.ainclusive.iotsim.persistence.evidence.EvidenceRow;
 import com.ainclusive.iotsim.persistence.run.RunRepository;
 import com.ainclusive.iotsim.persistence.run.RunRow;
+import com.ainclusive.iotsim.persistence.runtimeevent.RuntimeEventQuery;
+import com.ainclusive.iotsim.persistence.runtimeevent.RuntimeEventRepository;
+import com.ainclusive.iotsim.persistence.runtimeevent.RuntimeEventRow;
 import com.ainclusive.iotsim.persistence.schema.SchemaRepository;
 import com.ainclusive.iotsim.persistence.schema.SchemaWithNodes;
 import com.ainclusive.iotsim.platform.runtime.RuntimeController;
@@ -38,6 +41,7 @@ class SyntheticLiveRunServiceTest {
     private CapturingRuntime runtime;
     private FakeRuns runs;
     private FakeEvidence evidence;
+    private FakeEvents events;
     private MutableClock wall; // injected wall clock we advance by hand
 
     @BeforeEach
@@ -45,13 +49,14 @@ class SyntheticLiveRunServiceTest {
         runtime = new CapturingRuntime();
         runs = new FakeRuns();
         evidence = new FakeEvidence();
+        events = new FakeEvents();
         wall = MutableClock.at(T0, ZoneOffset.UTC);
     }
 
     private SyntheticLiveRunService service(String basis, SyntheticConfig config) {
         String rc = config == null ? "{}" : json.writeValueAsString(config);
         return new SyntheticLiveRunService(new FakeDataSources(basis, rc), new EmptySchemas(),
-                runtime, runs, evidence, json, wall);
+                runtime, runs, evidence, events, json, wall);
     }
 
     @Test
@@ -111,7 +116,7 @@ class SyntheticLiveRunServiceTest {
         CapturingRuntime batchRuntime = new CapturingRuntime();
         SyntheticRunService batch = new SyntheticRunService(
                 new FakeDataSources("SYNTHETIC", json.writeValueAsString(config(5L))),
-                new EmptySchemas(), batchRuntime, new FakeRuns(), new FakeEvidence(),
+                new EmptySchemas(), batchRuntime, new FakeRuns(), new FakeEvidence(), new FakeEvents(),
                 json, java.time.Clock.fixed(T0, ZoneOffset.UTC));
         batch.run(PROJECT, SOURCE, 1000);
 
@@ -136,6 +141,8 @@ class SyntheticLiveRunServiceTest {
         // capped at 1000ms => 14 values (temp 10 + rnd 4); count reflected in evidence.
         assertThat(runtime.applied).hasSize(14);
         assertThat(evidence.byId.get(s.evidenceId()).manifestJson()).contains("\"valueCount\":14");
+        // IS-182: cap-triggered auto-completion is mirrored into runtime_events.
+        assertThat(events.appended).extracting("type").containsExactly("RUN_COMPLETED");
         // A subsequent tick is a no-op (removed from registry).
         service.tickAll();
         assertThat(runtime.applied).hasSize(14);
@@ -177,7 +184,7 @@ class SyntheticLiveRunServiceTest {
         };
         SyntheticLiveRunService failing = new SyntheticLiveRunService(
                 new FakeDataSources("SYNTHETIC", json.writeValueAsString(config(5L))),
-                new EmptySchemas(), throwing, runs, evidence, json, wall);
+                new EmptySchemas(), throwing, runs, evidence, events, json, wall);
         SyntheticLiveRunSummary s = failing.start(PROJECT, SOURCE, null, "MANUAL", "local");
 
         wall.advance(Duration.ofMillis(500));
@@ -188,6 +195,8 @@ class SyntheticLiveRunServiceTest {
         // feed.emitted is advanced before applyValues is called, so valueCount reflects
         // the ticks that were computed (500ms / 100ms=5 + 500ms/250ms=2 = 7), not 0.
         assertThat(evidence.byId.get(s.evidenceId()).manifestJson()).contains("\"valueCount\":7");
+        // IS-182: tick-triggered failure is mirrored into runtime_events.
+        assertThat(events.appended).extracting("type").containsExactly("RUN_FAILED");
     }
 
     @Test
@@ -195,7 +204,7 @@ class SyntheticLiveRunServiceTest {
         // A transient DB error stamping evidence must not block the terminal COMPLETED write.
         SyntheticLiveRunService svc = new SyntheticLiveRunService(
                 new FakeDataSources("SYNTHETIC", json.writeValueAsString(config(5L))),
-                new EmptySchemas(), runtime, runs, throwingEvidenceAfterStart(), json, wall);
+                new EmptySchemas(), runtime, runs, throwingEvidenceAfterStart(), events, json, wall);
         SyntheticLiveRunSummary s = svc.start(PROJECT, SOURCE, 1000L, "MANUAL", "local");
 
         wall.advance(Duration.ofMillis(5000)); // past the cap
@@ -209,7 +218,7 @@ class SyntheticLiveRunServiceTest {
         // stopIfLive must not propagate an evidence-stamp failure into RunService.stop.
         SyntheticLiveRunService svc = new SyntheticLiveRunService(
                 new FakeDataSources("SYNTHETIC", json.writeValueAsString(config(5L))),
-                new EmptySchemas(), runtime, runs, throwingEvidenceAfterStart(), json, wall);
+                new EmptySchemas(), runtime, runs, throwingEvidenceAfterStart(), events, json, wall);
         SyntheticLiveRunSummary s = svc.start(PROJECT, SOURCE, null, "MANUAL", "local");
         wall.advance(Duration.ofMillis(500));
         svc.tickAll();
@@ -233,6 +242,38 @@ class SyntheticLiveRunServiceTest {
     }
 
     // --- fakes ---
+
+    private static final class FakeEvents implements RuntimeEventRepository {
+        final List<RuntimeEventRow> appended = new ArrayList<>();
+        private long seq;
+
+        public RuntimeEventRow append(String projectId, String dataSourceId, String runId,
+                String type, OffsetDateTime at, String payloadJson) {
+            RuntimeEventRow row = new RuntimeEventRow(++seq, projectId, dataSourceId, runId, type, at, payloadJson);
+            appended.add(row);
+            return row;
+        }
+
+        public Optional<RuntimeEventRow> findById(long id) {
+            throw new UnsupportedOperationException();
+        }
+
+        public List<RuntimeEventRow> findByProject(String projectId) {
+            throw new UnsupportedOperationException();
+        }
+
+        public List<RuntimeEventRow> findByRun(String runId) {
+            return appended.stream().filter(r -> runId.equals(r.runId())).toList();
+        }
+
+        public List<RuntimeEventRow> findByDataSource(String dataSourceId) {
+            throw new UnsupportedOperationException();
+        }
+
+        public List<RuntimeEventRow> query(RuntimeEventQuery filter) {
+            throw new UnsupportedOperationException();
+        }
+    }
 
     private static class CapturingRuntime implements RuntimeController {
         final List<NeutralValue> applied = new ArrayList<>();

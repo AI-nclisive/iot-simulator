@@ -13,6 +13,9 @@ import com.ainclusive.iotsim.persistence.recording.RecordingRepository;
 import com.ainclusive.iotsim.persistence.recording.RecordingRow;
 import com.ainclusive.iotsim.persistence.run.RunRepository;
 import com.ainclusive.iotsim.persistence.run.RunRow;
+import com.ainclusive.iotsim.persistence.runtimeevent.RuntimeEventQuery;
+import com.ainclusive.iotsim.persistence.runtimeevent.RuntimeEventRepository;
+import com.ainclusive.iotsim.persistence.runtimeevent.RuntimeEventRow;
 import com.ainclusive.iotsim.persistence.schema.SchemaRepository;
 import com.ainclusive.iotsim.persistence.schema.SchemaWithNodes;
 import com.ainclusive.iotsim.persistence.timeline.ValueTimelineRepository;
@@ -42,6 +45,7 @@ class ReplayServiceTest {
     private InMemoryRuntimeController runtime;
     private FakeRuns runs;
     private FakeEvidence evidence;
+    private FakeEvents events;
     private ReplayService service;
 
     @BeforeEach
@@ -49,6 +53,7 @@ class ReplayServiceTest {
         runtime = new InMemoryRuntimeController();
         runs = new FakeRuns();
         evidence = new FakeEvidence();
+        events = new FakeEvents();
         service = build(runtime);
     }
 
@@ -65,6 +70,7 @@ class ReplayServiceTest {
                 controller,
                 runs,
                 evidence,
+                events,
                 new ObjectMapper());
     }
 
@@ -99,6 +105,9 @@ class ReplayServiceTest {
         assertThat(ev.manifestJson()).contains("\"seed\":");
         assertThat(ev.manifestJson()).contains("\"kind\":\"REPLAY\"");
         assertThat(ev.manifestJson()).doesNotContain("\"endedAt\":null");
+        // IS-182: run completion is mirrored into runtime_events for the Events tab.
+        assertThat(events.appended).extracting("type").containsExactly("RUN_COMPLETED");
+        assertThat(events.appended.get(0).runId()).isEqualTo(summary.runId());
     }
 
     @Test
@@ -112,6 +121,8 @@ class ReplayServiceTest {
                 .extracting(RunRow::state).isEqualTo("FAILED");
         EvidenceRow ev = evidence.byId.values().iterator().next();
         assertThat(ev.manifestJson()).doesNotContain("\"endedAt\":null");
+        // IS-182: run failure is mirrored into runtime_events for the Events tab.
+        assertThat(events.appended).extracting("type").containsExactly("RUN_FAILED");
     }
 
     @Test
@@ -158,6 +169,7 @@ class ReplayServiceTest {
                 runtime,
                 runs,
                 evidence,
+                events,
                 new ObjectMapper());
 
         assertThatThrownBy(() -> mismatched.replay(PROJECT, SOURCE, RECORDING, null, true))
@@ -249,10 +261,43 @@ class ReplayServiceTest {
                 runtime,
                 runs,
                 evidence,
+                events,
                 new ObjectMapper());
     }
 
     // --- fakes ---
+
+    private static final class FakeEvents implements RuntimeEventRepository {
+        final List<RuntimeEventRow> appended = new ArrayList<>();
+        private long seq;
+
+        public RuntimeEventRow append(String projectId, String dataSourceId, String runId,
+                String type, OffsetDateTime at, String payloadJson) {
+            RuntimeEventRow row = new RuntimeEventRow(++seq, projectId, dataSourceId, runId, type, at, payloadJson);
+            appended.add(row);
+            return row;
+        }
+
+        public Optional<RuntimeEventRow> findById(long id) {
+            throw new UnsupportedOperationException();
+        }
+
+        public List<RuntimeEventRow> findByProject(String projectId) {
+            throw new UnsupportedOperationException();
+        }
+
+        public List<RuntimeEventRow> findByRun(String runId) {
+            return appended.stream().filter(r -> runId.equals(r.runId())).toList();
+        }
+
+        public List<RuntimeEventRow> findByDataSource(String dataSourceId) {
+            throw new UnsupportedOperationException();
+        }
+
+        public List<RuntimeEventRow> query(RuntimeEventQuery filter) {
+            throw new UnsupportedOperationException();
+        }
+    }
 
     private static final class ThrowingRuntime implements RuntimeController {
         public String start(String id, RuntimeStartSpec spec) {

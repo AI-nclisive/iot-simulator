@@ -3,6 +3,7 @@ package com.ainclusive.iotsim.domain.replay;
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.domain.common.SchemaVersionMismatchException;
 import com.ainclusive.iotsim.domain.datasource.RuntimeStartSpecs;
+import com.ainclusive.iotsim.domain.run.RunCompletionEvents;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRepository;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRow;
 import com.ainclusive.iotsim.persistence.evidence.EvidenceRepository;
@@ -11,6 +12,7 @@ import com.ainclusive.iotsim.persistence.recording.RecordingRepository;
 import com.ainclusive.iotsim.persistence.recording.RecordingRow;
 import com.ainclusive.iotsim.persistence.run.RunRepository;
 import com.ainclusive.iotsim.persistence.run.RunRow;
+import com.ainclusive.iotsim.persistence.runtimeevent.RuntimeEventRepository;
 import com.ainclusive.iotsim.persistence.schema.SchemaRepository;
 import com.ainclusive.iotsim.persistence.schema.SchemaWithNodes;
 import com.ainclusive.iotsim.persistence.timeline.ValueTimelineRepository;
@@ -55,6 +57,7 @@ public class ReplayLiveRunService {
     private final RuntimeController runtime;
     private final RunRepository runs;
     private final EvidenceRepository evidence;
+    private final RuntimeEventRepository events;
     private final ObjectMapper json;
     private final Clock wallClock;
 
@@ -63,14 +66,15 @@ public class ReplayLiveRunService {
     @Autowired
     public ReplayLiveRunService(DataSourceRepository dataSources, RecordingRepository recordings,
             ValueTimelineRepository timeline, SchemaRepository schemas, RuntimeController runtime,
-            RunRepository runs, EvidenceRepository evidence, ObjectMapper json) {
-        this(dataSources, recordings, timeline, schemas, runtime, runs, evidence, json, Clock.systemUTC());
+            RunRepository runs, EvidenceRepository evidence, RuntimeEventRepository events, ObjectMapper json) {
+        this(dataSources, recordings, timeline, schemas, runtime, runs, evidence, events, json, Clock.systemUTC());
     }
 
     /** Test seam: inject a controllable wall clock. */
     ReplayLiveRunService(DataSourceRepository dataSources, RecordingRepository recordings,
             ValueTimelineRepository timeline, SchemaRepository schemas, RuntimeController runtime,
-            RunRepository runs, EvidenceRepository evidence, ObjectMapper json, Clock wallClock) {
+            RunRepository runs, EvidenceRepository evidence, RuntimeEventRepository events,
+            ObjectMapper json, Clock wallClock) {
         this.dataSources = dataSources;
         this.recordings = recordings;
         this.timeline = timeline;
@@ -78,6 +82,7 @@ public class ReplayLiveRunService {
         this.runtime = runtime;
         this.runs = runs;
         this.evidence = evidence;
+        this.events = events;
         this.json = json;
         this.wallClock = wallClock;
     }
@@ -125,19 +130,20 @@ public class ReplayLiveRunService {
             if (values.isEmpty()) {
                 // Nothing to replay — complete immediately.
                 runtime.stop(dataSourceId);
-                stampAndEnd(run.id(), evidenceRow.id(), trigger, initiator, dataSourceId, startedAt,
+                stampAndEnd(projectId, run.id(), evidenceRow.id(), trigger, initiator, dataSourceId, startedAt,
                         recordingId, settings, 0, "COMPLETED");
                 return new ReplaySummary(recordingId, dataSourceId, 0, run.id(), evidenceRow.id(), settings);
             }
 
             Instant originSourceTime = values.get(0).sourceTime();
-            registry.put(run.id(), new LiveReplay(run.id(), evidenceRow.id(), dataSourceId,
+            registry.put(run.id(), new LiveReplay(projectId, run.id(), evidenceRow.id(), dataSourceId,
                     recordingId, trigger, initiator, startedAt, settings, startedAt, originSourceTime, values));
 
             return new ReplaySummary(recordingId, dataSourceId, values.size(),
                     run.id(), evidenceRow.id(), settings);
         } catch (RuntimeException e) {
             runs.end(run.id(), "FAILED", now());
+            RunCompletionEvents.appendTerminal(events, projectId, dataSourceId, run.id(), "FAILED", now());
             throw e;
         }
     }
@@ -202,6 +208,8 @@ public class ReplayLiveRunService {
         runtime.stop(live.dataSourceId);
         softStampEvidence(live, wallClock.instant());
         runs.end(live.runId, terminalState, now());
+        RunCompletionEvents.appendTerminal(events, live.projectId, live.dataSourceId, live.runId,
+                terminalState, now());
     }
 
     /**
@@ -227,7 +235,7 @@ public class ReplayLiveRunService {
         }
     }
 
-    private void stampAndEnd(String runId, String evidenceId, String trigger, String initiator,
+    private void stampAndEnd(String projectId, String runId, String evidenceId, String trigger, String initiator,
             String dataSourceId, Instant startedAt, String recordingId,
             DeterministicSettings settings, long valueCount, String terminalState) {
         try {
@@ -238,6 +246,7 @@ public class ReplayLiveRunService {
             // advisory
         }
         runs.end(runId, terminalState, now());
+        RunCompletionEvents.appendTerminal(events, projectId, dataSourceId, runId, terminalState, now());
     }
 
     private String manifest(String runId, String trigger, String initiator, String dataSourceId,
@@ -276,6 +285,7 @@ public class ReplayLiveRunService {
 
     /** In-memory handle for one running live replay. */
     static final class LiveReplay {
+        final String projectId;
         final String runId;
         final String evidenceId;
         final String dataSourceId;
@@ -291,10 +301,11 @@ public class ReplayLiveRunService {
         // volatile gives the single-writer/reader hand-off a happens-before edge.
         volatile int cursor;
 
-        LiveReplay(String runId, String evidenceId, String dataSourceId, String recordingId,
+        LiveReplay(String projectId, String runId, String evidenceId, String dataSourceId, String recordingId,
                 String trigger, String initiator, Instant startedAt,
                 DeterministicSettings settings, Instant replayStartWall, Instant originSourceTime,
                 List<NeutralValue> values) {
+            this.projectId = projectId;
             this.runId = runId;
             this.evidenceId = evidenceId;
             this.dataSourceId = dataSourceId;

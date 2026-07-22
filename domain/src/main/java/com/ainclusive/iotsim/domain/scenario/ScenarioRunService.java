@@ -5,6 +5,7 @@ import com.ainclusive.iotsim.domain.common.ScenarioInvalidException;
 import com.ainclusive.iotsim.domain.datasource.DataSourceService;
 import com.ainclusive.iotsim.domain.replay.ReplayService;
 import com.ainclusive.iotsim.domain.replay.ReplaySummary;
+import com.ainclusive.iotsim.domain.run.RunCompletionEvents;
 import com.ainclusive.iotsim.domain.synthetic.SyntheticRunService;
 import com.ainclusive.iotsim.persistence.evidence.EvidenceRepository;
 import com.ainclusive.iotsim.persistence.evidence.EvidenceRow;
@@ -95,10 +96,12 @@ public class ScenarioRunService {
             evidence.updateManifest(ev.id(),
                     manifest(run.id(), trig, actor, sourceIds, scenario, startedAt, Instant.now()));
             RunRow ended = runs.end(run.id(), "COMPLETED", now());
+            RunCompletionEvents.appendTerminal(events, projectId, null, run.id(), "COMPLETED", now());
             return new ScenarioRunSummary(run.id(), ev.id(), ended.state(), outcomes);
         } catch (RuntimeException e) {
             stampFailure(ev, run.id(), trig, actor, sourceIds, scenario, startedAt);
             runs.end(run.id(), "FAILED", now());
+            RunCompletionEvents.appendTerminal(events, projectId, null, run.id(), "FAILED", now());
             throw e;
         }
     }

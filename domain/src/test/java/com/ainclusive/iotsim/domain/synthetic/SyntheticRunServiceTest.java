@@ -10,6 +10,9 @@ import com.ainclusive.iotsim.persistence.evidence.EvidenceRepository;
 import com.ainclusive.iotsim.persistence.evidence.EvidenceRow;
 import com.ainclusive.iotsim.persistence.run.RunRepository;
 import com.ainclusive.iotsim.persistence.run.RunRow;
+import com.ainclusive.iotsim.persistence.runtimeevent.RuntimeEventQuery;
+import com.ainclusive.iotsim.persistence.runtimeevent.RuntimeEventRepository;
+import com.ainclusive.iotsim.persistence.runtimeevent.RuntimeEventRow;
 import com.ainclusive.iotsim.persistence.schema.SchemaRepository;
 import com.ainclusive.iotsim.persistence.schema.SchemaWithNodes;
 import com.ainclusive.iotsim.platform.runtime.RuntimeController;
@@ -39,12 +42,14 @@ class SyntheticRunServiceTest {
     private CapturingRuntime runtime;
     private FakeRuns runs;
     private FakeEvidence evidence;
+    private FakeEvents events;
 
     @BeforeEach
     void setUp() {
         runtime = new CapturingRuntime();
         runs = new FakeRuns();
         evidence = new FakeEvidence();
+        events = new FakeEvents();
     }
 
     private SyntheticConfig config(Long seed) {
@@ -58,7 +63,7 @@ class SyntheticRunServiceTest {
     private SyntheticRunService service(String basis, SyntheticConfig config) {
         String rc = config == null ? "{}" : json.writeValueAsString(config);
         return new SyntheticRunService(new FakeDataSources(basis, rc), new EmptySchemas(),
-                runtime, runs, evidence, json, FIXED);
+                runtime, runs, evidence, events, json, FIXED);
     }
 
     @Test
@@ -82,13 +87,16 @@ class SyntheticRunServiceTest {
         assertThat(ev.manifestJson()).contains("\"kind\":\"SYNTHETIC\"");
         assertThat(ev.manifestJson()).contains("\"runId\":\"" + summary.runId() + "\"");
         assertThat(ev.manifestJson()).doesNotContain("\"endedAt\":null");
+        // IS-182: run completion is mirrored into runtime_events for the Events tab.
+        assertThat(events.appended).extracting("type").containsExactly("RUN_COMPLETED");
+        assertThat(events.appended.get(0).runId()).isEqualTo(summary.runId());
     }
 
     @Test
     void runtimeFailureStampsEndedAtOnEvidenceManifest() {
         SyntheticRunService service = new SyntheticRunService(
                 new FakeDataSources("SYNTHETIC", json.writeValueAsString(config(1L))),
-                new EmptySchemas(), new ThrowingRuntime(), runs, evidence, json, FIXED);
+                new EmptySchemas(), new ThrowingRuntime(), runs, evidence, events, json, FIXED);
         assertThatThrownBy(() -> service.run(PROJECT, SOURCE, 1000))
                 .isInstanceOf(IllegalStateException.class);
         EvidenceRow ev = evidence.byId.values().iterator().next();
@@ -102,7 +110,7 @@ class SyntheticRunServiceTest {
         CapturingRuntime second = new CapturingRuntime();
         SyntheticRunService svc2 = new SyntheticRunService(
                 new FakeDataSources("SYNTHETIC", json.writeValueAsString(config(5L))),
-                new EmptySchemas(), second, new FakeRuns(), new FakeEvidence(), json, FIXED);
+                new EmptySchemas(), second, new FakeRuns(), new FakeEvidence(), new FakeEvents(), json, FIXED);
         svc2.run(PROJECT, SOURCE, 1000);
         assertThat(second.applied).isEqualTo(first);
     }
@@ -124,7 +132,7 @@ class SyntheticRunServiceTest {
     @Test
     void missingSourceThrowsNotFound() {
         SyntheticRunService service = new SyntheticRunService(new FakeDataSources("SYNTHETIC", "{}"),
-                new EmptySchemas(), runtime, runs, evidence, json, FIXED);
+                new EmptySchemas(), runtime, runs, evidence, events, json, FIXED);
         assertThatThrownBy(() -> service.run(PROJECT, "nope", 1000))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
@@ -133,11 +141,13 @@ class SyntheticRunServiceTest {
     void runtimeFailureEndsRunFailed() {
         SyntheticRunService service = new SyntheticRunService(
                 new FakeDataSources("SYNTHETIC", json.writeValueAsString(config(1L))),
-                new EmptySchemas(), new ThrowingRuntime(), runs, evidence, json, FIXED);
+                new EmptySchemas(), new ThrowingRuntime(), runs, evidence, events, json, FIXED);
         assertThatThrownBy(() -> service.run(PROJECT, SOURCE, 1000))
                 .isInstanceOf(IllegalStateException.class);
         assertThat(runs.byId.values()).singleElement()
                 .extracting(RunRow::state).isEqualTo("FAILED");
+        // IS-182: run failure is mirrored into runtime_events for the Events tab.
+        assertThat(events.appended).extracting("type").containsExactly("RUN_FAILED");
     }
 
     @Test
@@ -164,6 +174,38 @@ class SyntheticRunServiceTest {
     }
 
     // --- fakes ---
+
+    private static final class FakeEvents implements RuntimeEventRepository {
+        final List<RuntimeEventRow> appended = new ArrayList<>();
+        private long seq;
+
+        public RuntimeEventRow append(String projectId, String dataSourceId, String runId,
+                String type, OffsetDateTime at, String payloadJson) {
+            RuntimeEventRow row = new RuntimeEventRow(++seq, projectId, dataSourceId, runId, type, at, payloadJson);
+            appended.add(row);
+            return row;
+        }
+
+        public Optional<RuntimeEventRow> findById(long id) {
+            throw new UnsupportedOperationException();
+        }
+
+        public List<RuntimeEventRow> findByProject(String projectId) {
+            throw new UnsupportedOperationException();
+        }
+
+        public List<RuntimeEventRow> findByRun(String runId) {
+            return appended.stream().filter(r -> runId.equals(r.runId())).toList();
+        }
+
+        public List<RuntimeEventRow> findByDataSource(String dataSourceId) {
+            throw new UnsupportedOperationException();
+        }
+
+        public List<RuntimeEventRow> query(RuntimeEventQuery filter) {
+            throw new UnsupportedOperationException();
+        }
+    }
 
     private static final class CapturingRuntime implements RuntimeController {
         final List<NeutralValue> applied = new ArrayList<>();

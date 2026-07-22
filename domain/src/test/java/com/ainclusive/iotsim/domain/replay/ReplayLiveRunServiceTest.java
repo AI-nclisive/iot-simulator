@@ -79,7 +79,7 @@ class ReplayLiveRunServiceTest {
                 new FakeRecordings(RECORDING, PROJECT),
                 timeline,
                 new EmptySchemas(),
-                rt, runs, evidence, json, wall);
+                rt, runs, evidence, events, json, wall);
     }
 
     private ReplayLiveRunService serviceWithRecordingVersion(int schemaVersion) {
@@ -88,7 +88,7 @@ class ReplayLiveRunServiceTest {
                 new FakeRecordingsAtVersion(RECORDING, PROJECT, schemaVersion),
                 new FakeTimeline(defaultValues()),
                 new EmptySchemas(),
-                runtime, runs, evidence, json, wall);
+                runtime, runs, evidence, events, json, wall);
     }
 
     // --- tests ---
@@ -102,7 +102,7 @@ class ReplayLiveRunServiceTest {
                 new FakeRecordingsWithProtocol(RECORDING, PROJECT, "MODBUS_TCP"),
                 new FakeTimeline(defaultValues()),
                 new EmptySchemas(),
-                runtime, runs, evidence, json, wall);
+                runtime, runs, evidence, events, json, wall);
 
         assertThatThrownBy(() -> svc.start(PROJECT, SOURCE, RECORDING, null, true))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -273,7 +273,7 @@ class ReplayLiveRunServiceTest {
                 new FakeRecordings("other-rec", PROJECT), // RECORDING not found
                 new FakeTimeline(defaultValues()),
                 new EmptySchemas(),
-                runtime, runs, evidence, json, wall);
+                runtime, runs, evidence, events, json, wall);
 
         assertThatThrownBy(() -> svc.start(PROJECT, SOURCE, RECORDING, null, true))
                 .isInstanceOf(ResourceNotFoundException.class);
@@ -288,7 +288,7 @@ class ReplayLiveRunServiceTest {
                 new FakeRecordings(RECORDING, PROJECT),
                 new FakeTimeline(defaultValues()),
                 new EmptySchemas(),
-                runtime, runs, evidence, json, wall);
+                runtime, runs, evidence, events, json, wall);
 
         assertThatThrownBy(() -> svc.start(PROJECT, SOURCE, RECORDING, null, true))
                 .isInstanceOf(ResourceNotFoundException.class);
@@ -329,7 +329,7 @@ class ReplayLiveRunServiceTest {
                 new FakeRecordings(RECORDING, PROJECT),
                 new FakeTimeline(defaultValues()),
                 new EmptySchemas(),
-                runtime, runs, evidence, json, wall);
+                runtime, runs, evidence, events, json, wall);
 
         svc.start(PROJECT, SOURCE, RECORDING, null, true);
 
@@ -358,7 +358,7 @@ class ReplayLiveRunServiceTest {
                 new FakeRecordings(RECORDING, PROJECT),
                 new FakeTimeline(defaultValues()),
                 new EmptySchemas(),
-                runtime, runs, throwingEvidenceAfterStart(), json, wall);
+                runtime, runs, throwingEvidenceAfterStart(), events, json, wall);
         ReplaySummary summary = svc.start(PROJECT, SOURCE, RECORDING, null, true);
 
         // Must not propagate to RunService.stop.

@@ -3,6 +3,7 @@ package com.ainclusive.iotsim.domain.replay;
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.domain.common.SchemaVersionMismatchException;
 import com.ainclusive.iotsim.domain.datasource.RuntimeStartSpecs;
+import com.ainclusive.iotsim.domain.run.RunCompletionEvents;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRepository;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRow;
 import com.ainclusive.iotsim.persistence.evidence.EvidenceRepository;
@@ -11,6 +12,7 @@ import com.ainclusive.iotsim.persistence.recording.RecordingRepository;
 import com.ainclusive.iotsim.persistence.recording.RecordingRow;
 import com.ainclusive.iotsim.persistence.run.RunRepository;
 import com.ainclusive.iotsim.persistence.run.RunRow;
+import com.ainclusive.iotsim.persistence.runtimeevent.RuntimeEventRepository;
 import com.ainclusive.iotsim.persistence.schema.SchemaRepository;
 import com.ainclusive.iotsim.persistence.schema.SchemaWithNodes;
 import com.ainclusive.iotsim.persistence.timeline.ValueTimelineRepository;
@@ -45,11 +47,12 @@ public class ReplayService {
     private final RuntimeController runtime;
     private final RunRepository runs;
     private final EvidenceRepository evidence;
+    private final RuntimeEventRepository events;
     private final ObjectMapper json;
 
     public ReplayService(DataSourceRepository dataSources, RecordingRepository recordings,
             ValueTimelineRepository timeline, SchemaRepository schemas, RuntimeController runtime,
-            RunRepository runs, EvidenceRepository evidence, ObjectMapper json) {
+            RunRepository runs, EvidenceRepository evidence, RuntimeEventRepository events, ObjectMapper json) {
         this.dataSources = dataSources;
         this.recordings = recordings;
         this.timeline = timeline;
@@ -57,6 +60,7 @@ public class ReplayService {
         this.runtime = runtime;
         this.runs = runs;
         this.evidence = evidence;
+        this.events = events;
         this.json = json;
     }
 
@@ -135,10 +139,12 @@ public class ReplayService {
             evidence.updateManifest(evidenceRow.id(), manifest(run.id(), trigger, initiator, dataSourceId,
                     startedAt, Instant.now(), recordingId, settings, applied));
             runs.end(run.id(), "COMPLETED", now());
+            RunCompletionEvents.appendTerminal(events, projectId, dataSourceId, run.id(), "COMPLETED", now());
             return new ReplaySummary(recordingId, dataSourceId, applied, run.id(), evidenceRow.id(), settings);
         } catch (RuntimeException e) {
             stampFailure(evidenceRow, run.id(), trigger, initiator, dataSourceId, startedAt, recordingId, settings);
             runs.end(run.id(), "FAILED", now());
+            RunCompletionEvents.appendTerminal(events, projectId, dataSourceId, run.id(), "FAILED", now());
             throw e;
         }
     }
