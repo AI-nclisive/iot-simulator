@@ -1244,6 +1244,12 @@ Parallel execution:
   Work includes: resolve `sourceIds` to source names via `useDataSourcesStore` on the list page (listing all names for multi-source rows); resolve `scenarioId` to a scenario name on the detail page; raw ID remains an acceptable fallback when the referenced entity can't be found.
   Done when: list and detail pages show human-readable names wherever the referenced entity still exists; typecheck + vitest + build green.
 
+- [x] `UI-501` ✅ Data Sources — don't show "Healthy" for a stopped source
+  Goal: a disabled/stopped data source showed a green "Healthy" health badge on the Data Sources list and on the source detail pages, because `mapDataSource()` defaulted an absent health signal (`null`, returned for `STOPPED`/`STARTING` runtime state) to `"Healthy"`. Health only means something for an active run; a stopped source should show no health verdict instead of a misleading green one.
+  Surface: `Data Sources` list page; `Data Source Detail` — overview tab and preview header.
+  Work includes: make `DataSourceRow.health` nullable end-to-end; drop the `?? "Healthy"` fallback in `data-sources-store.ts`; render an em dash instead of a badge when health is `null` on the list page and both detail surfaces.
+  Done when: a stopped/disabled source shows no health badge (or "—") anywhere, a running source keeps its real Healthy/Warning/Error badge unchanged, and typecheck + vitest are green.
+
 ## Recommended Sequence
 
 1. Complete the P0 shell and shared-pattern tasks first.

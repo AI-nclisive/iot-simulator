@@ -50,7 +50,8 @@ const baseSource = {
   endpoint: "opc.tcp://localhost:4840",
   parameterCount: 0,
   status: "Stopped" as const,
-  health: "Healthy" as const,
+  // A stopped source has no runtime health signal (UI-501) — null, not "Healthy".
+  health: null,
 };
 
 const mockRunSynthetic = vi.fn().mockResolvedValue(undefined);
@@ -147,6 +148,23 @@ describe("DataSourcesListPage — protocol filter options (UI-463)", () => {
     const options = Array.from((select as HTMLSelectElement).options).map((o) => o.text);
     expect(options).toContain("OPC UA");
     expect(options).not.toContain("Modbus TCP");
+  });
+});
+
+describe("DataSourcesListPage — health badge for a stopped source (UI-501)", () => {
+  it("renders an em dash instead of a Healthy badge for a stopped source", async () => {
+    setupStore([{ ...baseSource }]);
+    renderPage();
+    await waitFor(() => expect(screen.getByText("Test Source")).toBeTruthy());
+    expect(screen.queryByText("Healthy")).toBeNull();
+    expect(screen.getByText("—")).toBeTruthy();
+  });
+
+  it("renders the real health badge for an active source", async () => {
+    setupStore([{ ...baseSource, status: "Active" as const, health: "Healthy" as const }]);
+    renderPage();
+    await waitFor(() => expect(screen.getByText("Test Source")).toBeTruthy());
+    expect(screen.getByText("Healthy")).toBeTruthy();
   });
 });
 
