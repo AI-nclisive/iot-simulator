@@ -16,6 +16,8 @@ import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
 import com.ainclusive.iotsim.domain.synthetic.SyntheticPattern.Constant;
 import com.ainclusive.iotsim.domain.synthetic.SyntheticPattern.Ramp;
+import com.ainclusive.iotsim.domain.synthetic.SyntheticPattern.RandomUniform;
+import com.ainclusive.iotsim.domain.synthetic.SyntheticPattern.RandomUuid;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
 
@@ -32,7 +34,7 @@ class SyntheticVariableTest {
     }
 
     @Test
-    void rejectsNonConstantPatternsForStructuralTypes() {
+    void rejectsPatternsThatAreNotSupportedForSpecialTypes() {
         Ramp dynamicPattern = new Ramp(0, 1, Duration.ofSeconds(1));
         assertThatExceptionOfType(IllegalArgumentException.class)
                 .isThrownBy(() -> new SyntheticVariable("n", BYTES, dynamicPattern, 100))
@@ -40,6 +42,9 @@ class SyntheticVariableTest {
         assertThatExceptionOfType(IllegalArgumentException.class)
                 .isThrownBy(() -> new SyntheticVariable("n", DATETIME, dynamicPattern, 100))
                 .withMessageContaining("DATETIME");
+        assertThatExceptionOfType(IllegalArgumentException.class)
+                .isThrownBy(() -> new SyntheticVariable("n", GUID, dynamicPattern, 100))
+                .withMessageContaining("GUID");
     }
 
     @Test
@@ -64,6 +69,13 @@ class SyntheticVariableTest {
                 .isEqualTo(EXPANDED_NODE_ID);
         assertThat(new SyntheticVariable("n", XML_ELEMENT, new Constant("<a/>"), 100).dataType())
                 .isEqualTo(XML_ELEMENT);
+    }
+
+    @Test
+    void allowsDedicatedRandomPatternsForDateTimeAndGuid() {
+        assertThat(new SyntheticVariable("n", DATETIME, new RandomUniform(0, 1), 100).dataType())
+                .isEqualTo(DATETIME);
+        assertThat(new SyntheticVariable("n", GUID, new RandomUuid(), 100).dataType()).isEqualTo(GUID);
     }
 
     @Test

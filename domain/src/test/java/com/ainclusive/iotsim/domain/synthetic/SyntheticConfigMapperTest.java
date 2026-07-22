@@ -173,6 +173,40 @@ class SyntheticConfigMapperTest {
     }
 
     @Test
+    void mapsRandomDateTimeIsoRangeToEpochMillis() {
+        var variable = new SyntheticVariableConfig("timestamp", DataType.DATETIME,
+                new PatternSpec("RANDOM_UNIFORM", null, null, null, null, null, null, null,
+                        null, null, null, "2026-07-01T00:00:00Z", "2026-07-31T00:00:00Z"), 500);
+
+        assertThat(SyntheticConfigMapper.toVariables(new SyntheticConfig(7L, List.of(variable))))
+                .extracting(SyntheticVariable::pattern)
+                .containsExactly(new SyntheticPattern.RandomUniform(
+                        Instant.parse("2026-07-01T00:00:00Z").toEpochMilli(),
+                        Instant.parse("2026-07-31T00:00:00Z").toEpochMilli()));
+    }
+
+    @Test
+    void rejectsInvalidRandomDateTimeRange() {
+        var variable = new SyntheticVariableConfig("timestamp", DataType.DATETIME,
+                new PatternSpec("RANDOM_UNIFORM", null, null, null, null, null, null, null,
+                        null, null, null, "2026-08-01T00:00:00Z", "2026-07-01T00:00:00Z"), 500);
+
+        assertThatThrownBy(() -> SyntheticConfigMapper.toVariables(new SyntheticConfig(7L, List.of(variable))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("dateTimeMin");
+    }
+
+    @Test
+    void mapsRandomUuidForGuid() {
+        var variable = new SyntheticVariableConfig("id", DataType.GUID,
+                spec("RANDOM_UUID", null, null, null, null, null, null, null), 500);
+
+        assertThat(SyntheticConfigMapper.toVariables(new SyntheticConfig(7L, List.of(variable))))
+                .extracting(SyntheticVariable::pattern)
+                .containsExactly(new SyntheticPattern.RandomUuid());
+    }
+
+    @Test
     void emptyVariablesRejected() {
         assertThatThrownBy(() -> new SyntheticConfig(1L, List.of()))
                 .isInstanceOf(IllegalArgumentException.class)

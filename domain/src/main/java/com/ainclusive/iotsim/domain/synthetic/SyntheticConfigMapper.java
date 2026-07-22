@@ -30,12 +30,18 @@ public final class SyntheticConfigMapper {
             case "RAMP" -> new SyntheticPattern.Ramp(req(spec.min(), "min"), req(spec.max(), "max"), period(spec));
             case "SINE" -> new SyntheticPattern.Sine(req(spec.min(), "min"), req(spec.max(), "max"), period(spec));
             case "SQUARE" -> new SyntheticPattern.Square(req(spec.min(), "min"), req(spec.max(), "max"), period(spec));
-            case "RANDOM_UNIFORM" ->
-                    new SyntheticPattern.RandomUniform(req(spec.min(), "min"), req(spec.max(), "max"));
+            case "RANDOM_UNIFORM" -> new SyntheticPattern.RandomUniform(
+                    spec.dateTimeMin() != null || spec.dateTimeMax() != null
+                            ? isoEpoch(spec.dateTimeMin(), "dateTimeMin")
+                            : req(spec.min(), "min"),
+                    spec.dateTimeMin() != null || spec.dateTimeMax() != null
+                            ? isoEpoch(spec.dateTimeMax(), "dateTimeMax")
+                            : req(spec.max(), "max"));
             case "RANDOM_WALK" -> new SyntheticPattern.RandomWalk(
                     req(spec.min(), "min"), req(spec.max(), "max"), req(spec.volatility(), "volatility"));
             case "ENUM_CYCLE" -> new SyntheticPattern.EnumCycle(reqList(spec.values(), "values"));
             case "RANDOM_CHOICE" -> new SyntheticPattern.RandomChoice(reqList(spec.values(), "values"));
+            case "RANDOM_UUID" -> new SyntheticPattern.RandomUuid();
             case "STEP_SEQUENCE" -> new SyntheticPattern.StepSequence(steps(spec));
             default -> throw new IllegalArgumentException("unknown pattern type: " + spec.type());
         };
@@ -67,13 +73,30 @@ public final class SyntheticConfigMapper {
         if (spec == null || spec.type() == null) {
             return; // toPattern supplies the standard required-field error
         }
-        if (dataType == DataType.DATETIME && "CONSTANT".equals(spec.type())) {
-            if (spec.dateTimeValue() == null) {
-                throw new IllegalArgumentException("DATETIME CONSTANT requires dateTimeValue as an ISO-8601 instant");
+        if (dataType == DataType.DATETIME) {
+            requireOneOf(spec.type(), dataType, "CONSTANT", "RANDOM_UNIFORM");
+            if ("CONSTANT".equals(spec.type())) {
+                if (spec.dateTimeValue() == null) {
+                    throw new IllegalArgumentException("DATETIME CONSTANT requires dateTimeValue as an ISO-8601 instant");
+                }
+                if (spec.value() != null || spec.stringValue() != null || spec.bytesValueBase64() != null) {
+                    throw new IllegalArgumentException("DATETIME CONSTANT must use only dateTimeValue");
+                }
             }
-            if (spec.value() != null || spec.stringValue() != null || spec.bytesValueBase64() != null) {
-                throw new IllegalArgumentException("DATETIME CONSTANT must use only dateTimeValue");
+            if ("RANDOM_UNIFORM".equals(spec.type())) {
+                if (spec.dateTimeMin() == null || spec.dateTimeMax() == null) {
+                    throw new IllegalArgumentException("DATETIME RANDOM_UNIFORM requires dateTimeMin and dateTimeMax as ISO-8601 instants");
+                }
+                long min = isoEpoch(spec.dateTimeMin(), "dateTimeMin");
+                long max = isoEpoch(spec.dateTimeMax(), "dateTimeMax");
+                if (min > max) {
+                    throw new IllegalArgumentException("dateTimeMin must be before or equal to dateTimeMax");
+                }
             }
+        }
+        if (dataType != DataType.DATETIME
+                && (spec.dateTimeValue() != null || spec.dateTimeMin() != null || spec.dateTimeMax() != null)) {
+            throw new IllegalArgumentException("ISO-8601 DATETIME fields are only valid for DATETIME variables");
         }
         if (dataType == DataType.STRING || dataType == DataType.LOCALIZED_TEXT) {
             requireOneOf(spec.type(), dataType, "CONSTANT", "ENUM_CYCLE", "RANDOM_CHOICE");
@@ -91,6 +114,9 @@ public final class SyntheticConfigMapper {
                     && reqList(spec.values(), "values").stream().anyMatch(v -> !(v instanceof Boolean))) {
                 throw new IllegalArgumentException("BOOL list values must all be booleans");
             }
+        }
+        if (dataType == DataType.GUID) {
+            requireOneOf(spec.type(), dataType, "CONSTANT", "RANDOM_UUID");
         }
         if (isInteger(dataType)) {
             requireIntegerFields(spec);
@@ -132,6 +158,17 @@ public final class SyntheticConfigMapper {
 
     private static boolean isWhole(double value) {
         return Double.isFinite(value) && value == Math.rint(value);
+    }
+
+    private static long isoEpoch(String value, String name) {
+        if (value == null) {
+            throw new IllegalArgumentException(name + " is required for this pattern");
+        }
+        try {
+            return Instant.parse(value).toEpochMilli();
+        } catch (RuntimeException e) {
+            throw new IllegalArgumentException(name + " must be an ISO-8601 instant", e);
+        }
     }
 
     private static List<Step> steps(PatternSpec spec) {

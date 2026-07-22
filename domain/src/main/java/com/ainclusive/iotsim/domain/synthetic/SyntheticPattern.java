@@ -3,6 +3,7 @@ package com.ainclusive.iotsim.domain.synthetic;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.random.RandomGenerator;
 
 /**
@@ -160,6 +161,14 @@ public sealed interface SyntheticPattern {
         @Override
         public Signal bind(RandomGenerator rng) {
             return (tick, elapsed) -> values.get(rng.nextInt(values.size()));
+        }
+    }
+
+    /** Generates a fresh UUID on every tick from the run-scoped seeded RNG. */
+    record RandomUuid() implements SyntheticPattern {
+        @Override
+        public Signal bind(RandomGenerator rng) {
+            return (tick, elapsed) -> new UUID(rng.nextLong(), rng.nextLong()).toString();
         }
     }
 

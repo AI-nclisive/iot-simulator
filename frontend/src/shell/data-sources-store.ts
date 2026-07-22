@@ -61,6 +61,7 @@ export type SyntheticPatternSpec = {
     | "SQUARE"
     | "RANDOM_UNIFORM"
     | "RANDOM_WALK"
+    | "RANDOM_UUID"
     | "ENUM_CYCLE"
     | "RANDOM_CHOICE";
   value?: number;
@@ -68,6 +69,9 @@ export type SyntheticPatternSpec = {
   stringValue?: string;
   /** ISO-8601 instant used by a DATETIME constant (IS-180). */
   dateTimeValue?: string;
+  /** ISO-8601 UTC bounds used by a random DATETIME pattern (IS-181). */
+  dateTimeMin?: string;
+  dateTimeMax?: string;
   /** IS-168: a CONSTANT for BYTES, standard Base64. */
   bytesValueBase64?: string;
   min?: number;
