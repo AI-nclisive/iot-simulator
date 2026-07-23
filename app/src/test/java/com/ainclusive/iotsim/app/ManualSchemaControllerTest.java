@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 import com.ainclusive.iotsim.api.error.PreconditionRequiredException;
 import com.ainclusive.iotsim.api.manualschema.ManualSchemaController;
@@ -15,6 +16,7 @@ import com.ainclusive.iotsim.api.manualschema.ManualSchemaController.DuplicateMa
 import com.ainclusive.iotsim.api.manualschema.ManualSchemaController.ManualSchemaResponse;
 import com.ainclusive.iotsim.api.manualschema.ManualSchemaController.NodeDto;
 import com.ainclusive.iotsim.api.manualschema.ManualSchemaController.UpdateManualSchemaRequest;
+import com.ainclusive.iotsim.api.schema.MemberDto;
 import com.ainclusive.iotsim.domain.common.ConcurrencyConflictException;
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.domain.manualschema.ManualSchema;
@@ -29,6 +31,7 @@ import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.http.ResponseEntity;
 
 /** Unit test for {@link ManualSchemaController} incl. node validation and ETag/If-Match mapping. */
@@ -150,5 +153,42 @@ class ManualSchemaControllerTest {
     void deleteReturnsNoContent() {
         ResponseEntity<Void> resp = controller.delete("p1", "ms1");
         assertThat(resp.getStatusCode().value()).isEqualTo(204);
+    }
+
+    @Test
+    void createRoundTripsDataTypeNodeAndVariableReferencingIt() {
+        given(service.create(anyString(), anyString(), anyString(), any(), any(), anyString()))
+                .willReturn(sample(0));
+        var dataTypeDto = new NodeDto("dt1", null, "Vector3D", "Vector3D", "DATA_TYPE",
+                null, null, null, null, null, List.of(), null, List.of(), null,
+                List.of(new MemberDto("x", "FLOAT64", null), new MemberDto("y", "FLOAT64", null)));
+        var variableDto = new NodeDto("v1", null, "Plant/Vec", "Vec", "VARIABLE",
+                null, "SCALAR", "READ", null, null, List.of(), null, List.of(), "dt1", List.of());
+        var request = new CreateManualSchemaRequest("OPC_UA", "Boiler", "desc",
+                List.of(dataTypeDto, variableDto));
+
+        controller.create("p1", request);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<SchemaNode>> nodesCaptor = ArgumentCaptor.forClass(List.class);
+        verify(service).create(anyString(), anyString(), anyString(), any(), nodesCaptor.capture(), anyString());
+        List<SchemaNode> savedNodes = nodesCaptor.getValue();
+        SchemaNode savedDataType = savedNodes.stream().filter(n -> n.nodeId().equals("dt1")).findFirst().orElseThrow();
+        SchemaNode savedVariable = savedNodes.stream().filter(n -> n.nodeId().equals("v1")).findFirst().orElseThrow();
+        assertThat(savedDataType.kind()).isEqualTo(NodeKind.DATA_TYPE);
+        assertThat(savedDataType.members()).extracting("name").containsExactly("x", "y");
+        assertThat(savedVariable.dataType()).isNull();
+        assertThat(savedVariable.dataTypeNodeId()).isEqualTo("dt1");
+    }
+
+    @Test
+    void createRejectsVariableWithBothDataTypeAndDataTypeNodeId() {
+        var variableDto = new NodeDto("v1", null, "Plant/Vec", "Vec", "VARIABLE",
+                "FLOAT64", "SCALAR", "READ", null, null, List.of(), null, List.of(), "dt1", List.of());
+        var request = new CreateManualSchemaRequest("OPC_UA", "Boiler", "desc", List.of(variableDto));
+
+        assertThatThrownBy(() -> controller.create("p1", request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("exactly one");
     }
 }

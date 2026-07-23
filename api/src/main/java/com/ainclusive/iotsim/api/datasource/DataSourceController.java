@@ -2,6 +2,7 @@ package com.ainclusive.iotsim.api.datasource;
 
 import com.ainclusive.iotsim.api.error.PreconditionRequiredException;
 import com.ainclusive.iotsim.api.scan.ScanController;
+import com.ainclusive.iotsim.api.schema.MemberDto;
 import com.ainclusive.iotsim.api.schema.ReferenceDto;
 import com.ainclusive.iotsim.api.schema.SchemaReferenceMapper;
 import com.ainclusive.iotsim.api.security.Permission;
@@ -264,14 +265,18 @@ public class DataSourceController {
             ValueRank valueRank =
                     d.valueRank() == null ? null : parseEnum(ValueRank.class, d.valueRank(), "valueRank");
             Access access = d.access() == null ? null : parseEnum(Access.class, d.access(), "access");
-            if (kind == NodeKind.VARIABLE && (dataType == null || valueRank == null || access == null)) {
+            if (kind == NodeKind.VARIABLE
+                    && (valueRank == null || access == null
+                            || (dataType == null) == (d.dataTypeNodeId() == null))) {
                 throw new IllegalArgumentException(
-                        "variable node '" + d.path() + "' requires dataType, valueRank and access");
+                        "variable node '" + d.path() + "' requires valueRank, access, and exactly one of"
+                                + " dataType or dataTypeNodeId");
             }
             nodes.add(new SchemaNode(
                     d.nodeId(), d.parentId(), d.path(), d.name(),
                     kind, dataType, valueRank, access, d.unit(), d.description(), d.arrayDimensions(),
-                    d.typeDefinition(), SchemaReferenceMapper.toModel(d.references())));
+                    d.typeDefinition(), SchemaReferenceMapper.toModel(d.references()), d.dataTypeNodeId(),
+                    SchemaReferenceMapper.toMembers(d.members())));
         }
         return nodes;
     }
@@ -320,11 +325,12 @@ public class DataSourceController {
     public record NodeDto(
             String nodeId, String parentId, String path, String name, String kind,
             String dataType, String valueRank, String access, String unit, String description,
-            List<Integer> arrayDimensions, String typeDefinition, List<ReferenceDto> references) {
+            List<Integer> arrayDimensions, String typeDefinition, List<ReferenceDto> references,
+            String dataTypeNodeId, List<MemberDto> members) {
         public NodeDto(String nodeId, String parentId, String path, String name, String kind,
                 String dataType, String valueRank, String access, String unit, String description) {
             this(nodeId, parentId, path, name, kind, dataType, valueRank, access, unit, description,
-                    List.of(), null, List.of());
+                    List.of(), null, List.of(), null, List.of());
         }
     }
 
