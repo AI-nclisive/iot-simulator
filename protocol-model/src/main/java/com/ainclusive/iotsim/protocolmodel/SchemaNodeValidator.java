@@ -31,9 +31,72 @@ public final class SchemaNodeValidator {
                     throw new IllegalArgumentException("reference target does not exist: " + reference.targetNodeId());
                 }
             }
+            validateDataTypeNodeId(node, byId);
+            validateMembers(node, byId);
         }
         for (SchemaNode node : nodes) {
             assertAcyclic(node, byId, new HashSet<>());
+        }
+    }
+
+    /** IS-183: a VARIABLE's dataTypeNodeId, if set, must point to an existing DATA_TYPE node. */
+    private static void validateDataTypeNodeId(SchemaNode node, Map<String, SchemaNode> byId) {
+        if (node.kind() != NodeKind.VARIABLE || node.dataTypeNodeId() == null) {
+            return;
+        }
+        SchemaNode target = byId.get(node.dataTypeNodeId());
+        if (target == null) {
+            throw new IllegalArgumentException("dataTypeNodeId target does not exist: " + node.dataTypeNodeId());
+        }
+        if (target.kind() != NodeKind.DATA_TYPE) {
+            throw new IllegalArgumentException(
+                    "dataTypeNodeId target must be a DATA_TYPE node: " + node.dataTypeNodeId());
+        }
+    }
+
+    /**
+     * IS-183: a DATA_TYPE node's members must have unique names, and any member nesting another
+     * DATA_TYPE must reference an existing, distinct DATA_TYPE node whose own members are all
+     * primitives — v1 keeps custom types to one level of struct-of-primitives, so no
+     * self-reference and no multi-level nesting.
+     */
+    private static void validateMembers(SchemaNode node, Map<String, SchemaNode> byId) {
+        if (node.kind() != NodeKind.DATA_TYPE) {
+            return;
+        }
+        Set<String> memberNames = new HashSet<>();
+        for (DataTypeMember member : node.members()) {
+            if (!memberNames.add(member.name())) {
+                throw new IllegalArgumentException(
+                        "duplicate member name '" + member.name() + "' in DATA_TYPE node: " + node.nodeId());
+            }
+            if (member.dataTypeNodeId() == null) {
+                continue;
+            }
+            if (member.dataTypeNodeId().equals(node.nodeId())) {
+                throw new IllegalArgumentException(
+                        "DATA_TYPE node '" + node.nodeId() + "' cannot reference itself in member '"
+                                + member.name() + "'");
+            }
+            SchemaNode target = byId.get(member.dataTypeNodeId());
+            if (target == null) {
+                throw new IllegalArgumentException(
+                        "member '" + member.name() + "' dataTypeNodeId does not exist: "
+                                + member.dataTypeNodeId());
+            }
+            if (target.kind() != NodeKind.DATA_TYPE) {
+                throw new IllegalArgumentException(
+                        "member '" + member.name() + "' dataTypeNodeId must be a DATA_TYPE node: "
+                                + member.dataTypeNodeId());
+            }
+            boolean targetNestsCustomType =
+                    target.members().stream().anyMatch(m -> m.dataTypeNodeId() != null);
+            if (targetNestsCustomType) {
+                throw new IllegalArgumentException(
+                        "member '" + member.name() + "' nests DATA_TYPE '" + target.nodeId()
+                                + "' which itself nests another custom type — only one level of"
+                                + " struct-of-primitives is supported");
+            }
         }
     }
 
