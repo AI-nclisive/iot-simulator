@@ -1269,7 +1269,7 @@ Parallel execution:
   Work includes: extend the shared `NodeDto` type with `OBJECT` kind + `arrayDimensions`/`typeDefinition`/`references`; add an Object option to the node-class picker; accept OBJECT as a valid parent (matching backend's FOLDER-or-OBJECT rule); treat OBJECT like FOLDER in the tree view; add a references editor (ORGANIZES/HAS_COMPONENT/HAS_PROPERTY/HAS_TYPE_DEFINITION/GENERIC) targeting another node in the schema. Method/DataType stay in "Coming soon" pending separate backend work.
   Done when: OBJECT nodes and typed references can be authored, saved, and reloaded correctly; typecheck + vitest + build green.
 
-- [ ] `UI-505` ⬜ Synthetic profile — bulk-apply update rate to selected measurements
+- [x] `UI-505` ✅ Synthetic profile — bulk-apply update rate to selected measurements
   Goal: the per-measurement "Update rate (ms)" field on the Configure profile step already accepts any value (no upper limit — e.g. 60000 for once a minute), but it can only be edited one row at a time; a source with many measurements has no way to set the send interval for all of them in one action, unlike the existing bulk pattern control ("Set pattern for selected…").
   Surface: `Create Data Source wizard` — Configure profile step (`synthetic-profile-step.tsx`).
   Work includes: an "Update rate for selected (ms)" input + "Apply rate" button next to the bulk pattern selector, applying the given rate to every currently-enabled (selected) row via the same select-all/enabled convention as `setPatternForSelected`.
