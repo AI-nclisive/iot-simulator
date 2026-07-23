@@ -235,6 +235,12 @@ function collectSubtreeIds(nodes: NodeDto[], rootId: string): Set<string> {
   return ids;
 }
 
+export function formatDataType(dataType: string): string {
+  const parts = dataType.split('_').map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase());
+  const formatted = parts.join('');
+  return formatted === 'Datetime' ? 'DateTime' : formatted;
+}
+
 function typeLabel(dataType: string): string {
   const mapped = mapDataType(dataType as Parameters<typeof mapDataType>[0]);
   return mapped ? mapped.charAt(0).toUpperCase() + mapped.slice(1) : dataType;
@@ -686,7 +692,7 @@ export function ManualSchemaEditorPage() {
                   <label className="flex flex-col gap-1.5 text-sm text-shell-muted">
                     Data type
                     <select className="shell-field" value={addType} onChange={(e) => setAddType(e.target.value)}>
-                      {DATA_TYPES.map((t) => <option key={t} value={t}>{typeLabel(t)}</option>)}
+                      {DATA_TYPES.map((t) => <option key={t} value={t}>{formatDataType(t)}</option>)}
                     </select>
                   </label>
                   <label className="flex flex-col gap-1.5 text-sm text-shell-muted">
@@ -855,7 +861,7 @@ export function ManualSchemaEditorPage() {
                   <label className="text-xs text-shell-muted">Type
                     <select aria-label={`Variable ${index + 1} type`} className="shell-field mt-1 w-full" value={row.dataType}
                       onChange={(e) => setBatchRows((prev) => prev.map((candidate) => candidate.id === row.id ? { ...candidate, dataType: e.target.value } : candidate))}>
-                      {DATA_TYPES.map((type) => <option key={type} value={type}>{typeLabel(type)}</option>)}
+                      {DATA_TYPES.map((type) => <option key={type} value={type}>{formatDataType(type)}</option>)}
                     </select>
                   </label>
                   <label className="text-xs text-shell-muted">Unit <span className="font-normal">(optional)</span>
