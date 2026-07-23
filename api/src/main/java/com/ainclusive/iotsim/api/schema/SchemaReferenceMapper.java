@@ -24,6 +24,14 @@ public final class SchemaReferenceMapper {
             return List.of();
         }
         return dtos.stream().map(d -> new DataTypeMember(d.name(),
-                d.dataType() == null ? null : DataType.valueOf(d.dataType()), d.dataTypeNodeId())).toList();
+                d.dataType() == null ? null : parseDataType(d.dataType()), d.dataTypeNodeId())).toList();
+    }
+
+    private static DataType parseDataType(String value) {
+        try {
+            return DataType.valueOf(value);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("invalid dataType: " + value);
+        }
     }
 }

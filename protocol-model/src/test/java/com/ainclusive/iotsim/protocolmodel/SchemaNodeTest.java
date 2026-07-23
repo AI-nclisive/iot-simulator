@@ -72,6 +72,16 @@ class SchemaNodeTest {
     }
 
     @Test
+    void dataTypeNodeRejectsANonNullDataTypeField() {
+        assertThatThrownBy(() -> new SchemaNode(
+                        "dt1", null, "Vector3D", "Vector3D", NodeKind.DATA_TYPE, DataType.FLOAT64, null, null,
+                        null, null, java.util.List.of(), null, java.util.List.of(), null,
+                        java.util.List.of(new DataTypeMember("x", DataType.FLOAT64, null))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("cannot have a dataType field");
+    }
+
+    @Test
     void nonDataTypeNodeRejectsMembers() {
         assertThatThrownBy(() -> new SchemaNode(
                         "f1", null, "Plant", "Plant", NodeKind.FOLDER, null, null, null, null, null,

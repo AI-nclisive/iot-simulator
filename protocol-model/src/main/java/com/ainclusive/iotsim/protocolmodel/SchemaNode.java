@@ -79,6 +79,9 @@ public record SchemaNode(
             if (members.isEmpty()) {
                 throw new IllegalArgumentException("DATA_TYPE node '" + nodeId + "' requires at least one member");
             }
+            if (dataType != null) {
+                throw new IllegalArgumentException("DATA_TYPE nodes cannot have a dataType field");
+            }
         } else if (!members.isEmpty()) {
             throw new IllegalArgumentException(kind + " nodes cannot have members");
         }
