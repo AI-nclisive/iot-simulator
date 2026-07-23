@@ -11,6 +11,7 @@ import com.ainclusive.iotsim.persistence.run.RunRepository;
 import com.ainclusive.iotsim.persistence.run.RunRow;
 import com.ainclusive.iotsim.persistence.runtimeevent.RuntimeEventRepository;
 import com.ainclusive.iotsim.persistence.schema.SchemaRepository;
+import com.ainclusive.iotsim.persistence.timeline.RunValueTimelineRepository;
 import com.ainclusive.iotsim.platform.runtime.RuntimeController;
 import com.ainclusive.iotsim.protocolmodel.DeterminismContext;
 import com.ainclusive.iotsim.protocolmodel.DeterministicSettings;
@@ -48,6 +49,7 @@ public class SyntheticLiveRunService {
     private final RunRepository runs;
     private final EvidenceRepository evidence;
     private final RuntimeEventRepository events;
+    private final RunValueTimelineRepository runValueTimeline;
     private final ObjectMapper json;
     private final Clock wallClock;
 
@@ -56,20 +58,22 @@ public class SyntheticLiveRunService {
     @Autowired
     public SyntheticLiveRunService(DataSourceRepository dataSources, SchemaRepository schemas,
             RuntimeController runtime, RunRepository runs, EvidenceRepository evidence,
-            RuntimeEventRepository events, ObjectMapper json) {
-        this(dataSources, schemas, runtime, runs, evidence, events, json, Clock.systemUTC());
+            RuntimeEventRepository events, RunValueTimelineRepository runValueTimeline, ObjectMapper json) {
+        this(dataSources, schemas, runtime, runs, evidence, events, runValueTimeline, json, Clock.systemUTC());
     }
 
     /** Test seam: inject a controllable wall clock so paced emission is reproducible without sleeps. */
     SyntheticLiveRunService(DataSourceRepository dataSources, SchemaRepository schemas,
             RuntimeController runtime, RunRepository runs, EvidenceRepository evidence,
-            RuntimeEventRepository events, ObjectMapper json, Clock wallClock) {
+            RuntimeEventRepository events, RunValueTimelineRepository runValueTimeline, ObjectMapper json,
+            Clock wallClock) {
         this.dataSources = dataSources;
         this.schemas = schemas;
         this.runtime = runtime;
         this.runs = runs;
         this.evidence = evidence;
         this.events = events;
+        this.runValueTimeline = runValueTimeline;
         this.json = json;
         this.wallClock = wallClock;
     }
@@ -145,6 +149,7 @@ public class SyntheticLiveRunService {
             due.sort(ORDER);
             if (!due.isEmpty()) {
                 runtime.applyValues(live.dataSourceId(), due);
+                runValueTimeline.append(live.runId(), due);
             }
             if (capped) {
                 finalizeRun(live, "COMPLETED");

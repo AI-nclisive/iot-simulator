@@ -11,6 +11,7 @@ import com.ainclusive.iotsim.persistence.run.RunRepository;
 import com.ainclusive.iotsim.persistence.run.RunRow;
 import com.ainclusive.iotsim.persistence.runtimeevent.RuntimeEventRepository;
 import com.ainclusive.iotsim.persistence.schema.SchemaRepository;
+import com.ainclusive.iotsim.persistence.timeline.RunValueTimelineRepository;
 import com.ainclusive.iotsim.platform.runtime.RuntimeController;
 import com.ainclusive.iotsim.protocolmodel.DeterminismContext;
 import com.ainclusive.iotsim.protocolmodel.DeterministicSettings;
@@ -44,26 +45,29 @@ public class SyntheticRunService {
     private final RunRepository runs;
     private final EvidenceRepository evidence;
     private final RuntimeEventRepository events;
+    private final RunValueTimelineRepository runValueTimeline;
     private final ObjectMapper json;
     private final Clock clock;
 
     @Autowired
     public SyntheticRunService(DataSourceRepository dataSources, SchemaRepository schemas,
             RuntimeController runtime, RunRepository runs, EvidenceRepository evidence,
-            RuntimeEventRepository events, ObjectMapper json) {
-        this(dataSources, schemas, runtime, runs, evidence, events, json, Clock.systemUTC());
+            RuntimeEventRepository events, RunValueTimelineRepository runValueTimeline, ObjectMapper json) {
+        this(dataSources, schemas, runtime, runs, evidence, events, runValueTimeline, json, Clock.systemUTC());
     }
 
     /** Test seam: pin the run-start clock so the produced series is fully reproducible. */
     SyntheticRunService(DataSourceRepository dataSources, SchemaRepository schemas,
             RuntimeController runtime, RunRepository runs, EvidenceRepository evidence,
-            RuntimeEventRepository events, ObjectMapper json, Clock clock) {
+            RuntimeEventRepository events, RunValueTimelineRepository runValueTimeline, ObjectMapper json,
+            Clock clock) {
         this.dataSources = dataSources;
         this.schemas = schemas;
         this.runtime = runtime;
         this.runs = runs;
         this.evidence = evidence;
         this.events = events;
+        this.runValueTimeline = runValueTimeline;
         this.json = json;
         this.clock = clock;
     }
@@ -119,6 +123,7 @@ public class SyntheticRunService {
 
             runtime.start(dataSourceId, RuntimeStartSpecs.of(schemas, source));
             long applied = runtime.applyValues(dataSourceId, values);
+            runValueTimeline.append(run.id(), values);
             evidence.updateManifest(evidenceRow.id(), manifest(run.id(), trigger, initiator, dataSourceId,
                     startedAt, clock.instant(), settings.seed(), values.size()));
             runs.end(run.id(), "COMPLETED", now());
