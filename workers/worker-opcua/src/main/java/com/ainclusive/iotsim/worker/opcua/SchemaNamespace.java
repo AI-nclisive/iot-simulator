@@ -96,7 +96,12 @@ final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
             if (!"VARIABLE".equals(def.kind())) {
                 continue;
             }
-            if (def.parentId() != null && !hierarchy.containsKey(def.parentId())) {
+            boolean parentIsFolder = def.parentId() == null || hierarchy.containsKey(def.parentId());
+            // Test-only (VarDef.referenceType): a HasProperty fixture's parent is another
+            // Variable, not a Folder/Object — a real device's own address space allows this,
+            // even though the neutral schema model never produces it (SchemaNodeValidator).
+            boolean parentIsVariable = !parentIsFolder && nodes.containsKey(def.parentId());
+            if (!parentIsFolder && !parentIsVariable) {
                 throw new IllegalArgumentException("Variable has a missing or non-folder parent: " + def.nodeId());
             }
             UaVariableNode node = UaVariableNode.builder(getNodeContext())
@@ -109,11 +114,21 @@ final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
                     .build();
             node.setValue(new DataValue(new Variant(OpcUaTypes.defaultValue(def.dataType()))));
             getNodeManager().addNode(node);
-            var parent = def.parentId() == null ? Identifiers.ObjectsFolder : hierarchy.get(def.parentId());
-            node.addReference(new Reference(
-                    node.getNodeId(), Identifiers.Organizes, parent.expanded(), false));
+            var parent = def.parentId() == null ? Identifiers.ObjectsFolder
+                    : parentIsFolder ? hierarchy.get(def.parentId()) : nodes.get(def.parentId()).getNodeId();
+            var referenceType = def.referenceType() == null ? Identifiers.Organizes : referenceTypeId(def.referenceType());
+            node.addReference(new Reference(node.getNodeId(), referenceType, parent.expanded(), false));
             nodes.put(def.nodeId(), node);
         }
+    }
+
+    /** Test-only seam (VarDef.referenceType): resolves a reference type name to its NodeId. */
+    private static org.eclipse.milo.opcua.stack.core.types.builtin.NodeId referenceTypeId(String name) {
+        return switch (name) {
+            case "HAS_PROPERTY" -> Identifiers.HasProperty;
+            case "HAS_COMPONENT" -> Identifiers.HasComponent;
+            default -> throw new IllegalArgumentException("unknown referenceType: " + name);
+        };
     }
 
     void updateValue(String nodeId, Object opcUaValue) {

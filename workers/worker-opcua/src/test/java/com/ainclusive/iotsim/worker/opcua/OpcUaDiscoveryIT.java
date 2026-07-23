@@ -136,6 +136,32 @@ class OpcUaDiscoveryIT {
     }
 
     @Test
+    void scanExcludesPropertyOfVariableChildren() throws Exception {
+        // IS-188: a real device commonly exposes Properties on a Variable (EURange,
+        // EngineeringUnits, Quality, ...) — a HasProperty child whose parent is the
+        // owning Variable itself. The neutral schema model only allows a FOLDER/OBJECT
+        // parent, so these must be excluded from scan results entirely rather than
+        // emitted with an invalid parent kind.
+        int port = freePort();
+        OpcUaServerRuntime runtime = new OpcUaServerRuntime(port, List.of(
+                new VarDef("temperature", null, "Temperature", "VARIABLE", "FLOAT64"),
+                new VarDef("quality", "temperature", "Quality", "VARIABLE", "STATUS_CODE", "HAS_PROPERTY")));
+        runtime.start();
+        try {
+            OpcUaDiscovery.ScanOutcome outcome = OpcUaDiscovery.scan(
+                    runtime.endpointUrl(), ANON, 0, () -> { }, soFar -> { });
+
+            assertThat(outcome.status()).isEqualTo(OpcUaDiscovery.OK);
+            Map<String, SchemaNodeMsg> byName = outcome.nodes().stream()
+                    .collect(Collectors.toMap(SchemaNodeMsg::getName, Function.identity()));
+            assertThat(byName).containsKey("Temperature");
+            assertThat(byName).doesNotContainKey("Quality");
+        } finally {
+            runtime.stop();
+        }
+    }
+
+    @Test
     void testConnectionSucceedsAgainstRunningServer() throws Exception {
         int port = freePort();
         OpcUaServerRuntime runtime = new OpcUaServerRuntime(
