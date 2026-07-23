@@ -46,12 +46,15 @@ function humanize(type: string): string {
     case "RECORDING_STOPPED": return "Recording stopped";
     case "CLIENT_CONNECTED":    return "Client connected";
     case "CLIENT_DISCONNECTED": return "Client disconnected";
+    case "RUN_COMPLETED":    return "Run completed";
+    case "RUN_STOPPED":      return "Run stopped";
+    case "RUN_FAILED":       return "Run failed";
     default: return type.toLowerCase().replace(/_/g, " ");
   }
 }
 
 function typeToLevel(type: string): RuntimeEventLevel {
-  if (type === "SOURCE_ERROR" || type === "HEALTH_ERROR" || type === "ERROR") return "error";
+  if (type === "SOURCE_ERROR" || type === "HEALTH_ERROR" || type === "ERROR" || type === "RUN_FAILED") return "error";
   if (type === "SOURCE_STALE" || type === "HEALTH_WARNING") return "warning";
   return "info";
 }
