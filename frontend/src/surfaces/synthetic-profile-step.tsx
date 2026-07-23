@@ -442,6 +442,7 @@ export function SyntheticProfileStep({
   const [recordings, setRecordings] = useState<RecordingOption[]>([]);
   const [selectedRecordingId, setSelectedRecordingId] = useState("");
   const [prefilling, setPrefilling] = useState(false);
+  const [bulkUpdateRateMs, setBulkUpdateRateMs] = useState("");
   // Per-node pattern suggestions from the last recording profile, so switching a measurement's
   // pattern type re-applies that type's stats-derived params (IS-146).
   const [suggestions, setSuggestions] = useState<
@@ -558,6 +559,19 @@ export function SyntheticProfileStep({
       const pattern = bulkPatternFor(node.dataType, type);
       if (pattern) changePattern(node.nodeId, pattern);
     }
+  }
+
+  // Bulk-apply one update rate to every currently-selected (enabled) row, so setting e.g. "send
+  // once a minute" doesn't require editing each measurement's row individually.
+  function setUpdateRateForSelected(rateMs: number) {
+    setDrafts((cur) => {
+      const next = { ...cur };
+      for (const node of variableNodes) {
+        if (!next[node.nodeId]?.enabled) continue;
+        next[node.nodeId] = { ...next[node.nodeId], updateRateMs: String(rateMs) };
+      }
+      return next;
+    });
   }
 
   // Derive patterns from a recording's captured values (POST /recordings/{id}/derive-synthetic)
@@ -860,6 +874,31 @@ export function SyntheticProfileStep({
                 More patterns…
               </button>
             ) : null}
+            <label className="flex items-center gap-2 text-sm text-shell-ink">
+              Update rate for selected (ms)
+              <input
+                aria-label="Update rate for selected (ms)"
+                className="shell-field w-28"
+                disabled={enabledCount === 0}
+                onChange={(e) => setBulkUpdateRateMs(e.target.value)}
+                placeholder="e.g. 60000"
+                step="1"
+                type="number"
+                value={bulkUpdateRateMs}
+              />
+            </label>
+            <button
+              className="shell-text-action"
+              disabled={enabledCount === 0 || num(bulkUpdateRateMs) === null || (num(bulkUpdateRateMs) ?? 0) <= 0}
+              type="button"
+              onClick={() => {
+                const rate = num(bulkUpdateRateMs);
+                if (rate == null || rate <= 0) return;
+                setUpdateRateForSelected(rate);
+              }}
+            >
+              Apply rate
+            </button>
           </div>
 
           <ul className="space-y-2">
