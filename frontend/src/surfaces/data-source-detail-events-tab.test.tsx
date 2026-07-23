@@ -231,6 +231,36 @@ describe("DataSourceDetailEventsTab — type→level mapping", () => {
     expect(screen.getByText("runtime")).toBeTruthy();
   });
 
+  it("RUN_COMPLETED maps to info level and runtime category (UI-502)", async () => {
+    setupDefaults();
+    resolvedApiFetch([makeDto({ id: 1, type: "RUN_COMPLETED", payload: {} })]);
+    render(<DataSourceDetailEventsTab source={mockSource} />);
+    await waitFor(() => expect(screen.getByText("info")).toBeTruthy());
+    const button = screen.getByRole("button", { name: /Run completed/i });
+    await userEvent.click(button);
+    expect(screen.getByText("runtime")).toBeTruthy();
+  });
+
+  it("RUN_STOPPED maps to info level and runtime category (UI-502)", async () => {
+    setupDefaults();
+    resolvedApiFetch([makeDto({ id: 1, type: "RUN_STOPPED", payload: {} })]);
+    render(<DataSourceDetailEventsTab source={mockSource} />);
+    await waitFor(() => expect(screen.getByText("info")).toBeTruthy());
+    const button = screen.getByRole("button", { name: /Run stopped/i });
+    await userEvent.click(button);
+    expect(screen.getByText("runtime")).toBeTruthy();
+  });
+
+  it("RUN_FAILED maps to error level and runtime category (UI-502)", async () => {
+    setupDefaults();
+    resolvedApiFetch([makeDto({ id: 1, type: "RUN_FAILED", payload: {} })]);
+    render(<DataSourceDetailEventsTab source={mockSource} />);
+    await waitFor(() => expect(screen.getAllByText("error").length).toBeGreaterThan(0));
+    const button = screen.getByRole("button", { name: /Run failed/i });
+    await userEvent.click(button);
+    expect(screen.getByText("runtime")).toBeTruthy();
+  });
+
   it("uses payload.detail as message when present", async () => {
     setupDefaults();
     resolvedApiFetch([makeDto({ id: 1, type: "SOURCE_START", payload: { detail: "Custom message" } })]);

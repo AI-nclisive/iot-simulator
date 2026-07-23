@@ -1250,6 +1250,13 @@ Parallel execution:
   Work includes: make `DataSourceRow.health` nullable end-to-end; drop the `?? "Healthy"` fallback in `data-sources-store.ts`; render an em dash instead of a badge when health is `null` on the list page and both detail surfaces.
   Done when: a stopped/disabled source shows no health badge (or "—") anywhere, a running source keeps its real Healthy/Warning/Error badge unchanged, and typecheck + vitest are green.
 
+- [x] `UI-502` ✅ Events tab — recognize RUN_COMPLETED/STOPPED/FAILED event types
+  Goal: `humanize`/`typeToLevel`/`typeToCategory` in the per-source Events tab had no cases for the new `RUN_COMPLETED`/`RUN_STOPPED`/`RUN_FAILED` event types (IS-182), so they rendered as raw, uncategorized text instead of a clear label.
+  Surface: `Data source detail` — Events tab.
+  Work includes: explicit human-readable labels and an appropriate category/level for the three new run-completion event types (`RUN_FAILED` as error level, matching existing `ERROR`/`SOURCE_STOP` treatment; all three categorized as `runtime`).
+  Depends: IS-182.
+  Done when: the three event types render with clear labels and correct level/category; typecheck + vitest + build green.
+
 ## Recommended Sequence
 
 1. Complete the P0 shell and shared-pattern tasks first.
