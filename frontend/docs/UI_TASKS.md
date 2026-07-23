@@ -1257,6 +1257,12 @@ Parallel execution:
   Depends: IS-182.
   Done when: the three event types render with clear labels and correct level/category; typecheck + vitest + build green.
 
+- [x] `UI-503` ✅ Manual Schema — fix duplicate data types in multi-variant dropdown
+  Goal: the dropdown for adding multi-variant data types shows many duplicate entries (Int, Int, Int... Float, Float... String, String...) because `typeLabel()` groups multiple OPC UA types into single categories, instead of showing all 21 unique OPC UA data type names properly formatted.
+  Surface: `Manual Schema Editor` — Add multiple variables batch form.
+  Work includes: create `formatDataType()` function that converts OPC UA names to readable format (INT8 → Int8, LOCALIZED_TEXT → LocalizedText, etc); replace `typeLabel()` with `formatDataType()` in both single-variable and batch-add dropdowns.
+  Done when: dropdown shows all unique data types with correct formatting (Int8, Int16, Float32, DateTime, etc); typecheck + vitest + build green.
+
 ## Recommended Sequence
 
 1. Complete the P0 shell and shared-pattern tasks first.
