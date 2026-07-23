@@ -7,19 +7,33 @@ import { useEditLease } from "../shell/use-edit-lease";
 import type { DataSourceRow } from "./mock-data-sources";
 import type { ParameterType, SchemaParameter } from "./mock-schema-parameters";
 
+export type ReferenceDto = {
+  targetNodeId: string;
+  type: "ORGANIZES" | "HAS_COMPONENT" | "HAS_PROPERTY" | "HAS_TYPE_DEFINITION" | "GENERIC";
+  forward: boolean;
+};
+
 // Backend schema shapes from GET/PUT /api/v1/projects/{pid}/data-sources/{id}/schema
 export type NodeDto = {
   nodeId: string;
   parentId: string | null;
   path: string;
   name: string;
-  kind: "FOLDER" | "VARIABLE";
+  kind: "FOLDER" | "OBJECT" | "VARIABLE";
   dataType: string | null;
   valueRank: string | null;
   access: string | null;
   unit: string | null;
   description: string | null;
+  arrayDimensions?: number[];
+  typeDefinition?: string | null;
+  references?: ReferenceDto[];
 };
+
+/** FOLDER and OBJECT nodes can contain children; only they're valid parents (backend rule). */
+export function canHaveChildren(kind: NodeDto["kind"]): boolean {
+  return kind === "FOLDER" || kind === "OBJECT";
+}
 
 type SchemaResponse = {
   id: string;
@@ -44,13 +58,13 @@ export function buildTree(nodes: NodeDto[]): TreeNode[] {
   // Sort: folders first, then by name within each group
   function sortChildren(node: TreeNode) {
     node.children.sort((a, b) => {
-      if (a.kind !== b.kind) return a.kind === "FOLDER" ? -1 : 1;
+      if (canHaveChildren(a.kind) !== canHaveChildren(b.kind)) return canHaveChildren(a.kind) ? -1 : 1;
       return a.name.localeCompare(b.name);
     });
     node.children.forEach(sortChildren);
   }
   roots.sort((a, b) => {
-    if (a.kind !== b.kind) return a.kind === "FOLDER" ? -1 : 1;
+    if (canHaveChildren(a.kind) !== canHaveChildren(b.kind)) return canHaveChildren(a.kind) ? -1 : 1;
     return a.name.localeCompare(b.name);
   });
   roots.forEach(sortChildren);
@@ -118,7 +132,7 @@ function TreeNodeRow({
   const isExpanded = expandedIds.has(node.nodeId);
   const isSelected = selectedId === node.nodeId;
   const indent = depth * 16;
-  const isFolder = node.kind === "FOLDER";
+  const isFolder = canHaveChildren(node.kind);
   const hasChildren = node.children.length > 0;
 
   // A Variable can itself have children (e.g. a structured value's component
@@ -235,7 +249,7 @@ export function DataSourceSchemaEditor({
         setTreeRoots(roots);
         // Auto-expand top-level folders
         setExpandedIds(
-          new Set(roots.filter((n) => n.kind === "FOLDER").map((n) => n.nodeId)),
+          new Set(roots.filter((n) => canHaveChildren(n.kind)).map((n) => n.nodeId)),
         );
       })
       .catch((err) => {

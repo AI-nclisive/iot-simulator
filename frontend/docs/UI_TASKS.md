@@ -1257,6 +1257,12 @@ Parallel execution:
   Depends: IS-182.
   Done when: the three event types render with clear labels and correct level/category; typecheck + vitest + build green.
 
+- [x] `UI-504` ✅ Manual Schema editor — support OBJECT node class and typed References
+  Goal: the editor only creates FOLDER/VARIABLE nodes, showing a "Coming soon" disclaimer for Object/Method/Reference/DataType — but the backend (IS-176) already fully supports OBJECT nodes and typed references end-to-end; this is purely a frontend gap.
+  Surface: `Manual Schemas` — editor.
+  Work includes: extend the shared `NodeDto` type with `OBJECT` kind + `arrayDimensions`/`typeDefinition`/`references`; add an Object option to the node-class picker; accept OBJECT as a valid parent (matching backend's FOLDER-or-OBJECT rule); treat OBJECT like FOLDER in the tree view; add a references editor (ORGANIZES/HAS_COMPONENT/HAS_PROPERTY/HAS_TYPE_DEFINITION/GENERIC) targeting another node in the schema. Method/DataType stay in "Coming soon" pending separate backend work.
+  Done when: OBJECT nodes and typed references can be authored, saved, and reloaded correctly; typecheck + vitest + build green.
+
 ## Recommended Sequence
 
 1. Complete the P0 shell and shared-pattern tasks first.

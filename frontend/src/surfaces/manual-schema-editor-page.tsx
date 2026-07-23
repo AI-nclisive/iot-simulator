@@ -7,7 +7,7 @@ import { useNotificationStore } from "../shell/notification-store";
 import { useShellStore } from "../shell/shell-store";
 import { SharedStatePanel } from "../ui/shared-state-panel";
 import { StatusBadge } from "../ui/status-badge";
-import { buildTree, type NodeDto } from "./data-source-schema-editor";
+import { buildTree, canHaveChildren, type NodeDto, type ReferenceDto } from "./data-source-schema-editor";
 
 const DATA_TYPES = [
   "BOOL", "INT8", "UINT8", "INT16", "UINT16", "INT32", "UINT32", "INT64", "UINT64",
@@ -186,7 +186,18 @@ const STRUCTURE_TEMPLATES = [
 
 const VALUE_RANKS = ["SCALAR", "ARRAY"] as const;
 const ACCESS_LEVELS = ["READ", "READ_WRITE"] as const;
-const UPCOMING_NODE_CLASSES = ["Object", "Method", "Reference", "DataType"] as const;
+const UPCOMING_NODE_CLASSES = ["Method", "DataType"] as const;
+const REFERENCE_TYPES = ["ORGANIZES", "HAS_COMPONENT", "HAS_PROPERTY", "HAS_TYPE_DEFINITION", "GENERIC"] as const;
+
+function referenceTypeLabel(type: ReferenceDto["type"]): string {
+  switch (type) {
+    case "ORGANIZES": return "Organizes";
+    case "HAS_COMPONENT": return "Has component";
+    case "HAS_PROPERTY": return "Has property";
+    case "HAS_TYPE_DEFINITION": return "Has type definition";
+    case "GENERIC": return "Generic";
+  }
+}
 
 type ValidationIssue = { nodeId: string; message: string };
 type BatchVariableRow = { id: string; name: string; dataType: string; unit: string; description: string };
@@ -202,7 +213,7 @@ export function validateManualSchemaNodes(nodes: NodeDto[]): ValidationIssue[] {
     if (node.parentId) {
       const parent = byId.get(node.parentId);
       if (!parent) issues.push({ nodeId: node.nodeId, message: "Its parent no longer exists." });
-      else if (parent.kind !== "FOLDER") issues.push({ nodeId: node.nodeId, message: "Only a folder can contain another node." });
+      else if (!canHaveChildren(parent.kind)) issues.push({ nodeId: node.nodeId, message: "Only a folder or object can contain another node." });
     }
     const key = `${node.parentId ?? "__top_level__"}:${name}`;
     const ids = siblingNames.get(key) ?? new Set<string>();
@@ -268,7 +279,7 @@ export function ManualSchemaEditorPage() {
   });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
-  const [addKind, setAddKind] = useState<"FOLDER" | "VARIABLE" | null>(null);
+  const [addKind, setAddKind] = useState<"FOLDER" | "OBJECT" | "VARIABLE" | null>(null);
   const [addName, setAddName] = useState("");
   const [addType, setAddType] = useState<string>("FLOAT64");
   const [addValueRank, setAddValueRank] = useState<string>("SCALAR");
@@ -277,6 +288,8 @@ export function ManualSchemaEditorPage() {
   const [addDescription, setAddDescription] = useState("");
   const [selectedSuggestion, setSelectedSuggestion] = useState("");
   const [addParentId, setAddParentId] = useState<string | null>(null);
+  const [addRefTargetId, setAddRefTargetId] = useState<string>("");
+  const [addRefType, setAddRefType] = useState<ReferenceDto["type"]>("ORGANIZES");
   const [batchRows, setBatchRows] = useState<BatchVariableRow[]>([]);
   const [showLibrary, setShowLibrary] = useState(false);
   const [showBatch, setShowBatch] = useState(false);
@@ -319,9 +332,9 @@ export function ManualSchemaEditorPage() {
   const treeRoots = useMemo(() => buildTree(nodes), [nodes]);
   const selectedNode = nodes.find((n) => n.nodeId === selectedId) ?? null;
   const variableCount = nodes.filter((n) => n.kind === "VARIABLE").length;
-  const folders = nodes.filter((n) => n.kind === "FOLDER");
+  const containers = nodes.filter((n) => canHaveChildren(n.kind));
   const isEmpty = nodes.length === 0;
-  const catalogParentId = selectedNode?.kind === "FOLDER" ? selectedNode.nodeId : null;
+  const catalogParentId = selectedNode && canHaveChildren(selectedNode.kind) ? selectedNode.nodeId : null;
   const validationIssues = useMemo(() => validateManualSchemaNodes(nodes), [nodes]);
   const selectedIssues = selectedId ? validationIssues.filter((issue) => issue.nodeId === selectedId) : [];
 
@@ -332,6 +345,18 @@ export function ManualSchemaEditorPage() {
       else next.add(id);
       return next;
     });
+  }
+
+  function addReference() {
+    if (!selectedNode || !addRefTargetId) return;
+    const reference: ReferenceDto = { targetNodeId: addRefTargetId, type: addRefType, forward: true };
+    updateSelectedNode({ references: [...(selectedNode.references ?? []), reference] });
+    setAddRefTargetId("");
+  }
+
+  function removeReference(index: number) {
+    if (!selectedNode) return;
+    updateSelectedNode({ references: (selectedNode.references ?? []).filter((_, i) => i !== index) });
   }
 
   function updateSelectedNode(patch: Partial<NodeDto>) {
@@ -409,9 +434,9 @@ export function ManualSchemaEditorPage() {
     setSelectedSuggestion("");
   }
 
-  function openAdd(kind: "FOLDER" | "VARIABLE") {
+  function openAdd(kind: "FOLDER" | "OBJECT" | "VARIABLE") {
     setAddKind(kind);
-    setAddParentId(selectedNode?.kind === "FOLDER" ? selectedNode.nodeId : null);
+    setAddParentId(selectedNode && canHaveChildren(selectedNode.kind) ? selectedNode.nodeId : null);
   }
 
   function addSuggestedVariable(variable: (typeof SUGGESTED_VARIABLES)[number]) {
@@ -601,17 +626,22 @@ export function ManualSchemaEditorPage() {
             <button className="shell-action" type="button" onClick={() => openAdd("FOLDER")}>
               {isEmpty ? "Start: create a folder" : "Add folder"}
             </button>
-            {folders.length > 0 ? (
+            {containers.length > 0 ? (
+              <button className="shell-action" type="button" onClick={() => openAdd("OBJECT")}>
+                Add object
+              </button>
+            ) : null}
+            {containers.length > 0 ? (
               <button className="shell-action" type="button" onClick={() => openAdd("VARIABLE")}>
                 Add variable
               </button>
             ) : null}
             <span className="text-xs text-shell-muted">
-              {selectedNode?.kind === "FOLDER"
+              {selectedNode && canHaveChildren(selectedNode.kind)
                 ? `New items will be placed inside ${selectedNode.path}.`
                 : isEmpty
                   ? "Step 1: create the first folder (for example, Tank 1)."
-                  : "Select a folder in the tree to add items inside it."}
+                  : "Select a folder or object in the tree to add items inside it."}
             </span>
             </div>
           </div>
@@ -621,19 +651,19 @@ export function ManualSchemaEditorPage() {
           <div className="mb-4 space-y-3 rounded-md border border-shell-line bg-white px-4 py-4">
             <fieldset>
               <legend className="text-sm font-medium text-shell-ink">Choose a node class</legend>
-              <p className="mt-1 text-xs text-shell-muted">Folders organize the server tree. Variables hold values clients can read or write.</p>
+              <p className="mt-1 text-xs text-shell-muted">Folders and objects organize the server tree. Variables hold values clients can read or write.</p>
               <div className="mt-3 flex flex-wrap gap-2" role="radiogroup" aria-label="Node class">
-                {(["FOLDER", "VARIABLE"] as const).map((kind) => (
+                {(["FOLDER", "OBJECT", "VARIABLE"] as const).map((kind) => (
                   <label key={kind} className={`cursor-pointer rounded-md border px-3 py-2 text-sm ${addKind === kind ? "border-shell-accent bg-shell-accent/5 text-shell-ink" : "border-shell-line text-shell-muted"}`}>
                     <input checked={addKind === kind} className="sr-only" name="node-class" type="radio" value={kind} onChange={() => setAddKind(kind)} />
-                    <span className="font-medium">{kind === "FOLDER" ? "Folder" : "Variable"}</span>
-                    <span className="block text-xs">{kind === "FOLDER" ? "Contains nodes" : "Stores a value"}</span>
+                    <span className="font-medium">{kind === "FOLDER" ? "Folder" : kind === "OBJECT" ? "Object" : "Variable"}</span>
+                    <span className="block text-xs">{kind === "FOLDER" ? "Contains nodes" : kind === "OBJECT" ? "Groups related nodes" : "Stores a value"}</span>
                   </label>
                 ))}
               </div>
             </fieldset>
             <div className="rounded-md bg-shell-base/60 px-3 py-2 text-xs text-shell-muted">
-              <span className="font-medium text-shell-ink">Coming soon: </span>{UPCOMING_NODE_CLASSES.join(", ")}. For now, create folders and variables to build your server structure.
+              <span className="font-medium text-shell-ink">Coming soon: </span>{UPCOMING_NODE_CLASSES.join(", ")}. For now, create folders, objects, and variables to build your server structure.
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
               <label className="flex flex-col gap-1.5 text-sm text-shell-muted">
@@ -645,8 +675,8 @@ export function ManualSchemaEditorPage() {
                   onChange={(e) => setAddParentId(e.target.value || null)}
                 >
                   <option value="">Top level of server</option>
-                  {folders.map((folder) => (
-                    <option key={folder.nodeId} value={folder.nodeId}>{folder.path}</option>
+                  {containers.map((container) => (
+                    <option key={container.nodeId} value={container.nodeId}>{container.path}</option>
                   ))}
                 </select>
               </label>
@@ -739,7 +769,7 @@ export function ManualSchemaEditorPage() {
           </div>
         ) : null}
 
-        {access.isAdmin && folders.length > 0 ? (
+        {access.isAdmin && containers.length > 0 ? (
           <div className="mb-4 flex flex-wrap gap-2">
             <button className="shell-text-action" type="button" onClick={() => setShowLibrary((open) => !open)}>
               {showLibrary ? "Hide parameter catalog" : "Choose from parameter catalog"}
@@ -750,14 +780,14 @@ export function ManualSchemaEditorPage() {
           </div>
         ) : null}
 
-        {access.isAdmin && folders.length > 0 && showLibrary ? (
+        {access.isAdmin && containers.length > 0 && showLibrary ? (
           <section className="mb-4 rounded-md border border-shell-line bg-shell-base/30 px-4 py-4">
             <div>
               <div>
                 <p className="text-sm font-medium text-shell-ink">Choose a parameter to add</p>
                 <p className="mt-1 text-xs text-shell-muted">
                   {catalogParentId
-                    ? `Add a parameter inside ${folders.find((folder) => folder.nodeId === catalogParentId)?.path}.`
+                    ? `Add a parameter inside ${containers.find((container) => container.nodeId === catalogParentId)?.path}.`
                     : "Select the folder that should contain this parameter."}
                 </p>
               </div>
@@ -823,7 +853,7 @@ export function ManualSchemaEditorPage() {
           </section>
         ) : null}
 
-        {access.isAdmin && folders.length > 0 && showBatch ? (
+        {access.isAdmin && containers.length > 0 && showBatch ? (
           <section className="mb-4 rounded-md border border-shell-line bg-white px-4 py-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
@@ -839,8 +869,8 @@ export function ManualSchemaEditorPage() {
                   onChange={(e) => setAddParentId(e.target.value || null)}
                 >
                   <option value="">Top level of server</option>
-                  {folders.map((folder) => (
-                    <option key={folder.nodeId} value={folder.nodeId}>{folder.path}</option>
+                  {containers.map((container) => (
+                    <option key={container.nodeId} value={container.nodeId}>{container.path}</option>
                   ))}
                 </select>
               </label>
@@ -916,7 +946,7 @@ export function ManualSchemaEditorPage() {
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
-                    {selectedNode.kind === "FOLDER" ? "Folder" : "Variable"}
+                    {selectedNode.kind === "FOLDER" ? "Folder" : selectedNode.kind === "OBJECT" ? "Object" : "Variable"}
                   </p>
                   <p className="mt-2 truncate font-mono text-sm text-shell-ink">{selectedNode.path}</p>
                 </div>
@@ -992,6 +1022,80 @@ export function ManualSchemaEditorPage() {
                     onChange={(e) => updateSelectedNode({ description: e.target.value || null })}
                   />
                 </label>
+                <div className="flex flex-col gap-2 text-sm text-shell-muted">
+                  References
+                  {(selectedNode.references ?? []).length > 0 ? (
+                    <ul className="space-y-1.5">
+                      {(selectedNode.references ?? []).map((reference, index) => {
+                        const target = nodes.find((n) => n.nodeId === reference.targetNodeId);
+                        return (
+                          <li
+                            key={`${reference.targetNodeId}-${reference.type}-${index}`}
+                            className="flex items-center justify-between gap-2 rounded-md border border-shell-line bg-shell-base/40 px-3 py-2 text-xs"
+                          >
+                            <span className="min-w-0 truncate text-shell-ink">
+                              <span className="font-medium">{referenceTypeLabel(reference.type)}</span>
+                              {" → "}
+                              <span className="font-mono">{target ? target.path : reference.targetNodeId}</span>
+                            </span>
+                            {access.isAdmin ? (
+                              <button
+                                className="shrink-0 text-shell-danger hover:underline"
+                                type="button"
+                                onClick={() => removeReference(index)}
+                              >
+                                Remove
+                              </button>
+                            ) : null}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : (
+                    <p className="text-xs text-shell-muted">No references yet.</p>
+                  )}
+                  {access.isAdmin ? (
+                    <div className="flex flex-wrap items-end gap-2">
+                      <label className="flex flex-col gap-1 text-xs uppercase tracking-wide text-shell-muted">
+                        Target node
+                        <select
+                          aria-label="Reference target node"
+                          className="shell-field"
+                          value={addRefTargetId}
+                          onChange={(e) => setAddRefTargetId(e.target.value)}
+                        >
+                          <option value="">Choose a node…</option>
+                          {nodes
+                            .filter((n) => n.nodeId !== selectedNode.nodeId)
+                            .map((n) => (
+                              <option key={n.nodeId} value={n.nodeId}>{n.path}</option>
+                            ))}
+                        </select>
+                      </label>
+                      <label className="flex flex-col gap-1 text-xs uppercase tracking-wide text-shell-muted">
+                        Reference type
+                        <select
+                          aria-label="Reference type"
+                          className="shell-field"
+                          value={addRefType}
+                          onChange={(e) => setAddRefType(e.target.value as ReferenceDto["type"])}
+                        >
+                          {REFERENCE_TYPES.map((type) => (
+                            <option key={type} value={type}>{referenceTypeLabel(type)}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <button
+                        className="shell-action"
+                        disabled={!addRefTargetId}
+                        type="button"
+                        onClick={addReference}
+                      >
+                        Add reference
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
                 {selectedIssues.length > 0 ? (
                   <div className="rounded-md border border-shell-danger/30 bg-shell-danger/5 px-3 py-2 text-xs text-shell-muted">
                     {selectedIssues.map((issue, index) => <p key={`${issue.message}-${index}`}>{issue.message}</p>)}
@@ -1101,7 +1205,7 @@ function ManualSchemaTree({
         const children = node.children as (NodeDto & { children: unknown[] })[];
         const isExpanded = expandedIds.has(node.nodeId);
         const isSelected = selectedId === node.nodeId;
-        const isFolder = node.kind === "FOLDER";
+        const isFolder = canHaveChildren(node.kind);
         return (
           <li key={node.nodeId}>
             <button
