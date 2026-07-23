@@ -235,7 +235,7 @@ function collectSubtreeIds(nodes: NodeDto[], rootId: string): Set<string> {
   return ids;
 }
 
-function formatDataType(dataType: string): string {
+export function formatDataType(dataType: string): string {
   const parts = dataType.split('_').map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase());
   const formatted = parts.join('');
   return formatted === 'Datetime' ? 'DateTime' : formatted;
