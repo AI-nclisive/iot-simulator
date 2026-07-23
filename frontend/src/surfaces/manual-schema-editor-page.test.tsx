@@ -257,7 +257,7 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add variable" }));
 
     expect(screen.getByText("Coming soon:")).toBeTruthy();
-    expect(screen.getByText(/For now, create folders and variables/i)).toBeTruthy();
+    expect(screen.getByText(/For now, create folders, objects, and variables/i)).toBeTruthy();
     expect(screen.queryByText(/address-space model/i)).toBeNull();
   });
 
@@ -286,6 +286,97 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
         }),
       );
     });
+  });
+
+  it("creates an OBJECT node that can itself contain a variable (UI-504)", async () => {
+    mockLoadManualSchemaById.mockResolvedValueOnce(schemaWithFolder);
+    renderPage();
+
+    await waitFor(() => screen.getByText("Reactor"));
+    fireEvent.click(screen.getByRole("button", { name: "Add object" }));
+    fireEvent.change(screen.getByLabelText("Parent folder for new node"), { target: { value: "f1" } });
+    fireEvent.change(screen.getAllByLabelText("Name").at(-1)!, { target: { value: "Motor" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+
+    await waitFor(() => screen.getByText("Motor"));
+    fireEvent.click(screen.getByRole("button", { name: "Add variable" }));
+    // Select Motor (an OBJECT) as the parent — it must appear as a valid container.
+    const parentSelect = screen.getByLabelText("Parent folder for new node") as HTMLSelectElement;
+    const motorOption = Array.from(parentSelect.options).find((o) => o.text === "/Reactor/Motor")!;
+    fireEvent.change(parentSelect, { target: { value: motorOption.value } });
+    fireEvent.change(screen.getAllByLabelText("Name").at(-1)!, { target: { value: "Speed" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByLabelText(/Save in this schema/));
+    fireEvent.click(screen.getAllByRole("button", { name: "Save" })[1]);
+
+    await waitFor(() => {
+      expect(mockUpdateManualSchema).toHaveBeenCalledWith(
+        "proj-1",
+        "ms-1",
+        expect.objectContaining({
+          nodes: expect.arrayContaining([
+            expect.objectContaining({ name: "Motor", kind: "OBJECT", parentId: "f1" }),
+            expect.objectContaining({ name: "Speed", kind: "VARIABLE", parentId: motorOption.value }),
+          ]),
+        }),
+      );
+    });
+  });
+
+  it("adds and removes a typed reference between two nodes (UI-504)", async () => {
+    mockLoadManualSchemaById.mockResolvedValueOnce(schemaWithFolder);
+    renderPage();
+
+    await waitFor(() => screen.getByText("Reactor"));
+    fireEvent.click(screen.getByText("Reactor"));
+    fireEvent.click(screen.getByText("Temp"));
+
+    fireEvent.change(screen.getByLabelText("Reference target node"), { target: { value: "f1" } });
+    fireEvent.change(screen.getByLabelText("Reference type"), { target: { value: "HAS_PROPERTY" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add reference" }));
+
+    expect(screen.getAllByText("Has property").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("/Reactor").length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByLabelText(/Save in this schema/));
+    fireEvent.click(screen.getAllByRole("button", { name: "Save" })[1]);
+
+    await waitFor(() => {
+      expect(mockUpdateManualSchema).toHaveBeenCalledWith(
+        "proj-1",
+        "ms-1",
+        expect.objectContaining({
+          nodes: expect.arrayContaining([
+            expect.objectContaining({
+              nodeId: "v1",
+              references: [{ targetNodeId: "f1", type: "HAS_PROPERTY", forward: true }],
+            }),
+          ]),
+        }),
+      );
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+    expect(screen.getByText("No references yet.")).not.toBeNull();
+  });
+
+  it("does not let a stale reference target create a self-reference after switching the selected node (UI-504)", async () => {
+    mockLoadManualSchemaById.mockResolvedValueOnce(schemaWithFolder);
+    renderPage();
+
+    await waitFor(() => screen.getByText("Reactor"));
+    fireEvent.click(screen.getByText("Reactor"));
+    fireEvent.click(screen.getByText("Temp"));
+    // Target the folder while "Temp" is selected — addRefTargetId becomes "f1".
+    fireEvent.change(screen.getByLabelText("Reference target node"), { target: { value: "f1" } });
+
+    // Now select the folder itself — its own nodeId ("f1") matches the stale target.
+    fireEvent.click(screen.getByText("Reactor"));
+
+    expect((screen.getByRole("button", { name: "Add reference" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("fills a new variable from the suggested parameter catalog", async () => {
@@ -373,7 +464,7 @@ describe("validateManualSchemaNodes", () => {
     ]);
     expect(issues.map((issue) => issue.message)).toEqual(expect.arrayContaining([
       "A browse name cannot contain a slash or backslash.",
-      "Only a folder can contain another node.",
+      "Only a folder or object can contain another node.",
       "Sibling nodes must have unique browse names.",
     ]));
   });
