@@ -417,7 +417,7 @@ class EvidenceServiceTest {
         final Map<String, List<NeutralValue>> byRun = new HashMap<>();
 
         public long append(String runId, List<NeutralValue> values) {
-            byRun.put(runId, values);
+            byRun.computeIfAbsent(runId, k -> new java.util.ArrayList<>()).addAll(values);
             return values.size();
         }
 

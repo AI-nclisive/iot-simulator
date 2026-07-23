@@ -104,6 +104,9 @@ class SyntheticRunServiceTest {
                 .isInstanceOf(IllegalStateException.class);
         EvidenceRow ev = evidence.byId.values().iterator().next();
         assertThat(ev.manifestJson()).doesNotContain("\"endedAt\":null");
+        // IS-185 review: append happens after applyValues, so a run that never got to
+        // apply its values must not have them show up in evidence as if they were sent.
+        assertThat(runValueTimeline.readAll(runs.byId.keySet().iterator().next())).isEmpty();
     }
 
     @Test

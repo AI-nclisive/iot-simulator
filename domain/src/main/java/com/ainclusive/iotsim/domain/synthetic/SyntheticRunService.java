@@ -120,10 +120,10 @@ public class SyntheticRunService {
                     startedAt, null, settings.seed(), 0));
 
             List<NeutralValue> values = generate(variables, settings, durationMs);
-            runValueTimeline.append(run.id(), values);
 
             runtime.start(dataSourceId, RuntimeStartSpecs.of(schemas, source));
             long applied = runtime.applyValues(dataSourceId, values);
+            runValueTimeline.append(run.id(), values);
             evidence.updateManifest(evidenceRow.id(), manifest(run.id(), trigger, initiator, dataSourceId,
                     startedAt, clock.instant(), settings.seed(), values.size()));
             runs.end(run.id(), "COMPLETED", now());
