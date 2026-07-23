@@ -2,6 +2,7 @@ package com.ainclusive.iotsim.domain.synthetic;
 
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.domain.datasource.RuntimeStartSpecs;
+import com.ainclusive.iotsim.domain.run.EvidenceCompletionStamp;
 import com.ainclusive.iotsim.domain.run.RunCompletionEvents;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRepository;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRow;
@@ -128,11 +129,13 @@ public class SyntheticRunService {
                     startedAt, clock.instant(), settings.seed(), values.size()));
             runs.end(run.id(), "COMPLETED", now());
             RunCompletionEvents.appendTerminal(events, projectId, dataSourceId, run.id(), "COMPLETED", now());
+            EvidenceCompletionStamp.finalizeStatus(evidence, run.id(), "COMPLETED");
             return new SyntheticRunSummary(dataSourceId, applied, settings.seed(), run.id(), evidenceRow.id());
         } catch (RuntimeException e) {
             stampFailure(evidenceRow, run.id(), trigger, initiator, dataSourceId, startedAt, settings.seed());
             runs.end(run.id(), "FAILED", now());
             RunCompletionEvents.appendTerminal(events, projectId, dataSourceId, run.id(), "FAILED", now());
+            EvidenceCompletionStamp.finalizeStatus(evidence, run.id(), "FAILED");
             throw e;
         }
     }

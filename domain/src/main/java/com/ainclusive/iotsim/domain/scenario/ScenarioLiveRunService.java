@@ -4,6 +4,7 @@ import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.domain.common.ScenarioInvalidException;
 import com.ainclusive.iotsim.domain.datasource.DataSourceService;
 import com.ainclusive.iotsim.domain.replay.ReplayService;
+import com.ainclusive.iotsim.domain.run.EvidenceCompletionStamp;
 import com.ainclusive.iotsim.domain.run.RunCompletionEvents;
 import com.ainclusive.iotsim.domain.synthetic.SyntheticRunService;
 import com.ainclusive.iotsim.persistence.evidence.EvidenceRepository;
@@ -156,6 +157,7 @@ public class ScenarioLiveRunService {
             stampFailure(run.id(), trig, actor, sourceIds, scenario, startedAt);
             runs.end(run.id(), "FAILED", now());
             RunCompletionEvents.appendTerminal(events, projectId, null, run.id(), "FAILED", now());
+            EvidenceCompletionStamp.finalizeStatus(evidence, run.id(), "FAILED");
             throw e;
         }
     }
@@ -267,6 +269,7 @@ public class ScenarioLiveRunService {
             // intentionally swallowed — registry cleanup still happens in finally
         }
         RunCompletionEvents.appendTerminal(events, projectId, null, runId, state, now());
+        EvidenceCompletionStamp.finalizeStatus(evidence, runId, state);
     }
 
     private static void safeNotify(Runnable action) {

@@ -18,6 +18,7 @@ import com.ainclusive.iotsim.domain.synthetic.SyntheticLiveRunService;
 import com.ainclusive.iotsim.domain.synthetic.SyntheticLiveRunSummary;
 import com.ainclusive.iotsim.domain.synthetic.SyntheticRunService;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRepository;
+import com.ainclusive.iotsim.persistence.evidence.EvidenceRepository;
 import com.ainclusive.iotsim.persistence.run.RunRepository;
 import com.ainclusive.iotsim.persistence.run.RunRow;
 import com.ainclusive.iotsim.persistence.runtimeevent.RuntimeEventRepository;
@@ -39,6 +40,7 @@ class RunServiceTest {
     private ScenarioRepository scenarios;
     private RuntimeController runtime;
     private RuntimeEventRepository events;
+    private EvidenceRepository evidence;
     private ReplayService replay;
     private ReplayLiveRunService replayLive;
     private SyntheticRunService synthetic;
@@ -53,14 +55,15 @@ class RunServiceTest {
         scenarios = mock(ScenarioRepository.class);
         runtime = mock(RuntimeController.class);
         events = mock(RuntimeEventRepository.class);
+        evidence = mock(EvidenceRepository.class);
         replay = mock(ReplayService.class);
         replayLive = mock(ReplayLiveRunService.class);
         synthetic = mock(SyntheticRunService.class);
         syntheticLive = mock(SyntheticLiveRunService.class);
         scenarioLive = mock(ScenarioLiveRunService.class);
         when(dataSources.findByProject(PROJECT)).thenReturn(List.of());
-        service = new RunService(runs, dataSources, scenarios, runtime, events, replay, replayLive, synthetic,
-                syntheticLive, scenarioLive);
+        service = new RunService(runs, dataSources, scenarios, runtime, events, evidence, replay, replayLive,
+                synthetic, syntheticLive, scenarioLive);
     }
 
     private RunRow row(String id, String kind, String state, List<String> sources) {
@@ -90,11 +93,16 @@ class RunServiceTest {
     void stopStopsSourcesAndEndsRunWhenNonTerminal() {
         when(runs.findById("r1")).thenReturn(Optional.of(row("r1", "REPLAY", "RUNNING", List.of("ds1", "ds2"))));
         when(runs.end(eq("r1"), eq("STOPPED"), any())).thenReturn(row("r1", "REPLAY", "STOPPED", List.of("ds1", "ds2")));
+        when(evidence.findByRun("r1")).thenReturn(Optional.of(
+                new com.ainclusive.iotsim.persistence.evidence.EvidenceRow(
+                        "ev-1", PROJECT, "r1", "CAPTURING", "{}", null, OffsetDateTime.now(), "local")));
         RunView v = service.stop(PROJECT, "r1");
         verify(runtime).stop("ds1");
         verify(runtime).stop("ds2");
         verify(runs).end(eq("r1"), eq("STOPPED"), any());
         assertThat(v.state()).isEqualTo("STOPPED");
+        // IS-187: the shared manual-stop path must also flip evidence off CAPTURING.
+        verify(evidence).updateStatus(eq("ev-1"), eq("PARTIAL"), org.mockito.ArgumentMatchers.isNull());
     }
 
     @Test

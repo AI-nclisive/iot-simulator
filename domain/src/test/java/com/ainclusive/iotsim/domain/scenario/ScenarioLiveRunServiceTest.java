@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -107,8 +108,9 @@ class ScenarioLiveRunServiceTest {
         RunRow completed = new RunRow(runId, PROJECT, "SCENARIO", "MANUAL", "local", "COMPLETED",
                 SCENARIO, null, OffsetDateTime.now(), null, OffsetDateTime.now(), List.of(SOURCE), null);
         when(runs.end(eq(runId), eq("COMPLETED"), any())).thenReturn(completed);
-        when(evidence.create(eq(PROJECT), eq(runId), anyString()))
-                .thenReturn(new EvidenceRow("ev-1", PROJECT, runId, "CAPTURING", "{}", null, null, "local"));
+        EvidenceRow ev = new EvidenceRow("ev-1", PROJECT, runId, "CAPTURING", "{}", null, null, "local");
+        when(evidence.create(eq(PROJECT), eq(runId), anyString())).thenReturn(ev);
+        when(evidence.findByRun(runId)).thenReturn(Optional.of(ev));
     }
 
     // ---- tests ----
@@ -190,6 +192,8 @@ class ScenarioLiveRunServiceTest {
         assertThat(manifests.getAllValues().get(1)).contains("\"kind\":\"SCENARIO\"");
         // IS-182: scenario completion is mirrored into runtime_events (project-level, no single source).
         verify(events).append(eq(PROJECT), eq((String) null), eq("run-1"), eq("RUN_COMPLETED"), any(), any());
+        // IS-187: a completed scenario's evidence leaves CAPTURING for READY.
+        verify(evidence).updateStatus(eq("ev-1"), eq("READY"), isNull());
     }
 
     @Test
@@ -199,8 +203,9 @@ class ScenarioLiveRunServiceTest {
         RunRow parent = runningRun("run-1");
         when(runs.create(any(), any(), any(), any(), any(), any(), any())).thenReturn(parent);
         when(runs.start(eq("run-1"), any())).thenReturn(parent);
-        when(evidence.create(any(), eq("run-1"), any()))
-                .thenReturn(new EvidenceRow("ev-1", PROJECT, "run-1", "CAPTURING", "{}", null, null, "local"));
+        EvidenceRow ev = new EvidenceRow("ev-1", PROJECT, "run-1", "CAPTURING", "{}", null, null, "local");
+        when(evidence.create(any(), eq("run-1"), any())).thenReturn(ev);
+        when(evidence.findByRun("run-1")).thenReturn(Optional.of(ev));
         org.mockito.Mockito.doThrow(new RuntimeException("boom")).when(dataSources).start(eq(PROJECT), eq(SOURCE), anyString());
 
         // start() itself should not throw (the exception is caught inside executeSteps)
@@ -214,6 +219,8 @@ class ScenarioLiveRunServiceTest {
         assertThat(manifests.getAllValues().get(1)).doesNotContain("\"endedAt\":null");
         // IS-182: scenario failure is mirrored into runtime_events.
         verify(events).append(eq(PROJECT), eq((String) null), eq("run-1"), eq("RUN_FAILED"), any(), any());
+        // IS-187: a failed scenario's evidence leaves CAPTURING for PARTIAL, not READY.
+        verify(evidence).updateStatus(eq("ev-1"), eq("PARTIAL"), isNull());
     }
 
     @Test

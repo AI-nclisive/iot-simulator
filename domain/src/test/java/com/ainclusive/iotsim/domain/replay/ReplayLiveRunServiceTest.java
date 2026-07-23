@@ -194,6 +194,8 @@ class ReplayLiveRunServiceTest {
                 .contains("\"endedAt\":\"" + wall.instant() + "\"");
         // IS-182: auto-completion is mirrored into runtime_events.
         assertThat(events.appended).extracting("type").containsExactly("RUN_COMPLETED");
+        // IS-187: a completed run's evidence leaves CAPTURING for READY.
+        assertThat(evidence.byId.get(summary.evidenceId()).status()).isEqualTo("READY");
 
         // A subsequent tick is a no-op — removed from registry.
         svc.tickAll();
@@ -223,6 +225,9 @@ class ReplayLiveRunServiceTest {
         assertThat(runs.byId.get(summary.runId()).state()).isEqualTo("RUNNING");
         // Runtime NOT stopped — RunService owns that too.
         assertThat(runtime.state(SOURCE)).isEqualTo("RUNNING");
+        // IS-187: stopIfLive doesn't own the terminal state, so evidence status must
+        // stay CAPTURING until RunService.stop actually ends the run.
+        assertThat(evidence.byId.get(summary.evidenceId()).status()).isEqualTo("CAPTURING");
 
         // Subsequent ticks are no-ops.
         wall.advance(Duration.ofSeconds(5));
@@ -271,6 +276,9 @@ class ReplayLiveRunServiceTest {
                 .extracting(RunRow::state).isEqualTo("FAILED");
         // IS-182: start failure is mirrored into runtime_events.
         assertThat(events.appended).extracting("type").containsExactly("RUN_FAILED");
+        // IS-187: a failed run's evidence leaves CAPTURING for PARTIAL, not READY.
+        assertThat(evidence.byId.values()).singleElement()
+                .extracting(EvidenceRow::status).isEqualTo("PARTIAL");
     }
 
     @Test
@@ -315,6 +323,8 @@ class ReplayLiveRunServiceTest {
         assertThat(runtime.state(SOURCE)).isEqualTo("STOPPED");
         // IS-182: immediate auto-completion is mirrored into runtime_events.
         assertThat(events.appended).extracting("type").containsExactly("RUN_COMPLETED");
+        // IS-187: a completed run's evidence leaves CAPTURING for READY.
+        assertThat(evidence.byId.get(summary.evidenceId()).status()).isEqualTo("READY");
         // Nothing in registry — tick is a no-op.
         svc.tickAll();
         assertThat(runtime.applied).isEmpty();
@@ -734,7 +744,7 @@ class ReplayLiveRunServiceTest {
         }
 
         public Optional<EvidenceRow> findByRun(String runId) {
-            throw new UnsupportedOperationException();
+            return byId.values().stream().filter(e -> runId.equals(e.runId())).findFirst();
         }
 
         public List<EvidenceRow> findByProject(String projectId) {
@@ -742,7 +752,11 @@ class ReplayLiveRunServiceTest {
         }
 
         public EvidenceRow updateStatus(String id, String status, String objectRef) {
-            throw new UnsupportedOperationException();
+            EvidenceRow e = byId.get(id);
+            EvidenceRow u = new EvidenceRow(e.id(), e.projectId(), e.runId(), status,
+                    e.manifestJson(), objectRef, e.createdAt(), e.createdBy());
+            byId.put(id, u);
+            return u;
         }
 
         public List<EvidenceRow> findByProjectPaged(String projectId, OffsetDateTime afterAt,

@@ -3,6 +3,7 @@ package com.ainclusive.iotsim.domain.replay;
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.domain.common.SchemaVersionMismatchException;
 import com.ainclusive.iotsim.domain.datasource.RuntimeStartSpecs;
+import com.ainclusive.iotsim.domain.run.EvidenceCompletionStamp;
 import com.ainclusive.iotsim.domain.run.RunCompletionEvents;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRepository;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRow;
@@ -144,6 +145,7 @@ public class ReplayLiveRunService {
         } catch (RuntimeException e) {
             runs.end(run.id(), "FAILED", now());
             RunCompletionEvents.appendTerminal(events, projectId, dataSourceId, run.id(), "FAILED", now());
+            EvidenceCompletionStamp.finalizeStatus(evidence, run.id(), "FAILED");
             throw e;
         }
     }
@@ -210,6 +212,7 @@ public class ReplayLiveRunService {
         runs.end(live.runId, terminalState, now());
         RunCompletionEvents.appendTerminal(events, live.projectId, live.dataSourceId, live.runId,
                 terminalState, now());
+        EvidenceCompletionStamp.finalizeStatus(evidence, live.runId, terminalState);
     }
 
     /**
@@ -247,6 +250,7 @@ public class ReplayLiveRunService {
         }
         runs.end(runId, terminalState, now());
         RunCompletionEvents.appendTerminal(events, projectId, dataSourceId, runId, terminalState, now());
+        EvidenceCompletionStamp.finalizeStatus(evidence, runId, terminalState);
     }
 
     private String manifest(String runId, String trigger, String initiator, String dataSourceId,
