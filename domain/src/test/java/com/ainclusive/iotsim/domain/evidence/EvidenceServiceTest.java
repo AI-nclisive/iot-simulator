@@ -16,6 +16,7 @@ import com.ainclusive.iotsim.persistence.run.RunRow;
 import com.ainclusive.iotsim.persistence.runtimeevent.RuntimeEventQuery;
 import com.ainclusive.iotsim.persistence.runtimeevent.RuntimeEventRepository;
 import com.ainclusive.iotsim.persistence.runtimeevent.RuntimeEventRow;
+import com.ainclusive.iotsim.persistence.timeline.RunValueTimelineRepository;
 import com.ainclusive.iotsim.persistence.timeline.ValueTimelineRepository;
 import com.ainclusive.iotsim.persistence.timeline.ValueTimelineRepository.ValueTimelineEntry;
 import com.ainclusive.iotsim.platform.storage.ObjectStore;
@@ -41,6 +42,7 @@ class EvidenceServiceTest {
     private final FakeEvidence evidence = new FakeEvidence();
     private final FakeRuns runs = new FakeRuns();
     private final FakeTimeline timeline = new FakeTimeline();
+    private final FakeRunTimeline runTimeline = new FakeRunTimeline();
     private final FakeRuntimeEvents runtimeEvents = new FakeRuntimeEvents();
     private final FakeClients clients = new FakeClients();
     private final FakeObjectStore objectStore = new FakeObjectStore();
@@ -48,7 +50,7 @@ class EvidenceServiceTest {
     private final EvidenceArtifactWriter summaryWriter = new JsonSummaryEvidenceWriter(new ObjectMapper());
 
     private EvidenceService service() {
-        return new EvidenceService(evidence, runs, timeline, runtimeEvents, clients,
+        return new EvidenceService(evidence, runs, timeline, runTimeline, runtimeEvents, clients,
                 List.of(bundleWriter, summaryWriter), objectStore, new ObjectMapper(), fakeProjects());
     }
 
@@ -66,7 +68,7 @@ class EvidenceServiceTest {
             evidence.byId.put(evId, new EvidenceRow(evId, "page-proj", null, "CAPTURING",
                     "{}", null, now.minusSeconds(i), "local"));
         }
-        EvidenceService svc = new EvidenceService(evidence, runs, timeline, runtimeEvents, clients,
+        EvidenceService svc = new EvidenceService(evidence, runs, timeline, runTimeline, runtimeEvents, clients,
                 List.of(bundleWriter, summaryWriter), objectStore, new ObjectMapper(), existsProjects("page-proj"));
 
         Page<EvidenceView> page = svc.listPaged("page-proj", null, 2);
@@ -160,6 +162,23 @@ class EvidenceServiceTest {
     }
 
     @Test
+    void assemblesValueTimelineFromRunValueTimelineWhenNoRecording() {
+        // IS-185: SYNTHETIC (and SCENARIO) evidence carries no recordingId — the value
+        // timeline must come from the run-keyed store instead of always being empty.
+        runs.byId.put("run-2", new RunRow("run-2", "p1", "SYNTHETIC", "MANUAL", "local", "COMPLETED",
+                null, "ev-2", off(START), off(END), off(START), List.of("src-1"), null));
+        evidence.byId.put("ev-2", new EvidenceRow("ev-2", "p1", "run-2", "CAPTURING",
+                "{\"recordingId\":null}", null, off(START), "local"));
+        runTimeline.byRun.put("run-2", List.of(
+                new NeutralValue("ns=2;s=Temp", START.plusSeconds(1), 42.0, Quality.GOOD, null)));
+
+        EvidenceContent content = service().assemble("ev-2");
+
+        assertThat(content.manifest().recordingId()).isNull();
+        assertThat(content.valueTimeline()).hasSize(1);
+    }
+
+    @Test
     void failedRunMapsToFailedCompleteness() {
         seedReplayEvidence("FAILED");
         assertThat(service().assemble("ev-1").manifest().completeness()).isEqualTo(Completeness.FAILED);
@@ -240,7 +259,7 @@ class EvidenceServiceTest {
                 return "bundle.zip";
             }
         };
-        EvidenceService svc = new EvidenceService(evidence, runs, timeline, runtimeEvents, clients,
+        EvidenceService svc = new EvidenceService(evidence, runs, timeline, runTimeline, runtimeEvents, clients,
                 List.of(boom), objectStore, new ObjectMapper(), fakeProjects());
 
         EvidenceView result = svc.export("p1", "ev-1", EvidenceFormat.BUNDLE);
@@ -391,6 +410,23 @@ class EvidenceServiceTest {
         public List<ValueTimelineEntry> readPage(String recordingId, long afterSeq, int limit,
                 com.ainclusive.iotsim.protocolmodel.ValueFilter filter) {
             throw new UnsupportedOperationException();
+        }
+    }
+
+    private static final class FakeRunTimeline implements RunValueTimelineRepository {
+        final Map<String, List<NeutralValue>> byRun = new HashMap<>();
+
+        public long append(String runId, List<NeutralValue> values) {
+            byRun.put(runId, values);
+            return values.size();
+        }
+
+        public List<NeutralValue> readAll(String runId) {
+            return byRun.getOrDefault(runId, List.of());
+        }
+
+        public void deleteByRun(String runId) {
+            byRun.remove(runId);
         }
     }
 

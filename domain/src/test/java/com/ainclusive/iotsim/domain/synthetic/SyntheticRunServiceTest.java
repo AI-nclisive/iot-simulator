@@ -13,6 +13,7 @@ import com.ainclusive.iotsim.persistence.run.RunRepository;
 import com.ainclusive.iotsim.persistence.run.RunRow;
 import com.ainclusive.iotsim.persistence.schema.SchemaRepository;
 import com.ainclusive.iotsim.persistence.schema.SchemaWithNodes;
+import com.ainclusive.iotsim.persistence.timeline.RunValueTimelineRepository;
 import com.ainclusive.iotsim.platform.runtime.RuntimeController;
 import com.ainclusive.iotsim.platform.runtime.RuntimeStartSpec;
 import com.ainclusive.iotsim.platform.runtime.SourceHealth;
@@ -41,6 +42,7 @@ class SyntheticRunServiceTest {
     private FakeRuns runs;
     private FakeEvidence evidence;
     private FakeRuntimeEventRepository events;
+    private FakeRunValueTimeline runValueTimeline;
 
     @BeforeEach
     void setUp() {
@@ -48,6 +50,7 @@ class SyntheticRunServiceTest {
         runs = new FakeRuns();
         evidence = new FakeEvidence();
         events = new FakeRuntimeEventRepository();
+        runValueTimeline = new FakeRunValueTimeline();
     }
 
     private SyntheticConfig config(Long seed) {
@@ -61,7 +64,7 @@ class SyntheticRunServiceTest {
     private SyntheticRunService service(String basis, SyntheticConfig config) {
         String rc = config == null ? "{}" : json.writeValueAsString(config);
         return new SyntheticRunService(new FakeDataSources(basis, rc), new EmptySchemas(),
-                runtime, runs, evidence, events, json, FIXED);
+                runtime, runs, evidence, events, runValueTimeline, json, FIXED);
     }
 
     @Test
@@ -75,6 +78,8 @@ class SyntheticRunServiceTest {
         assertThat(summary.seed()).isEqualTo(5L);
         assertThat(runtime.applied).hasSize(14);
         assertThat(runtime.state(SOURCE)).isEqualTo("RUNNING");
+        // IS-185: generated values are persisted for evidence export, keyed by run.
+        assertThat(runValueTimeline.readAll(summary.runId())).hasSize(14);
 
         RunRow run = runs.byId.get(summary.runId());
         assertThat(run.kind()).isEqualTo("SYNTHETIC");
@@ -94,7 +99,7 @@ class SyntheticRunServiceTest {
     void runtimeFailureStampsEndedAtOnEvidenceManifest() {
         SyntheticRunService service = new SyntheticRunService(
                 new FakeDataSources("SYNTHETIC", json.writeValueAsString(config(1L))),
-                new EmptySchemas(), new ThrowingRuntime(), runs, evidence, events, json, FIXED);
+                new EmptySchemas(), new ThrowingRuntime(), runs, evidence, events, runValueTimeline, json, FIXED);
         assertThatThrownBy(() -> service.run(PROJECT, SOURCE, 1000))
                 .isInstanceOf(IllegalStateException.class);
         EvidenceRow ev = evidence.byId.values().iterator().next();
@@ -108,7 +113,8 @@ class SyntheticRunServiceTest {
         CapturingRuntime second = new CapturingRuntime();
         SyntheticRunService svc2 = new SyntheticRunService(
                 new FakeDataSources("SYNTHETIC", json.writeValueAsString(config(5L))),
-                new EmptySchemas(), second, new FakeRuns(), new FakeEvidence(), new FakeRuntimeEventRepository(), json, FIXED);
+                new EmptySchemas(), second, new FakeRuns(), new FakeEvidence(), new FakeRuntimeEventRepository(),
+                new FakeRunValueTimeline(), json, FIXED);
         svc2.run(PROJECT, SOURCE, 1000);
         assertThat(second.applied).isEqualTo(first);
     }
@@ -130,7 +136,7 @@ class SyntheticRunServiceTest {
     @Test
     void missingSourceThrowsNotFound() {
         SyntheticRunService service = new SyntheticRunService(new FakeDataSources("SYNTHETIC", "{}"),
-                new EmptySchemas(), runtime, runs, evidence, events, json, FIXED);
+                new EmptySchemas(), runtime, runs, evidence, events, runValueTimeline, json, FIXED);
         assertThatThrownBy(() -> service.run(PROJECT, "nope", 1000))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
@@ -139,7 +145,7 @@ class SyntheticRunServiceTest {
     void runtimeFailureEndsRunFailed() {
         SyntheticRunService service = new SyntheticRunService(
                 new FakeDataSources("SYNTHETIC", json.writeValueAsString(config(1L))),
-                new EmptySchemas(), new ThrowingRuntime(), runs, evidence, events, json, FIXED);
+                new EmptySchemas(), new ThrowingRuntime(), runs, evidence, events, runValueTimeline, json, FIXED);
         assertThatThrownBy(() -> service.run(PROJECT, SOURCE, 1000))
                 .isInstanceOf(IllegalStateException.class);
         assertThat(runs.byId.values()).singleElement()
@@ -381,6 +387,23 @@ class SyntheticRunServiceTest {
         public List<EvidenceRow> findByProjectPaged(String projectId, OffsetDateTime afterAt,
                 String afterId, int limit) {
             return List.of();
+        }
+    }
+
+    private static final class FakeRunValueTimeline implements RunValueTimelineRepository {
+        final java.util.Map<String, List<NeutralValue>> byRun = new java.util.LinkedHashMap<>();
+
+        public long append(String runId, List<NeutralValue> values) {
+            byRun.computeIfAbsent(runId, k -> new ArrayList<>()).addAll(values);
+            return values.size();
+        }
+
+        public List<NeutralValue> readAll(String runId) {
+            return byRun.getOrDefault(runId, List.of());
+        }
+
+        public void deleteByRun(String runId) {
+            byRun.remove(runId);
         }
     }
 }

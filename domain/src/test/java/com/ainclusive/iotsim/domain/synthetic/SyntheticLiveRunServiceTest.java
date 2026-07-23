@@ -11,6 +11,7 @@ import com.ainclusive.iotsim.persistence.run.RunRepository;
 import com.ainclusive.iotsim.persistence.run.RunRow;
 import com.ainclusive.iotsim.persistence.schema.SchemaRepository;
 import com.ainclusive.iotsim.persistence.schema.SchemaWithNodes;
+import com.ainclusive.iotsim.persistence.timeline.RunValueTimelineRepository;
 import com.ainclusive.iotsim.platform.runtime.RuntimeController;
 import com.ainclusive.iotsim.platform.runtime.RuntimeStartSpec;
 import com.ainclusive.iotsim.platform.runtime.SourceHealth;
@@ -40,6 +41,7 @@ class SyntheticLiveRunServiceTest {
     private FakeRuns runs;
     private FakeEvidence evidence;
     private FakeRuntimeEventRepository events;
+    private FakeRunValueTimeline runValueTimeline;
     private MutableClock wall; // injected wall clock we advance by hand
 
     @BeforeEach
@@ -48,13 +50,14 @@ class SyntheticLiveRunServiceTest {
         runs = new FakeRuns();
         evidence = new FakeEvidence();
         events = new FakeRuntimeEventRepository();
+        runValueTimeline = new FakeRunValueTimeline();
         wall = MutableClock.at(T0, ZoneOffset.UTC);
     }
 
     private SyntheticLiveRunService service(String basis, SyntheticConfig config) {
         String rc = config == null ? "{}" : json.writeValueAsString(config);
         return new SyntheticLiveRunService(new FakeDataSources(basis, rc), new EmptySchemas(),
-                runtime, runs, evidence, events, json, wall);
+                runtime, runs, evidence, events, runValueTimeline, json, wall);
     }
 
     @Test
@@ -90,7 +93,7 @@ class SyntheticLiveRunServiceTest {
     @Test
     void tickEmitsOnlySamplesDueSinceStart() {
         SyntheticLiveRunService service = service("SYNTHETIC", config(5L));
-        service.start(PROJECT, SOURCE, null, "MANUAL", "local");
+        SyntheticLiveRunSummary started = service.start(PROJECT, SOURCE, null, "MANUAL", "local");
 
         // config: temp @100ms, rnd @250ms. Advance 500ms of wall time.
         wall.advance(Duration.ofMillis(500));
@@ -105,6 +108,8 @@ class SyntheticLiveRunServiceTest {
 
         // temp now 10 total (=> +5), rnd now 4 total (=> +2) => +7, cumulative 14.
         assertThat(runtime.applied).hasSize(14);
+        // IS-185: every emitted value is also persisted for evidence export.
+        assertThat(runValueTimeline.readAll(started.runId())).hasSize(14);
     }
 
     @Test
@@ -115,7 +120,7 @@ class SyntheticLiveRunServiceTest {
         SyntheticRunService batch = new SyntheticRunService(
                 new FakeDataSources("SYNTHETIC", json.writeValueAsString(config(5L))),
                 new EmptySchemas(), batchRuntime, new FakeRuns(), new FakeEvidence(), new FakeRuntimeEventRepository(),
-                json, java.time.Clock.fixed(T0, ZoneOffset.UTC));
+                new FakeRunValueTimeline(), json, java.time.Clock.fixed(T0, ZoneOffset.UTC));
         batch.run(PROJECT, SOURCE, 1000);
 
         SyntheticLiveRunService live = service("SYNTHETIC", config(5L));
@@ -182,7 +187,7 @@ class SyntheticLiveRunServiceTest {
         };
         SyntheticLiveRunService failing = new SyntheticLiveRunService(
                 new FakeDataSources("SYNTHETIC", json.writeValueAsString(config(5L))),
-                new EmptySchemas(), throwing, runs, evidence, events, json, wall);
+                new EmptySchemas(), throwing, runs, evidence, events, runValueTimeline, json, wall);
         SyntheticLiveRunSummary s = failing.start(PROJECT, SOURCE, null, "MANUAL", "local");
 
         wall.advance(Duration.ofMillis(500));
@@ -202,7 +207,7 @@ class SyntheticLiveRunServiceTest {
         // A transient DB error stamping evidence must not block the terminal COMPLETED write.
         SyntheticLiveRunService svc = new SyntheticLiveRunService(
                 new FakeDataSources("SYNTHETIC", json.writeValueAsString(config(5L))),
-                new EmptySchemas(), runtime, runs, throwingEvidenceAfterStart(), events, json, wall);
+                new EmptySchemas(), runtime, runs, throwingEvidenceAfterStart(), events, runValueTimeline, json, wall);
         SyntheticLiveRunSummary s = svc.start(PROJECT, SOURCE, 1000L, "MANUAL", "local");
 
         wall.advance(Duration.ofMillis(5000)); // past the cap
@@ -216,7 +221,7 @@ class SyntheticLiveRunServiceTest {
         // stopIfLive must not propagate an evidence-stamp failure into RunService.stop.
         SyntheticLiveRunService svc = new SyntheticLiveRunService(
                 new FakeDataSources("SYNTHETIC", json.writeValueAsString(config(5L))),
-                new EmptySchemas(), runtime, runs, throwingEvidenceAfterStart(), events, json, wall);
+                new EmptySchemas(), runtime, runs, throwingEvidenceAfterStart(), events, runValueTimeline, json, wall);
         SyntheticLiveRunSummary s = svc.start(PROJECT, SOURCE, null, "MANUAL", "local");
         wall.advance(Duration.ofMillis(500));
         svc.tickAll();
@@ -427,6 +432,23 @@ class SyntheticLiveRunServiceTest {
         public List<EvidenceRow> findByProjectPaged(String projectId, OffsetDateTime afterAt,
                 String afterId, int limit) {
             return List.of();
+        }
+    }
+
+    private static final class FakeRunValueTimeline implements RunValueTimelineRepository {
+        final java.util.Map<String, List<NeutralValue>> byRun = new java.util.LinkedHashMap<>();
+
+        public long append(String runId, List<NeutralValue> values) {
+            byRun.computeIfAbsent(runId, k -> new ArrayList<>()).addAll(values);
+            return values.size();
+        }
+
+        public List<NeutralValue> readAll(String runId) {
+            return byRun.getOrDefault(runId, List.of());
+        }
+
+        public void deleteByRun(String runId) {
+            byRun.remove(runId);
         }
     }
 }

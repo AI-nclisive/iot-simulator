@@ -12,6 +12,7 @@ import com.ainclusive.iotsim.persistence.run.RunRepository;
 import com.ainclusive.iotsim.persistence.run.RunRow;
 import com.ainclusive.iotsim.persistence.runtimeevent.RuntimeEventRepository;
 import com.ainclusive.iotsim.persistence.runtimeevent.RuntimeEventRow;
+import com.ainclusive.iotsim.persistence.timeline.RunValueTimelineRepository;
 import com.ainclusive.iotsim.persistence.timeline.ValueTimelineRepository;
 import com.ainclusive.iotsim.platform.storage.ObjectStore;
 import com.ainclusive.iotsim.protocolmodel.NeutralValue;
@@ -44,6 +45,7 @@ public class EvidenceService {
     private final EvidenceRepository evidence;
     private final RunRepository runs;
     private final ValueTimelineRepository timeline;
+    private final RunValueTimelineRepository runTimeline;
     private final RuntimeEventRepository runtimeEvents;
     private final ClientConnectionRepository clients;
     private final Map<EvidenceFormat, EvidenceArtifactWriter> writers;
@@ -52,12 +54,14 @@ public class EvidenceService {
     private final ProjectRepository projects;
 
     public EvidenceService(EvidenceRepository evidence, RunRepository runs,
-            ValueTimelineRepository timeline, RuntimeEventRepository runtimeEvents,
+            ValueTimelineRepository timeline, RunValueTimelineRepository runTimeline,
+            RuntimeEventRepository runtimeEvents,
             ClientConnectionRepository clients, List<EvidenceArtifactWriter> writers,
             ObjectStore objectStore, ObjectMapper json, ProjectRepository projects) {
         this.evidence = evidence;
         this.runs = runs;
         this.timeline = timeline;
+        this.runTimeline = runTimeline;
         this.runtimeEvents = runtimeEvents;
         this.clients = clients;
         this.writers = new EnumMap<>(EvidenceFormat.class);
@@ -130,8 +134,14 @@ public class EvidenceService {
         Instant endedAt = run != null ? toInstant(run.endedAt()) : null;
         List<String> sourceIds = run != null ? run.sourceIds() : List.of();
 
-        List<ValueSample> valueTimeline = recordingId == null ? List.of()
-                : timeline.readAll(recordingId).stream().map(EvidenceService::toSample).toList();
+        List<ValueSample> valueTimeline;
+        if (recordingId != null) {
+            valueTimeline = timeline.readAll(recordingId).stream().map(EvidenceService::toSample).toList();
+        } else if (ev.runId() != null) {
+            valueTimeline = runTimeline.readAll(ev.runId()).stream().map(EvidenceService::toSample).toList();
+        } else {
+            valueTimeline = List.of();
+        }
 
         // Runtime events aren't run-tagged at the source (the supervisor writes runId=null) and
         // client connections carry no runId, so both are scoped by source + the run's time window.
