@@ -348,7 +348,7 @@ export function ManualSchemaEditorPage() {
   }
 
   function addReference() {
-    if (!selectedNode || !addRefTargetId) return;
+    if (!selectedNode || !addRefTargetId || addRefTargetId === selectedNode.nodeId) return;
     const reference: ReferenceDto = { targetNodeId: addRefTargetId, type: addRefType, forward: true };
     updateSelectedNode({ references: [...(selectedNode.references ?? []), reference] });
     setAddRefTargetId("");
@@ -1087,7 +1087,7 @@ export function ManualSchemaEditorPage() {
                       </label>
                       <button
                         className="shell-action"
-                        disabled={!addRefTargetId}
+                        disabled={!addRefTargetId || addRefTargetId === selectedNode.nodeId}
                         type="button"
                         onClick={addReference}
                       >

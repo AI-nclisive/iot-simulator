@@ -363,6 +363,22 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
     expect(screen.getByText("No references yet.")).not.toBeNull();
   });
 
+  it("does not let a stale reference target create a self-reference after switching the selected node (UI-504)", async () => {
+    mockLoadManualSchemaById.mockResolvedValueOnce(schemaWithFolder);
+    renderPage();
+
+    await waitFor(() => screen.getByText("Reactor"));
+    fireEvent.click(screen.getByText("Reactor"));
+    fireEvent.click(screen.getByText("Temp"));
+    // Target the folder while "Temp" is selected — addRefTargetId becomes "f1".
+    fireEvent.change(screen.getByLabelText("Reference target node"), { target: { value: "f1" } });
+
+    // Now select the folder itself — its own nodeId ("f1") matches the stale target.
+    fireEvent.click(screen.getByText("Reactor"));
+
+    expect((screen.getByRole("button", { name: "Add reference" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
   it("fills a new variable from the suggested parameter catalog", async () => {
     mockLoadManualSchemaById.mockResolvedValueOnce(schemaWithFolder);
     renderPage();
