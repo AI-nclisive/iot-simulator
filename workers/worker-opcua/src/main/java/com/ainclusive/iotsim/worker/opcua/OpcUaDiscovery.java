@@ -132,6 +132,18 @@ final class OpcUaDiscovery {
                 if (!isVariable && ref.getNodeClass() != NodeClass.Object) {
                     continue;
                 }
+                // A Variable's HasProperty children (EURange, EngineeringUnits,
+                // EnumStrings, Quality, ...) are metadata about the value, not part of
+                // it, and are extremely common on AnalogItemType/DataItemType
+                // variables. They're skipped entirely (IS-188) — not just left
+                // un-descended-into: the neutral schema model only allows a
+                // FOLDER/OBJECT parent (SchemaNodeValidator), and a Property's parent
+                // is always its owning Variable, so emitting them as discovered nodes
+                // made every such real device un-scannable ("parent must be a FOLDER
+                // or OBJECT").
+                if (isVariable && Identifiers.HasProperty.equals(ref.getReferenceTypeId())) {
+                    continue;
+                }
                 if (nodes.size() >= cap) {
                     truncated = true;
                     return new ScanOutcome(PARTIAL, List.copyOf(nodes), truncated, unknown[0],
@@ -144,16 +156,8 @@ final class OpcUaDiscovery {
                         isVariable ? neutralTypeOf(client, childId, unknown) : null));
                 // A Variable can itself have children (e.g. a structured/complex
                 // value's component Variables via HasComponent), not just
-                // Objects/Folders — keep descending. But a Variable's HasProperty
-                // children (EURange, EngineeringUnits, EnumStrings, ...) are metadata
-                // about the value, not part of it, and are extremely common on
-                // AnalogItemType/DataItemType variables — descending into those
-                // multiplies scan RPCs without adding useful schema nodes, so they're
-                // recorded as leaves instead of pushed back onto the stack.
-                boolean isProperty = isVariable && Identifiers.HasProperty.equals(ref.getReferenceTypeId());
-                if (!isProperty) {
-                    stack.push(new Frame(childId, neutralId, path));
-                }
+                // Objects/Folders — keep descending.
+                stack.push(new Frame(childId, neutralId, path));
                 if (nodes.size() % PROGRESS_STEP == 0) {
                     onProgress.onDiscovered(nodes.size());
                 }
