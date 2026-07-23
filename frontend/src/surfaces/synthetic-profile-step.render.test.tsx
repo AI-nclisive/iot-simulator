@@ -224,7 +224,7 @@ describe("SyntheticProfileStep — decimal number fields (UI-486)", () => {
     expect(inputs.length).toBeGreaterThan(0);
     expect((screen.getByLabelText(/^Min$/i) as HTMLInputElement).getAttribute("step")).toBe("any");
     expect((screen.getByLabelText(/^Max$/i) as HTMLInputElement).getAttribute("step")).toBe("any");
-    expect((screen.getByLabelText(/Update rate/i) as HTMLInputElement).getAttribute("step")).toBe("1");
+    expect((screen.getByLabelText(/^Update rate \(ms\)$/i) as HTMLInputElement).getAttribute("step")).toBe("1");
   });
 
   it("accepts a decimal value typed into Min and reports it as valid", async () => {
@@ -350,6 +350,33 @@ describe("SyntheticProfileStep — select-all / deselect-all (UI-487)", () => {
     // (not overwritten by the bulk apply while it was deselected).
     await user.click(rowCheckboxes()[1]);
     expect(rowPatternSelects()[1].value).toBe("RANDOM_UNIFORM");
+  });
+
+  function bulkRateInput(): HTMLInputElement {
+    return screen.getByLabelText(/Update rate for selected/i) as HTMLInputElement;
+  }
+
+  function rowUpdateRateInputs(): HTMLInputElement[] {
+    const list = screen.getByRole("list");
+    return within(list).getAllByLabelText(/^Update rate \(ms\)$/i) as HTMLInputElement[];
+  }
+
+  it("bulk update-rate applies one rate to every currently-selected row", async () => {
+    const user = await renderWithTwoMeasurements();
+    await user.type(bulkRateInput(), "60000");
+    await user.click(screen.getByRole("button", { name: "Apply rate" }));
+    expect(rowUpdateRateInputs().every((i) => i.value === "60000")).toBe(true);
+  });
+
+  it("bulk update-rate skips rows that were deselected first", async () => {
+    const user = await renderWithTwoMeasurements();
+    await user.click(rowCheckboxes()[1]);
+    await user.type(bulkRateInput(), "60000");
+    await user.click(screen.getByRole("button", { name: "Apply rate" }));
+    expect(rowUpdateRateInputs()[0].value).toBe("60000");
+
+    await user.click(rowCheckboxes()[1]);
+    expect(rowUpdateRateInputs()[1].value).toBe("1000");
   });
 });
 
