@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.domain.common.SchemaVersionMismatchException;
+import com.ainclusive.iotsim.domain.run.FakeRuntimeEventRepository;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRepository;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRow;
 import com.ainclusive.iotsim.persistence.evidence.EvidenceRepository;
@@ -45,6 +46,7 @@ class ReplayLiveRunServiceTest {
     private CapturingRuntime runtime;
     private FakeRuns runs;
     private FakeEvidence evidence;
+    private FakeRuntimeEventRepository events;
     private FakeDataSources dataSources;
     private MutableClock wall;
 
@@ -53,6 +55,7 @@ class ReplayLiveRunServiceTest {
         runtime = new CapturingRuntime();
         runs = new FakeRuns();
         evidence = new FakeEvidence();
+        events = new FakeRuntimeEventRepository();
         dataSources = new FakeDataSources(SOURCE, PROJECT);
         wall = MutableClock.at(T0, ZoneOffset.UTC);
     }
@@ -79,7 +82,7 @@ class ReplayLiveRunServiceTest {
                 new FakeRecordings(RECORDING, PROJECT),
                 timeline,
                 new EmptySchemas(),
-                rt, runs, evidence, json, wall);
+                rt, runs, evidence, events, json, wall);
     }
 
     private ReplayLiveRunService serviceWithRecordingVersion(int schemaVersion) {
@@ -88,7 +91,7 @@ class ReplayLiveRunServiceTest {
                 new FakeRecordingsAtVersion(RECORDING, PROJECT, schemaVersion),
                 new FakeTimeline(defaultValues()),
                 new EmptySchemas(),
-                runtime, runs, evidence, json, wall);
+                runtime, runs, evidence, events, json, wall);
     }
 
     // --- tests ---
@@ -102,7 +105,7 @@ class ReplayLiveRunServiceTest {
                 new FakeRecordingsWithProtocol(RECORDING, PROJECT, "MODBUS_TCP"),
                 new FakeTimeline(defaultValues()),
                 new EmptySchemas(),
-                runtime, runs, evidence, json, wall);
+                runtime, runs, evidence, events, json, wall);
 
         assertThatThrownBy(() -> svc.start(PROJECT, SOURCE, RECORDING, null, true))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -189,6 +192,8 @@ class ReplayLiveRunServiceTest {
         assertThat(evidence.byId.get(summary.evidenceId()).manifestJson())
                 .doesNotContain("\"endedAt\":null")
                 .contains("\"endedAt\":\"" + wall.instant() + "\"");
+        // IS-182: auto-completion is mirrored into runtime_events.
+        assertThat(events.appended).extracting("type").containsExactly("RUN_COMPLETED");
 
         // A subsequent tick is a no-op — removed from registry.
         svc.tickAll();
@@ -264,6 +269,8 @@ class ReplayLiveRunServiceTest {
 
         assertThat(runs.byId.values()).singleElement()
                 .extracting(RunRow::state).isEqualTo("FAILED");
+        // IS-182: start failure is mirrored into runtime_events.
+        assertThat(events.appended).extracting("type").containsExactly("RUN_FAILED");
     }
 
     @Test
@@ -273,7 +280,7 @@ class ReplayLiveRunServiceTest {
                 new FakeRecordings("other-rec", PROJECT), // RECORDING not found
                 new FakeTimeline(defaultValues()),
                 new EmptySchemas(),
-                runtime, runs, evidence, json, wall);
+                runtime, runs, evidence, events, json, wall);
 
         assertThatThrownBy(() -> svc.start(PROJECT, SOURCE, RECORDING, null, true))
                 .isInstanceOf(ResourceNotFoundException.class);
@@ -288,7 +295,7 @@ class ReplayLiveRunServiceTest {
                 new FakeRecordings(RECORDING, PROJECT),
                 new FakeTimeline(defaultValues()),
                 new EmptySchemas(),
-                runtime, runs, evidence, json, wall);
+                runtime, runs, evidence, events, json, wall);
 
         assertThatThrownBy(() -> svc.start(PROJECT, SOURCE, RECORDING, null, true))
                 .isInstanceOf(ResourceNotFoundException.class);
@@ -306,6 +313,8 @@ class ReplayLiveRunServiceTest {
         assertThat(runs.byId.get(summary.runId()).state()).isEqualTo("COMPLETED");
         // Runtime must be stopped — no leak for the empty-timeline path.
         assertThat(runtime.state(SOURCE)).isEqualTo("STOPPED");
+        // IS-182: immediate auto-completion is mirrored into runtime_events.
+        assertThat(events.appended).extracting("type").containsExactly("RUN_COMPLETED");
         // Nothing in registry — tick is a no-op.
         svc.tickAll();
         assertThat(runtime.applied).isEmpty();
@@ -329,7 +338,7 @@ class ReplayLiveRunServiceTest {
                 new FakeRecordings(RECORDING, PROJECT),
                 new FakeTimeline(defaultValues()),
                 new EmptySchemas(),
-                runtime, runs, evidence, json, wall);
+                runtime, runs, evidence, events, json, wall);
 
         svc.start(PROJECT, SOURCE, RECORDING, null, true);
 
@@ -358,7 +367,7 @@ class ReplayLiveRunServiceTest {
                 new FakeRecordings(RECORDING, PROJECT),
                 new FakeTimeline(defaultValues()),
                 new EmptySchemas(),
-                runtime, runs, throwingEvidenceAfterStart(), json, wall);
+                runtime, runs, throwingEvidenceAfterStart(), events, json, wall);
         ReplaySummary summary = svc.start(PROJECT, SOURCE, RECORDING, null, true);
 
         // Must not propagate to RunService.stop.

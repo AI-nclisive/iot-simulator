@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
+import com.ainclusive.iotsim.domain.run.FakeRuntimeEventRepository;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRepository;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRow;
 import com.ainclusive.iotsim.persistence.evidence.EvidenceRepository;
@@ -39,12 +40,14 @@ class SyntheticRunServiceTest {
     private CapturingRuntime runtime;
     private FakeRuns runs;
     private FakeEvidence evidence;
+    private FakeRuntimeEventRepository events;
 
     @BeforeEach
     void setUp() {
         runtime = new CapturingRuntime();
         runs = new FakeRuns();
         evidence = new FakeEvidence();
+        events = new FakeRuntimeEventRepository();
     }
 
     private SyntheticConfig config(Long seed) {
@@ -58,7 +61,7 @@ class SyntheticRunServiceTest {
     private SyntheticRunService service(String basis, SyntheticConfig config) {
         String rc = config == null ? "{}" : json.writeValueAsString(config);
         return new SyntheticRunService(new FakeDataSources(basis, rc), new EmptySchemas(),
-                runtime, runs, evidence, json, FIXED);
+                runtime, runs, evidence, events, json, FIXED);
     }
 
     @Test
@@ -82,13 +85,16 @@ class SyntheticRunServiceTest {
         assertThat(ev.manifestJson()).contains("\"kind\":\"SYNTHETIC\"");
         assertThat(ev.manifestJson()).contains("\"runId\":\"" + summary.runId() + "\"");
         assertThat(ev.manifestJson()).doesNotContain("\"endedAt\":null");
+        // IS-182: run completion is mirrored into runtime_events for the Events tab.
+        assertThat(events.appended).extracting("type").containsExactly("RUN_COMPLETED");
+        assertThat(events.appended.get(0).runId()).isEqualTo(summary.runId());
     }
 
     @Test
     void runtimeFailureStampsEndedAtOnEvidenceManifest() {
         SyntheticRunService service = new SyntheticRunService(
                 new FakeDataSources("SYNTHETIC", json.writeValueAsString(config(1L))),
-                new EmptySchemas(), new ThrowingRuntime(), runs, evidence, json, FIXED);
+                new EmptySchemas(), new ThrowingRuntime(), runs, evidence, events, json, FIXED);
         assertThatThrownBy(() -> service.run(PROJECT, SOURCE, 1000))
                 .isInstanceOf(IllegalStateException.class);
         EvidenceRow ev = evidence.byId.values().iterator().next();
@@ -102,7 +108,7 @@ class SyntheticRunServiceTest {
         CapturingRuntime second = new CapturingRuntime();
         SyntheticRunService svc2 = new SyntheticRunService(
                 new FakeDataSources("SYNTHETIC", json.writeValueAsString(config(5L))),
-                new EmptySchemas(), second, new FakeRuns(), new FakeEvidence(), json, FIXED);
+                new EmptySchemas(), second, new FakeRuns(), new FakeEvidence(), new FakeRuntimeEventRepository(), json, FIXED);
         svc2.run(PROJECT, SOURCE, 1000);
         assertThat(second.applied).isEqualTo(first);
     }
@@ -124,7 +130,7 @@ class SyntheticRunServiceTest {
     @Test
     void missingSourceThrowsNotFound() {
         SyntheticRunService service = new SyntheticRunService(new FakeDataSources("SYNTHETIC", "{}"),
-                new EmptySchemas(), runtime, runs, evidence, json, FIXED);
+                new EmptySchemas(), runtime, runs, evidence, events, json, FIXED);
         assertThatThrownBy(() -> service.run(PROJECT, "nope", 1000))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
@@ -133,11 +139,13 @@ class SyntheticRunServiceTest {
     void runtimeFailureEndsRunFailed() {
         SyntheticRunService service = new SyntheticRunService(
                 new FakeDataSources("SYNTHETIC", json.writeValueAsString(config(1L))),
-                new EmptySchemas(), new ThrowingRuntime(), runs, evidence, json, FIXED);
+                new EmptySchemas(), new ThrowingRuntime(), runs, evidence, events, json, FIXED);
         assertThatThrownBy(() -> service.run(PROJECT, SOURCE, 1000))
                 .isInstanceOf(IllegalStateException.class);
         assertThat(runs.byId.values()).singleElement()
                 .extracting(RunRow::state).isEqualTo("FAILED");
+        // IS-182: run failure is mirrored into runtime_events for the Events tab.
+        assertThat(events.appended).extracting("type").containsExactly("RUN_FAILED");
     }
 
     @Test

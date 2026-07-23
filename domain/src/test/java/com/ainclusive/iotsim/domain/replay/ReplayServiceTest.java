@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.domain.common.SchemaVersionMismatchException;
+import com.ainclusive.iotsim.domain.run.FakeRuntimeEventRepository;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRepository;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRow;
 import com.ainclusive.iotsim.persistence.evidence.EvidenceRepository;
@@ -42,6 +43,7 @@ class ReplayServiceTest {
     private InMemoryRuntimeController runtime;
     private FakeRuns runs;
     private FakeEvidence evidence;
+    private FakeRuntimeEventRepository events;
     private ReplayService service;
 
     @BeforeEach
@@ -49,6 +51,7 @@ class ReplayServiceTest {
         runtime = new InMemoryRuntimeController();
         runs = new FakeRuns();
         evidence = new FakeEvidence();
+        events = new FakeRuntimeEventRepository();
         service = build(runtime);
     }
 
@@ -65,6 +68,7 @@ class ReplayServiceTest {
                 controller,
                 runs,
                 evidence,
+                events,
                 new ObjectMapper());
     }
 
@@ -99,6 +103,9 @@ class ReplayServiceTest {
         assertThat(ev.manifestJson()).contains("\"seed\":");
         assertThat(ev.manifestJson()).contains("\"kind\":\"REPLAY\"");
         assertThat(ev.manifestJson()).doesNotContain("\"endedAt\":null");
+        // IS-182: run completion is mirrored into runtime_events for the Events tab.
+        assertThat(events.appended).extracting("type").containsExactly("RUN_COMPLETED");
+        assertThat(events.appended.get(0).runId()).isEqualTo(summary.runId());
     }
 
     @Test
@@ -112,6 +119,8 @@ class ReplayServiceTest {
                 .extracting(RunRow::state).isEqualTo("FAILED");
         EvidenceRow ev = evidence.byId.values().iterator().next();
         assertThat(ev.manifestJson()).doesNotContain("\"endedAt\":null");
+        // IS-182: run failure is mirrored into runtime_events for the Events tab.
+        assertThat(events.appended).extracting("type").containsExactly("RUN_FAILED");
     }
 
     @Test
@@ -158,6 +167,7 @@ class ReplayServiceTest {
                 runtime,
                 runs,
                 evidence,
+                events,
                 new ObjectMapper());
 
         assertThatThrownBy(() -> mismatched.replay(PROJECT, SOURCE, RECORDING, null, true))
@@ -249,6 +259,7 @@ class ReplayServiceTest {
                 runtime,
                 runs,
                 evidence,
+                events,
                 new ObjectMapper());
     }
 

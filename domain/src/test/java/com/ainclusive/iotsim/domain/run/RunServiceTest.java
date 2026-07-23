@@ -20,6 +20,7 @@ import com.ainclusive.iotsim.domain.synthetic.SyntheticRunService;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRepository;
 import com.ainclusive.iotsim.persistence.run.RunRepository;
 import com.ainclusive.iotsim.persistence.run.RunRow;
+import com.ainclusive.iotsim.persistence.runtimeevent.RuntimeEventRepository;
 import com.ainclusive.iotsim.persistence.scenario.ScenarioRepository;
 import com.ainclusive.iotsim.platform.runtime.RuntimeController;
 import com.ainclusive.iotsim.platform.runtime.SourceHealth;
@@ -37,6 +38,7 @@ class RunServiceTest {
     private DataSourceRepository dataSources;
     private ScenarioRepository scenarios;
     private RuntimeController runtime;
+    private RuntimeEventRepository events;
     private ReplayService replay;
     private ReplayLiveRunService replayLive;
     private SyntheticRunService synthetic;
@@ -50,13 +52,14 @@ class RunServiceTest {
         dataSources = mock(DataSourceRepository.class);
         scenarios = mock(ScenarioRepository.class);
         runtime = mock(RuntimeController.class);
+        events = mock(RuntimeEventRepository.class);
         replay = mock(ReplayService.class);
         replayLive = mock(ReplayLiveRunService.class);
         synthetic = mock(SyntheticRunService.class);
         syntheticLive = mock(SyntheticLiveRunService.class);
         scenarioLive = mock(ScenarioLiveRunService.class);
         when(dataSources.findByProject(PROJECT)).thenReturn(List.of());
-        service = new RunService(runs, dataSources, scenarios, runtime, replay, replayLive, synthetic,
+        service = new RunService(runs, dataSources, scenarios, runtime, events, replay, replayLive, synthetic,
                 syntheticLive, scenarioLive);
     }
 
@@ -117,9 +120,12 @@ class RunServiceTest {
     void stopReplayCancelsLiveFeedAndEndsRunStopped() {
         when(runs.findById("run-r")).thenReturn(Optional.of(row("run-r", "REPLAY", "RUNNING", List.of("ds1"))));
         when(runs.end(eq("run-r"), eq("STOPPED"), any())).thenReturn(row("run-r", "REPLAY", "STOPPED", List.of("ds1")));
+        when(replayLive.stopIfLive("run-r")).thenReturn(true);
         service.stop(PROJECT, "run-r");
         verify(replayLive).stopIfLive("run-r");
         verify(runs).end(eq("run-r"), eq("STOPPED"), any());
+        // IS-182: manual stop of a live replay is mirrored into runtime_events.
+        verify(events).append(eq(PROJECT), eq("ds1"), eq("run-r"), eq("RUN_STOPPED"), any(), any());
     }
 
     @Test
@@ -163,9 +169,12 @@ class RunServiceTest {
     void stopSyntheticCancelsLiveFeedAndEndsRunStopped() {
         when(runs.findById("run-9")).thenReturn(Optional.of(row("run-9", "SYNTHETIC", "RUNNING", List.of("ds1"))));
         when(runs.end(eq("run-9"), eq("STOPPED"), any())).thenReturn(row("run-9", "SYNTHETIC", "STOPPED", List.of("ds1")));
+        when(syntheticLive.stopIfLive("run-9")).thenReturn(true);
         service.stop(PROJECT, "run-9");
         verify(syntheticLive).stopIfLive("run-9");
         verify(runs).end(eq("run-9"), eq("STOPPED"), any());
+        // IS-182: manual stop of a live synthetic run is mirrored into runtime_events.
+        verify(events).append(eq(PROJECT), eq("ds1"), eq("run-9"), eq("RUN_STOPPED"), any(), any());
     }
 
     // ---- SCENARIO routing ----

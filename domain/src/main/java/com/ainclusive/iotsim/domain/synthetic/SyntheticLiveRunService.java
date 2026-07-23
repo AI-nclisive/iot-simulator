@@ -2,12 +2,14 @@ package com.ainclusive.iotsim.domain.synthetic;
 
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.domain.datasource.RuntimeStartSpecs;
+import com.ainclusive.iotsim.domain.run.RunCompletionEvents;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRepository;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRow;
 import com.ainclusive.iotsim.persistence.evidence.EvidenceRepository;
 import com.ainclusive.iotsim.persistence.evidence.EvidenceRow;
 import com.ainclusive.iotsim.persistence.run.RunRepository;
 import com.ainclusive.iotsim.persistence.run.RunRow;
+import com.ainclusive.iotsim.persistence.runtimeevent.RuntimeEventRepository;
 import com.ainclusive.iotsim.persistence.schema.SchemaRepository;
 import com.ainclusive.iotsim.platform.runtime.RuntimeController;
 import com.ainclusive.iotsim.protocolmodel.DeterminismContext;
@@ -45,6 +47,7 @@ public class SyntheticLiveRunService {
     private final RuntimeController runtime;
     private final RunRepository runs;
     private final EvidenceRepository evidence;
+    private final RuntimeEventRepository events;
     private final ObjectMapper json;
     private final Clock wallClock;
 
@@ -52,19 +55,21 @@ public class SyntheticLiveRunService {
 
     @Autowired
     public SyntheticLiveRunService(DataSourceRepository dataSources, SchemaRepository schemas,
-            RuntimeController runtime, RunRepository runs, EvidenceRepository evidence, ObjectMapper json) {
-        this(dataSources, schemas, runtime, runs, evidence, json, Clock.systemUTC());
+            RuntimeController runtime, RunRepository runs, EvidenceRepository evidence,
+            RuntimeEventRepository events, ObjectMapper json) {
+        this(dataSources, schemas, runtime, runs, evidence, events, json, Clock.systemUTC());
     }
 
     /** Test seam: inject a controllable wall clock so paced emission is reproducible without sleeps. */
     SyntheticLiveRunService(DataSourceRepository dataSources, SchemaRepository schemas,
             RuntimeController runtime, RunRepository runs, EvidenceRepository evidence,
-            ObjectMapper json, Clock wallClock) {
+            RuntimeEventRepository events, ObjectMapper json, Clock wallClock) {
         this.dataSources = dataSources;
         this.schemas = schemas;
         this.runtime = runtime;
         this.runs = runs;
         this.evidence = evidence;
+        this.events = events;
         this.json = json;
         this.wallClock = wallClock;
     }
@@ -105,12 +110,13 @@ public class SyntheticLiveRunService {
             for (SyntheticVariable variable : variables) {
                 feeds.add(new VariableFeed(variable.generator(context), variable.updateRateMs()));
             }
-            registry.put(run.id(), new LiveRun(run.id(), evidenceRow.id(), dataSourceId,
+            registry.put(run.id(), new LiveRun(projectId, run.id(), evidenceRow.id(), dataSourceId,
                     trigger, initiator, settings.seed(), startedAt, maxDurationMs, feeds));
 
             return new SyntheticLiveRunSummary(dataSourceId, settings.seed(), run.id(), evidenceRow.id(), "RUNNING");
         } catch (RuntimeException e) {
             runs.end(run.id(), "FAILED", now());
+            RunCompletionEvents.appendTerminal(events, projectId, dataSourceId, run.id(), "FAILED", now());
             throw e;
         }
     }
@@ -169,6 +175,8 @@ public class SyntheticLiveRunService {
         }
         stampEvidence(live, wallClock.instant());
         runs.end(live.runId(), terminalState, now());
+        RunCompletionEvents.appendTerminal(events, live.projectId(), live.dataSourceId(), live.runId(),
+                terminalState, now());
     }
 
     /**
@@ -252,7 +260,7 @@ public class SyntheticLiveRunService {
     }
 
     /** In-memory handle for one running live feed. */
-    record LiveRun(String runId, String evidenceId, String dataSourceId,
+    record LiveRun(String projectId, String runId, String evidenceId, String dataSourceId,
             String trigger, String initiator, long seed,
             Instant startedAt, Long maxDurationMs, List<VariableFeed> feeds) {
 

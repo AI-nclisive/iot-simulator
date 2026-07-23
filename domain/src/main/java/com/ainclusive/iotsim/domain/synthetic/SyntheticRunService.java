@@ -2,12 +2,14 @@ package com.ainclusive.iotsim.domain.synthetic;
 
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.domain.datasource.RuntimeStartSpecs;
+import com.ainclusive.iotsim.domain.run.RunCompletionEvents;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRepository;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRow;
 import com.ainclusive.iotsim.persistence.evidence.EvidenceRepository;
 import com.ainclusive.iotsim.persistence.evidence.EvidenceRow;
 import com.ainclusive.iotsim.persistence.run.RunRepository;
 import com.ainclusive.iotsim.persistence.run.RunRow;
+import com.ainclusive.iotsim.persistence.runtimeevent.RuntimeEventRepository;
 import com.ainclusive.iotsim.persistence.schema.SchemaRepository;
 import com.ainclusive.iotsim.platform.runtime.RuntimeController;
 import com.ainclusive.iotsim.protocolmodel.DeterminismContext;
@@ -41,24 +43,27 @@ public class SyntheticRunService {
     private final RuntimeController runtime;
     private final RunRepository runs;
     private final EvidenceRepository evidence;
+    private final RuntimeEventRepository events;
     private final ObjectMapper json;
     private final Clock clock;
 
     @Autowired
     public SyntheticRunService(DataSourceRepository dataSources, SchemaRepository schemas,
-            RuntimeController runtime, RunRepository runs, EvidenceRepository evidence, ObjectMapper json) {
-        this(dataSources, schemas, runtime, runs, evidence, json, Clock.systemUTC());
+            RuntimeController runtime, RunRepository runs, EvidenceRepository evidence,
+            RuntimeEventRepository events, ObjectMapper json) {
+        this(dataSources, schemas, runtime, runs, evidence, events, json, Clock.systemUTC());
     }
 
     /** Test seam: pin the run-start clock so the produced series is fully reproducible. */
     SyntheticRunService(DataSourceRepository dataSources, SchemaRepository schemas,
             RuntimeController runtime, RunRepository runs, EvidenceRepository evidence,
-            ObjectMapper json, Clock clock) {
+            RuntimeEventRepository events, ObjectMapper json, Clock clock) {
         this.dataSources = dataSources;
         this.schemas = schemas;
         this.runtime = runtime;
         this.runs = runs;
         this.evidence = evidence;
+        this.events = events;
         this.json = json;
         this.clock = clock;
     }
@@ -117,10 +122,12 @@ public class SyntheticRunService {
             evidence.updateManifest(evidenceRow.id(), manifest(run.id(), trigger, initiator, dataSourceId,
                     startedAt, clock.instant(), settings.seed(), values.size()));
             runs.end(run.id(), "COMPLETED", now());
+            RunCompletionEvents.appendTerminal(events, projectId, dataSourceId, run.id(), "COMPLETED", now());
             return new SyntheticRunSummary(dataSourceId, applied, settings.seed(), run.id(), evidenceRow.id());
         } catch (RuntimeException e) {
             stampFailure(evidenceRow, run.id(), trigger, initiator, dataSourceId, startedAt, settings.seed());
             runs.end(run.id(), "FAILED", now());
+            RunCompletionEvents.appendTerminal(events, projectId, dataSourceId, run.id(), "FAILED", now());
             throw e;
         }
     }
