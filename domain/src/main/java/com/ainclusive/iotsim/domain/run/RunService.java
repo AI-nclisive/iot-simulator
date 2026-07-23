@@ -98,15 +98,14 @@ public class RunService {
         boolean wasLiveSynthetic = syntheticLive.stopIfLive(id); // no-op unless it is a live synthetic run
         scenarioLive.stopIfLive(id);                  // no-op unless it is an async scenario run; owns its own STOPPED event
         run.sourceIds().forEach(runtime::stop);
-        RunRow after = TERMINAL.contains(run.state())
-                ? run
-                : runs.end(id, "STOPPED", OffsetDateTime.now(ZoneOffset.UTC));
+        boolean wasNonTerminal = !TERMINAL.contains(run.state());
+        RunRow after = wasNonTerminal ? runs.end(id, "STOPPED", OffsetDateTime.now(ZoneOffset.UTC)) : run;
         // IS-182: only stamp here for the two live services that don't own their own STOPPED
-        // write (scenario's background thread already appends its own terminal event).
-        if (!TERMINAL.contains(run.state()) && (wasLiveReplay || wasLiveSynthetic)) {
+        // write (scenario's background thread already appends its own terminal event). Reuse
+        // after.endedAt() rather than a fresh now() so runs.endedAt and runtime_events.at match.
+        if (wasNonTerminal && (wasLiveReplay || wasLiveSynthetic)) {
             String dataSourceId = run.sourceIds().isEmpty() ? null : run.sourceIds().get(0);
-            RunCompletionEvents.appendTerminal(events, projectId, dataSourceId, id, "STOPPED",
-                    OffsetDateTime.now(ZoneOffset.UTC));
+            RunCompletionEvents.appendTerminal(events, projectId, dataSourceId, id, "STOPPED", after.endedAt());
         }
         return view(after, sourceNames(projectId));
     }

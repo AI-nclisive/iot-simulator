@@ -4,15 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
+import com.ainclusive.iotsim.domain.run.FakeRuntimeEventRepository;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRepository;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRow;
 import com.ainclusive.iotsim.persistence.evidence.EvidenceRepository;
 import com.ainclusive.iotsim.persistence.evidence.EvidenceRow;
 import com.ainclusive.iotsim.persistence.run.RunRepository;
 import com.ainclusive.iotsim.persistence.run.RunRow;
-import com.ainclusive.iotsim.persistence.runtimeevent.RuntimeEventQuery;
-import com.ainclusive.iotsim.persistence.runtimeevent.RuntimeEventRepository;
-import com.ainclusive.iotsim.persistence.runtimeevent.RuntimeEventRow;
 import com.ainclusive.iotsim.persistence.schema.SchemaRepository;
 import com.ainclusive.iotsim.persistence.schema.SchemaWithNodes;
 import com.ainclusive.iotsim.platform.runtime.RuntimeController;
@@ -42,14 +40,14 @@ class SyntheticRunServiceTest {
     private CapturingRuntime runtime;
     private FakeRuns runs;
     private FakeEvidence evidence;
-    private FakeEvents events;
+    private FakeRuntimeEventRepository events;
 
     @BeforeEach
     void setUp() {
         runtime = new CapturingRuntime();
         runs = new FakeRuns();
         evidence = new FakeEvidence();
-        events = new FakeEvents();
+        events = new FakeRuntimeEventRepository();
     }
 
     private SyntheticConfig config(Long seed) {
@@ -110,7 +108,7 @@ class SyntheticRunServiceTest {
         CapturingRuntime second = new CapturingRuntime();
         SyntheticRunService svc2 = new SyntheticRunService(
                 new FakeDataSources("SYNTHETIC", json.writeValueAsString(config(5L))),
-                new EmptySchemas(), second, new FakeRuns(), new FakeEvidence(), new FakeEvents(), json, FIXED);
+                new EmptySchemas(), second, new FakeRuns(), new FakeEvidence(), new FakeRuntimeEventRepository(), json, FIXED);
         svc2.run(PROJECT, SOURCE, 1000);
         assertThat(second.applied).isEqualTo(first);
     }
@@ -174,38 +172,6 @@ class SyntheticRunServiceTest {
     }
 
     // --- fakes ---
-
-    private static final class FakeEvents implements RuntimeEventRepository {
-        final List<RuntimeEventRow> appended = new ArrayList<>();
-        private long seq;
-
-        public RuntimeEventRow append(String projectId, String dataSourceId, String runId,
-                String type, OffsetDateTime at, String payloadJson) {
-            RuntimeEventRow row = new RuntimeEventRow(++seq, projectId, dataSourceId, runId, type, at, payloadJson);
-            appended.add(row);
-            return row;
-        }
-
-        public Optional<RuntimeEventRow> findById(long id) {
-            throw new UnsupportedOperationException();
-        }
-
-        public List<RuntimeEventRow> findByProject(String projectId) {
-            throw new UnsupportedOperationException();
-        }
-
-        public List<RuntimeEventRow> findByRun(String runId) {
-            return appended.stream().filter(r -> runId.equals(r.runId())).toList();
-        }
-
-        public List<RuntimeEventRow> findByDataSource(String dataSourceId) {
-            throw new UnsupportedOperationException();
-        }
-
-        public List<RuntimeEventRow> query(RuntimeEventQuery filter) {
-            throw new UnsupportedOperationException();
-        }
-    }
 
     private static final class CapturingRuntime implements RuntimeController {
         final List<NeutralValue> applied = new ArrayList<>();
