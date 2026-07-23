@@ -146,6 +146,8 @@ class SyntheticLiveRunServiceTest {
         assertThat(evidence.byId.get(s.evidenceId()).manifestJson()).contains("\"valueCount\":14");
         // IS-182: cap-triggered auto-completion is mirrored into runtime_events.
         assertThat(events.appended).extracting("type").containsExactly("RUN_COMPLETED");
+        // IS-187: a completed run's evidence leaves CAPTURING for READY.
+        assertThat(evidence.byId.get(s.evidenceId()).status()).isEqualTo("READY");
         // A subsequent tick is a no-op (removed from registry).
         service.tickAll();
         assertThat(runtime.applied).hasSize(14);
@@ -169,6 +171,9 @@ class SyntheticLiveRunServiceTest {
                 .contains("\"endedAt\":\"" + wall.instant() + "\"");
         // Run is NOT ended here (RunService owns that on manual stop): still RUNNING.
         assertThat(runs.byId.get(s.runId()).state()).isEqualTo("RUNNING");
+        // IS-187: stopIfLive doesn't own the terminal state, so it must not flip evidence
+        // status either — RunService.stop finalizes it once the run actually ends.
+        assertThat(evidence.byId.get(s.evidenceId()).status()).isEqualTo("CAPTURING");
         // Ticking after stop does nothing.
         wall.advance(Duration.ofMillis(500));
         service.tickAll();
@@ -195,6 +200,8 @@ class SyntheticLiveRunServiceTest {
 
         assertThat(runs.byId.get(s.runId()).state()).isEqualTo("FAILED");
         assertThat(failing.stopIfLive(s.runId())).isFalse(); // already removed
+        // IS-187: a failed run's evidence leaves CAPTURING for PARTIAL, not READY.
+        assertThat(evidence.byId.get(s.evidenceId()).status()).isEqualTo("PARTIAL");
         // feed.emitted is advanced before applyValues is called, so valueCount reflects
         // the ticks that were computed (500ms / 100ms=5 + 500ms/250ms=2 = 7), not 0.
         assertThat(evidence.byId.get(s.evidenceId()).manifestJson()).contains("\"valueCount\":7");
@@ -421,7 +428,7 @@ class SyntheticLiveRunServiceTest {
         }
 
         public Optional<EvidenceRow> findByRun(String runId) {
-            throw new UnsupportedOperationException();
+            return byId.values().stream().filter(e -> runId.equals(e.runId())).findFirst();
         }
 
         public List<EvidenceRow> findByProject(String projectId) {
@@ -429,7 +436,11 @@ class SyntheticLiveRunServiceTest {
         }
 
         public EvidenceRow updateStatus(String id, String status, String objectRef) {
-            throw new UnsupportedOperationException();
+            EvidenceRow e = byId.get(id);
+            EvidenceRow u = new EvidenceRow(e.id(), e.projectId(), e.runId(), status,
+                    e.manifestJson(), objectRef, e.createdAt(), e.createdBy());
+            byId.put(id, u);
+            return u;
         }
 
         public List<EvidenceRow> findByProjectPaged(String projectId, OffsetDateTime afterAt,

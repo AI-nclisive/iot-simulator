@@ -10,6 +10,7 @@ import com.ainclusive.iotsim.domain.synthetic.SyntheticLiveRunService;
 import com.ainclusive.iotsim.domain.synthetic.SyntheticRunService;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRepository;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRow;
+import com.ainclusive.iotsim.persistence.evidence.EvidenceRepository;
 import com.ainclusive.iotsim.persistence.run.RunRepository;
 import com.ainclusive.iotsim.persistence.run.RunRow;
 import com.ainclusive.iotsim.persistence.runtimeevent.RuntimeEventRepository;
@@ -40,6 +41,7 @@ public class RunService {
     private final ScenarioRepository scenarios;
     private final RuntimeController runtime;
     private final RuntimeEventRepository events;
+    private final EvidenceRepository evidence;
     private final ReplayService replay;                   // batch primitive (scenario REPLAY steps)
     private final ReplayLiveRunService replayLive;        // live standalone replay (IS-140)
     private final SyntheticRunService synthetic;          // batch primitive (scenarios)
@@ -47,14 +49,15 @@ public class RunService {
     private final ScenarioLiveRunService scenarioLive;    // async scenario engine (IS-141)
 
     public RunService(RunRepository runs, DataSourceRepository dataSources, ScenarioRepository scenarios,
-            RuntimeController runtime, RuntimeEventRepository events, ReplayService replay,
-            ReplayLiveRunService replayLive, SyntheticRunService synthetic,
+            RuntimeController runtime, RuntimeEventRepository events, EvidenceRepository evidence,
+            ReplayService replay, ReplayLiveRunService replayLive, SyntheticRunService synthetic,
             SyntheticLiveRunService syntheticLive, ScenarioLiveRunService scenarioLive) {
         this.runs = runs;
         this.dataSources = dataSources;
         this.scenarios = scenarios;
         this.runtime = runtime;
         this.events = events;
+        this.evidence = evidence;
         this.replay = replay;
         this.replayLive = replayLive;
         this.synthetic = synthetic;
@@ -106,6 +109,11 @@ public class RunService {
         if (wasNonTerminal && (wasLiveReplay || wasLiveSynthetic)) {
             String dataSourceId = run.sourceIds().isEmpty() ? null : run.sourceIds().get(0);
             RunCompletionEvents.appendTerminal(events, projectId, dataSourceId, id, "STOPPED", after.endedAt());
+        }
+        // IS-187: flip evidence out of CAPTURING for every manual stop this method itself
+        // ends (a scenario's own async loop stamps its own evidence status via safeEnd).
+        if (wasNonTerminal) {
+            EvidenceCompletionStamp.finalizeStatus(evidence, id, "STOPPED");
         }
         return view(after, sourceNames(projectId));
     }

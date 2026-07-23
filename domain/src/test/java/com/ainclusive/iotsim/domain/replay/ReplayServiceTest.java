@@ -106,6 +106,8 @@ class ReplayServiceTest {
         // IS-182: run completion is mirrored into runtime_events for the Events tab.
         assertThat(events.appended).extracting("type").containsExactly("RUN_COMPLETED");
         assertThat(events.appended.get(0).runId()).isEqualTo(summary.runId());
+        // IS-187: a completed run's evidence leaves CAPTURING for READY.
+        assertThat(ev.status()).isEqualTo("READY");
     }
 
     @Test
@@ -121,6 +123,8 @@ class ReplayServiceTest {
         assertThat(ev.manifestJson()).doesNotContain("\"endedAt\":null");
         // IS-182: run failure is mirrored into runtime_events for the Events tab.
         assertThat(events.appended).extracting("type").containsExactly("RUN_FAILED");
+        // IS-187: a failed run's evidence leaves CAPTURING for PARTIAL, not READY.
+        assertThat(ev.status()).isEqualTo("PARTIAL");
     }
 
     @Test
@@ -393,7 +397,7 @@ class ReplayServiceTest {
         }
 
         public Optional<EvidenceRow> findByRun(String runId) {
-            throw new UnsupportedOperationException();
+            return byId.values().stream().filter(e -> runId.equals(e.runId())).findFirst();
         }
 
         public List<EvidenceRow> findByProject(String projectId) {
@@ -407,7 +411,11 @@ class ReplayServiceTest {
         }
 
         public EvidenceRow updateStatus(String id, String status, String objectRef) {
-            throw new UnsupportedOperationException();
+            EvidenceRow e = byId.get(id);
+            EvidenceRow u = new EvidenceRow(e.id(), e.projectId(), e.runId(), status,
+                    e.manifestJson(), objectRef, e.createdAt(), e.createdBy());
+            byId.put(id, u);
+            return u;
         }
     }
 

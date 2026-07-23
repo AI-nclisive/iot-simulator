@@ -18,6 +18,7 @@ import com.ainclusive.iotsim.domain.synthetic.SyntheticLiveRunService;
 import com.ainclusive.iotsim.domain.synthetic.SyntheticLiveRunSummary;
 import com.ainclusive.iotsim.domain.synthetic.SyntheticRunService;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRepository;
+import com.ainclusive.iotsim.persistence.evidence.EvidenceRepository;
 import com.ainclusive.iotsim.persistence.run.RunRepository;
 import com.ainclusive.iotsim.persistence.run.RunRow;
 import com.ainclusive.iotsim.persistence.runtimeevent.RuntimeEventRepository;
@@ -39,6 +40,7 @@ class RunServiceTest {
     private ScenarioRepository scenarios;
     private RuntimeController runtime;
     private RuntimeEventRepository events;
+    private EvidenceRepository evidence;
     private ReplayService replay;
     private ReplayLiveRunService replayLive;
     private SyntheticRunService synthetic;
@@ -53,14 +55,15 @@ class RunServiceTest {
         scenarios = mock(ScenarioRepository.class);
         runtime = mock(RuntimeController.class);
         events = mock(RuntimeEventRepository.class);
+        evidence = mock(EvidenceRepository.class);
         replay = mock(ReplayService.class);
         replayLive = mock(ReplayLiveRunService.class);
         synthetic = mock(SyntheticRunService.class);
         syntheticLive = mock(SyntheticLiveRunService.class);
         scenarioLive = mock(ScenarioLiveRunService.class);
         when(dataSources.findByProject(PROJECT)).thenReturn(List.of());
-        service = new RunService(runs, dataSources, scenarios, runtime, events, replay, replayLive, synthetic,
-                syntheticLive, scenarioLive);
+        service = new RunService(runs, dataSources, scenarios, runtime, events, evidence, replay, replayLive,
+                synthetic, syntheticLive, scenarioLive);
     }
 
     private RunRow row(String id, String kind, String state, List<String> sources) {
