@@ -93,11 +93,16 @@ class RunServiceTest {
     void stopStopsSourcesAndEndsRunWhenNonTerminal() {
         when(runs.findById("r1")).thenReturn(Optional.of(row("r1", "REPLAY", "RUNNING", List.of("ds1", "ds2"))));
         when(runs.end(eq("r1"), eq("STOPPED"), any())).thenReturn(row("r1", "REPLAY", "STOPPED", List.of("ds1", "ds2")));
+        when(evidence.findByRun("r1")).thenReturn(Optional.of(
+                new com.ainclusive.iotsim.persistence.evidence.EvidenceRow(
+                        "ev-1", PROJECT, "r1", "CAPTURING", "{}", null, OffsetDateTime.now(), "local")));
         RunView v = service.stop(PROJECT, "r1");
         verify(runtime).stop("ds1");
         verify(runtime).stop("ds2");
         verify(runs).end(eq("r1"), eq("STOPPED"), any());
         assertThat(v.state()).isEqualTo("STOPPED");
+        // IS-187: the shared manual-stop path must also flip evidence off CAPTURING.
+        verify(evidence).updateStatus(eq("ev-1"), eq("PARTIAL"), org.mockito.ArgumentMatchers.isNull());
     }
 
     @Test
