@@ -1,10 +1,5 @@
 import { describe, it, expect } from "vitest";
-
-function formatDataType(dataType: string): string {
-  const parts = dataType.split('_').map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase());
-  const formatted = parts.join('');
-  return formatted === 'Datetime' ? 'DateTime' : formatted;
-}
+import { formatDataType } from "./manual-schema-editor-page";
 
 describe("formatDataType", () => {
   it("converts BOOL", () => {
