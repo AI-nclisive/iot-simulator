@@ -198,6 +198,9 @@ class SyntheticLiveRunServiceTest {
         // feed.emitted is advanced before applyValues is called, so valueCount reflects
         // the ticks that were computed (500ms / 100ms=5 + 500ms/250ms=2 = 7), not 0.
         assertThat(evidence.byId.get(s.evidenceId()).manifestJson()).contains("\"valueCount\":7");
+        // IS-185 review: append happens after applyValues, so a tick whose applyValues
+        // throws must not have leaked its values into the run's timeline either.
+        assertThat(runValueTimeline.readAll(s.runId())).isEmpty();
         // IS-182: tick-triggered failure is mirrored into runtime_events.
         assertThat(events.appended).extracting("type").containsExactly("RUN_FAILED");
     }

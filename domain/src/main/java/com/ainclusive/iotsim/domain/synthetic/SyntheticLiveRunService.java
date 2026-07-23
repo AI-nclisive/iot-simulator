@@ -148,8 +148,8 @@ public class SyntheticLiveRunService {
             }
             due.sort(ORDER);
             if (!due.isEmpty()) {
-                runValueTimeline.append(live.runId(), due);
                 runtime.applyValues(live.dataSourceId(), due);
+                runValueTimeline.append(live.runId(), due);
             }
             if (capped) {
                 finalizeRun(live, "COMPLETED");
