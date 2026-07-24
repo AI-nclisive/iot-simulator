@@ -12,6 +12,11 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ManualSchemaEditorPage, validateManualSchemaNodes, collectSubtreeIds } from "./manual-schema-editor-page";
+import {
+  deleteNodeOperation,
+  duplicateNodeOperation,
+  pasteNodeOperation,
+} from "./schema-operations";
 
 const { mockNavigate } = vi.hoisted(() => ({ mockNavigate: vi.fn() }));
 
@@ -574,35 +579,40 @@ describe("Context menu operations (UI-506)", () => {
       node("sibling", "root", "VARIABLE"),
     ];
 
-    it("deleteNode: removes target and descendants, orphaned siblings promoted to roots", () => {
-      // deleteNode removes 'root' and descendants. Sibling (parentId: "root") becomes orphan.
-      // After deletion, promote orphan to root by setting parentId to null
-      const remaining = baseNodes.filter(n => n.nodeId !== "root" && n.nodeId !== "child");
-      const promoted = remaining.map(n => n.parentId === "root" ? { ...n, parentId: null } : n);
-      expect(validateManualSchemaNodes(promoted)).toHaveLength(0);
-    });
-
-    it("duplicateNode: creates copy with new ID, result passes schema validation", () => {
-      // duplicateNode clones subtree, assigns new nodeId to avoid conflicts
-      const newId = "child_copy";
-      const cloned = { ...baseNodes[1], nodeId: newId, path: "/Root/Child_copy" };
-      expect(validateManualSchemaNodes([...baseNodes, cloned])).toHaveLength(0);
-    });
-
-    it("cutNode+pasteNode: moves node to new parent, result passes validation", () => {
-      // cutNode→clipboard, pasteNode recreates at new parentId
-      // Guard prevents pasting node into own subtree (cycles)
-      const moved = { ...baseNodes[1], parentId: "sibling", path: "/Root/Sibling/Child" };
-      const updated = baseNodes.filter(n => n.nodeId !== "child").concat(moved);
-      expect(validateManualSchemaNodes(updated)).toHaveLength(0);
-    });
-
-    it("copyNode+pasteNode: creates independent clone at new parent, result passes validation", () => {
-      // copyNode→clipboard with source intact, pasteNode creates new copy
-      const newId = "child_pasted";
-      const pasted = { ...baseNodes[1], nodeId: newId, path: "/Root/Sibling/Child_pasted" };
-      const result = [...baseNodes, pasted];
+    it("deleteNode: removes target and descendants, result passes schema validation", () => {
+      const result = deleteNodeOperation(baseNodes, "root");
       expect(validateManualSchemaNodes(result)).toHaveLength(0);
+      expect(result.find(n => n.nodeId === "root")).toBeUndefined();
+      expect(result.find(n => n.nodeId === "child")).toBeUndefined();
+      expect(result.find(n => n.nodeId === "sibling")).toBeDefined();
+      expect(result.find(n => n.nodeId === "sibling")?.parentId).toBeNull();
+    });
+
+    it("duplicateNode: creates independent copy with new IDs, result passes schema validation", () => {
+      const result = duplicateNodeOperation(baseNodes, "child");
+      expect(validateManualSchemaNodes(result)).toHaveLength(0);
+      expect(result.length).toBe(baseNodes.length + 1);
+      const copied = result.find(n => n.name.includes("copy"));
+      expect(copied).toBeDefined();
+      expect(copied?.nodeId).not.toBe("child");
+      expect(copied?.parentId).toBe("root");
+    });
+
+    it("pasteNode: moves cut node to new parent, result passes validation", () => {
+      const clipboard = { mode: "cut" as const, nodeId: "child" };
+      const result = pasteNodeOperation(baseNodes, clipboard, "sibling");
+      expect(validateManualSchemaNodes(result)).toHaveLength(0);
+      const movedNode = result.find(n => n.nodeId === "child");
+      expect(movedNode?.parentId).toBe("sibling");
+    });
+
+    it("pasteNode with copy: clones node to new parent, result passes validation", () => {
+      const clipboard = { mode: "copy" as const, nodeId: "child" };
+      const result = pasteNodeOperation(baseNodes, clipboard, "sibling");
+      expect(validateManualSchemaNodes(result)).toHaveLength(0);
+      expect(result.length).toBe(baseNodes.length + 1);
+      const original = result.find(n => n.nodeId === "child");
+      expect(original?.parentId).toBe("root");
     });
   });
 });
