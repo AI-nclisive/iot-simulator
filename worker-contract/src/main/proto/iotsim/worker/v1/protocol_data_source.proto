@@ -102,10 +102,10 @@ message SchemaNodeMsg {
   string description = 10;
 
   // IS-189: Critical OPC UA attributes (IEC 62541)
-  int32 access_level_full = 11;   // Full 8-bit mask (0 if unset)
+  uint32 access_level_full = 11;   // Full 8-bit AccessLevel mask per IEC 62541 (0 if unset)
   int32 minimum_sampling_interval = 12;  // ms (-1 = indeterminate, 0 = continuous)
-  int32 write_mask = 13;          // Attribute write permissions (0 if unset)
-  bool historizing = 14;          // Server collects history?
+  uint32 write_mask = 13;          // UInt32 WriteMask: which attributes are client-writable (0 if unset)
+  bool historizing = 14;          // Server collects historical values?
 }
 
 message StartRequest {}

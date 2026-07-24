@@ -25,6 +25,9 @@ public final class OpcUaTemplates {
     /**
      * Pump device template with flow rate, pressure, status, and motor sub-device.
      * Structure: Pump (parent) -> {FlowRate, Pressure, Status, IsRunning, Motor}
+     *
+     * Note: When adding multiple Pump instances, you must rename node IDs to avoid duplicates
+     * (e.g., "pump_parent_1", "pump_parent_2"). Motor sub-device IDs are shared; update them accordingly.
      */
     public static List<SchemaNode> pump() {
         List<SchemaNode> nodes = new ArrayList<>();

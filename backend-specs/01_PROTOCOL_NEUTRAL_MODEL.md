@@ -29,7 +29,7 @@ addressable structure of one data-source, independent of protocol.
 | `protocolBindings` | map<protocol, binding> | Projection hints, see §5. Optional; defaults derived. |
 | `accessLevelFull` | integer 0–255 \| null | **IS-189 (IEC 62541)**: Full 8-bit AccessLevel mask (CurrentRead, CurrentWrite, HistoryRead, HistoryWrite, SemanticChange, StatusWrite, TimestampWrite). Null = not specified. |
 | `minimumSamplingInterval` | integer (ms) \| null | **IS-189 (IEC 62541)**: Server minimum sampling interval in milliseconds. -1 = indeterminate, 0 = continuous. Null = unknown. |
-| `writeMask` | integer 0–255 \| null | **IS-189 (IEC 62541)**: UInt32 mask indicating which node attributes can be written by clients. 0 = all immutable. Null = not specified. |
+| `writeMask` | UInt32 (0–2^32-1) \| null | **IS-189 (IEC 62541)**: WriteMask attribute indicating which node attributes can be written by clients (per IEC 62541). 0 = all immutable. Null = not specified. |
 | `historizing` | boolean \| null | **IS-189 (IEC 62541)**: Whether server actively collects historical values for this variable. Null = not specified. |
 | `references` | list of `SchemaReference` | **IS-189**: Type+direction edges to other nodes (ORGANIZES, HAS_COMPONENT, HAS_PROPERTY, HAS_TYPE_DEFINITION, GENERIC). Property/Component children now captured with correct reference type. |
 
