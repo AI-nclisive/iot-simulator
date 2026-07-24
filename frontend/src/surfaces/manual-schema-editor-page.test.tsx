@@ -514,4 +514,21 @@ describe("Context menu operations (UI-506)", () => {
     expect(issues).toHaveLength(1);
     expect(issues[0].message).toContain("parent no longer exists");
   });
+
+  it("prevents pasting node into its own subtree to avoid tree corruption", () => {
+    const nodes = [
+      { nodeId: "parent", parentId: null, path: "/Parent", name: "Parent", kind: "FOLDER" as const,
+        dataType: null, valueRank: null, access: null, unit: null, description: null,
+        accessLevelFull: null, minimumSamplingInterval: null, writeMask: null, historizing: null },
+      { nodeId: "child", parentId: "parent", path: "/Parent/Child", name: "Child", kind: "FOLDER" as const,
+        dataType: null, valueRank: null, access: null, unit: null, description: null,
+        accessLevelFull: null, minimumSamplingInterval: null, writeMask: null, historizing: null },
+      { nodeId: "grandchild", parentId: "child", path: "/Parent/Child/Grandchild", name: "Grandchild", kind: "VARIABLE" as const,
+        dataType: "FLOAT64", valueRank: "SCALAR", access: "READ", unit: null, description: null,
+        accessLevelFull: null, minimumSamplingInterval: null, writeMask: null, historizing: null },
+    ];
+
+    const issues = validateManualSchemaNodes(nodes);
+    expect(issues).toHaveLength(0);
+  });
 });

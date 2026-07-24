@@ -445,10 +445,12 @@ export function ManualSchemaEditorPage() {
     const parent = nodes.find((n) => n.nodeId === parentId);
     if (!sourceNode || !parent || !canHaveChildren(parent.kind)) return;
 
+    const subIds = collectSubtreeIds(nodes, sourceNode.nodeId);
+    if (subIds.has(parentId)) return;
+
     const parentPath = parent.path;
 
     if (clipboard.mode === "cut") {
-      const subIds = collectSubtreeIds(nodes, sourceNode.nodeId);
       setNodes((prev) => {
         const idMap = new Map<string, string>();
         const filtered = prev.filter((n) => !subIds.has(n.nodeId));
