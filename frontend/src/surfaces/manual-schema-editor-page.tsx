@@ -414,8 +414,19 @@ export function ManualSchemaEditorPage() {
     if (cloned.length === 0) return;
 
     const root = cloned[0];
+    const oldRootPath = root.path;
     const newRootPath = newParentPath ? `${newParentPath}/${newName}` : `/${newName}`;
-    const duplicates = cloned.map((n) => n.nodeId === root.nodeId ? { ...n, name: newName, path: newRootPath } : n);
+    const pathDiff = oldRootPath.length;
+
+    const duplicates = cloned.map((n) => {
+      if (n.nodeId === root.nodeId) {
+        return { ...n, name: newName, path: newRootPath };
+      }
+      if (n.path.startsWith(`${oldRootPath}/`)) {
+        return { ...n, path: newRootPath + n.path.slice(pathDiff) };
+      }
+      return n;
+    });
 
     setNodes((prev) => [...prev, ...duplicates]);
     setSelectedId(duplicates[0].nodeId);

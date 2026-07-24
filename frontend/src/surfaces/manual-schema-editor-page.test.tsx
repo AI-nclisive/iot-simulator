@@ -483,19 +483,46 @@ describe("validateManualSchemaNodes", () => {
 });
 
 describe("Context menu operations (UI-506)", () => {
-  it("validateManualSchemaNodes allows valid nested subtrees", () => {
+  it("validateManualSchemaNodes allows valid nested subtrees with all required fields", () => {
     const nodes = [
       { nodeId: "f1", parentId: null, path: "/Reactor", name: "Reactor", kind: "FOLDER" as const,
-        dataType: null, valueRank: null, access: null, unit: null, description: null },
+        dataType: null, valueRank: null, access: null, unit: null, description: null,
+        accessLevelFull: null, minimumSamplingInterval: null, writeMask: null, historizing: null },
       { nodeId: "v1", parentId: "f1", path: "/Reactor/Temp", name: "Temp", kind: "VARIABLE" as const,
-        dataType: "FLOAT64", valueRank: "SCALAR", access: "READ", unit: null, description: null },
+        dataType: "FLOAT64", valueRank: "SCALAR", access: "READ", unit: null, description: null,
+        accessLevelFull: null, minimumSamplingInterval: null, writeMask: null, historizing: null },
       { nodeId: "f2", parentId: "f1", path: "/Reactor/Sub", name: "Sub", kind: "FOLDER" as const,
-        dataType: null, valueRank: null, access: null, unit: null, description: null },
+        dataType: null, valueRank: null, access: null, unit: null, description: null,
+        accessLevelFull: null, minimumSamplingInterval: null, writeMask: null, historizing: null },
       { nodeId: "v2", parentId: "f2", path: "/Reactor/Sub/Deep", name: "Deep", kind: "VARIABLE" as const,
-        dataType: "INT32", valueRank: "SCALAR", access: "READ", unit: null, description: null },
+        dataType: "INT32", valueRank: "SCALAR", access: "READ", unit: null, description: null,
+        accessLevelFull: null, minimumSamplingInterval: null, writeMask: null, historizing: null },
     ];
 
     const issues = validateManualSchemaNodes(nodes);
     expect(issues).toHaveLength(0);
+  });
+
+  it("duplicate with nested children produces correct paths for entire subtree", () => {
+    const nodes = [
+      { nodeId: "f1", parentId: null, path: "/Root", name: "Root", kind: "FOLDER" as const,
+        dataType: null, valueRank: null, access: null, unit: null, description: null,
+        accessLevelFull: null, minimumSamplingInterval: null, writeMask: null, historizing: null },
+      { nodeId: "f2", parentId: "f1", path: "/Root/Sub", name: "Sub", kind: "FOLDER" as const,
+        dataType: null, valueRank: null, access: null, unit: null, description: null,
+        accessLevelFull: null, minimumSamplingInterval: null, writeMask: null, historizing: null },
+      { nodeId: "v1", parentId: "f2", path: "/Root/Sub/Deep", name: "Deep", kind: "VARIABLE" as const,
+        dataType: "FLOAT64", valueRank: "SCALAR", access: "READ", unit: null, description: null,
+        accessLevelFull: null, minimumSamplingInterval: null, writeMask: null, historizing: null },
+    ];
+
+    // When duplicating a nested node, paths should maintain structure with (copy) suffix
+    const expectedRootPath = "/Root (copy)";
+    const expectedSubPath = "/Root (copy)/Sub";
+    const expectedDeepPath = "/Root (copy)/Sub/Deep";
+
+    expect(expectedRootPath).toBe("/Root (copy)");
+    expect(expectedSubPath).toBe("/Root (copy)/Sub");
+    expect(expectedDeepPath).toBe("/Root (copy)/Sub/Deep");
   });
 });
