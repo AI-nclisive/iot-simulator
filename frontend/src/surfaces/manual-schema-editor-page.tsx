@@ -380,20 +380,43 @@ export function ManualSchemaEditorPage() {
     if (selectedId === nodeId) setSelectedId(null);
   }
 
+  function cloneSubtree(nodeId: string, newParentId: string | null, idMap: Map<string, string>): NodeDto[] {
+    const node = nodes.find((n) => n.nodeId === nodeId);
+    if (!node) return [];
+
+    const newId = idMap.get(nodeId) || newNodeId();
+    idMap.set(nodeId, newId);
+
+    const newPath = pathFor(newParentId, node.name);
+    const cloned: NodeDto = {
+      ...node,
+      nodeId: newId,
+      parentId: newParentId,
+      path: newPath,
+    };
+
+    const children = nodes.filter((n) => n.parentId === nodeId);
+    const clonedChildren = children.flatMap((child) => cloneSubtree(child.nodeId, newId, idMap));
+
+    return [cloned, ...clonedChildren];
+  }
+
   function duplicateNode(nodeId: string) {
     const node = nodes.find((n) => n.nodeId === nodeId);
     if (!node) return;
-    const newId = newNodeId();
+
+    const idMap = new Map<string, string>();
     const newName = `${node.name} (copy)`;
-    const newPath = pathFor(node.parentId, newName);
-    const duplicate: NodeDto = {
-      ...node,
-      nodeId: newId,
-      name: newName,
-      path: newPath,
-    };
-    setNodes((prev) => [...prev, duplicate]);
-    setSelectedId(newId);
+    const newParentId = node.parentId;
+
+    const cloned = cloneSubtree(nodeId, newParentId, idMap);
+    if (cloned.length === 0) return;
+
+    const root = cloned[0];
+    const duplicates = cloned.map((n) => n.nodeId === root.nodeId ? { ...n, name: newName, path: pathFor(newParentId, newName) } : n);
+
+    setNodes((prev) => [...prev, ...duplicates]);
+    setSelectedId(duplicates[0].nodeId);
   }
 
   function cutNode(nodeId: string) {
@@ -404,32 +427,27 @@ export function ManualSchemaEditorPage() {
     setClipboard({ mode: "copy", nodeId });
   }
 
-  function pasteNode() {
-    if (!clipboard || !selectedNode || !canHaveChildren(selectedNode.kind)) return;
+  function pasteNode(parentId: string) {
+    if (!clipboard) return;
     const sourceNode = nodes.find((n) => n.nodeId === clipboard.nodeId);
-    if (!sourceNode) return;
+    const parent = nodes.find((n) => n.nodeId === parentId);
+    if (!sourceNode || !parent || !canHaveChildren(parent.kind)) return;
 
     if (clipboard.mode === "cut") {
       const subIds = collectSubtreeIds(nodes, sourceNode.nodeId);
       setNodes((prev) => {
+        const idMap = new Map<string, string>();
         const filtered = prev.filter((n) => !subIds.has(n.nodeId));
-        const newPath = pathFor(selectedNode.nodeId, sourceNode.name);
-        const moved = { ...sourceNode, parentId: selectedNode.nodeId, path: newPath };
-        return [...filtered, moved];
+        const cloned = cloneSubtree(sourceNode.nodeId, parentId, idMap);
+        return [...filtered, ...cloned];
       });
       setClipboard(null);
     } else {
-      const newId = newNodeId();
-      const newPath = pathFor(selectedNode.nodeId, sourceNode.name);
-      const copied: NodeDto = {
-        ...sourceNode,
-        nodeId: newId,
-        parentId: selectedNode.nodeId,
-        path: newPath,
-      };
-      setNodes((prev) => [...prev, copied]);
+      const idMap = new Map<string, string>();
+      const cloned = cloneSubtree(sourceNode.nodeId, parentId, idMap);
+      setNodes((prev) => [...prev, ...cloned]);
     }
-    setExpandedIds((prev) => new Set(prev).add(selectedNode.nodeId));
+    setExpandedIds((prev) => new Set(prev).add(parentId));
   }
 
   function buildContextMenuActions(nodeId: string): ContextMenuAction[] {
@@ -487,10 +505,7 @@ export function ManualSchemaEditorPage() {
     actions.push({
       label: "Paste",
       disabled: !canPaste || !canHaveChildren(node.kind),
-      onClick: () => {
-        setSelectedId(nodeId);
-        setTimeout(() => pasteNode(), 0);
-      },
+      onClick: () => pasteNode(nodeId),
     });
 
     actions.push({ label: "", divider: true } as any);
