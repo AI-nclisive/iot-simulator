@@ -1275,6 +1275,13 @@ Parallel execution:
   Work includes: an "Update rate for selected (ms)" input + "Apply rate" button next to the bulk pattern selector, applying the given rate to every currently-enabled (selected) row via the same select-all/enabled convention as `setPatternForSelected`.
   Done when: typing a rate and clicking Apply sets that rate on every selected row, skips deselected rows; typecheck + vitest + build green.
 
+- [ ] `UI-506` Manual Schema editor — context menu for tree nodes
+  Goal: the schema tree currently allows editing only via the node detail panel (right sidebar); a context menu (right-click on a node) would provide faster, more discoverable access to common actions like Add Child, Edit, Delete, Duplicate, Cut/Copy/Paste, and Promote/Demote reference types.
+  Surface: `Manual Schema Editor` — tree view context menu.
+  Work includes: right-click handler on tree nodes triggering a context menu with actions for Add Child (FOLDER/OBJECT/VARIABLE), Edit node, Delete with confirmation, Duplicate node (incrementing ID), Cut, Copy, Paste, and reference type management (for Property/Component children, change ORGANIZES ↔ HAS_PROPERTY ↔ HAS_COMPONENT).
+  Depends: IS-189 (VARIABLE as parent + typed references).
+  Done when: right-click on any tree node shows context menu with working actions; all actions update the schema correctly; typecheck + vitest + build green.
+
 ## Recommended Sequence
 
 1. Complete the P0 shell and shared-pattern tasks first.
