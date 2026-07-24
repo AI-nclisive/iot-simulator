@@ -38,16 +38,25 @@ class SchemaNodeValidatorTest {
         assertThatThrownBy(() -> SchemaNodeValidator.validate(List.of(orphan)))
                 .hasMessageContaining("parent does not exist");
 
-        SchemaNode variable = new SchemaNode("variable", null, "Variable", "Variable", NodeKind.VARIABLE,
-                DataType.FLOAT64, ValueRank.SCALAR, Access.READ, null, null);
-        SchemaNode variableChild = node("variable-child", "variable", NodeKind.OBJECT);
-        assertThatThrownBy(() -> SchemaNodeValidator.validate(List.of(variable, variableChild)))
-                .hasMessageContaining("parent must be a FOLDER or OBJECT");
-
         SchemaNode method = node("method", null, NodeKind.METHOD);
         SchemaNode methodChild = node("method-child", "method", NodeKind.OBJECT);
         assertThatThrownBy(() -> SchemaNodeValidator.validate(List.of(method, methodChild)))
-                .hasMessageContaining("parent must be a FOLDER or OBJECT");
+                .hasMessageContaining("parent must be a FOLDER, OBJECT, or VARIABLE");
+    }
+
+    @Test
+    void acceptsVariableAsParentForPropertyChildren() {
+        // IS-189: Variable can now be a parent for Property/Component children
+        SchemaNode variable = new SchemaNode("sensor", null, "Sensor", "Sensor", NodeKind.VARIABLE,
+                DataType.FLOAT64, ValueRank.SCALAR, Access.READ, null, null);
+        SchemaNode euRange = new SchemaNode("eu_range", "sensor", "Sensor/EURange", "EURange",
+                NodeKind.VARIABLE, DataType.FLOAT64, ValueRank.SCALAR, Access.READ, null, null, List.of(),
+                null, List.of(new SchemaReference("sensor", ReferenceType.HAS_PROPERTY, false)));
+        SchemaNode euUnits = new SchemaNode("eu_units", "sensor", "Sensor/EngineeringUnits", "EngineeringUnits",
+                NodeKind.VARIABLE, DataType.STRING, ValueRank.SCALAR, Access.READ, null, null, List.of(),
+                null, List.of(new SchemaReference("sensor", ReferenceType.HAS_PROPERTY, false)));
+
+        SchemaNodeValidator.validate(List.of(variable, euRange, euUnits));
     }
 
     @Test

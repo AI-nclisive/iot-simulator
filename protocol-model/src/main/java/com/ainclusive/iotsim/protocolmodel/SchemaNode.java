@@ -27,6 +27,15 @@ import java.util.Objects;
  *                        {@code dataType} on the same VARIABLE.
  * @param members   ordered, named+typed members of a {@link NodeKind#DATA_TYPE} node's structure
  *                  (IS-183); empty for every other kind
+ * @param accessLevelFull  IEC 62541 AccessLevel 8-bit mask (nullable): bits for CurrentRead(0),
+ *                         CurrentWrite(1), HistoryRead(2), HistoryWrite(3), SemanticChange(4),
+ *                         StatusWrite(5), TimestampWrite(6); {@code null} = server does not expose
+ * @param minimumSamplingInterval  server's minimum sampling interval in milliseconds (nullable):
+ *                                  -1 = indeterminate, 0 = continuous; {@code null} = unknown
+ * @param writeMask  UInt32 mask indicating which node attributes can be written (nullable):
+ *                   0 = all immutable, 255 = all writable; {@code null} = not specified
+ * @param historizing  whether server actively collects historical values (nullable);
+ *                     {@code null} = not specified, false = no history collection
  */
 public record SchemaNode(
         String nodeId,
@@ -43,7 +52,11 @@ public record SchemaNode(
         String typeDefinition,
         List<SchemaReference> references,
         String dataTypeNodeId,
-        List<DataTypeMember> members) {
+        List<DataTypeMember> members,
+        Integer accessLevelFull,
+        Integer minimumSamplingInterval,
+        Integer writeMask,
+        Boolean historizing) {
 
     public SchemaNode {
         Objects.requireNonNull(nodeId, "nodeId");
@@ -66,6 +79,13 @@ public record SchemaNode(
             if (arrayDimensions.stream().anyMatch(dimension -> dimension < 0)) {
                 throw new IllegalArgumentException("arrayDimensions must be non-negative");
             }
+            // IS-189: Validate critical OPC UA attributes if present
+            if (accessLevelFull != null && (accessLevelFull < 0 || accessLevelFull > 255)) {
+                throw new IllegalArgumentException("accessLevelFull must be 0-255: " + accessLevelFull);
+            }
+            if (writeMask != null && (writeMask < 0 || writeMask > 255)) {
+                throw new IllegalArgumentException("writeMask must be 0-255: " + writeMask);
+            }
         } else if (!arrayDimensions.isEmpty()) {
             throw new IllegalArgumentException(kind + " nodes cannot have array dimensions");
         }
@@ -87,18 +107,20 @@ public record SchemaNode(
         }
     }
 
-    /** Backward-compatible constructor for OPC-UA address-space nodes authored before IS-183. */
+    /** Backward-compatible constructor for OPC-UA address-space nodes authored before IS-189 (critical attributes). */
     public SchemaNode(String nodeId, String parentId, String path, String name, NodeKind kind,
             DataType dataType, ValueRank valueRank, Access access, String unit, String description,
             List<Integer> arrayDimensions, String typeDefinition, List<SchemaReference> references) {
         this(nodeId, parentId, path, name, kind, dataType, valueRank, access, unit, description,
-                arrayDimensions, typeDefinition, references, null, List.of());
+                arrayDimensions, typeDefinition, references, null, List.of(),
+                null, null, null, null);  // IS-189 fields = null
     }
 
     /** Backward-compatible constructor for folders and scalar/array variables authored before IS-176. */
     public SchemaNode(String nodeId, String parentId, String path, String name, NodeKind kind,
             DataType dataType, ValueRank valueRank, Access access, String unit, String description) {
         this(nodeId, parentId, path, name, kind, dataType, valueRank, access, unit, description,
-                List.of(), null, List.of(), null, List.of());
+                List.of(), null, List.of(), null, List.of(),
+                null, null, null, null);  // IS-183 + IS-189 fields = null
     }
 }
