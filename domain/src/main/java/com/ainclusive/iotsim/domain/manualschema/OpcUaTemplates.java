@@ -98,23 +98,15 @@ public final class OpcUaTemplates {
     /**
      * Motor device template with speed, current, temperature, and mode.
      * Structure: Motor -> {Speed, Current, Temperature, Mode}
-     *
-     * ⚠️ CRITICAL: This template uses fixed node IDs that conflict with pump()'s embedded motor:
-     * - pump() includes an embedded motor with nodeIds: motor_parent, motor_speed, motor_current, motor_temperature, motor_mode
-     * - motor() as a standalone template also uses the same fixed nodeIds
-     * - Result: duplicate nodeId errors if both pump() and motor() are combined in one schema
-     *
-     * Solution: Use motorWithPrefix("motor_standalone") instead of motor() to generate unique IDs:
-     * - motorWithPrefix("motor_standalone") → motor_standalone_parent, motor_standalone_speed, etc.
-     * - Or rename manually through the manual editor after adding motor() to existing pump() schema
+     * Uses node IDs with prefix: motor_parent, motor_speed, motor_current, motor_temperature, motor_mode
      */
     public static List<SchemaNode> motor() {
         return motorAsSubdevice(null, "motor");
     }
 
     /**
-     * Motor template with custom node ID prefix to avoid conflicts.
-     * Use this when combining multiple motor templates or when motor() conflicts with pump().
+     * Motor template with custom node ID prefix.
+     * Use this to generate unique IDs when combining multiple motor templates in one schema.
      *
      * Example: motorWithPrefix("motor_standalone") → motor_standalone_parent, motor_standalone_speed, …
      *
