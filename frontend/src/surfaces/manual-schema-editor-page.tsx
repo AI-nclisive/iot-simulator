@@ -1243,7 +1243,7 @@ export function ManualSchemaEditorPage() {
                             type="checkbox"
                             checked={selectedNode.historizing ?? false}
                             disabled={!access.isAdmin}
-                            onChange={(e) => updateSelectedNode({ historizing: e.target.checked || null })}
+                            onChange={(e) => updateSelectedNode({ historizing: e.target.checked })}
                           />
                           <span>Historizing</span>
                         </label>

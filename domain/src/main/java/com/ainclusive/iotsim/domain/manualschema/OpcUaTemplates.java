@@ -88,8 +88,8 @@ public final class OpcUaTemplates {
                 3, 500, 3, null
         ));
 
-        // Motor sub-device (with pump_parent as parentId, "motor" prefix for embedded motor)
-        var motorNodes = motorAsSubdevice("pump_parent", "motor");
+        // Motor sub-device (with pump_parent as parentId, "pump_motor" prefix to avoid collision with standalone motor())
+        var motorNodes = motorAsSubdevice("pump_parent", "pump_motor");
         nodes.addAll(motorNodes);
 
         return nodes;
