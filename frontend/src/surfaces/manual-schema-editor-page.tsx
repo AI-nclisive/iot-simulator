@@ -9,6 +9,7 @@ import { SharedStatePanel } from "../ui/shared-state-panel";
 import { StatusBadge } from "../ui/status-badge";
 import { buildTree, canHaveChildren, type NodeDto, type ReferenceDto } from "./data-source-schema-editor";
 import { SchemaTreeContextMenu, type ContextMenuAction } from "./schema-tree-context-menu";
+import { TemplatePickerModal, type TemplateInfo } from "./template-picker-modal";
 
 const DATA_TYPES = [
   "BOOL", "INT8", "UINT8", "INT16", "UINT16", "INT32", "UINT32", "INT64", "UINT64",
