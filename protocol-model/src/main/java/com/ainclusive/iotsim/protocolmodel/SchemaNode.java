@@ -79,12 +79,12 @@ public record SchemaNode(
             if (arrayDimensions.stream().anyMatch(dimension -> dimension < 0)) {
                 throw new IllegalArgumentException("arrayDimensions must be non-negative");
             }
-            // IS-189: Validate critical OPC UA attributes if present
+            // IS-189: Validate critical OPC UA attributes if present (per IEC 62541)
             if (accessLevelFull != null && (accessLevelFull < 0 || accessLevelFull > 255)) {
-                throw new IllegalArgumentException("accessLevelFull must be 0-255: " + accessLevelFull);
+                throw new IllegalArgumentException("accessLevelFull must be 0-255 (8-bit): " + accessLevelFull);
             }
-            if (writeMask != null && (writeMask < 0 || writeMask > 255)) {
-                throw new IllegalArgumentException("writeMask must be 0-255: " + writeMask);
+            if (writeMask != null && writeMask < 0) {
+                throw new IllegalArgumentException("writeMask must be non-negative (UInt32): " + writeMask);
             }
         } else if (!arrayDimensions.isEmpty()) {
             throw new IllegalArgumentException(kind + " nodes cannot have array dimensions");

@@ -216,7 +216,7 @@ public final class OpcUaNodeSetImporter {
             return null;
         }
         try {
-            return Integer.parseInt(interval);
+            return (int) Math.round(Double.parseDouble(interval));
         } catch (NumberFormatException ignored) {
             return null;
         }
