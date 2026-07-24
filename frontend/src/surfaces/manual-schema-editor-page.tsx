@@ -373,7 +373,11 @@ export function ManualSchemaEditorPage() {
     const node = nodes.find((n) => n.nodeId === nodeId);
     if (!node) return;
     const subIds = collectSubtreeIds(nodes, nodeId);
-    setNodes((prev) => prev.filter((n) => !subIds.has(n.nodeId)));
+    setNodes((prev) =>
+      prev
+        .filter((n) => !subIds.has(n.nodeId))
+        .map((n) => (subIds.has(n.parentId || "") ? { ...n, parentId: null } : n))
+    );
     if (subIds.has(selectedId || "")) setSelectedId(null);
   }
 

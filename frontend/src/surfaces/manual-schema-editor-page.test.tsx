@@ -574,10 +574,12 @@ describe("Context menu operations (UI-506)", () => {
       node("sibling", "root", "VARIABLE"),
     ];
 
-    it("deleteNode: removes target and descendants, result passes schema validation", () => {
-      // deleteNode filters nodes where subtree contains deleted node
+    it("deleteNode: removes target and descendants, orphaned siblings promoted to roots", () => {
+      // deleteNode removes 'root' and descendants. Sibling (parentId: "root") becomes orphan.
+      // After deletion, promote orphan to root by setting parentId to null
       const remaining = baseNodes.filter(n => n.nodeId !== "root" && n.nodeId !== "child");
-      expect(validateManualSchemaNodes([...remaining, baseNodes[2]])).toHaveLength(0);
+      const promoted = remaining.map(n => n.parentId === "root" ? { ...n, parentId: null } : n);
+      expect(validateManualSchemaNodes(promoted)).toHaveLength(0);
     });
 
     it("duplicateNode: creates copy with new ID, result passes schema validation", () => {
