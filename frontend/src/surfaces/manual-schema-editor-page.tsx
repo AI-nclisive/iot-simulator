@@ -8,6 +8,7 @@ import { useShellStore } from "../shell/shell-store";
 import { SharedStatePanel } from "../ui/shared-state-panel";
 import { StatusBadge } from "../ui/status-badge";
 import { buildTree, canHaveChildren, type NodeDto, type ReferenceDto } from "./data-source-schema-editor";
+import { SchemaTreeContextMenu, type ContextMenuAction } from "./schema-tree-context-menu";
 import { TemplatePickerModal, type TemplateInfo } from "./template-picker-modal";
 
 const DATA_TYPES = [
@@ -313,8 +314,14 @@ export function ManualSchemaEditorPage() {
   const [saveMode, setSaveMode] = useState<SaveMode | null>(null);
   const [saveAsName, setSaveAsName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+<<<<<<< HEAD
   const [showOpcUaAttributes, setShowOpcUaAttributes] = useState(false);
   const [showTemplatePickerModal, setShowTemplatePickerModal] = useState(false);
+=======
+  const [contextMenuNode, setContextMenuNode] = useState<string | null>(null);
+  const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null);
+  const [clipboard, setClipboard] = useState<{ mode: "cut" | "copy"; nodeId: string } | null>(null);
+>>>>>>> 4b623f0 (feat(UI-506): Implement schema tree context menu)
 
   useEffect(() => {
     if (!currentProjectId || !schemaId) return;
@@ -363,6 +370,147 @@ export function ManualSchemaEditorPage() {
       else next.add(id);
       return next;
     });
+  }
+
+  function deleteNode(nodeId: string) {
+    const node = nodes.find((n) => n.nodeId === nodeId);
+    if (!node) return;
+    const subIds = collectSubtreeIds(nodes, nodeId);
+    setNodes((prev) => prev.filter((n) => !subIds.has(n.nodeId)));
+    if (selectedId === nodeId) setSelectedId(null);
+  }
+
+  function duplicateNode(nodeId: string) {
+    const node = nodes.find((n) => n.nodeId === nodeId);
+    if (!node) return;
+    const newId = newNodeId();
+    const newName = `${node.name} (copy)`;
+    const newPath = pathFor(node.parentId, newName);
+    const duplicate: NodeDto = {
+      ...node,
+      nodeId: newId,
+      name: newName,
+      path: newPath,
+    };
+    setNodes((prev) => [...prev, duplicate]);
+    setSelectedId(newId);
+  }
+
+  function cutNode(nodeId: string) {
+    setClipboard({ mode: "cut", nodeId });
+  }
+
+  function copyNode(nodeId: string) {
+    setClipboard({ mode: "copy", nodeId });
+  }
+
+  function pasteNode() {
+    if (!clipboard || !selectedNode || !canHaveChildren(selectedNode.kind)) return;
+    const sourceNode = nodes.find((n) => n.nodeId === clipboard.nodeId);
+    if (!sourceNode) return;
+
+    if (clipboard.mode === "cut") {
+      const subIds = collectSubtreeIds(nodes, sourceNode.nodeId);
+      setNodes((prev) => {
+        const filtered = prev.filter((n) => !subIds.has(n.nodeId));
+        const newPath = pathFor(selectedNode.nodeId, sourceNode.name);
+        const moved = { ...sourceNode, parentId: selectedNode.nodeId, path: newPath };
+        return [...filtered, moved];
+      });
+      setClipboard(null);
+    } else {
+      const newId = newNodeId();
+      const newPath = pathFor(selectedNode.nodeId, sourceNode.name);
+      const copied: NodeDto = {
+        ...sourceNode,
+        nodeId: newId,
+        parentId: selectedNode.nodeId,
+        path: newPath,
+      };
+      setNodes((prev) => [...prev, copied]);
+    }
+    setExpandedIds((prev) => new Set(prev).add(selectedNode.nodeId));
+  }
+
+  function buildContextMenuActions(nodeId: string): ContextMenuAction[] {
+    const node = nodes.find((n) => n.nodeId === nodeId);
+    if (!node) return [];
+
+    const actions: ContextMenuAction[] = [];
+
+    if (canHaveChildren(node.kind)) {
+      actions.push({
+        label: "Add Folder",
+        onClick: () => {
+          setSelectedId(nodeId);
+          openAdd("FOLDER");
+        },
+      });
+      actions.push({
+        label: "Add Object",
+        onClick: () => {
+          setSelectedId(nodeId);
+          openAdd("OBJECT");
+        },
+      });
+      actions.push({
+        label: "Add Variable",
+        onClick: () => {
+          setSelectedId(nodeId);
+          openAdd("VARIABLE");
+        },
+      });
+      actions.push({ label: "", divider: true } as any);
+    }
+
+    actions.push({
+      label: "Edit",
+      onClick: () => setSelectedId(nodeId),
+    });
+
+    actions.push({
+      label: "Duplicate",
+      onClick: () => duplicateNode(nodeId),
+    });
+
+    actions.push({
+      label: "Cut",
+      onClick: () => cutNode(nodeId),
+    });
+
+    actions.push({
+      label: "Copy",
+      onClick: () => copyNode(nodeId),
+    });
+
+    const canPaste = clipboard !== null;
+    actions.push({
+      label: "Paste",
+      disabled: !canPaste || !canHaveChildren(node.kind),
+      onClick: () => {
+        setSelectedId(nodeId);
+        setTimeout(() => pasteNode(), 0);
+      },
+    });
+
+    actions.push({ label: "", divider: true } as any);
+
+    actions.push({
+      label: "Delete",
+      onClick: () => {
+        if (confirm(`Delete "${node.name}" and all its children?`)) {
+          deleteNode(nodeId);
+        }
+      },
+    });
+
+    return actions;
+  }
+
+  function handleTreeContextMenu(e: React.MouseEvent, nodeId: string) {
+    e.preventDefault();
+    setContextMenuNode(nodeId);
+    setContextMenuPos({ x: e.clientX, y: e.clientY });
   }
 
   function addReference() {
@@ -482,6 +630,7 @@ export function ManualSchemaEditorPage() {
     const folder: NodeDto = {
       nodeId: folderId, parentId, path: folderPath, name: template.name, kind: "FOLDER",
       dataType: null, valueRank: null, access: null, unit: null, description: template.description,
+      accessLevelFull: null, minimumSamplingInterval: null, writeMask: null, historizing: null,
     };
     const variables: NodeDto[] = template.variables.map((variable) => ({
       nodeId: newNodeId(), parentId: folderId, path: `${folderPath}/${variable.name}`, name: variable.name,
@@ -979,6 +1128,7 @@ export function ManualSchemaEditorPage() {
                   selectedId={selectedId}
                   onSelect={setSelectedId}
                   onToggle={toggleExpand}
+                  onContextMenu={handleTreeContextMenu}
                 />
               )}
             </div>
@@ -1336,12 +1486,26 @@ export function ManualSchemaEditorPage() {
         </div>
       ) : null}
 
+<<<<<<< HEAD
       <TemplatePickerModal
         open={showTemplatePickerModal}
         templates={availableTemplates}
         onSelectTemplate={handleTemplateSelection}
         onClose={() => setShowTemplatePickerModal(false)}
       />
+=======
+      {contextMenuNode && contextMenuPos ? (
+        <SchemaTreeContextMenu
+          x={contextMenuPos.x}
+          y={contextMenuPos.y}
+          actions={buildContextMenuActions(contextMenuNode)}
+          onClose={() => {
+            setContextMenuNode(null);
+            setContextMenuPos(null);
+          }}
+        />
+      ) : null}
+>>>>>>> 4b623f0 (feat(UI-506): Implement schema tree context menu)
     </div>
   );
 }
@@ -1353,6 +1517,7 @@ function ManualSchemaTree({
   expandedIds,
   onSelect,
   onToggle,
+  onContextMenu,
 }: {
   nodes: (NodeDto & { children: unknown[] })[];
   depth: number;
@@ -1360,6 +1525,7 @@ function ManualSchemaTree({
   expandedIds: Set<string>;
   onSelect: (id: string) => void;
   onToggle: (id: string) => void;
+  onContextMenu: (e: React.MouseEvent, nodeId: string) => void;
 }) {
   return (
     <ul className={depth === 0 ? "py-1" : undefined}>
@@ -1380,6 +1546,7 @@ function ManualSchemaTree({
                 if (isFolder) onToggle(node.nodeId);
                 onSelect(node.nodeId);
               }}
+              onContextMenu={(e) => onContextMenu(e, node.nodeId)}
             >
               <span
                 className="w-3 shrink-0 text-center text-xs text-shell-muted"
@@ -1415,6 +1582,7 @@ function ManualSchemaTree({
                 selectedId={selectedId}
                 onSelect={onSelect}
                 onToggle={onToggle}
+                onContextMenu={onContextMenu}
               />
             ) : null}
           </li>
