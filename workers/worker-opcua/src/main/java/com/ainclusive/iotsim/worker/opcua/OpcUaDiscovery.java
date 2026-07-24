@@ -61,8 +61,10 @@ final class OpcUaDiscovery {
     record ScanOutcome(String status, List<SchemaNodeMsg> nodes, boolean truncated,
             int unknownCount, String message) {}
 
-    /** IS-189: Attributes read from a Variable node (nullable fields = not available from server). */
-    record VariableAttributes(Integer accessLevel, Integer minimumSamplingInterval,
+    /** IS-189: Attributes read from a Variable node (nullable fields = not available from server).
+     *  minimumSamplingInterval is a Double per OPC UA §5.6.2 (server minimum sampling interval in milliseconds).
+     */
+    record VariableAttributes(Integer accessLevel, Double minimumSamplingInterval,
             Boolean historizing, Integer writeMask, Integer userAccessLevel) {}
 
     /** Reachability/auth probe: connect then disconnect, classifying any failure. */
@@ -128,7 +130,7 @@ final class OpcUaDiscovery {
             }
 
             Integer accessLevel = extractIntValue(results[0]);
-            Integer minimumSamplingInterval = extractIntValue(results[1]);
+            Double minimumSamplingInterval = extractDoubleValue(results[1]);
             Boolean historizing = extractBoolValue(results[2]);
             Integer writeMask = extractIntValue(results[3]);
             Integer userAccessLevel = extractIntValue(results[4]);
@@ -146,6 +148,18 @@ final class OpcUaDiscovery {
         Object val = dv.getValue().getValue();
         if (val instanceof Number n) {
             return n.intValue();
+        }
+        return null;
+    }
+
+    /** Extract Double value from DataValue, preserving decimal precision for MinimumSamplingInterval. */
+    private static Double extractDoubleValue(DataValue dv) {
+        if (dv == null || dv.getValue() == null) {
+            return null;
+        }
+        Object val = dv.getValue().getValue();
+        if (val instanceof Number n) {
+            return n.doubleValue();
         }
         return null;
     }
