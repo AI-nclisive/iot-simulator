@@ -106,6 +106,7 @@ message SchemaNodeMsg {
   int32 minimum_sampling_interval = 12;  // ms (-1 = indeterminate, 0 = continuous)
   uint32 write_mask = 13;          // UInt32 WriteMask: which attributes are client-writable (0 if unset)
   bool historizing = 14;          // Server collects historical values?
+  string reference_type = 15;      // OPC UA reference type (e.g. "HAS_PROPERTY", "HAS_COMPONENT") from parent's discovery
 }
 
 message StartRequest {}

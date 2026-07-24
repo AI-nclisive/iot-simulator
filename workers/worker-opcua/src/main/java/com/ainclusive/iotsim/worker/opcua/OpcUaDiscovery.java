@@ -341,6 +341,10 @@ final class OpcUaDiscovery {
                 }
             }
         }
+        // IS-189: Preserve reference type from discovery (HAS_COMPONENT, HAS_PROPERTY, etc.)
+        if (referenceType != null) {
+            b.setReferenceType(referenceType);
+        }
         return b.build();
     }
 
