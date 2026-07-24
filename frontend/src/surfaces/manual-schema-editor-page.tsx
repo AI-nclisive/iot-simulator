@@ -380,14 +380,14 @@ export function ManualSchemaEditorPage() {
     if (selectedId === nodeId) setSelectedId(null);
   }
 
-  function cloneSubtree(nodeId: string, newParentId: string | null, idMap: Map<string, string>): NodeDto[] {
+  function cloneSubtree(nodeId: string, newParentId: string | null, newParentPath: string, idMap: Map<string, string>): NodeDto[] {
     const node = nodes.find((n) => n.nodeId === nodeId);
     if (!node) return [];
 
     const newId = idMap.get(nodeId) || newNodeId();
     idMap.set(nodeId, newId);
 
-    const newPath = pathFor(newParentId, node.name);
+    const newPath = newParentPath ? `${newParentPath}/${node.name}` : `/${node.name}`;
     const cloned: NodeDto = {
       ...node,
       nodeId: newId,
@@ -396,7 +396,7 @@ export function ManualSchemaEditorPage() {
     };
 
     const children = nodes.filter((n) => n.parentId === nodeId);
-    const clonedChildren = children.flatMap((child) => cloneSubtree(child.nodeId, newId, idMap));
+    const clonedChildren = children.flatMap((child) => cloneSubtree(child.nodeId, newId, newPath, idMap));
 
     return [cloned, ...clonedChildren];
   }
@@ -408,12 +408,14 @@ export function ManualSchemaEditorPage() {
     const idMap = new Map<string, string>();
     const newName = `${node.name} (copy)`;
     const newParentId = node.parentId;
+    const newParentPath = newParentId ? (nodes.find((n) => n.nodeId === newParentId)?.path ?? "/") : "";
 
-    const cloned = cloneSubtree(nodeId, newParentId, idMap);
+    const cloned = cloneSubtree(nodeId, newParentId, newParentPath, idMap);
     if (cloned.length === 0) return;
 
     const root = cloned[0];
-    const duplicates = cloned.map((n) => n.nodeId === root.nodeId ? { ...n, name: newName, path: pathFor(newParentId, newName) } : n);
+    const newRootPath = newParentPath ? `${newParentPath}/${newName}` : `/${newName}`;
+    const duplicates = cloned.map((n) => n.nodeId === root.nodeId ? { ...n, name: newName, path: newRootPath } : n);
 
     setNodes((prev) => [...prev, ...duplicates]);
     setSelectedId(duplicates[0].nodeId);
@@ -433,18 +435,20 @@ export function ManualSchemaEditorPage() {
     const parent = nodes.find((n) => n.nodeId === parentId);
     if (!sourceNode || !parent || !canHaveChildren(parent.kind)) return;
 
+    const parentPath = parent.path;
+
     if (clipboard.mode === "cut") {
       const subIds = collectSubtreeIds(nodes, sourceNode.nodeId);
       setNodes((prev) => {
         const idMap = new Map<string, string>();
         const filtered = prev.filter((n) => !subIds.has(n.nodeId));
-        const cloned = cloneSubtree(sourceNode.nodeId, parentId, idMap);
+        const cloned = cloneSubtree(sourceNode.nodeId, parentId, parentPath, idMap);
         return [...filtered, ...cloned];
       });
       setClipboard(null);
     } else {
       const idMap = new Map<string, string>();
-      const cloned = cloneSubtree(sourceNode.nodeId, parentId, idMap);
+      const cloned = cloneSubtree(sourceNode.nodeId, parentId, parentPath, idMap);
       setNodes((prev) => [...prev, ...cloned]);
     }
     setExpandedIds((prev) => new Set(prev).add(parentId));

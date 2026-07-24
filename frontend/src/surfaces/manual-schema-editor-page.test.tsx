@@ -28,7 +28,8 @@ const schema = {
   description: null,
   nodes: [
     { nodeId: "v1", parentId: null, path: "/v1", name: "Level", kind: "VARIABLE" as const,
-      dataType: "FLOAT64", valueRank: "SCALAR", access: "READ", unit: null, description: null },
+      dataType: "FLOAT64", valueRank: "SCALAR", access: "READ", unit: null, description: null,
+      accessLevelFull: null, minimumSamplingInterval: null, writeMask: null, historizing: null },
   ],
   version: 0,
 };
@@ -37,9 +38,11 @@ const schemaWithFolder = {
   ...schema,
   nodes: [
     { nodeId: "f1", parentId: null, path: "/Reactor", name: "Reactor", kind: "FOLDER" as const,
-      dataType: null, valueRank: null, access: null, unit: null, description: null },
+      dataType: null, valueRank: null, access: null, unit: null, description: null,
+      accessLevelFull: null, minimumSamplingInterval: null, writeMask: null, historizing: null },
     { nodeId: "v1", parentId: "f1", path: "/Reactor/Temp", name: "Temp", kind: "VARIABLE" as const,
-      dataType: "FLOAT64", valueRank: "SCALAR", access: "READ", unit: null, description: null },
+      dataType: "FLOAT64", valueRank: "SCALAR", access: "READ", unit: null, description: null,
+      accessLevelFull: null, minimumSamplingInterval: null, writeMask: null, historizing: null },
   ],
 };
 
@@ -479,9 +482,8 @@ describe("validateManualSchemaNodes", () => {
   });
 });
 
-describe("Context menu operations (UI-506) — unit-level helpers", () => {
-  it("collectSubtreeIds includes root and all descendants", () => {
-    // This tests the core logic used by delete/cut/paste operations
+describe("Context menu operations (UI-506)", () => {
+  it("validateManualSchemaNodes allows valid nested subtrees", () => {
     const nodes = [
       { nodeId: "f1", parentId: null, path: "/Reactor", name: "Reactor", kind: "FOLDER" as const,
         dataType: null, valueRank: null, access: null, unit: null, description: null },
@@ -493,9 +495,7 @@ describe("Context menu operations (UI-506) — unit-level helpers", () => {
         dataType: "INT32", valueRank: "SCALAR", access: "READ", unit: null, description: null },
     ];
 
-    // collectSubtreeIds is used internally by delete/cut operations
-    // Testing via validateManualSchemaNodes ensures the tree logic is correct
     const issues = validateManualSchemaNodes(nodes);
-    expect(issues).toHaveLength(0); // No validation errors when tree is correct
+    expect(issues).toHaveLength(0);
   });
 });
