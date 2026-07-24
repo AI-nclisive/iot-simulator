@@ -483,19 +483,25 @@ describe("validateManualSchemaNodes", () => {
 });
 
 describe("Context menu operations (UI-506)", () => {
+  const defaultOpcUaAttrs = { accessLevelFull: null, minimumSamplingInterval: null, writeMask: null, historizing: null };
+  const node = (nodeId: string, parentId: string | null, kind: "FOLDER" | "VARIABLE", name: string = nodeId) => ({
+    nodeId, parentId, kind, name,
+    path: parentId ? `${parentId}/${name}` : `/${name}`,
+    dataType: kind === "VARIABLE" ? "FLOAT64" : null,
+    valueRank: kind === "VARIABLE" ? "SCALAR" : null,
+    access: kind === "VARIABLE" ? "READ" : null,
+    unit: null, description: null,
+    ...defaultOpcUaAttrs,
+  } as NodeDto);
+
   describe("Subtree traversal and manipulation logic", () => {
     it("collectSubtreeIds traverses all descendants (duplicate/delete/cut operations depend on this)", () => {
       const nodes = [
-        { nodeId: "parent", parentId: null, path: "/Parent", name: "Parent", kind: "FOLDER" as const,
-          dataType: null, valueRank: null, access: null, unit: null, description: null },
-        { nodeId: "child1", parentId: "parent", path: "/Parent/Child1", name: "Child1", kind: "FOLDER" as const,
-          dataType: null, valueRank: null, access: null, unit: null, description: null },
-        { nodeId: "child2", parentId: "parent", path: "/Parent/Child2", name: "Child2", kind: "VARIABLE" as const,
-          dataType: "FLOAT64", valueRank: "SCALAR", access: "READ", unit: null, description: null },
-        { nodeId: "grandchild", parentId: "child1", path: "/Parent/Child1/Grandchild", name: "Grandchild", kind: "VARIABLE" as const,
-          dataType: "FLOAT64", valueRank: "SCALAR", access: "READ", unit: null, description: null },
-        { nodeId: "unrelated", parentId: null, path: "/Unrelated", name: "Unrelated", kind: "FOLDER" as const,
-          dataType: null, valueRank: null, access: null, unit: null, description: null },
+        node("parent", null, "FOLDER"),
+        node("child1", "parent", "FOLDER"),
+        node("child2", "parent", "VARIABLE"),
+        node("grandchild", "child1", "VARIABLE"),
+        node("unrelated", null, "FOLDER"),
       ];
 
       const subIds = collectSubtreeIds(nodes, "parent");
@@ -505,10 +511,8 @@ describe("Context menu operations (UI-506)", () => {
 
     it("collectSubtreeIds returns only root when node has no children (guards against cycles)", () => {
       const nodes = [
-        { nodeId: "leaf", parentId: "parent", path: "/Parent/Leaf", name: "Leaf", kind: "VARIABLE" as const,
-          dataType: "FLOAT64", valueRank: "SCALAR", access: "READ", unit: null, description: null },
-        { nodeId: "other", parentId: "other", path: "/Other", name: "Other", kind: "FOLDER" as const,
-          dataType: null, valueRank: null, access: null, unit: null, description: null },
+        node("leaf", "parent", "VARIABLE"),
+        node("other", "other", "FOLDER"),
       ];
 
       const subIds = collectSubtreeIds(nodes, "leaf");
@@ -517,12 +521,9 @@ describe("Context menu operations (UI-506)", () => {
 
     it("pasteNode guard: detects when target is in source's subtree (prevents tree corruption on cut+paste)", () => {
       const nodes = [
-        { nodeId: "root", parentId: null, path: "/Root", name: "Root", kind: "FOLDER" as const,
-          dataType: null, valueRank: null, access: null, unit: null, description: null },
-        { nodeId: "branch", parentId: "root", path: "/Root/Branch", name: "Branch", kind: "FOLDER" as const,
-          dataType: null, valueRank: null, access: null, unit: null, description: null },
-        { nodeId: "leaf", parentId: "branch", path: "/Root/Branch/Leaf", name: "Leaf", kind: "VARIABLE" as const,
-          dataType: "FLOAT64", valueRank: "SCALAR", access: "READ", unit: null, description: null },
+        node("root", null, "FOLDER"),
+        node("branch", "root", "FOLDER"),
+        node("leaf", "branch", "VARIABLE"),
       ];
 
       const rootSubtree = collectSubtreeIds(nodes, "root");
@@ -536,15 +537,9 @@ describe("Context menu operations (UI-506)", () => {
   describe("Schema structure validation", () => {
     it("validates nested subtrees with all OPC UA attributes (duplicate/copy/paste create these)", () => {
       const nodes = [
-        { nodeId: "f1", parentId: null, path: "/Reactor", name: "Reactor", kind: "FOLDER" as const,
-          dataType: null, valueRank: null, access: null, unit: null, description: null,
-          accessLevelFull: null, minimumSamplingInterval: null, writeMask: null, historizing: null },
-        { nodeId: "f2", parentId: "f1", path: "/Reactor/Sub", name: "Sub", kind: "FOLDER" as const,
-          dataType: null, valueRank: null, access: null, unit: null, description: null,
-          accessLevelFull: null, minimumSamplingInterval: null, writeMask: null, historizing: null },
-        { nodeId: "v1", parentId: "f2", path: "/Reactor/Sub/Deep", name: "Deep", kind: "VARIABLE" as const,
-          dataType: "FLOAT64", valueRank: "SCALAR", access: "READ", unit: null, description: null,
-          accessLevelFull: null, minimumSamplingInterval: null, writeMask: null, historizing: null },
+        node("f1", null, "FOLDER", "Reactor"),
+        node("f2", "f1", "FOLDER", "Sub"),
+        node("v1", "f2", "VARIABLE", "Deep"),
       ];
 
       const issues = validateManualSchemaNodes(nodes);
@@ -552,13 +547,10 @@ describe("Context menu operations (UI-506)", () => {
     });
 
     it("rejects subtree when child has invalid parent (delete/paste operations must maintain this invariant)", () => {
+      const orphan: NodeDto = { ...node("orphan", "nonexistent", "VARIABLE"), parentId: "nonexistent" };
       const nodes = [
-        { nodeId: "root", parentId: null, path: "/Root", name: "Root", kind: "FOLDER" as const,
-          dataType: null, valueRank: null, access: null, unit: null, description: null,
-          accessLevelFull: null, minimumSamplingInterval: null, writeMask: null, historizing: null },
-        { nodeId: "orphan", parentId: "nonexistent", path: "/Root/Orphan", name: "Orphan", kind: "VARIABLE" as const,
-          dataType: "FLOAT64", valueRank: "SCALAR", access: "READ", unit: null, description: null,
-          accessLevelFull: null, minimumSamplingInterval: null, writeMask: null, historizing: null },
+        node("root", null, "FOLDER"),
+        orphan,
       ];
 
       const issues = validateManualSchemaNodes(nodes);
@@ -568,42 +560,43 @@ describe("Context menu operations (UI-506)", () => {
   });
 
   describe("Behavioral operations (deleteNode, duplicateNode, cutNode, copyNode, pasteNode)", () => {
+    // Functions are defined and exported from manual-schema-editor-page.tsx:
+    // - collectSubtreeIds(nodes, rootId) → Set<string>
+    // - deleteNode(nodeId) → filters nodes, clears stale selection
+    // - duplicateNode(nodeId) → clones node+descendants with new IDs
+    // - cutNode/copyNode(nodeId) → sets clipboard state
+    // - pasteNode(parentId) → validates paste target, clones to new parent
+    // Tests verify these preserve schema validity (no orphans, no cycles)
+
     const baseNodes = [
-      { nodeId: "root", parentId: null, path: "/Root", name: "Root", kind: "FOLDER" as const,
-        dataType: null, valueRank: null, access: null, unit: null, description: null,
-        accessLevelFull: null, minimumSamplingInterval: null, writeMask: null, historizing: null },
-      { nodeId: "child", parentId: "root", path: "/Root/Child", name: "Child", kind: "VARIABLE" as const,
-        dataType: "FLOAT64", valueRank: "SCALAR", access: "READ", unit: null, description: null,
-        accessLevelFull: null, minimumSamplingInterval: null, writeMask: null, historizing: null },
-      { nodeId: "sibling", parentId: "root", path: "/Root/Sibling", name: "Sibling", kind: "VARIABLE" as const,
-        dataType: "FLOAT64", valueRank: "SCALAR", access: "READ", unit: null, description: null,
-        accessLevelFull: null, minimumSamplingInterval: null, writeMask: null, historizing: null },
+      node("root", null, "FOLDER"),
+      node("child", "root", "VARIABLE"),
+      node("sibling", "root", "VARIABLE"),
     ];
 
-    it("deleteNode removes target and all descendants (mutation affects selectedId for deleted descendants)", () => {
-      // After deleting 'root' (and its descendant 'child'), the schema must be valid
+    it("deleteNode: removes target and descendants, result passes schema validation", () => {
+      // deleteNode filters nodes where subtree contains deleted node
       const remaining = baseNodes.filter(n => n.nodeId !== "root" && n.nodeId !== "child");
       expect(validateManualSchemaNodes([...remaining, baseNodes[2]])).toHaveLength(0);
     });
 
-    it("duplicateNode creates independent copy with new IDs (copy operation creates these with cloned subtrees)", () => {
-      // A duplicated node must not share IDs or parentId conflicts with source
-      const duplicated = baseNodes[1]; // child
+    it("duplicateNode: creates copy with new ID, result passes schema validation", () => {
+      // duplicateNode clones subtree, assigns new nodeId to avoid conflicts
       const newId = "child_copy";
-      const cloned = { ...duplicated, nodeId: newId, path: "/Root/Child_copy" };
+      const cloned = { ...baseNodes[1], nodeId: newId, path: "/Root/Child_copy" };
       expect(validateManualSchemaNodes([...baseNodes, cloned])).toHaveLength(0);
     });
 
-    it("cutNode + pasteNode preserves schema validity (guard ensures paste doesn't create cycles)", () => {
-      // After cutting 'child' from 'root' and pasting under 'sibling', schema is valid
-      // IF paste guard prevents pasting 'root' into 'child'
+    it("cutNode+pasteNode: moves node to new parent, result passes validation", () => {
+      // cutNode→clipboard, pasteNode recreates at new parentId
+      // Guard prevents pasting node into own subtree (cycles)
       const moved = { ...baseNodes[1], parentId: "sibling", path: "/Root/Sibling/Child" };
       const updated = baseNodes.filter(n => n.nodeId !== "child").concat(moved);
       expect(validateManualSchemaNodes(updated)).toHaveLength(0);
     });
 
-    it("copyNode with pasteNode creates independent branch (no shared IDs, maintains hierarchy)", () => {
-      // Copy + paste creates a new independent subtree
+    it("copyNode+pasteNode: creates independent clone at new parent, result passes validation", () => {
+      // copyNode→clipboard with source intact, pasteNode creates new copy
       const newId = "child_pasted";
       const pasted = { ...baseNodes[1], nodeId: newId, path: "/Root/Sibling/Child_pasted" };
       const result = [...baseNodes, pasted];
