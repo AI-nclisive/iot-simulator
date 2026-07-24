@@ -241,7 +241,7 @@ function newNodeId(): string {
 }
 
 /** Every id in `nodes` that is `rootId` or a (possibly indirect) descendant of it. */
-function collectSubtreeIds(nodes: NodeDto[], rootId: string): Set<string> {
+export function collectSubtreeIds(nodes: NodeDto[], rootId: string): Set<string> {
   const ids = new Set([rootId]);
   let grew = true;
   while (grew) {

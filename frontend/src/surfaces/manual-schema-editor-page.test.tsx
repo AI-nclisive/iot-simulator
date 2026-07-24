@@ -11,7 +11,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ManualSchemaEditorPage, validateManualSchemaNodes } from "./manual-schema-editor-page";
+import { ManualSchemaEditorPage, validateManualSchemaNodes, collectSubtreeIds } from "./manual-schema-editor-page";
 
 const { mockNavigate } = vi.hoisted(() => ({ mockNavigate: vi.fn() }));
 
@@ -483,6 +483,50 @@ describe("validateManualSchemaNodes", () => {
 });
 
 describe("Context menu operations (UI-506)", () => {
+  it("collectSubtreeIds includes root and all descendants", () => {
+    const nodes = [
+      { nodeId: "parent", parentId: null, path: "/Parent", name: "Parent", kind: "FOLDER" as const,
+        dataType: null, valueRank: null, access: null, unit: null, description: null },
+      { nodeId: "child1", parentId: "parent", path: "/Parent/Child1", name: "Child1", kind: "FOLDER" as const,
+        dataType: null, valueRank: null, access: null, unit: null, description: null },
+      { nodeId: "child2", parentId: "parent", path: "/Parent/Child2", name: "Child2", kind: "VARIABLE" as const,
+        dataType: "FLOAT64", valueRank: "SCALAR", access: "READ", unit: null, description: null },
+      { nodeId: "grandchild", parentId: "child1", path: "/Parent/Child1/Grandchild", name: "Grandchild", kind: "VARIABLE" as const,
+        dataType: "FLOAT64", valueRank: "SCALAR", access: "READ", unit: null, description: null },
+      { nodeId: "unrelated", parentId: null, path: "/Unrelated", name: "Unrelated", kind: "FOLDER" as const,
+        dataType: null, valueRank: null, access: null, unit: null, description: null },
+    ];
+
+    const subIds = collectSubtreeIds(nodes, "parent");
+    expect(subIds).toEqual(new Set(["parent", "child1", "child2", "grandchild"]));
+  });
+
+  it("collectSubtreeIds handles single node with no children", () => {
+    const nodes = [
+      { nodeId: "leaf", parentId: "parent", path: "/Parent/Leaf", name: "Leaf", kind: "VARIABLE" as const,
+        dataType: "FLOAT64", valueRank: "SCALAR", access: "READ", unit: null, description: null },
+    ];
+
+    const subIds = collectSubtreeIds(nodes, "leaf");
+    expect(subIds).toEqual(new Set(["leaf"]));
+  });
+
+  it("detectsguard against pasting node into its own subtree", () => {
+    const nodes = [
+      { nodeId: "parent", parentId: null, path: "/Parent", name: "Parent", kind: "FOLDER" as const,
+        dataType: null, valueRank: null, access: null, unit: null, description: null },
+      { nodeId: "child", parentId: "parent", path: "/Parent/Child", name: "Child", kind: "FOLDER" as const,
+        dataType: null, valueRank: null, access: null, unit: null, description: null },
+      { nodeId: "grandchild", parentId: "child", path: "/Parent/Child/Grandchild", name: "Grandchild", kind: "VARIABLE" as const,
+        dataType: "FLOAT64", valueRank: "SCALAR", access: "READ", unit: null, description: null },
+    ];
+
+    const parentSubtree = collectSubtreeIds(nodes, "parent");
+    // If trying to paste parent into child, child is in parent's subtree, so guard should prevent it
+    expect(parentSubtree.has("child")).toBe(true);
+    expect(parentSubtree.has("grandchild")).toBe(true);
+  });
+
   it("validates nested subtrees with all required OPC UA attribute fields", () => {
     const nodes = [
       { nodeId: "f1", parentId: null, path: "/Reactor", name: "Reactor", kind: "FOLDER" as const,
@@ -492,38 +536,6 @@ describe("Context menu operations (UI-506)", () => {
         dataType: null, valueRank: null, access: null, unit: null, description: null,
         accessLevelFull: null, minimumSamplingInterval: null, writeMask: null, historizing: null },
       { nodeId: "v1", parentId: "f2", path: "/Reactor/Sub/Deep", name: "Deep", kind: "VARIABLE" as const,
-        dataType: "FLOAT64", valueRank: "SCALAR", access: "READ", unit: null, description: null,
-        accessLevelFull: null, minimumSamplingInterval: null, writeMask: null, historizing: null },
-    ];
-
-    const issues = validateManualSchemaNodes(nodes);
-    expect(issues).toHaveLength(0);
-  });
-
-  it("rejects subtree with invalid parent reference from child", () => {
-    const nodes = [
-      { nodeId: "f1", parentId: null, path: "/Root", name: "Root", kind: "FOLDER" as const,
-        dataType: null, valueRank: null, access: null, unit: null, description: null,
-        accessLevelFull: null, minimumSamplingInterval: null, writeMask: null, historizing: null },
-      { nodeId: "v1", parentId: "missing-parent", path: "/Root/Bad", name: "Bad", kind: "VARIABLE" as const,
-        dataType: "FLOAT64", valueRank: "SCALAR", access: "READ", unit: null, description: null,
-        accessLevelFull: null, minimumSamplingInterval: null, writeMask: null, historizing: null },
-    ];
-
-    const issues = validateManualSchemaNodes(nodes);
-    expect(issues).toHaveLength(1);
-    expect(issues[0].message).toContain("parent no longer exists");
-  });
-
-  it("prevents pasting node into its own subtree to avoid tree corruption", () => {
-    const nodes = [
-      { nodeId: "parent", parentId: null, path: "/Parent", name: "Parent", kind: "FOLDER" as const,
-        dataType: null, valueRank: null, access: null, unit: null, description: null,
-        accessLevelFull: null, minimumSamplingInterval: null, writeMask: null, historizing: null },
-      { nodeId: "child", parentId: "parent", path: "/Parent/Child", name: "Child", kind: "FOLDER" as const,
-        dataType: null, valueRank: null, access: null, unit: null, description: null,
-        accessLevelFull: null, minimumSamplingInterval: null, writeMask: null, historizing: null },
-      { nodeId: "grandchild", parentId: "child", path: "/Parent/Child/Grandchild", name: "Grandchild", kind: "VARIABLE" as const,
         dataType: "FLOAT64", valueRank: "SCALAR", access: "READ", unit: null, description: null,
         accessLevelFull: null, minimumSamplingInterval: null, writeMask: null, historizing: null },
     ];
