@@ -41,7 +41,7 @@ public final class OpcUaTemplates {
                         new SchemaReference("pump_pressure", ReferenceType.HAS_COMPONENT, true),
                         new SchemaReference("pump_status", ReferenceType.HAS_COMPONENT, true),
                         new SchemaReference("pump_isrunning", ReferenceType.HAS_COMPONENT, true),
-                        new SchemaReference("motor_parent", ReferenceType.HAS_COMPONENT, true)
+                        new SchemaReference("pump_motor_parent", ReferenceType.HAS_COMPONENT, true)
                 )));
 
         // Flow rate (FLOAT64) with sampling interval
