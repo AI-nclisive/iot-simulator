@@ -136,15 +136,17 @@ class OpcUaDiscoveryIT {
     }
 
     @Test
-    void scanExcludesPropertyOfVariableChildren() throws Exception {
+    void scanReparentsPropertyOfVariableChildrenToNearestContainer() throws Exception {
         // IS-188: a real device commonly exposes Properties on a Variable (EURange,
         // EngineeringUnits, Quality, ...) — a HasProperty child whose parent is the
         // owning Variable itself. The neutral schema model only allows a FOLDER/OBJECT
-        // parent, so these must be excluded from scan results entirely rather than
-        // emitted with an invalid parent kind.
+        // parent (SchemaNodeValidator), so these must be re-homed onto the nearest
+        // FOLDER/OBJECT ancestor rather than dropped — losing them would mean a scanned
+        // schema no longer faithfully reproduces the real device.
         int port = freePort();
         OpcUaServerRuntime runtime = new OpcUaServerRuntime(port, List.of(
-                new VarDef("temperature", null, "Temperature", "VARIABLE", "FLOAT64"),
+                new VarDef("plant", null, "Plant", "OBJECT", null),
+                new VarDef("temperature", "plant", "Temperature", "VARIABLE", "FLOAT64"),
                 new VarDef("quality", "temperature", "Quality", "VARIABLE", "STATUS_CODE", "HAS_PROPERTY")));
         runtime.start();
         try {
@@ -154,8 +156,35 @@ class OpcUaDiscoveryIT {
             assertThat(outcome.status()).isEqualTo(OpcUaDiscovery.OK);
             Map<String, SchemaNodeMsg> byName = outcome.nodes().stream()
                     .collect(Collectors.toMap(SchemaNodeMsg::getName, Function.identity()));
-            assertThat(byName).containsKey("Temperature");
-            assertThat(byName).doesNotContainKey("Quality");
+            // Quality is preserved (not dropped) and re-homed onto Plant (the nearest
+            // FOLDER/OBJECT ancestor), not onto Temperature (its real, but invalid, parent).
+            assertThat(byName.get("Quality").getParentId()).isEqualTo(byName.get("Plant").getNodeId());
+            assertThat(byName.get("Temperature").getParentId()).isEqualTo(byName.get("Plant").getNodeId());
+        } finally {
+            runtime.stop();
+        }
+    }
+
+    @Test
+    void scanReparentsComponentOfVariableChildrenToNearestContainerToo() throws Exception {
+        // The same "Variable can never be a schema parent" problem applies regardless of
+        // which OPC UA reference type connects a Variable to its own child — HasComponent
+        // (e.g. a structured/complex value's component Variables) is just as real as
+        // HasProperty, and must be re-homed the same way, not just the Property case.
+        int port = freePort();
+        OpcUaServerRuntime runtime = new OpcUaServerRuntime(port, List.of(
+                new VarDef("plant", null, "Plant", "OBJECT", null),
+                new VarDef("vector", "plant", "Vector", "VARIABLE", "FLOAT64"),
+                new VarDef("x", "vector", "X", "VARIABLE", "FLOAT64", "HAS_COMPONENT")));
+        runtime.start();
+        try {
+            OpcUaDiscovery.ScanOutcome outcome = OpcUaDiscovery.scan(
+                    runtime.endpointUrl(), ANON, 0, () -> { }, soFar -> { });
+
+            assertThat(outcome.status()).isEqualTo(OpcUaDiscovery.OK);
+            Map<String, SchemaNodeMsg> byName = outcome.nodes().stream()
+                    .collect(Collectors.toMap(SchemaNodeMsg::getName, Function.identity()));
+            assertThat(byName.get("X").getParentId()).isEqualTo(byName.get("Plant").getNodeId());
         } finally {
             runtime.stop();
         }

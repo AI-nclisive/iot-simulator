@@ -132,18 +132,6 @@ final class OpcUaDiscovery {
                 if (!isVariable && ref.getNodeClass() != NodeClass.Object) {
                     continue;
                 }
-                // A Variable's HasProperty children (EURange, EngineeringUnits,
-                // EnumStrings, Quality, ...) are metadata about the value, not part of
-                // it, and are extremely common on AnalogItemType/DataItemType
-                // variables. They're skipped entirely (IS-188) — not just left
-                // un-descended-into: the neutral schema model only allows a
-                // FOLDER/OBJECT parent (SchemaNodeValidator), and a Property's parent
-                // is always its owning Variable, so emitting them as discovered nodes
-                // made every such real device un-scannable ("parent must be a FOLDER
-                // or OBJECT").
-                if (isVariable && Identifiers.HasProperty.equals(ref.getReferenceTypeId())) {
-                    continue;
-                }
                 if (nodes.size() >= cap) {
                     truncated = true;
                     return new ScanOutcome(PARTIAL, List.copyOf(nodes), truncated, unknown[0],
@@ -152,12 +140,27 @@ final class OpcUaDiscovery {
                 String name = displayName(ref);
                 String neutralId = childId.toParseableString();
                 String path = frame.path().isEmpty() ? name : frame.path() + "/" + name;
-                nodes.add(toNode(neutralId, frame.parentId(), path, name, isVariable,
+                // A Variable is never a valid schema parent (SchemaNodeValidator only allows
+                // FOLDER/OBJECT), regardless of which OPC UA reference type connects it to its
+                // own children — HasComponent (a structured/complex value's component
+                // Variables) and HasProperty (EURange, EngineeringUnits, Quality, ...) both
+                // occur in practice, on real devices, e.g. AnalogItemType/DataItemType nodes.
+                // Re-home such a node onto the nearest FOLDER/OBJECT ancestor (frame.containerId())
+                // instead of its immediate (Variable) parent (IS-188) — this keeps the data
+                // (nothing is dropped) while satisfying the model. The node's path still reflects
+                // its full logical nesting even though its schema parentId does not.
+                nodes.add(toNode(neutralId, frame.containerId(), path, name, isVariable,
                         isVariable ? neutralTypeOf(client, childId, unknown) : null));
-                // A Variable can itself have children (e.g. a structured/complex
-                // value's component Variables via HasComponent), not just
-                // Objects/Folders — keep descending.
-                stack.push(new Frame(childId, neutralId, path));
+                // Properties describe the value, not part of it, and descending into them
+                // multiplies scan RPCs without discovering anything further in practice, so
+                // they're recorded but not pushed back onto the stack. Anything else (Folders,
+                // Objects, and a Variable's HasComponent children) keeps descending, carrying
+                // forward the same nearest-container id if this node is itself a Variable.
+                boolean isProperty = isVariable && Identifiers.HasProperty.equals(ref.getReferenceTypeId());
+                if (!isProperty) {
+                    String childContainerId = isVariable ? frame.containerId() : neutralId;
+                    stack.push(new Frame(childId, childContainerId, path));
+                }
                 if (nodes.size() % PROGRESS_STEP == 0) {
                     onProgress.onDiscovered(nodes.size());
                 }
@@ -171,7 +174,13 @@ final class OpcUaDiscovery {
         return new ScanOutcome(OK, List.copyOf(nodes), truncated, unknownCount, message);
     }
 
-    private record Frame(NodeId nodeId, String parentId, String path) {}
+    /**
+     * @param containerId the nearest FOLDER/OBJECT ancestor's neutral id to assign as
+     *     {@code parentId} to any child discovered under this frame — not necessarily
+     *     this frame's own id, since this frame's own node may itself be a Variable
+     *     (never a valid schema parent).
+     */
+    private record Frame(NodeId nodeId, String containerId, String path) {}
 
     private static List<ReferenceDescription> browseChildren(OpcUaClient client, NodeId nodeId)
             throws Exception {
