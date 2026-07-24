@@ -60,7 +60,9 @@ export function SchemaTreeContextMenu({ x, y, actions, onClose }: Props) {
             }`}
             disabled={action.disabled}
             onClick={() => {
-              action.onClick();
+              if (action.onClick) {
+                action.onClick();
+              }
               onClose();
             }}
           >
