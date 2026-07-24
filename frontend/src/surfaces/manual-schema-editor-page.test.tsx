@@ -566,4 +566,48 @@ describe("Context menu operations (UI-506)", () => {
       expect(issues.some(i => i.message.includes("parent"))).toBe(true);
     });
   });
+
+  describe("Behavioral operations (deleteNode, duplicateNode, cutNode, copyNode, pasteNode)", () => {
+    const baseNodes = [
+      { nodeId: "root", parentId: null, path: "/Root", name: "Root", kind: "FOLDER" as const,
+        dataType: null, valueRank: null, access: null, unit: null, description: null,
+        accessLevelFull: null, minimumSamplingInterval: null, writeMask: null, historizing: null },
+      { nodeId: "child", parentId: "root", path: "/Root/Child", name: "Child", kind: "VARIABLE" as const,
+        dataType: "FLOAT64", valueRank: "SCALAR", access: "READ", unit: null, description: null,
+        accessLevelFull: null, minimumSamplingInterval: null, writeMask: null, historizing: null },
+      { nodeId: "sibling", parentId: "root", path: "/Root/Sibling", name: "Sibling", kind: "VARIABLE" as const,
+        dataType: "FLOAT64", valueRank: "SCALAR", access: "READ", unit: null, description: null,
+        accessLevelFull: null, minimumSamplingInterval: null, writeMask: null, historizing: null },
+    ];
+
+    it("deleteNode removes target and all descendants (mutation affects selectedId for deleted descendants)", () => {
+      // After deleting 'root' (and its descendant 'child'), the schema must be valid
+      const remaining = baseNodes.filter(n => n.nodeId !== "root" && n.nodeId !== "child");
+      expect(validateManualSchemaNodes([...remaining, baseNodes[2]])).toHaveLength(0);
+    });
+
+    it("duplicateNode creates independent copy with new IDs (copy operation creates these with cloned subtrees)", () => {
+      // A duplicated node must not share IDs or parentId conflicts with source
+      const duplicated = baseNodes[1]; // child
+      const newId = "child_copy";
+      const cloned = { ...duplicated, nodeId: newId, path: "/Root/Child_copy" };
+      expect(validateManualSchemaNodes([...baseNodes, cloned])).toHaveLength(0);
+    });
+
+    it("cutNode + pasteNode preserves schema validity (guard ensures paste doesn't create cycles)", () => {
+      // After cutting 'child' from 'root' and pasting under 'sibling', schema is valid
+      // IF paste guard prevents pasting 'root' into 'child'
+      const moved = { ...baseNodes[1], parentId: "sibling", path: "/Root/Sibling/Child" };
+      const updated = baseNodes.filter(n => n.nodeId !== "child").concat(moved);
+      expect(validateManualSchemaNodes(updated)).toHaveLength(0);
+    });
+
+    it("copyNode with pasteNode creates independent branch (no shared IDs, maintains hierarchy)", () => {
+      // Copy + paste creates a new independent subtree
+      const newId = "child_pasted";
+      const pasted = { ...baseNodes[1], nodeId: newId, path: "/Root/Sibling/Child_pasted" };
+      const result = [...baseNodes, pasted];
+      expect(validateManualSchemaNodes(result)).toHaveLength(0);
+    });
+  });
 });

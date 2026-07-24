@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 export interface ContextMenuAction {
   label: string;
   icon?: string;
-  onClick: () => void;
+  onClick?: () => void;
   disabled?: boolean;
   divider?: boolean;
   submenu?: ContextMenuAction[];

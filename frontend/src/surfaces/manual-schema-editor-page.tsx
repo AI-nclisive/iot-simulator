@@ -374,7 +374,7 @@ export function ManualSchemaEditorPage() {
     if (!node) return;
     const subIds = collectSubtreeIds(nodes, nodeId);
     setNodes((prev) => prev.filter((n) => !subIds.has(n.nodeId)));
-    if (selectedId === nodeId) setSelectedId(null);
+    if (subIds.has(selectedId || "")) setSelectedId(null);
   }
 
   function cloneSubtree(nodeId: string, newParentId: string | null, newParentPath: string, idMap: Map<string, string>): NodeDto[] {
@@ -492,7 +492,7 @@ export function ManualSchemaEditorPage() {
           openAdd("VARIABLE");
         },
       });
-      actions.push({ label: "", divider: true } as any);
+      actions.push({ label: "", divider: true });
     }
 
     actions.push({
