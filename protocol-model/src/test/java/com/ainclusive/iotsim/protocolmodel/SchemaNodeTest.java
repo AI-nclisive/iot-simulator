@@ -11,7 +11,9 @@ class SchemaNodeTest {
     void variableRequiresDataType() {
         assertThatThrownBy(() -> new SchemaNode(
                         "n1", null, "Plant/Temp", "Temp",
-                        NodeKind.VARIABLE, null, ValueRank.SCALAR, Access.READ, "degC", null))
+                        NodeKind.VARIABLE, null, ValueRank.SCALAR, Access.READ, "degC", null,
+                        java.util.List.of(), null, java.util.List.of(), null, java.util.List.of(),
+                        null, null, null, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("dataType");
     }
@@ -20,7 +22,9 @@ class SchemaNodeTest {
     void folderDoesNotRequireDataType() {
         var folder = new SchemaNode(
                 "f1", null, "Plant", "Plant",
-                NodeKind.FOLDER, null, null, null, null, null);
+                NodeKind.FOLDER, null, null, null, null, null,
+                java.util.List.of(), null, java.util.List.of(), null, java.util.List.of(),
+                null, null, null, null);
         assertThat(folder.kind()).isEqualTo(NodeKind.FOLDER);
     }
 
@@ -28,7 +32,8 @@ class SchemaNodeTest {
     void variableMayReferenceCustomDataTypeInsteadOfPrimitive() {
         var variable = new SchemaNode(
                 "n1", null, "Plant/Vec", "Vec", NodeKind.VARIABLE, null, ValueRank.SCALAR, Access.READ,
-                null, null, java.util.List.of(), null, java.util.List.of(), "dt1", java.util.List.of());
+                null, null, java.util.List.of(), null, java.util.List.of(), "dt1", java.util.List.of(),
+                null, null, null, null);
         assertThat(variable.dataType()).isNull();
         assertThat(variable.dataTypeNodeId()).isEqualTo("dt1");
     }
@@ -38,7 +43,7 @@ class SchemaNodeTest {
         assertThatThrownBy(() -> new SchemaNode(
                         "n1", null, "Plant/Vec", "Vec", NodeKind.VARIABLE, DataType.FLOAT64, ValueRank.SCALAR,
                         Access.READ, null, null, java.util.List.of(), null, java.util.List.of(), "dt1",
-                        java.util.List.of()))
+                        java.util.List.of(), null, null, null, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("exactly one");
     }
@@ -47,14 +52,16 @@ class SchemaNodeTest {
     void dataTypeNodeRequiresAtLeastOneMemberAndNoParent() {
         assertThatThrownBy(() -> new SchemaNode(
                         "dt1", null, "Vector3D", "Vector3D", NodeKind.DATA_TYPE, null, null, null, null, null,
-                        java.util.List.of(), null, java.util.List.of(), null, java.util.List.of()))
+                        java.util.List.of(), null, java.util.List.of(), null, java.util.List.of(),
+                        null, null, null, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("at least one member");
 
         assertThatThrownBy(() -> new SchemaNode(
                         "dt1", "someParent", "Vector3D", "Vector3D", NodeKind.DATA_TYPE, null, null, null, null,
                         null, java.util.List.of(), null, java.util.List.of(), null,
-                        java.util.List.of(new DataTypeMember("x", DataType.FLOAT64, null))))
+                        java.util.List.of(new DataTypeMember("x", DataType.FLOAT64, null)),
+                        null, null, null, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("top-level");
     }
@@ -67,7 +74,8 @@ class SchemaNodeTest {
                 java.util.List.of(
                         new DataTypeMember("x", DataType.FLOAT64, null),
                         new DataTypeMember("y", DataType.FLOAT64, null),
-                        new DataTypeMember("z", DataType.FLOAT64, null)));
+                        new DataTypeMember("z", DataType.FLOAT64, null)),
+                null, null, null, null);
         assertThat(dataType.members()).hasSize(3);
     }
 
@@ -76,7 +84,8 @@ class SchemaNodeTest {
         assertThatThrownBy(() -> new SchemaNode(
                         "dt1", null, "Vector3D", "Vector3D", NodeKind.DATA_TYPE, DataType.FLOAT64, null, null,
                         null, null, java.util.List.of(), null, java.util.List.of(), null,
-                        java.util.List.of(new DataTypeMember("x", DataType.FLOAT64, null))))
+                        java.util.List.of(new DataTypeMember("x", DataType.FLOAT64, null)),
+                        null, null, null, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("cannot have a dataType field");
     }
@@ -86,7 +95,8 @@ class SchemaNodeTest {
         assertThatThrownBy(() -> new SchemaNode(
                         "f1", null, "Plant", "Plant", NodeKind.FOLDER, null, null, null, null, null,
                         java.util.List.of(), null, java.util.List.of(), null,
-                        java.util.List.of(new DataTypeMember("x", DataType.FLOAT64, null))))
+                        java.util.List.of(new DataTypeMember("x", DataType.FLOAT64, null)),
+                        null, null, null, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("cannot have members");
     }

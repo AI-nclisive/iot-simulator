@@ -276,7 +276,7 @@ public class DataSourceController {
                     d.nodeId(), d.parentId(), d.path(), d.name(),
                     kind, dataType, valueRank, access, d.unit(), d.description(), d.arrayDimensions(),
                     d.typeDefinition(), SchemaReferenceMapper.toModel(d.references()), d.dataTypeNodeId(),
-                    SchemaReferenceMapper.toMembers(d.members())));
+                    SchemaReferenceMapper.toMembers(d.members()), null, null, null, null));
         }
         return nodes;
     }

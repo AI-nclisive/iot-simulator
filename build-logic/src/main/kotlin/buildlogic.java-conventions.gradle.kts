@@ -5,7 +5,7 @@ import org.gradle.api.tasks.testing.Test
 import org.gradle.testing.jacoco.tasks.JacocoReport
 
 // Shared Java conventions for every backend module.
-// Toolchain = Java 25 LTS (backend-specs/07_MODULE_STRUCTURE.md).
+// Toolchain = Java 21 LTS (backend-specs/07_MODULE_STRUCTURE.md).
 plugins {
     `java-library`
     checkstyle
@@ -18,7 +18,7 @@ apply(plugin = "com.diffplug.spotless")
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(25)
+        languageVersion = JavaLanguageVersion.of(21)
     }
 }
 

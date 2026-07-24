@@ -90,11 +90,21 @@ final class OpcUaDiscovery {
 
     /** IS-189: Maps OPC UA ReferenceTypeId to our ReferenceType enum values. */
     private static String mapReferenceType(NodeId refTypeId) {
-        if (refTypeId == null) return "ORGANIZES";
-        if (Identifiers.Organizes.equals(refTypeId)) return "ORGANIZES";
-        if (Identifiers.HasProperty.equals(refTypeId)) return "HAS_PROPERTY";
-        if (Identifiers.HasComponent.equals(refTypeId)) return "HAS_COMPONENT";
-        if (Identifiers.HasTypeDefinition.equals(refTypeId)) return "HAS_TYPE_DEFINITION";
+        if (refTypeId == null) {
+            return "ORGANIZES";
+        }
+        if (Identifiers.Organizes.equals(refTypeId)) {
+            return "ORGANIZES";
+        }
+        if (Identifiers.HasProperty.equals(refTypeId)) {
+            return "HAS_PROPERTY";
+        }
+        if (Identifiers.HasComponent.equals(refTypeId)) {
+            return "HAS_COMPONENT";
+        }
+        if (Identifiers.HasTypeDefinition.equals(refTypeId)) {
+            return "HAS_TYPE_DEFINITION";
+        }
         return "GENERIC";
     }
 
@@ -130,7 +140,9 @@ final class OpcUaDiscovery {
     }
 
     private static Integer extractIntValue(DataValue dv) {
-        if (dv == null || dv.getValue() == null) return null;
+        if (dv == null || dv.getValue() == null) {
+            return null;
+        }
         Object val = dv.getValue().getValue();
         if (val instanceof Number n) {
             return n.intValue();
@@ -139,7 +151,9 @@ final class OpcUaDiscovery {
     }
 
     private static Boolean extractBoolValue(DataValue dv) {
-        if (dv == null || dv.getValue() == null) return null;
+        if (dv == null || dv.getValue() == null) {
+            return null;
+        }
         Object val = dv.getValue().getValue();
         if (val instanceof Boolean b) {
             return b;
