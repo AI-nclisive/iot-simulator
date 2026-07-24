@@ -1221,18 +1221,18 @@ export function ManualSchemaEditorPage() {
                           />
                         </label>
                         <label className="flex flex-col gap-1.5 text-sm text-shell-muted">
-                          Write mask (0-255)
+                          Write mask (UInt32: 0-4294967295)
                           <input
                             className="shell-field"
                             disabled={!access.isAdmin}
                             type="number"
                             min="0"
-                            max="255"
+                            max="4294967295"
                             value={selectedNode.writeMask ?? ""}
                             placeholder="Not specified"
                             onChange={(e) => {
                               const val = e.target.value ? parseInt(e.target.value, 10) : null;
-                              if (val === null || (val >= 0 && val <= 255)) {
+                              if (val === null || (val >= 0 && val <= 4294967295)) {
                                 updateSelectedNode({ writeMask: val });
                               }
                             }}
