@@ -456,7 +456,8 @@ describe("validateManualSchemaNodes", () => {
     expect(issues).toEqual([]);
   });
 
-  it("reports duplicate names and a node under a variable", () => {
+  it("reports duplicate names and missing references under a variable (IS-189)", () => {
+    // IS-189: VARIABLE can be a parent, but children need a reference (HasProperty or HasComponent)
     const issues = validateManualSchemaNodes([
       { nodeId: "parent", parentId: null, path: "/Parent", name: "Parent", kind: "VARIABLE" as const, dataType: "FLOAT64", valueRank: "SCALAR", access: "READ", unit: null, description: null },
       { nodeId: "child", parentId: "parent", path: "/Parent/Bad", name: "Bad/Name", kind: "VARIABLE" as const, dataType: "FLOAT64", valueRank: "SCALAR", access: "READ", unit: null, description: null },
@@ -464,7 +465,7 @@ describe("validateManualSchemaNodes", () => {
     ]);
     expect(issues.map((issue) => issue.message)).toEqual(expect.arrayContaining([
       "A browse name cannot contain a slash or backslash.",
-      "Only a folder or object can contain another node.",
+      "Variable parent must have a reference (HasProperty or HasComponent) to this child.",
       "Sibling nodes must have unique browse names.",
     ]));
   });

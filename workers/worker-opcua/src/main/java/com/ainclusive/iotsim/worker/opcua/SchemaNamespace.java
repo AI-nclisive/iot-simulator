@@ -97,12 +97,10 @@ final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
                 continue;
             }
             boolean parentIsFolder = def.parentId() == null || hierarchy.containsKey(def.parentId());
-            // Test-only (VarDef.referenceType): a HasProperty fixture's parent is another
-            // Variable, not a Folder/Object — a real device's own address space allows this,
-            // even though the neutral schema model never produces it (SchemaNodeValidator).
+            // IS-189: A HasProperty/HasComponent child's parent is another Variable
             boolean parentIsVariable = !parentIsFolder && nodes.containsKey(def.parentId());
             if (!parentIsFolder && !parentIsVariable) {
-                throw new IllegalArgumentException("Variable has a missing or non-folder parent: " + def.nodeId());
+                throw new IllegalArgumentException("Variable has a missing or non-folder/variable parent: " + def.nodeId());
             }
             UaVariableNode node = UaVariableNode.builder(getNodeContext())
                     .setNodeId(newNodeId(def.nodeId()))
@@ -122,11 +120,17 @@ final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
         }
     }
 
-    /** Test-only seam (VarDef.referenceType): resolves a reference type name to its NodeId. */
+    /** IS-189: Resolves a reference type name to its OPC UA NodeId. */
     private static org.eclipse.milo.opcua.stack.core.types.builtin.NodeId referenceTypeId(String name) {
+        if (name == null) {
+            return Identifiers.Organizes;  // default
+        }
         return switch (name) {
+            case "ORGANIZES" -> Identifiers.Organizes;
             case "HAS_PROPERTY" -> Identifiers.HasProperty;
             case "HAS_COMPONENT" -> Identifiers.HasComponent;
+            case "HAS_TYPE_DEFINITION" -> Identifiers.HasTypeDefinition;
+            case "GENERIC" -> Identifiers.References;  // generic reference type
             default -> throw new IllegalArgumentException("unknown referenceType: " + name);
         };
     }

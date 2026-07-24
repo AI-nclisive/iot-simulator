@@ -37,6 +37,15 @@ public class JooqSchemaRepository implements SchemaRepository {
     private static final Field<Integer[]> ARRAY_DIMENSIONS =
             field(name("schema_nodes", "array_dimensions"), Integer[].class);
     private static final Field<String> TYPE_DEFINITION = field(name("schema_nodes", "type_definition"), String.class);
+    // IS-189: Critical OPC UA attributes
+    private static final Field<Integer> ACCESS_LEVEL_FULL =
+            field(name("schema_nodes", "access_level_full"), Integer.class);
+    private static final Field<Integer> MINIMUM_SAMPLING_INTERVAL =
+            field(name("schema_nodes", "minimum_sampling_interval"), Integer.class);
+    private static final Field<Integer> WRITE_MASK =
+            field(name("schema_nodes", "write_mask"), Integer.class);
+    private static final Field<Boolean> HISTORIZING =
+            field(name("schema_nodes", "historizing"), Boolean.class);
     private static final Table<?> NODE_REFERENCES = table(name("schema_node_references"));
     private static final Field<String> REFERENCE_SCHEMA_ID =
             field(name("schema_node_references", "schema_id"), String.class);
@@ -129,6 +138,11 @@ public class JooqSchemaRepository implements SchemaRepository {
                         .set(SCHEMA_NODES.DESCRIPTION, n.description())
                         .set(ARRAY_DIMENSIONS, n.arrayDimensions().toArray(Integer[]::new))
                         .set(TYPE_DEFINITION, n.typeDefinition())
+                        // IS-189: Persist critical OPC UA attributes
+                        .set(ACCESS_LEVEL_FULL, n.accessLevelFull())
+                        .set(MINIMUM_SAMPLING_INTERVAL, n.minimumSamplingInterval())
+                        .set(WRITE_MASK, n.writeMask())
+                        .set(HISTORIZING, n.historizing())
                         .execute();
             }
             for (SchemaNode n : nodes) {
@@ -202,6 +216,13 @@ public class JooqSchemaRepository implements SchemaRepository {
                 r.getDescription(),
                 r.get(ARRAY_DIMENSIONS) == null ? List.of() : List.of(r.get(ARRAY_DIMENSIONS)),
                 r.get(TYPE_DEFINITION),
-                referencesBySource.getOrDefault(r.getNodeId(), List.of()));
+                referencesBySource.getOrDefault(r.getNodeId(), List.of()),
+                null,  // dataTypeNodeId (IS-183, not read from this basic repository)
+                List.of(),  // members (IS-183, not read from this basic repository)
+                // IS-189: Critical OPC UA attributes
+                r.get(ACCESS_LEVEL_FULL),
+                r.get(MINIMUM_SAMPLING_INTERVAL),
+                r.get(WRITE_MASK),
+                r.get(HISTORIZING));
     }
 }
