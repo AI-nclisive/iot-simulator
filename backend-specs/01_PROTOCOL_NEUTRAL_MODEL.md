@@ -17,16 +17,21 @@ addressable structure of one data-source, independent of protocol.
 | Field | Type | Notes |
 | --- | --- | --- |
 | `nodeId` | stable string (ULID/slug) | Identity; stable across edits and exports. |
-| `parentId` | string \| null | Tree structure; null = root child. |
+| `parentId` | string \| null | Tree structure; null = root child. **IS-189**: can now be `VARIABLE` for Property/Component children. |
 | `path` | string | Human-readable address, e.g. `Plant/Line1/Temp`. Derived, unique within schema. |
 | `name` | string | Display name. |
-| `kind` | enum `FOLDER \| VARIABLE` | Folders group; variables carry values. |
+| `kind` | enum `FOLDER \| OBJECT \| VARIABLE \| METHOD` | **IS-189**: VARIABLE can now be parent for Property/Component children via HasProperty/HasComponent references. |
 | `dataType` | enum (see §2) | Required for `VARIABLE`. |
 | `valueRank` | enum `SCALAR \| ARRAY` | Arrays carry an `arrayLength` hint. |
 | `access` | enum `READ \| READ_WRITE` | Default `READ`. |
 | `unit` | string \| null | Engineering unit (informational). |
 | `description` | string \| null | |
 | `protocolBindings` | map<protocol, binding> | Projection hints, see §5. Optional; defaults derived. |
+| `accessLevelFull` | integer 0–255 \| null | **IS-189 (IEC 62541)**: Full 8-bit AccessLevel mask (CurrentRead, CurrentWrite, HistoryRead, HistoryWrite, SemanticChange, StatusWrite, TimestampWrite). Null = not specified. |
+| `minimumSamplingInterval` | integer (ms) \| null | **IS-189 (IEC 62541)**: Server minimum sampling interval in milliseconds. -1 = indeterminate, 0 = continuous. Null = unknown. |
+| `writeMask` | integer 0–255 \| null | **IS-189 (IEC 62541)**: UInt32 mask indicating which node attributes can be written by clients. 0 = all immutable. Null = not specified. |
+| `historizing` | boolean \| null | **IS-189 (IEC 62541)**: Whether server actively collects historical values for this variable. Null = not specified. |
+| `references` | list of `SchemaReference` | **IS-189**: Type+direction edges to other nodes (ORGANIZES, HAS_COMPONENT, HAS_PROPERTY, HAS_TYPE_DEFINITION, GENERIC). Property/Component children now captured with correct reference type. |
 
 Rules: `path` is unique within a schema; `nodeId` is the only stable reference
 (used by recordings, samples, scenarios, faults, evidence). A schema is
