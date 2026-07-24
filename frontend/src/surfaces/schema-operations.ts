@@ -1,4 +1,4 @@
-import { type NodeDto } from "./data-source-schema-editor";
+import { type NodeDto, canHaveChildren } from "./data-source-schema-editor";
 
 export function collectSubtreeIds(nodes: NodeDto[], rootId: string): Set<string> {
   const visited = new Set<string>();
@@ -63,9 +63,10 @@ export function duplicateNodeOperation(nodes: NodeDto[], nodeId: string): NodeDt
   const newName = `${node.name} (copy)`;
   const newParentId = node.parentId;
   const newParentPath = newParentId ? (nodes.find((n) => n.nodeId === newParentId)?.path ?? "/") : "";
+  const newRootPath = newParentPath ? `${newParentPath}/${newName}` : `/${newName}`;
 
-  const cloned = cloneSubtree(nodes, nodeId, newParentId, newParentPath, idMap);
-  const renamed = cloned[0] ? { ...cloned[0], name: newName } : null;
+  const cloned = cloneSubtree(nodes, nodeId, newParentId, newRootPath, idMap);
+  const renamed = cloned[0] ? { ...cloned[0], name: newName, path: newRootPath } : null;
 
   return [...nodes, ...(renamed ? [renamed, ...cloned.slice(1)] : cloned)];
 }
@@ -90,6 +91,9 @@ export function pasteNodeOperation(
 
   const sourceSubtree = collectSubtreeIds(nodes, clipboard.nodeId);
   if (sourceSubtree.has(parentId || "")) return nodes;
+
+  const parentNode = parentId ? nodes.find((n) => n.nodeId === parentId) : null;
+  if (parentId && !canHaveChildren(parentNode?.kind)) return nodes;
 
   const parentNode = parentId ? nodes.find((n) => n.nodeId === parentId) : null;
   const newParentPath = parentNode ? parentNode.path : "";
