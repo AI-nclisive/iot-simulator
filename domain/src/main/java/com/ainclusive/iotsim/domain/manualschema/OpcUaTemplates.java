@@ -88,8 +88,8 @@ public final class OpcUaTemplates {
                 3, 500, 3, null
         ));
 
-        // Motor sub-device (with pump_parent as parentId)
-        var motorNodes = motorAsSubdevice("pump_parent");
+        // Motor sub-device (with pump_parent as parentId, "motor" prefix for embedded motor)
+        var motorNodes = motorAsSubdevice("pump_parent", "motor");
         nodes.addAll(motorNodes);
 
         return nodes;
@@ -99,46 +99,57 @@ public final class OpcUaTemplates {
      * Motor device template with speed, current, temperature, and mode.
      * Structure: Motor -> {Speed, Current, Temperature, Mode}
      *
-     * ⚠️ CRITICAL: This template uses fixed node IDs that MUST be manually renamed if combined with
-     * pump() in the same schema:
+     * ⚠️ CRITICAL: This template uses fixed node IDs that conflict with pump()'s embedded motor:
      * - pump() includes an embedded motor with nodeIds: motor_parent, motor_speed, motor_current, motor_temperature, motor_mode
      * - motor() as a standalone template also uses the same fixed nodeIds
-     * - Result: duplicate nodeId errors if both pump() and motor() are in one schema
+     * - Result: duplicate nodeId errors if both pump() and motor() are combined in one schema
      *
-     * Solution: After adding motor() to a schema that already has pump(), rename all motor node IDs
-     * through the manual editor:
-     * - motor_parent → motor_standalone_parent
-     * - motor_speed → motor_standalone_speed
-     * - motor_current → motor_standalone_current
-     * - motor_temperature → motor_standalone_temperature
-     * - motor_mode → motor_standalone_mode
+     * Solution: Use motorWithPrefix("motor_standalone") instead of motor() to generate unique IDs:
+     * - motorWithPrefix("motor_standalone") → motor_standalone_parent, motor_standalone_speed, etc.
+     * - Or rename manually through the manual editor after adding motor() to existing pump() schema
      */
     public static List<SchemaNode> motor() {
-        return motorAsSubdevice(null);
+        return motorAsSubdevice(null, "motor");
     }
 
     /**
-     * Helper method to create motor nodes with optional parent.
+     * Motor template with custom node ID prefix to avoid conflicts.
+     * Use this when combining multiple motor templates or when motor() conflicts with pump().
+     *
+     * Example: motorWithPrefix("motor_standalone") → motor_standalone_parent, motor_standalone_speed, …
+     *
+     * @param idPrefix  prefix for all generated node IDs (e.g. "motor_standalone", "aux_motor")
+     * @return motor nodes with prefixed IDs
      */
-    private static List<SchemaNode> motorAsSubdevice(String parentId) {
+    public static List<SchemaNode> motorWithPrefix(String idPrefix) {
+        if (idPrefix == null || idPrefix.isBlank()) {
+            throw new IllegalArgumentException("idPrefix cannot be null or blank");
+        }
+        return motorAsSubdevice(null, idPrefix);
+    }
+
+    /**
+     * Helper method to create motor nodes with optional parent and custom ID prefix.
+     */
+    private static List<SchemaNode> motorAsSubdevice(String parentId, String idPrefix) {
         List<SchemaNode> nodes = new ArrayList<>();
 
         // Parent motor object
         nodes.add(new SchemaNode(
-                "motor_parent", parentId,
+                idPrefix + "_parent", parentId,
                 parentId != null ? parentId + "/Motor" : "Motor",
                 "Motor",
                 NodeKind.OBJECT, null, null, null, null, null,
                 List.of(), null, List.of(
-                        new SchemaReference("motor_speed", ReferenceType.HAS_COMPONENT, true),
-                        new SchemaReference("motor_current", ReferenceType.HAS_COMPONENT, true),
-                        new SchemaReference("motor_temperature", ReferenceType.HAS_COMPONENT, true),
-                        new SchemaReference("motor_mode", ReferenceType.HAS_COMPONENT, true)
+                        new SchemaReference(idPrefix + "_speed", ReferenceType.HAS_COMPONENT, true),
+                        new SchemaReference(idPrefix + "_current", ReferenceType.HAS_COMPONENT, true),
+                        new SchemaReference(idPrefix + "_temperature", ReferenceType.HAS_COMPONENT, true),
+                        new SchemaReference(idPrefix + "_mode", ReferenceType.HAS_COMPONENT, true)
                 )));
 
         // Speed (FLOAT64)
         nodes.add(new SchemaNode(
-                "motor_speed", "motor_parent",
+                idPrefix + "_speed", idPrefix + "_parent",
                 (parentId != null ? parentId + "/" : "") + "Motor/Speed",
                 "Speed",
                 NodeKind.VARIABLE, DataType.FLOAT64, ValueRank.SCALAR, Access.READ, "RPM", "Motor speed",
@@ -149,7 +160,7 @@ public final class OpcUaTemplates {
 
         // Current (FLOAT64)
         nodes.add(new SchemaNode(
-                "motor_current", "motor_parent",
+                idPrefix + "_current", idPrefix + "_parent",
                 (parentId != null ? parentId + "/" : "") + "Motor/Current",
                 "Current",
                 NodeKind.VARIABLE, DataType.FLOAT64, ValueRank.SCALAR, Access.READ, "A", "Motor current draw",
@@ -160,7 +171,7 @@ public final class OpcUaTemplates {
 
         // Temperature (FLOAT64)
         nodes.add(new SchemaNode(
-                "motor_temperature", "motor_parent",
+                idPrefix + "_temperature", idPrefix + "_parent",
                 (parentId != null ? parentId + "/" : "") + "Motor/Temperature",
                 "Temperature",
                 NodeKind.VARIABLE, DataType.FLOAT64, ValueRank.SCALAR, Access.READ, "degC", "Motor temperature",
@@ -171,7 +182,7 @@ public final class OpcUaTemplates {
 
         // Mode (INT32)
         nodes.add(new SchemaNode(
-                "motor_mode", "motor_parent",
+                idPrefix + "_mode", idPrefix + "_parent",
                 (parentId != null ? parentId + "/" : "") + "Motor/Mode",
                 "Mode",
                 NodeKind.VARIABLE, DataType.INT32, ValueRank.SCALAR, Access.READ_WRITE, null, "Motor operating mode",
