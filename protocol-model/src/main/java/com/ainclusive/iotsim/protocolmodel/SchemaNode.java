@@ -32,8 +32,9 @@ import java.util.Objects;
  *                         StatusWrite(5), TimestampWrite(6); {@code null} = server does not expose
  * @param minimumSamplingInterval  server's minimum sampling interval in milliseconds (nullable):
  *                                  -1 = indeterminate, 0 = continuous; {@code null} = unknown
- * @param writeMask  UInt32 mask indicating which node attributes can be written (nullable):
- *                   0 = all immutable, 255 = all writable; {@code null} = not specified
+ * @param writeMask  OPC UA WriteMask as Java Integer (0-2147483647): each bit (0-31) represents
+ *                   a writable attribute per IEC 62541; 0 = all immutable, bits set = those attributes writable;
+ *                   {@code null} = not specified
  * @param historizing  whether server actively collects historical values (nullable);
  *                     {@code null} = not specified, false = no history collection
  */
