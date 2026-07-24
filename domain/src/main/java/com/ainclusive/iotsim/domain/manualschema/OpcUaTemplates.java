@@ -98,6 +98,10 @@ public final class OpcUaTemplates {
     /**
      * Motor device template with speed, current, temperature, and mode.
      * Structure: Motor -> {Speed, Current, Temperature, Mode}
+     *
+     * WARNING: Uses fixed node IDs (motor_parent, motor_speed, etc.) that conflict with pump()'s
+     * embedded motor. When combining pump() + motor() in one schema, rename all motor node IDs
+     * (e.g., motor_parent → motor_standalone_parent) to avoid duplicate nodeId errors.
      */
     public static List<SchemaNode> motor() {
         return motorAsSubdevice(null);
