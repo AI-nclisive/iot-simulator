@@ -313,14 +313,11 @@ export function ManualSchemaEditorPage() {
   const [saveMode, setSaveMode] = useState<SaveMode | null>(null);
   const [saveAsName, setSaveAsName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
-<<<<<<< HEAD
   const [showOpcUaAttributes, setShowOpcUaAttributes] = useState(false);
   const [showTemplatePickerModal, setShowTemplatePickerModal] = useState(false);
-=======
   const [contextMenuNode, setContextMenuNode] = useState<string | null>(null);
   const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null);
   const [clipboard, setClipboard] = useState<{ mode: "cut" | "copy"; nodeId: string } | null>(null);
->>>>>>> 4b623f0 (feat(UI-506): Implement schema tree context menu)
 
   useEffect(() => {
     if (!currentProjectId || !schemaId) return;
@@ -1517,14 +1514,13 @@ export function ManualSchemaEditorPage() {
         </div>
       ) : null}
 
-<<<<<<< HEAD
       <TemplatePickerModal
         open={showTemplatePickerModal}
         templates={availableTemplates}
         onSelectTemplate={handleTemplateSelection}
         onClose={() => setShowTemplatePickerModal(false)}
       />
-=======
+
       {contextMenuNode && contextMenuPos ? (
         <SchemaTreeContextMenu
           x={contextMenuPos.x}
@@ -1536,7 +1532,6 @@ export function ManualSchemaEditorPage() {
           }}
         />
       ) : null}
->>>>>>> 4b623f0 (feat(UI-506): Implement schema tree context menu)
     </div>
   );
 }
