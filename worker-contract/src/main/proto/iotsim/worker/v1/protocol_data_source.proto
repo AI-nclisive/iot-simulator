@@ -94,12 +94,18 @@ message SchemaNodeMsg {
   string parent_id = 2;   // empty if root
   string path = 3;
   string name = 4;
-  string kind = 5;        // FOLDER | VARIABLE
+  string kind = 5;        // FOLDER | OBJECT | VARIABLE | METHOD
   string data_type = 6;   // empty if unset
   string value_rank = 7;  // empty if unset
   string access = 8;      // empty if unset
   string unit = 9;
   string description = 10;
+
+  // IS-189: Critical OPC UA attributes (IEC 62541)
+  int32 access_level_full = 11;   // Full 8-bit mask (0 if unset)
+  int32 minimum_sampling_interval = 12;  // ms (-1 = indeterminate, 0 = continuous)
+  int32 write_mask = 13;          // Attribute write permissions (0 if unset)
+  bool historizing = 14;          // Server collects history?
 }
 
 message StartRequest {}

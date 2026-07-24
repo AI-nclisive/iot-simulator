@@ -17,6 +17,7 @@ import com.ainclusive.iotsim.api.manualschema.ManualSchemaController.ManualSchem
 import com.ainclusive.iotsim.api.manualschema.ManualSchemaController.NodeDto;
 import com.ainclusive.iotsim.api.manualschema.ManualSchemaController.UpdateManualSchemaRequest;
 import com.ainclusive.iotsim.api.schema.MemberDto;
+import com.ainclusive.iotsim.api.schema.ReferenceDto;
 import com.ainclusive.iotsim.domain.common.ConcurrencyConflictException;
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.domain.manualschema.ManualSchema;
@@ -25,6 +26,7 @@ import com.ainclusive.iotsim.domain.support.Page;
 import com.ainclusive.iotsim.protocolmodel.Access;
 import com.ainclusive.iotsim.protocolmodel.DataType;
 import com.ainclusive.iotsim.protocolmodel.NodeKind;
+import com.ainclusive.iotsim.protocolmodel.ReferenceType;
 import com.ainclusive.iotsim.protocolmodel.SchemaNode;
 import com.ainclusive.iotsim.protocolmodel.ValueRank;
 import java.time.Instant;
@@ -161,9 +163,11 @@ class ManualSchemaControllerTest {
                 .willReturn(sample(0));
         var dataTypeDto = new NodeDto("dt1", null, "Vector3D", "Vector3D", "DATA_TYPE",
                 null, null, null, null, null, List.of(), null, List.of(), null,
-                List.of(new MemberDto("x", "FLOAT64", null), new MemberDto("y", "FLOAT64", null)));
+                List.of(new MemberDto("x", "FLOAT64", null), new MemberDto("y", "FLOAT64", null)),
+                null, null, null, null);
         var variableDto = new NodeDto("v1", null, "Plant/Vec", "Vec", "VARIABLE",
-                null, "SCALAR", "READ", null, null, List.of(), null, List.of(), "dt1", List.of());
+                null, "SCALAR", "READ", null, null, List.of(), null, List.of(), "dt1", List.of(),
+                null, null, null, null);
         var request = new CreateManualSchemaRequest("OPC_UA", "Boiler", "desc",
                 List.of(dataTypeDto, variableDto));
 
@@ -184,11 +188,64 @@ class ManualSchemaControllerTest {
     @Test
     void createRejectsVariableWithBothDataTypeAndDataTypeNodeId() {
         var variableDto = new NodeDto("v1", null, "Plant/Vec", "Vec", "VARIABLE",
-                "FLOAT64", "SCALAR", "READ", null, null, List.of(), null, List.of(), "dt1", List.of());
+                "FLOAT64", "SCALAR", "READ", null, null, List.of(), null, List.of(), "dt1", List.of(),
+                null, null, null, null);
         var request = new CreateManualSchemaRequest("OPC_UA", "Boiler", "desc", List.of(variableDto));
 
         assertThatThrownBy(() -> controller.create("p1", request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("exactly one");
+    }
+
+    @Test
+    void createVariableWithPropertyChild() {
+        given(service.create(anyString(), anyString(), anyString(), any(), any(), anyString()))
+                .willReturn(sample(0));
+        var parentVar = new NodeDto("v1", null, "Plant/Temp", "Temp", "VARIABLE",
+                "FLOAT64", "SCALAR", "READ", "degC", null, List.of(), null, List.of(), null, List.of(),
+                null, null, null, null);
+        var childProp = new NodeDto("p1", "v1", "Plant/Temp/Status", "Status", "VARIABLE",
+                "BOOL", "SCALAR", "READ", null, null, List.of(), null,
+                List.of(new ReferenceDto("v1", "HAS_PROPERTY", false)), null, List.of(),
+                null, null, null, null);
+        var request = new CreateManualSchemaRequest("OPC_UA", "Boiler", "desc",
+                List.of(parentVar, childProp));
+
+        controller.create("p1", request);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<SchemaNode>> nodesCaptor = ArgumentCaptor.forClass(List.class);
+        verify(service).create(anyString(), anyString(), anyString(), any(), nodesCaptor.capture(), anyString());
+        List<SchemaNode> savedNodes = nodesCaptor.getValue();
+        SchemaNode savedParent = savedNodes.stream().filter(n -> n.nodeId().equals("v1")).findFirst().orElseThrow();
+        SchemaNode savedChild = savedNodes.stream().filter(n -> n.nodeId().equals("p1")).findFirst().orElseThrow();
+        assertThat(savedParent.kind()).isEqualTo(NodeKind.VARIABLE);
+        assertThat(savedParent.parentId()).isNull();
+        assertThat(savedChild.kind()).isEqualTo(NodeKind.VARIABLE);
+        assertThat(savedChild.parentId()).isEqualTo("v1");
+        assertThat(savedChild.references()).hasSize(1);
+        assertThat(savedChild.references().get(0).type()).isEqualTo(ReferenceType.HAS_PROPERTY);
+    }
+
+    @Test
+    void createVariableWithOpcUaAttributesPersists() {
+        given(service.create(anyString(), anyString(), anyString(), any(), any(), anyString()))
+                .willReturn(sample(0));
+        var variableDto = new NodeDto("v1", null, "Plant/Temp", "Temp", "VARIABLE",
+                "FLOAT64", "SCALAR", "READ", "degC", null, List.of(), null, List.of(), null, List.of(),
+                0x03, 100, 0xFF, true);
+        var request = new CreateManualSchemaRequest("OPC_UA", "Boiler", "desc", List.of(variableDto));
+
+        controller.create("p1", request);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<SchemaNode>> nodesCaptor = ArgumentCaptor.forClass(List.class);
+        verify(service).create(anyString(), anyString(), anyString(), any(), nodesCaptor.capture(), anyString());
+        List<SchemaNode> savedNodes = nodesCaptor.getValue();
+        SchemaNode savedNode = savedNodes.stream().filter(n -> n.nodeId().equals("v1")).findFirst().orElseThrow();
+        assertThat(savedNode.accessLevelFull()).isEqualTo(0x03);
+        assertThat(savedNode.minimumSamplingInterval()).isEqualTo(100);
+        assertThat(savedNode.writeMask()).isEqualTo(0xFF);
+        assertThat(savedNode.historizing()).isTrue();
     }
 }

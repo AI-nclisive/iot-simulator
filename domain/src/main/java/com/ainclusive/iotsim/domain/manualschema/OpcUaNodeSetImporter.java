@@ -58,8 +58,11 @@ public final class OpcUaNodeSetImporter {
                         "DataType '" + element.getAttribute("DataType") + "' is not supported"));
                 continue;
             }
+            // IS-189: Extract critical OPC UA attributes
             rawNodes.add(new RawNode(nodeId, browseName(element), kind, dataType, valueRank(element),
-                    access(element), references(element, nodeId, diagnostics)));
+                    access(element), references(element, nodeId, diagnostics),
+                    accessLevelFull(element), minimumSamplingInterval(element),
+                    writeMask(element), historizing(element)));
         }
         return materialize(rawNodes, diagnostics);
     }
@@ -96,16 +99,22 @@ public final class OpcUaNodeSetImporter {
                     .filter(reference -> byId.containsKey(reference.target))
                     .map(reference -> new SchemaReference(reference.target, referenceType(reference.type), reference.forward))
                     .toList();
+            // IS-189: Include critical OPC UA attributes
             nodes.add(new SchemaNode(raw.nodeId, parents.get(raw.nodeId), path, raw.name, raw.kind, raw.dataType,
-                    raw.valueRank, raw.access, null, null, List.of(), null, references));
+                    raw.valueRank, raw.access, null, null, List.of(), null, references,
+                    null, List.of(),  // dataTypeNodeId, members (not used in NodeSet import)
+                    raw.accessLevelFull, raw.minimumSamplingInterval, raw.writeMask, raw.historizing));
         }
         Set<String> importedIds = nodes.stream().map(SchemaNode::nodeId).collect(java.util.stream.Collectors.toSet());
+        // IS-189: Preserve attributes when filtering references
         nodes = nodes.stream().map(node -> new SchemaNode(
                 node.nodeId(), node.parentId(), node.path(), node.name(), node.kind(), node.dataType(),
                 node.valueRank(), node.access(), node.unit(), node.description(), node.arrayDimensions(),
                 node.typeDefinition(), node.references().stream()
                         .filter(reference -> importedIds.contains(reference.targetNodeId()))
-                        .toList())).toList();
+                        .toList(),
+                node.dataTypeNodeId(), node.members(),
+                node.accessLevelFull(), node.minimumSamplingInterval(), node.writeMask(), node.historizing())).toList();
         return new Result(List.copyOf(nodes), List.copyOf(diagnostics));
     }
 
@@ -188,6 +197,51 @@ public final class OpcUaNodeSetImporter {
         }
     }
 
+    // IS-189: Parse critical OPC UA attributes from NodeSet XML
+    private static Integer accessLevelFull(Element element) {
+        String level = element.getAttribute("AccessLevel");
+        if (level.isBlank()) {
+            return null;
+        }
+        try {
+            return Integer.decode(level);
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    private static Integer minimumSamplingInterval(Element element) {
+        String interval = element.getAttribute("MinimumSamplingInterval");
+        if (interval.isBlank()) {
+            return null;
+        }
+        try {
+            return Integer.parseInt(interval);
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    private static Integer writeMask(Element element) {
+        String mask = element.getAttribute("WriteMask");
+        if (mask.isBlank()) {
+            return null;
+        }
+        try {
+            return Integer.decode(mask);
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    private static Boolean historizing(Element element) {
+        String value = element.getAttribute("Historizing");
+        if (value.isBlank()) {
+            return null;
+        }
+        return "true".equalsIgnoreCase(value);
+    }
+
     private static DataType dataTypeOf(String dataType) {
         String id = numericIdentifier(dataType);
         return switch (id) {
@@ -226,7 +280,9 @@ public final class OpcUaNodeSetImporter {
             return new Diagnostic("UNSUPPORTED", subject, identifier, message);
         }
     }
+    // IS-189: Extended with critical OPC UA attributes
     private record RawNode(String nodeId, String name, NodeKind kind, DataType dataType, ValueRank valueRank,
-            Access access, List<RawReference> references) {}
+            Access access, List<RawReference> references, Integer accessLevelFull, Integer minimumSamplingInterval,
+            Integer writeMask, Boolean historizing) {}
     private record RawReference(String target, String type, boolean forward) {}
 }

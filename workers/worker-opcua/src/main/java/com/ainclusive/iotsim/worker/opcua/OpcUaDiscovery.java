@@ -61,6 +61,10 @@ final class OpcUaDiscovery {
     record ScanOutcome(String status, List<SchemaNodeMsg> nodes, boolean truncated,
             int unknownCount, String message) {}
 
+    /** IS-189: Attributes read from a Variable node (nullable fields = not available from server). */
+    record VariableAttributes(Integer accessLevel, Integer minimumSamplingInterval,
+            Boolean historizing, Integer writeMask, Integer userAccessLevel) {}
+
     /** Reachability/auth probe: connect then disconnect, classifying any failure. */
     static ConnectionTest testConnection(String endpointUrl, Credentials credentials) {
         OpcUaClient client = null;
@@ -83,6 +87,79 @@ final class OpcUaDiscovery {
 
     /** Nodes discovered between progress callbacks — frequent enough to feel live, rare enough not to flood the RPC. */
     private static final int PROGRESS_STEP = 20;
+
+    /** IS-189: Maps OPC UA ReferenceTypeId to our ReferenceType enum values. */
+    private static String mapReferenceType(NodeId refTypeId) {
+        if (refTypeId == null) {
+            return "ORGANIZES";
+        }
+        if (Identifiers.Organizes.equals(refTypeId)) {
+            return "ORGANIZES";
+        }
+        if (Identifiers.HasProperty.equals(refTypeId)) {
+            return "HAS_PROPERTY";
+        }
+        if (Identifiers.HasComponent.equals(refTypeId)) {
+            return "HAS_COMPONENT";
+        }
+        if (Identifiers.HasTypeDefinition.equals(refTypeId)) {
+            return "HAS_TYPE_DEFINITION";
+        }
+        return "GENERIC";
+    }
+
+    /** IS-189: Batch-read critical OPC UA attributes for a Variable node. */
+    private static VariableAttributes readVariableAttributes(OpcUaClient client, NodeId nodeId) {
+        try {
+            List<ReadValueId> toRead = List.of(
+                    new ReadValueId(nodeId, AttributeId.AccessLevel.uid(), null, QualifiedName.NULL_VALUE),
+                    new ReadValueId(nodeId, AttributeId.MinimumSamplingInterval.uid(), null, QualifiedName.NULL_VALUE),
+                    new ReadValueId(nodeId, AttributeId.Historizing.uid(), null, QualifiedName.NULL_VALUE),
+                    new ReadValueId(nodeId, AttributeId.WriteMask.uid(), null, QualifiedName.NULL_VALUE),
+                    new ReadValueId(nodeId, AttributeId.UserAccessLevel.uid(), null, QualifiedName.NULL_VALUE)
+            );
+
+            ReadResponse response = client.read(0.0, TimestampsToReturn.Neither, toRead)
+                    .get(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            DataValue[] results = response.getResults();
+
+            if (results == null || results.length < 5) {
+                return new VariableAttributes(null, null, null, null, null);
+            }
+
+            Integer accessLevel = extractIntValue(results[0]);
+            Integer minimumSamplingInterval = extractIntValue(results[1]);
+            Boolean historizing = extractBoolValue(results[2]);
+            Integer writeMask = extractIntValue(results[3]);
+            Integer userAccessLevel = extractIntValue(results[4]);
+
+            return new VariableAttributes(accessLevel, minimumSamplingInterval, historizing, writeMask, userAccessLevel);
+        } catch (Exception e) {
+            return new VariableAttributes(null, null, null, null, null);
+        }
+    }
+
+    private static Integer extractIntValue(DataValue dv) {
+        if (dv == null || dv.getValue() == null) {
+            return null;
+        }
+        Object val = dv.getValue().getValue();
+        if (val instanceof Number n) {
+            return n.intValue();
+        }
+        return null;
+    }
+
+    private static Boolean extractBoolValue(DataValue dv) {
+        if (dv == null || dv.getValue() == null) {
+            return null;
+        }
+        Object val = dv.getValue().getValue();
+        if (val instanceof Boolean b) {
+            return b;
+        }
+        return null;
+    }
 
     /** Connects and browses the address space into neutral schema nodes. */
     static ScanOutcome scan(String endpointUrl, Credentials credentials, int maxNodes,
@@ -132,18 +209,11 @@ final class OpcUaDiscovery {
                 if (!isVariable && ref.getNodeClass() != NodeClass.Object) {
                     continue;
                 }
-                // A Variable's HasProperty children (EURange, EngineeringUnits,
-                // EnumStrings, Quality, ...) are metadata about the value, not part of
-                // it, and are extremely common on AnalogItemType/DataItemType
-                // variables. They're skipped entirely (IS-188) — not just left
-                // un-descended-into: the neutral schema model only allows a
-                // FOLDER/OBJECT parent (SchemaNodeValidator), and a Property's parent
-                // is always its owning Variable, so emitting them as discovered nodes
-                // made every such real device un-scannable ("parent must be a FOLDER
-                // or OBJECT").
-                if (isVariable && Identifiers.HasProperty.equals(ref.getReferenceTypeId())) {
-                    continue;
-                }
+
+                // IS-189: No longer skip Property/Component nodes — now supported via VARIABLE parents
+                // Capture reference type for all nodes (used for HasProperty/HasComponent edges)
+                String referenceType = mapReferenceType(ref.getReferenceTypeId());
+
                 if (nodes.size() >= cap) {
                     truncated = true;
                     return new ScanOutcome(PARTIAL, List.copyOf(nodes), truncated, unknown[0],
@@ -152,8 +222,16 @@ final class OpcUaDiscovery {
                 String name = displayName(ref);
                 String neutralId = childId.toParseableString();
                 String path = frame.path().isEmpty() ? name : frame.path() + "/" + name;
+
+                // IS-189: Read critical attributes for Variables
+                VariableAttributes attrs = null;
+                if (isVariable) {
+                    attrs = readVariableAttributes(client, childId);
+                }
+
                 nodes.add(toNode(neutralId, frame.parentId(), path, name, isVariable,
-                        isVariable ? neutralTypeOf(client, childId, unknown) : null));
+                        isVariable ? neutralTypeOf(client, childId, unknown) : null, referenceType, attrs));
+
                 // A Variable can itself have children (e.g. a structured/complex
                 // value's component Variables via HasComponent), not just
                 // Objects/Folders — keep descending.
@@ -221,7 +299,7 @@ final class OpcUaDiscovery {
     }
 
     private static SchemaNodeMsg toNode(String nodeId, String parentId, String path, String name,
-            boolean variable, String dataType) {
+            boolean variable, String dataType, String referenceType, VariableAttributes attrs) {
         SchemaNodeMsg.Builder b = SchemaNodeMsg.newBuilder()
                 .setNodeId(nodeId)
                 .setParentId(parentId == null ? "" : parentId)
@@ -232,6 +310,22 @@ final class OpcUaDiscovery {
             b.setDataType(dataType == null ? "" : dataType) // empty = unknown type
                     .setValueRank("SCALAR")
                     .setAccess("READ");
+
+            // IS-189: Add critical OPC UA attributes if available
+            if (attrs != null) {
+                if (attrs.accessLevel() != null) {
+                    b.setAccessLevelFull(attrs.accessLevel());
+                }
+                if (attrs.minimumSamplingInterval() != null) {
+                    b.setMinimumSamplingInterval(attrs.minimumSamplingInterval());
+                }
+                if (attrs.writeMask() != null) {
+                    b.setWriteMask(attrs.writeMask());
+                }
+                if (attrs.historizing() != null) {
+                    b.setHistorizing(attrs.historizing());
+                }
+            }
         }
         return b.build();
     }

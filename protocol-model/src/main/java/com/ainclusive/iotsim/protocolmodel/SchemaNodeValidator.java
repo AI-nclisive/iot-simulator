@@ -108,8 +108,9 @@ public final class SchemaNodeValidator {
         if (parent == null) {
             throw new IllegalArgumentException("parent does not exist: " + node.parentId());
         }
-        if (parent.kind() != NodeKind.FOLDER && parent.kind() != NodeKind.OBJECT) {
-            throw new IllegalArgumentException("parent must be a FOLDER or OBJECT: " + parent.nodeId());
+        // IS-189: Allow VARIABLE as parent for Property/Component edges (HasProperty/HasComponent references)
+        if (parent.kind() != NodeKind.FOLDER && parent.kind() != NodeKind.OBJECT && parent.kind() != NodeKind.VARIABLE) {
+            throw new IllegalArgumentException("parent must be a FOLDER, OBJECT, or VARIABLE: " + parent.nodeId());
         }
     }
 

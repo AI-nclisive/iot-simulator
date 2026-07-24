@@ -26,7 +26,7 @@ tasks.test {
     val opcuaDist = project(":workers:worker-opcua").layout.buildDirectory
         .dir("install/worker-opcua").map { it.asFile.absolutePath }
     val workerJavaHome = javaToolchains.launcherFor {
-        languageVersion.set(JavaLanguageVersion.of(25))
+        languageVersion.set(JavaLanguageVersion.of(21))
     }.map { it.metadata.installationPath.asFile.absolutePath }
     doFirst {
         systemProperty("iotsim.worker.opcua.dist", opcuaDist.get())

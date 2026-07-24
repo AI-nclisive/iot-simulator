@@ -8,6 +8,7 @@ import { useShellStore } from "../shell/shell-store";
 import { SharedStatePanel } from "../ui/shared-state-panel";
 import { StatusBadge } from "../ui/status-badge";
 import { buildTree, canHaveChildren, type NodeDto, type ReferenceDto } from "./data-source-schema-editor";
+import { TemplatePickerModal, type TemplateInfo } from "./template-picker-modal";
 
 const DATA_TYPES = [
   "BOOL", "INT8", "UINT8", "INT16", "UINT16", "INT32", "UINT32", "INT64", "UINT64",
@@ -213,7 +214,16 @@ export function validateManualSchemaNodes(nodes: NodeDto[]): ValidationIssue[] {
     if (node.parentId) {
       const parent = byId.get(node.parentId);
       if (!parent) issues.push({ nodeId: node.nodeId, message: "Its parent no longer exists." });
-      else if (!canHaveChildren(parent.kind)) issues.push({ nodeId: node.nodeId, message: "Only a folder or object can contain another node." });
+      else if (!canHaveChildren(parent.kind)) issues.push({ nodeId: node.nodeId, message: "Only a folder, object, or variable can contain another node." });
+      // IS-189: When parent is VARIABLE, the parent must have a reference (HasProperty or HasComponent) to this child
+      else if (parent.kind === "VARIABLE") {
+        const hasValidRef = (parent.references ?? []).some((ref) =>
+          (ref.type === "HAS_PROPERTY" || ref.type === "HAS_COMPONENT") && ref.targetNodeId === node.nodeId
+        );
+        if (!hasValidRef) {
+          issues.push({ nodeId: node.nodeId, message: "Variable parent must have a reference (HasProperty or HasComponent) to this child." });
+        }
+      }
     }
     const key = `${node.parentId ?? "__top_level__"}:${name}`;
     const ids = siblingNames.get(key) ?? new Set<string>();
@@ -303,6 +313,8 @@ export function ManualSchemaEditorPage() {
   const [saveMode, setSaveMode] = useState<SaveMode | null>(null);
   const [saveAsName, setSaveAsName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [showOpcUaAttributes, setShowOpcUaAttributes] = useState(false);
+  const [showTemplatePickerModal, setShowTemplatePickerModal] = useState(false);
 
   useEffect(() => {
     if (!currentProjectId || !schemaId) return;
@@ -420,6 +432,10 @@ export function ManualSchemaEditorPage() {
       access: addKind === "VARIABLE" ? addAccess : null,
       unit: addKind === "VARIABLE" ? addUnit || null : null,
       description: addDescription || null,
+      accessLevelFull: null,
+      minimumSamplingInterval: null,
+      writeMask: null,
+      historizing: null,
     };
     setNodes((prev) => [...prev, node]);
     if (parentId) setExpandedIds((prev) => new Set(prev).add(parentId));
@@ -452,6 +468,7 @@ export function ManualSchemaEditorPage() {
       nodeId: newNodeId(), parentId, path: pathFor(parentId, variable.name),
       name: variable.name, kind: "VARIABLE", dataType: variable.dataType, valueRank: "SCALAR",
       access: "READ", unit: variable.unit, description: variable.description,
+      accessLevelFull: null, minimumSamplingInterval: null, writeMask: null, historizing: null,
     };
     setNodes((prev) => [...prev, node]);
     setExpandedIds((prev) => new Set(prev).add(parentId));
@@ -470,10 +487,26 @@ export function ManualSchemaEditorPage() {
       nodeId: newNodeId(), parentId: folderId, path: `${folderPath}/${variable.name}`, name: variable.name,
       kind: "VARIABLE", dataType: variable.dataType, valueRank: "SCALAR", access: "READ",
       unit: variable.unit ?? null, description: variable.description,
+      accessLevelFull: null, minimumSamplingInterval: null, writeMask: null, historizing: null,
     }));
     setNodes((prev) => [...prev, folder, ...variables]);
     setExpandedIds((prev) => new Set([...prev, parentId, folderId]));
   }
+
+  function handleTemplateSelection(templateName: string) {
+    const template = STRUCTURE_TEMPLATES.find((t) => t.name === templateName);
+    if (template) {
+      addStructureTemplate(template);
+      setShowTemplatePickerModal(false);
+    }
+  }
+
+  const availableTemplates: TemplateInfo[] = STRUCTURE_TEMPLATES.map((template) => ({
+    name: template.name,
+    group: template.group,
+    description: template.description,
+    variableCount: template.variables.length,
+  }));
 
   function appendBatchRow() {
     setBatchRows((prev) => [...prev, { id: newNodeId(), name: "", dataType: "FLOAT64", unit: "", description: "" }]);
@@ -486,6 +519,7 @@ export function ManualSchemaEditorPage() {
       nodeId: newNodeId(), parentId: addParentId, path: pathFor(addParentId, row.name.trim()), name: row.name.trim(),
       kind: "VARIABLE", dataType: row.dataType, valueRank: "SCALAR", access: "READ",
       unit: row.unit.trim() || null, description: row.description.trim() || null,
+      accessLevelFull: null, minimumSamplingInterval: null, writeMask: null, historizing: null,
     }));
     setNodes((prev) => [...prev, ...created]);
     if (addParentId) setExpandedIds((prev) => new Set(prev).add(addParentId));
@@ -777,6 +811,9 @@ export function ManualSchemaEditorPage() {
 
         {access.isAdmin && containers.length > 0 ? (
           <div className="mb-4 flex flex-wrap gap-2">
+            <button className="shell-action" type="button" onClick={() => setShowTemplatePickerModal(true)}>
+              Add from template
+            </button>
             <button className="shell-text-action" type="button" onClick={() => setShowLibrary((open) => !open)}>
               {showLibrary ? "Hide parameter catalog" : "Choose from parameter catalog"}
             </button>
@@ -955,6 +992,11 @@ export function ManualSchemaEditorPage() {
                     {selectedNode.kind === "FOLDER" ? "Folder" : selectedNode.kind === "OBJECT" ? "Object" : "Variable"}
                   </p>
                   <p className="mt-2 truncate font-mono text-sm text-shell-ink">{selectedNode.path}</p>
+                  {selectedNode.parentId && nodes.find((n) => n.nodeId === selectedNode.parentId)?.kind === "VARIABLE" ? (
+                    <p className="mt-1 text-xs text-shell-muted">
+                      Parent: <span className="font-mono">{nodes.find((n) => n.nodeId === selectedNode.parentId)?.name}</span> (VARIABLE)
+                    </p>
+                  ) : null}
                 </div>
                 {access.isAdmin ? (
                   <button
@@ -1028,6 +1070,38 @@ export function ManualSchemaEditorPage() {
                     onChange={(e) => updateSelectedNode({ description: e.target.value || null })}
                   />
                 </label>
+                {selectedNode.parentId && nodes.find((n) => n.nodeId === selectedNode.parentId)?.kind === "VARIABLE" ? (() => {
+                  const parent = nodes.find((n) => n.nodeId === selectedNode.parentId);
+                  const childRef = parent?.references?.find((ref) => ref.targetNodeId === selectedNode.nodeId);
+                  return (
+                    <label className="flex flex-col gap-2 text-sm text-shell-muted">
+                      Reference type <span className="font-normal text-shell-danger">(required)</span>
+                      <select
+                        className="shell-field"
+                        disabled={!access.isAdmin}
+                        value={childRef?.type ?? "HAS_PROPERTY"}
+                        onChange={(e) => {
+                          const refType = e.target.value as ReferenceDto["type"];
+                          if (!parent) return;
+                          // Update or create the reference in the parent
+                          const parentRefs = parent.references ?? [];
+                          const existingRefIndex = parentRefs.findIndex((ref) => ref.targetNodeId === selectedNode.nodeId);
+                          let updated: ReferenceDto[];
+                          if (existingRefIndex >= 0) {
+                            updated = parentRefs.map((ref, i) => i === existingRefIndex ? { ...ref, type: refType } : ref);
+                          } else {
+                            updated = [...parentRefs, { targetNodeId: selectedNode.nodeId, type: refType, forward: true }];
+                          }
+                          // Update parent node
+                          setNodes((prev) => prev.map((n) => n.nodeId === parent.nodeId ? { ...n, references: updated } : n));
+                        }}
+                      >
+                        <option value="HAS_PROPERTY">Has property</option>
+                        <option value="HAS_COMPONENT">Has component</option>
+                      </select>
+                    </label>
+                  );
+                })() : null}
                 <div className="flex flex-col gap-2 text-sm text-shell-muted">
                   References
                   {(selectedNode.references ?? []).length > 0 ? (
@@ -1102,6 +1176,81 @@ export function ManualSchemaEditorPage() {
                     </div>
                   ) : null}
                 </div>
+                {selectedNode.kind === "VARIABLE" ? (
+                  <div className="flex flex-col gap-2 text-sm text-shell-muted">
+                    <button
+                      className="flex items-center justify-between rounded-md border border-shell-line bg-shell-base/30 px-3 py-2 text-left hover:bg-shell-base/50"
+                      type="button"
+                      onClick={() => setShowOpcUaAttributes(!showOpcUaAttributes)}
+                    >
+                      <span className="font-medium text-shell-ink">OPC UA Attributes</span>
+                      <span className="text-xs text-shell-muted">{showOpcUaAttributes ? "▾" : "▸"}</span>
+                    </button>
+                    {showOpcUaAttributes ? (
+                      <div className="space-y-3 rounded-md border border-shell-line bg-shell-base/20 p-3">
+                        <label className="flex flex-col gap-1.5 text-sm text-shell-muted">
+                          Access level (0-255)
+                          <input
+                            className="shell-field"
+                            disabled={!access.isAdmin}
+                            type="number"
+                            min="0"
+                            max="255"
+                            value={selectedNode.accessLevelFull ?? ""}
+                            placeholder="Not specified"
+                            onChange={(e) => {
+                              const val = e.target.value ? parseInt(e.target.value, 10) : null;
+                              if (val === null || (val >= 0 && val <= 255)) {
+                                updateSelectedNode({ accessLevelFull: val });
+                              }
+                            }}
+                          />
+                        </label>
+                        <label className="flex flex-col gap-1.5 text-sm text-shell-muted">
+                          Minimum sampling interval (ms)
+                          <input
+                            className="shell-field"
+                            disabled={!access.isAdmin}
+                            type="number"
+                            value={selectedNode.minimumSamplingInterval ?? ""}
+                            placeholder="Not specified (-1=indeterminate, 0=continuous)"
+                            onChange={(e) => {
+                              const val = e.target.value ? parseInt(e.target.value, 10) : null;
+                              updateSelectedNode({ minimumSamplingInterval: val });
+                            }}
+                          />
+                        </label>
+                        <label className="flex flex-col gap-1.5 text-sm text-shell-muted">
+                          Write mask (0-255)
+                          <input
+                            className="shell-field"
+                            disabled={!access.isAdmin}
+                            type="number"
+                            min="0"
+                            max="255"
+                            value={selectedNode.writeMask ?? ""}
+                            placeholder="Not specified"
+                            onChange={(e) => {
+                              const val = e.target.value ? parseInt(e.target.value, 10) : null;
+                              if (val === null || (val >= 0 && val <= 255)) {
+                                updateSelectedNode({ writeMask: val });
+                              }
+                            }}
+                          />
+                        </label>
+                        <label className="flex items-center gap-2 text-sm text-shell-muted">
+                          <input
+                            type="checkbox"
+                            checked={selectedNode.historizing ?? false}
+                            disabled={!access.isAdmin}
+                            onChange={(e) => updateSelectedNode({ historizing: e.target.checked || null })}
+                          />
+                          <span>Historizing</span>
+                        </label>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
                 {selectedIssues.length > 0 ? (
                   <div className="rounded-md border border-shell-danger/30 bg-shell-danger/5 px-3 py-2 text-xs text-shell-muted">
                     {selectedIssues.map((issue, index) => <p key={`${issue.message}-${index}`}>{issue.message}</p>)}
@@ -1186,6 +1335,13 @@ export function ManualSchemaEditorPage() {
           </div>
         </div>
       ) : null}
+
+      <TemplatePickerModal
+        open={showTemplatePickerModal}
+        templates={availableTemplates}
+        onSelectTemplate={handleTemplateSelection}
+        onClose={() => setShowTemplatePickerModal(false)}
+      />
     </div>
   );
 }
