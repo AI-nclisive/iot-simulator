@@ -331,7 +331,7 @@ final class OpcUaDiscovery {
                     b.setAccessLevelFull(attrs.accessLevel());
                 }
                 if (attrs.minimumSamplingInterval() != null) {
-                    b.setMinimumSamplingInterval(attrs.minimumSamplingInterval());
+                    b.setMinimumSamplingInterval((int) Math.round(attrs.minimumSamplingInterval()));
                 }
                 if (attrs.writeMask() != null) {
                     b.setWriteMask(attrs.writeMask());
