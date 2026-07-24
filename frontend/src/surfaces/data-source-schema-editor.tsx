@@ -28,11 +28,15 @@ export type NodeDto = {
   arrayDimensions?: number[];
   typeDefinition?: string | null;
   references?: ReferenceDto[];
+  accessLevelFull?: number | null;
+  minimumSamplingInterval?: number | null;
+  writeMask?: number | null;
+  historizing?: boolean | null;
 };
 
-/** FOLDER and OBJECT nodes can contain children; only they're valid parents (backend rule). */
+/** FOLDER, OBJECT, and VARIABLE nodes can contain children (IS-189: VARIABLE via HasProperty/HasComponent references). */
 export function canHaveChildren(kind: NodeDto["kind"]): boolean {
-  return kind === "FOLDER" || kind === "OBJECT";
+  return kind === "FOLDER" || kind === "OBJECT" || kind === "VARIABLE";
 }
 
 type SchemaResponse = {

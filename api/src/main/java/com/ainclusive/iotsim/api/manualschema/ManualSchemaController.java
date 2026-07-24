@@ -184,7 +184,8 @@ public class ManualSchemaController {
                     d.nodeId(), d.parentId(), d.path(), d.name(),
                     kind, dataType, valueRank, access, d.unit(), d.description(), d.arrayDimensions(),
                     d.typeDefinition(), SchemaReferenceMapper.toModel(d.references()), d.dataTypeNodeId(),
-                    SchemaReferenceMapper.toMembers(d.members()), null, null, null, null));
+                    SchemaReferenceMapper.toMembers(d.members()), d.accessLevelFull(), d.minimumSamplingInterval(),
+                    d.writeMask(), d.historizing()));
         }
         return nodes;
     }
@@ -234,12 +235,13 @@ public class ManualSchemaController {
             String nodeId, String parentId, String path, String name, String kind,
             String dataType, String valueRank, String access, String unit, String description,
             List<Integer> arrayDimensions, String typeDefinition, List<ReferenceDto> references,
-            String dataTypeNodeId, List<MemberDto> members) {
+            String dataTypeNodeId, List<MemberDto> members,
+            Integer accessLevelFull, Integer minimumSamplingInterval, Integer writeMask, Boolean historizing) {
 
         public NodeDto(String nodeId, String parentId, String path, String name, String kind,
                 String dataType, String valueRank, String access, String unit, String description) {
             this(nodeId, parentId, path, name, kind, dataType, valueRank, access, unit, description,
-                    List.of(), null, List.of(), null, List.of());
+                    List.of(), null, List.of(), null, List.of(), null, null, null, null);
         }
 
         static NodeDto from(SchemaNode n) {
@@ -250,7 +252,8 @@ public class ManualSchemaController {
                     n.access() == null ? null : n.access().name(),
                     n.unit(), n.description(), n.arrayDimensions(), n.typeDefinition(),
                     n.references().stream().map(ReferenceDto::from).toList(),
-                    n.dataTypeNodeId(), n.members().stream().map(MemberDto::from).toList());
+                    n.dataTypeNodeId(), n.members().stream().map(MemberDto::from).toList(),
+                    n.accessLevelFull(), n.minimumSamplingInterval(), n.writeMask(), n.historizing());
         }
     }
 
