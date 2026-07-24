@@ -19,7 +19,7 @@ class OpcUaTemplatesTest {
 
         assertThat(nodes).isNotEmpty();
         assertThat(nodes.stream().map(SchemaNode::nodeId)).contains(
-                "pump_parent", "pump_flowrate", "pump_pressure", "pump_status", "pump_isrunning", "motor_parent");
+                "pump_parent", "pump_flowrate", "pump_pressure", "pump_status", "pump_isrunning", "pump_motor_parent");
 
         // Verify parent pump object
         var pumpParent = nodes.stream().filter(n -> n.nodeId().equals("pump_parent")).findFirst();
@@ -29,14 +29,14 @@ class OpcUaTemplatesTest {
         assertThat(pumpParent.get().path()).isEqualTo("Pump");
         assertThat(pumpParent.get().references())
                 .extracting(ref -> ref.targetNodeId())
-                .contains("pump_flowrate", "pump_pressure", "pump_status", "pump_isrunning", "motor_parent");
+                .contains("pump_flowrate", "pump_pressure", "pump_status", "pump_isrunning", "pump_motor_parent");
 
         // Verify HAS_COMPONENT references are present
         assertThat(pumpParent.get().references())
                 .allMatch(ref -> ref.type() == ReferenceType.HAS_COMPONENT);
 
-        // Verify motor sub-device is included
-        assertThat(nodes.stream().filter(n -> n.nodeId().equals("motor_parent")).findFirst()).isPresent();
+        // Verify embedded motor sub-device is included with pump_motor prefix
+        assertThat(nodes.stream().filter(n -> n.nodeId().equals("pump_motor_parent")).findFirst()).isPresent();
     }
 
     @Test
@@ -87,10 +87,10 @@ class OpcUaTemplatesTest {
         var pumpChildren = nodes.stream().filter(n -> n.parentId() != null && n.parentId().equals("pump_parent")).toList();
         assertThat(pumpChildren).hasSizeGreaterThanOrEqualTo(5);  // FlowRate, Pressure, Status, IsRunning, Motor
 
-        // Verify motor is correctly linked as a sub-component
-        var motor = nodes.stream().filter(n -> n.nodeId().equals("motor_parent")).findFirst();
+        // Verify pump's embedded motor is correctly linked as a sub-component with pump_motor prefix
+        var motor = nodes.stream().filter(n -> n.nodeId().equals("pump_motor_parent")).findFirst();
         assertThat(motor).isPresent();
-        assertThat(motor.get().parentId()).isEqualTo("pump_parent");  // Motor is a HAS_COMPONENT child of pump
+        assertThat(motor.get().parentId()).isEqualTo("pump_parent");  // Embedded motor is a HAS_COMPONENT child of pump
     }
 
     @Test
