@@ -65,15 +65,17 @@ export function duplicateNodeOperation(nodes: NodeDto[], nodeId: string): NodeDt
   const parentPath = newParentId ? (nodes.find((n) => n.nodeId === newParentId)?.path ?? "/") : "";
 
   const cloned = cloneSubtree(nodes, nodeId, newParentId, parentPath, idMap);
-  const renamed = cloned[0]
-    ? {
-        ...cloned[0],
-        name: newName,
-        path: parentPath ? `${parentPath}/${newName}` : `/${newName}`,
-      }
-    : null;
+  const newRootPath = parentPath ? `${parentPath}/${newName}` : `/${newName}`;
+  const renamed = cloned.map((n, i) => {
+    if (i === 0) {
+      return { ...n, name: newName, path: newRootPath };
+    }
+    const oldRootPath = cloned[0].path;
+    const newPath = n.path.replace(oldRootPath, newRootPath);
+    return { ...n, path: newPath };
+  });
 
-  return [...nodes, ...(renamed ? [renamed, ...cloned.slice(1)] : cloned)];
+  return [...nodes, ...renamed];
 }
 
 export function cutNodeOperation(nodeId: string): { mode: "cut"; nodeId: string } {
@@ -105,14 +107,16 @@ export function pasteNodeOperation(
   if (clipboard.mode === "cut") {
     const cutSubIds = collectSubtreeIds(nodes, clipboard.nodeId);
     const remaining = nodes.filter((n) => !cutSubIds.has(n.nodeId));
+    const rootNode = nodes.find((n) => n.nodeId === clipboard.nodeId);
+    if (!rootNode) return nodes;
+    const newRootPath = newParentPath ? `${newParentPath}/${rootNode.name}` : `/${rootNode.name}`;
     const movedNodes = nodes
       .filter((n) => cutSubIds.has(n.nodeId))
       .map((n) => {
         if (n.nodeId === clipboard.nodeId) {
-          return { ...n, parentId, path: newParentPath ? `${newParentPath}/${n.name}` : `/${n.name}` };
+          return { ...n, parentId, path: newRootPath };
         }
-        const oldParentPath = nodes.find((p) => p.nodeId === n.parentId)?.path ?? "";
-        const newPath = n.path.replace(oldParentPath, newParentPath || "");
+        const newPath = n.path.replace(rootNode.path, newRootPath);
         return { ...n, path: newPath };
       });
     return [...remaining, ...movedNodes];
