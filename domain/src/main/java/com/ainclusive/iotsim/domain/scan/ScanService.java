@@ -335,12 +335,12 @@ public class ScanService implements DisposableBean {
             List<DiscoveredNode> discovered, List<TypeResolution> resolutions) {
         Map<String, TypeResolution> byNodeId = indexResolutions(discovered, resolutions);
         List<SchemaNode> nodes = new ArrayList<>();
-        List<String> unresolved = new ArrayList<>();
         for (DiscoveredNode n : discovered) {
             if ("VARIABLE".equals(n.kind()) && n.isUnknownType()) {
                 TypeResolution r = byNodeId.get(n.nodeId());
                 if (r == null) {
-                    unresolved.add(n.path() == null ? n.nodeId() : n.path());
+                    // IS-189: unresolved unknown types are kept with null dataType; backend handles them as INT64 default
+                    nodes.add(variableNode(n, null, valueRank(n.valueRank()), access(n.access())));
                 } else if (!r.exclude()) {
                     nodes.add(variableNode(n, DataType.valueOf(r.dataType()),
                             r.valueRank() == null ? valueRank(n.valueRank()) : ValueRank.valueOf(r.valueRank()),
@@ -353,10 +353,6 @@ public class ScanService implements DisposableBean {
                 nodes.add(new SchemaNode(n.nodeId(), n.parentId(), n.path(), n.name(),
                         NodeKind.FOLDER, null, null, null, n.unit(), n.description()));
             }
-        }
-        if (!unresolved.isEmpty()) {
-            throw new IllegalArgumentException(
-                    "scan has unknown-typed nodes requiring resolution before create: " + unresolved);
         }
         return nodes;
     }

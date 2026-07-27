@@ -140,8 +140,8 @@ public class ScanController {
 
     /**
      * Creates a data source (basis=SCAN) from a completed scan. Unknown-typed
-     * discovered nodes must be addressed via {@code typeResolutions} (assign a type
-     * or exclude); an unresolved unknown node rejects the request (400).
+     * discovered nodes are kept with null dataType; optional {@code typeResolutions}
+     * can assign types or exclude them. Backend handles null dataTypes as INT64 default.
      */
     @Operation(
             summary = "Create data source from scan",

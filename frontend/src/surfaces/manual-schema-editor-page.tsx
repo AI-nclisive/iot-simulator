@@ -9,7 +9,6 @@ import { SharedStatePanel } from "../ui/shared-state-panel";
 import { StatusBadge } from "../ui/status-badge";
 import { buildTree, canHaveChildren, type NodeDto, type ReferenceDto } from "./data-source-schema-editor";
 import { SchemaTreeContextMenu, type ContextMenuAction } from "./schema-tree-context-menu";
-import { TemplatePickerModal, type TemplateInfo } from "./template-picker-modal";
 
 const DATA_TYPES = [
   "BOOL", "INT8", "UINT8", "INT16", "UINT16", "INT32", "UINT32", "INT64", "UINT64",
@@ -315,7 +314,6 @@ export function ManualSchemaEditorPage() {
   const [saveAsName, setSaveAsName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [showOpcUaAttributes, setShowOpcUaAttributes] = useState(false);
-  const [showTemplatePickerModal, setShowTemplatePickerModal] = useState(false);
   const [contextMenuNode, setContextMenuNode] = useState<string | null>(null);
   const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null);
   const [clipboard, setClipboard] = useState<{ mode: "cut" | "copy"; nodeId: string } | null>(null);
@@ -675,21 +673,6 @@ export function ManualSchemaEditorPage() {
     setExpandedIds((prev) => new Set([...prev, parentId, folderId]));
   }
 
-  function handleTemplateSelection(templateName: string) {
-    const template = STRUCTURE_TEMPLATES.find((t) => t.name === templateName);
-    if (template) {
-      addStructureTemplate(template);
-      setShowTemplatePickerModal(false);
-    }
-  }
-
-  const availableTemplates: TemplateInfo[] = STRUCTURE_TEMPLATES.map((template) => ({
-    name: template.name,
-    group: template.group,
-    description: template.description,
-    variableCount: template.variables.length,
-  }));
-
   function appendBatchRow() {
     setBatchRows((prev) => [...prev, { id: newNodeId(), name: "", dataType: "FLOAT64", unit: "", description: "" }]);
   }
@@ -993,9 +976,6 @@ export function ManualSchemaEditorPage() {
 
         {access.isAdmin && containers.length > 0 ? (
           <div className="mb-4 flex flex-wrap gap-2">
-            <button className="shell-action" type="button" onClick={() => setShowTemplatePickerModal(true)}>
-              Add from template
-            </button>
             <button className="shell-text-action" type="button" onClick={() => setShowLibrary((open) => !open)}>
               {showLibrary ? "Hide parameter catalog" : "Choose from parameter catalog"}
             </button>
@@ -1519,12 +1499,6 @@ export function ManualSchemaEditorPage() {
         </div>
       ) : null}
 
-      <TemplatePickerModal
-        open={showTemplatePickerModal}
-        templates={availableTemplates}
-        onSelectTemplate={handleTemplateSelection}
-        onClose={() => setShowTemplatePickerModal(false)}
-      />
 
       {contextMenuNode && contextMenuPos ? (
         <SchemaTreeContextMenu
