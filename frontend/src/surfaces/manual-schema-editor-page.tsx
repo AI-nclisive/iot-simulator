@@ -8,6 +8,7 @@ import { useShellStore } from "../shell/shell-store";
 import { SharedStatePanel } from "../ui/shared-state-panel";
 import { StatusBadge } from "../ui/status-badge";
 import { buildTree, canHaveChildren, type NodeDto, type ReferenceDto } from "./data-source-schema-editor";
+import { SchemaTreeContextMenu, type ContextMenuAction } from "./schema-tree-context-menu";
 import { TemplatePickerModal, type TemplateInfo } from "./template-picker-modal";
 
 const DATA_TYPES = [
@@ -241,7 +242,7 @@ function newNodeId(): string {
 }
 
 /** Every id in `nodes` that is `rootId` or a (possibly indirect) descendant of it. */
-function collectSubtreeIds(nodes: NodeDto[], rootId: string): Set<string> {
+export function collectSubtreeIds(nodes: NodeDto[], rootId: string): Set<string> {
   const ids = new Set([rootId]);
   let grew = true;
   while (grew) {
@@ -315,6 +316,9 @@ export function ManualSchemaEditorPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [showOpcUaAttributes, setShowOpcUaAttributes] = useState(false);
   const [showTemplatePickerModal, setShowTemplatePickerModal] = useState(false);
+  const [contextMenuNode, setContextMenuNode] = useState<string | null>(null);
+  const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null);
+  const [clipboard, setClipboard] = useState<{ mode: "cut" | "copy"; nodeId: string } | null>(null);
 
   useEffect(() => {
     if (!currentProjectId || !schemaId) return;
@@ -363,6 +367,183 @@ export function ManualSchemaEditorPage() {
       else next.add(id);
       return next;
     });
+  }
+
+  function deleteNode(nodeId: string) {
+    const node = nodes.find((n) => n.nodeId === nodeId);
+    if (!node) return;
+    const subIds = collectSubtreeIds(nodes, nodeId);
+    setNodes((prev) =>
+      prev
+        .filter((n) => !subIds.has(n.nodeId))
+        .map((n) => (subIds.has(n.parentId || "") ? { ...n, parentId: null } : n))
+    );
+    if (subIds.has(selectedId || "")) setSelectedId(null);
+  }
+
+  function cloneSubtree(nodeId: string, newParentId: string | null, newParentPath: string, idMap: Map<string, string>): NodeDto[] {
+    const node = nodes.find((n) => n.nodeId === nodeId);
+    if (!node) return [];
+
+    const newId = idMap.get(nodeId) || newNodeId();
+    idMap.set(nodeId, newId);
+
+    const newPath = newParentPath ? `${newParentPath}/${node.name}` : `/${node.name}`;
+    const cloned: NodeDto = {
+      ...node,
+      nodeId: newId,
+      parentId: newParentId,
+      path: newPath,
+    };
+
+    const children = nodes.filter((n) => n.parentId === nodeId);
+    const clonedChildren = children.flatMap((child) => cloneSubtree(child.nodeId, newId, newPath, idMap));
+
+    return [cloned, ...clonedChildren];
+  }
+
+  function duplicateNode(nodeId: string) {
+    const node = nodes.find((n) => n.nodeId === nodeId);
+    if (!node) return;
+
+    const idMap = new Map<string, string>();
+    const newName = `${node.name} (copy)`;
+    const newParentId = node.parentId;
+    const newParentPath = newParentId ? (nodes.find((n) => n.nodeId === newParentId)?.path ?? "/") : "";
+
+    const cloned = cloneSubtree(nodeId, newParentId, newParentPath, idMap);
+    if (cloned.length === 0) return;
+
+    const root = cloned[0];
+    const oldRootPath = root.path;
+    const newRootPath = newParentPath ? `${newParentPath}/${newName}` : `/${newName}`;
+    const pathDiff = oldRootPath.length;
+
+    const duplicates = cloned.map((n) => {
+      if (n.nodeId === root.nodeId) {
+        return { ...n, name: newName, path: newRootPath };
+      }
+      if (n.path.startsWith(`${oldRootPath}/`)) {
+        return { ...n, path: newRootPath + n.path.slice(pathDiff) };
+      }
+      return n;
+    });
+
+    setNodes((prev) => [...prev, ...duplicates]);
+    setSelectedId(duplicates[0].nodeId);
+  }
+
+  function cutNode(nodeId: string) {
+    setClipboard({ mode: "cut", nodeId });
+  }
+
+  function copyNode(nodeId: string) {
+    setClipboard({ mode: "copy", nodeId });
+  }
+
+  function pasteNode(parentId: string) {
+    if (!clipboard) return;
+    const sourceNode = nodes.find((n) => n.nodeId === clipboard.nodeId);
+    const parent = nodes.find((n) => n.nodeId === parentId);
+    if (!sourceNode || !parent || !canHaveChildren(parent.kind)) return;
+
+    const subIds = collectSubtreeIds(nodes, sourceNode.nodeId);
+    if (subIds.has(parentId)) return;
+
+    const parentPath = parent.path;
+
+    if (clipboard.mode === "cut") {
+      setNodes((prev) => {
+        const idMap = new Map<string, string>();
+        const filtered = prev.filter((n) => !subIds.has(n.nodeId));
+        const cloned = cloneSubtree(sourceNode.nodeId, parentId, parentPath, idMap);
+        return [...filtered, ...cloned];
+      });
+      setClipboard(null);
+    } else {
+      const idMap = new Map<string, string>();
+      const cloned = cloneSubtree(sourceNode.nodeId, parentId, parentPath, idMap);
+      setNodes((prev) => [...prev, ...cloned]);
+    }
+    setExpandedIds((prev) => new Set(prev).add(parentId));
+  }
+
+  function buildContextMenuActions(nodeId: string): ContextMenuAction[] {
+    const node = nodes.find((n) => n.nodeId === nodeId);
+    if (!node) return [];
+
+    const actions: ContextMenuAction[] = [];
+
+    if (canHaveChildren(node.kind)) {
+      actions.push({
+        label: "Add Folder",
+        onClick: () => {
+          setSelectedId(nodeId);
+          openAdd("FOLDER");
+        },
+      });
+      actions.push({
+        label: "Add Object",
+        onClick: () => {
+          setSelectedId(nodeId);
+          openAdd("OBJECT");
+        },
+      });
+      actions.push({
+        label: "Add Variable",
+        onClick: () => {
+          setSelectedId(nodeId);
+          openAdd("VARIABLE");
+        },
+      });
+      actions.push({ label: "", divider: true });
+    }
+
+    actions.push({
+      label: "Edit",
+      onClick: () => setSelectedId(nodeId),
+    });
+
+    actions.push({
+      label: "Duplicate",
+      onClick: () => duplicateNode(nodeId),
+    });
+
+    actions.push({
+      label: "Cut",
+      onClick: () => cutNode(nodeId),
+    });
+
+    actions.push({
+      label: "Copy",
+      onClick: () => copyNode(nodeId),
+    });
+
+    const canPaste = clipboard !== null;
+    actions.push({
+      label: "Paste",
+      disabled: !canPaste || !canHaveChildren(node.kind),
+      onClick: () => pasteNode(nodeId),
+    });
+
+    actions.push({ label: "", divider: true });
+
+    actions.push({
+      label: "Delete",
+      onClick: () => {
+        if (confirm(`Delete "${node.name}" and all its children?`)) {
+          deleteNode(nodeId);
+        }
+      },
+    });
+
+    return actions;
+  }
+
+  function handleTreeContextMenu(e: React.MouseEvent, nodeId: string) {
+    e.preventDefault();
+    setContextMenuNode(nodeId);
+    setContextMenuPos({ x: e.clientX, y: e.clientY });
   }
 
   function addReference() {
@@ -482,6 +663,7 @@ export function ManualSchemaEditorPage() {
     const folder: NodeDto = {
       nodeId: folderId, parentId, path: folderPath, name: template.name, kind: "FOLDER",
       dataType: null, valueRank: null, access: null, unit: null, description: template.description,
+      accessLevelFull: null, minimumSamplingInterval: null, writeMask: null, historizing: null,
     };
     const variables: NodeDto[] = template.variables.map((variable) => ({
       nodeId: newNodeId(), parentId: folderId, path: `${folderPath}/${variable.name}`, name: variable.name,
@@ -979,6 +1161,7 @@ export function ManualSchemaEditorPage() {
                   selectedId={selectedId}
                   onSelect={setSelectedId}
                   onToggle={toggleExpand}
+                  onContextMenu={handleTreeContextMenu}
                 />
               )}
             </div>
@@ -1342,6 +1525,18 @@ export function ManualSchemaEditorPage() {
         onSelectTemplate={handleTemplateSelection}
         onClose={() => setShowTemplatePickerModal(false)}
       />
+
+      {contextMenuNode && contextMenuPos ? (
+        <SchemaTreeContextMenu
+          x={contextMenuPos.x}
+          y={contextMenuPos.y}
+          actions={buildContextMenuActions(contextMenuNode)}
+          onClose={() => {
+            setContextMenuNode(null);
+            setContextMenuPos(null);
+          }}
+        />
+      ) : null}
     </div>
   );
 }
@@ -1353,6 +1548,7 @@ function ManualSchemaTree({
   expandedIds,
   onSelect,
   onToggle,
+  onContextMenu,
 }: {
   nodes: (NodeDto & { children: unknown[] })[];
   depth: number;
@@ -1360,6 +1556,7 @@ function ManualSchemaTree({
   expandedIds: Set<string>;
   onSelect: (id: string) => void;
   onToggle: (id: string) => void;
+  onContextMenu: (e: React.MouseEvent, nodeId: string) => void;
 }) {
   return (
     <ul className={depth === 0 ? "py-1" : undefined}>
@@ -1380,6 +1577,7 @@ function ManualSchemaTree({
                 if (isFolder) onToggle(node.nodeId);
                 onSelect(node.nodeId);
               }}
+              onContextMenu={(e) => onContextMenu(e, node.nodeId)}
             >
               <span
                 className="w-3 shrink-0 text-center text-xs text-shell-muted"
@@ -1415,6 +1613,7 @@ function ManualSchemaTree({
                 selectedId={selectedId}
                 onSelect={onSelect}
                 onToggle={onToggle}
+                onContextMenu={onContextMenu}
               />
             ) : null}
           </li>

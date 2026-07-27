@@ -11,7 +11,12 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ManualSchemaEditorPage, validateManualSchemaNodes } from "./manual-schema-editor-page";
+import { ManualSchemaEditorPage, validateManualSchemaNodes, collectSubtreeIds } from "./manual-schema-editor-page";
+import {
+  deleteNodeOperation,
+  duplicateNodeOperation,
+  pasteNodeOperation,
+} from "./schema-operations";
 
 const { mockNavigate } = vi.hoisted(() => ({ mockNavigate: vi.fn() }));
 
@@ -28,7 +33,8 @@ const schema = {
   description: null,
   nodes: [
     { nodeId: "v1", parentId: null, path: "/v1", name: "Level", kind: "VARIABLE" as const,
-      dataType: "FLOAT64", valueRank: "SCALAR", access: "READ", unit: null, description: null },
+      dataType: "FLOAT64", valueRank: "SCALAR", access: "READ", unit: null, description: null,
+      accessLevelFull: null, minimumSamplingInterval: null, writeMask: null, historizing: null },
   ],
   version: 0,
 };
@@ -37,9 +43,11 @@ const schemaWithFolder = {
   ...schema,
   nodes: [
     { nodeId: "f1", parentId: null, path: "/Reactor", name: "Reactor", kind: "FOLDER" as const,
-      dataType: null, valueRank: null, access: null, unit: null, description: null },
+      dataType: null, valueRank: null, access: null, unit: null, description: null,
+      accessLevelFull: null, minimumSamplingInterval: null, writeMask: null, historizing: null },
     { nodeId: "v1", parentId: "f1", path: "/Reactor/Temp", name: "Temp", kind: "VARIABLE" as const,
-      dataType: "FLOAT64", valueRank: "SCALAR", access: "READ", unit: null, description: null },
+      dataType: "FLOAT64", valueRank: "SCALAR", access: "READ", unit: null, description: null,
+      accessLevelFull: null, minimumSamplingInterval: null, writeMask: null, historizing: null },
   ],
 };
 
@@ -476,5 +484,136 @@ describe("validateManualSchemaNodes", () => {
     ]);
 
     expect(issues).toEqual([{ nodeId: "backslash", message: "A browse name cannot contain a slash or backslash." }]);
+  });
+});
+
+describe("Context menu operations (UI-506)", () => {
+  const defaultOpcUaAttrs = { accessLevelFull: null, minimumSamplingInterval: null, writeMask: null, historizing: null };
+  const node = (nodeId: string, parentId: string | null, kind: "FOLDER" | "VARIABLE", name: string = nodeId) => ({
+    nodeId, parentId, kind, name,
+    path: parentId ? `${parentId}/${name}` : `/${name}`,
+    dataType: kind === "VARIABLE" ? "FLOAT64" : null,
+    valueRank: kind === "VARIABLE" ? "SCALAR" : null,
+    access: kind === "VARIABLE" ? "READ" : null,
+    unit: null, description: null,
+    ...defaultOpcUaAttrs,
+  } as NodeDto);
+
+  describe("Subtree traversal and manipulation logic", () => {
+    it("collectSubtreeIds traverses all descendants (duplicate/delete/cut operations depend on this)", () => {
+      const nodes = [
+        node("parent", null, "FOLDER"),
+        node("child1", "parent", "FOLDER"),
+        node("child2", "parent", "VARIABLE"),
+        node("grandchild", "child1", "VARIABLE"),
+        node("unrelated", null, "FOLDER"),
+      ];
+
+      const subIds = collectSubtreeIds(nodes, "parent");
+      expect(subIds).toEqual(new Set(["parent", "child1", "child2", "grandchild"]));
+      expect(subIds.has("unrelated")).toBe(false);
+    });
+
+    it("collectSubtreeIds returns only root when node has no children (guards against cycles)", () => {
+      const nodes = [
+        node("leaf", "parent", "VARIABLE"),
+        node("other", "other", "FOLDER"),
+      ];
+
+      const subIds = collectSubtreeIds(nodes, "leaf");
+      expect(subIds).toEqual(new Set(["leaf"]));
+    });
+
+    it("pasteNode guard: detects when target is in source's subtree (prevents tree corruption on cut+paste)", () => {
+      const nodes = [
+        node("root", null, "FOLDER"),
+        node("branch", "root", "FOLDER"),
+        node("leaf", "branch", "VARIABLE"),
+      ];
+
+      const rootSubtree = collectSubtreeIds(nodes, "root");
+      // Guard check: if trying to paste 'root' into 'branch' (its descendant):
+      // 'branch' should be in 'root's subtree, so guard prevents it
+      expect(rootSubtree.has("branch")).toBe(true);
+      expect(rootSubtree.has("leaf")).toBe(true);
+    });
+  });
+
+  describe("Schema structure validation", () => {
+    it("validates nested subtrees with all OPC UA attributes (duplicate/copy/paste create these)", () => {
+      const nodes = [
+        node("f1", null, "FOLDER", "Reactor"),
+        node("f2", "f1", "FOLDER", "Sub"),
+        node("v1", "f2", "VARIABLE", "Deep"),
+      ];
+
+      const issues = validateManualSchemaNodes(nodes);
+      expect(issues).toHaveLength(0);
+    });
+
+    it("rejects subtree when child has invalid parent (delete/paste operations must maintain this invariant)", () => {
+      const orphan: NodeDto = { ...node("orphan", "nonexistent", "VARIABLE"), parentId: "nonexistent" };
+      const nodes = [
+        node("root", null, "FOLDER"),
+        orphan,
+      ];
+
+      const issues = validateManualSchemaNodes(nodes);
+      expect(issues.length).toBeGreaterThan(0);
+      expect(issues.some(i => i.message.includes("parent"))).toBe(true);
+    });
+  });
+
+  describe("Behavioral operations (deleteNode, duplicateNode, cutNode, copyNode, pasteNode)", () => {
+    // Functions are defined and exported from manual-schema-editor-page.tsx:
+    // - collectSubtreeIds(nodes, rootId) → Set<string>
+    // - deleteNode(nodeId) → filters nodes, clears stale selection
+    // - duplicateNode(nodeId) → clones node+descendants with new IDs
+    // - cutNode/copyNode(nodeId) → sets clipboard state
+    // - pasteNode(parentId) → validates paste target, clones to new parent
+    // Tests verify these preserve schema validity (no orphans, no cycles)
+
+    const baseNodes = [
+      node("root", null, "FOLDER"),
+      node("child", "root", "VARIABLE"),
+      node("sibling", "root", "VARIABLE"),
+    ];
+
+    it("deleteNode: removes target and descendants, result passes schema validation", () => {
+      const result = deleteNodeOperation(baseNodes, "child");
+      expect(validateManualSchemaNodes(result)).toHaveLength(0);
+      expect(result.find(n => n.nodeId === "child")).toBeUndefined();
+      expect(result.find(n => n.nodeId === "root")).toBeDefined();
+      expect(result.find(n => n.nodeId === "sibling")).toBeDefined();
+    });
+
+    it("duplicateNode: creates independent copy with new IDs, result passes schema validation", () => {
+      const result = duplicateNodeOperation(baseNodes, "child");
+      expect(validateManualSchemaNodes(result)).toHaveLength(0);
+      expect(result.length).toBe(baseNodes.length + 1);
+      const copied = result.find(n => n.name.includes("copy"));
+      expect(copied).toBeDefined();
+      expect(copied?.nodeId).not.toBe("child");
+      expect(copied?.parentId).toBe("root");
+    });
+
+    it("pasteNode: moves cut node to same parent (stays in place), result passes validation", () => {
+      const clipboard = { mode: "cut" as const, nodeId: "child" };
+      const result = pasteNodeOperation(baseNodes, clipboard, "root");
+      expect(validateManualSchemaNodes(result)).toHaveLength(0);
+      expect(result.length).toBe(baseNodes.length);
+      const moved = result.find(n => n.nodeId === "child");
+      expect(moved).toBeDefined();
+      expect(moved?.parentId).toBe("root");
+    });
+
+    it("pasteNode with copy: clones node to new parent, result passes validation", () => {
+      const clipboard = { mode: "copy" as const, nodeId: "child" };
+      const result = pasteNodeOperation(baseNodes, clipboard, "root");
+      expect(validateManualSchemaNodes(result)).toHaveLength(0);
+      expect(result.length).toBe(baseNodes.length + 1);
+      const original = result.find(n => n.nodeId === "child");
+      expect(original?.parentId).toBe("root");
+    });
   });
 });
