@@ -597,12 +597,14 @@ describe("Context menu operations (UI-506)", () => {
       expect(copied?.parentId).toBe("root");
     });
 
-    it("pasteNode: moves cut node to new parent, result passes validation", () => {
+    it("pasteNode: moves cut node to same parent (stays in place), result passes validation", () => {
       const clipboard = { mode: "cut" as const, nodeId: "child" };
       const result = pasteNodeOperation(baseNodes, clipboard, "root");
       expect(validateManualSchemaNodes(result)).toHaveLength(0);
       expect(result.length).toBe(baseNodes.length);
-      expect(result.find(n => n.nodeId === "child")).toBeDefined();
+      const moved = result.find(n => n.nodeId === "child");
+      expect(moved).toBeDefined();
+      expect(moved?.parentId).toBe("root");
     });
 
     it("pasteNode with copy: clones node to new parent, result passes validation", () => {

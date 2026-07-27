@@ -526,7 +526,7 @@ export function ManualSchemaEditorPage() {
       onClick: () => pasteNode(nodeId),
     });
 
-    actions.push({ label: "", divider: true } as any);
+    actions.push({ label: "", divider: true });
 
     actions.push({
       label: "Delete",

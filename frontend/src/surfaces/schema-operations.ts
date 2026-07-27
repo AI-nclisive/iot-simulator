@@ -62,11 +62,16 @@ export function duplicateNodeOperation(nodes: NodeDto[], nodeId: string): NodeDt
   const idMap = new Map<string, string>();
   const newName = `${node.name} (copy)`;
   const newParentId = node.parentId;
-  const newParentPath = newParentId ? (nodes.find((n) => n.nodeId === newParentId)?.path ?? "/") : "";
-  const newRootPath = newParentPath ? `${newParentPath}/${newName}` : `/${newName}`;
+  const parentPath = newParentId ? (nodes.find((n) => n.nodeId === newParentId)?.path ?? "/") : "";
 
-  const cloned = cloneSubtree(nodes, nodeId, newParentId, newRootPath, idMap);
-  const renamed = cloned[0] ? { ...cloned[0], name: newName, path: newRootPath } : null;
+  const cloned = cloneSubtree(nodes, nodeId, newParentId, parentPath, idMap);
+  const renamed = cloned[0]
+    ? {
+        ...cloned[0],
+        name: newName,
+        path: parentPath ? `${parentPath}/${newName}` : `/${newName}`,
+      }
+    : null;
 
   return [...nodes, ...(renamed ? [renamed, ...cloned.slice(1)] : cloned)];
 }
@@ -97,14 +102,23 @@ export function pasteNodeOperation(
 
   const newParentPath = parentNode ? parentNode.path : "";
 
-  const idMap = new Map<string, string>();
-  const cloned = cloneSubtree(nodes, clipboard.nodeId, parentId, newParentPath, idMap);
-
   if (clipboard.mode === "cut") {
     const cutSubIds = collectSubtreeIds(nodes, clipboard.nodeId);
     const remaining = nodes.filter((n) => !cutSubIds.has(n.nodeId));
-    return [...remaining, ...cloned];
+    const movedNodes = nodes
+      .filter((n) => cutSubIds.has(n.nodeId))
+      .map((n) => {
+        if (n.nodeId === clipboard.nodeId) {
+          return { ...n, parentId, path: newParentPath ? `${newParentPath}/${n.name}` : `/${n.name}` };
+        }
+        const oldParentPath = nodes.find((p) => p.nodeId === n.parentId)?.path ?? "";
+        const newPath = n.path.replace(oldParentPath, newParentPath || "");
+        return { ...n, path: newPath };
+      });
+    return [...remaining, ...movedNodes];
   } else {
+    const idMap = new Map<string, string>();
+    const cloned = cloneSubtree(nodes, clipboard.nodeId, parentId, newParentPath, idMap);
     return [...nodes, ...cloned];
   }
 }
