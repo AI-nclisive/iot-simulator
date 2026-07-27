@@ -93,9 +93,8 @@ export function pasteNodeOperation(
   if (sourceSubtree.has(parentId || "")) return nodes;
 
   const parentNode = parentId ? nodes.find((n) => n.nodeId === parentId) : null;
-  if (parentId && !canHaveChildren(parentNode?.kind)) return nodes;
+  if (parentId && parentNode && !canHaveChildren(parentNode.kind)) return nodes;
 
-  const parentNode = parentId ? nodes.find((n) => n.nodeId === parentId) : null;
   const newParentPath = parentNode ? parentNode.path : "";
 
   const idMap = new Map<string, string>();
