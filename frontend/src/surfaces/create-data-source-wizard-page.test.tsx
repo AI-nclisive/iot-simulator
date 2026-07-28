@@ -260,7 +260,7 @@ describe("scanStepValidationMessage (UI-458)", () => {
     ).toBeNull();
   });
 
-  it("returns unresolved message when unknown node has no type and no exclude", () => {
+  it("returns null when a non-neutral node has no replacement type", () => {
     const resolutions: TypeResolutionEntry[] = [
       { nodeId: unknownNode.nodeId, dataType: "", valueRank: 1, access: "READ", exclude: false },
     ];
@@ -271,7 +271,7 @@ describe("scanStepValidationMessage (UI-458)", () => {
         unknownCount: 1,
         truncated: false,
       }),
-    ).toBe("Resolve all unknown node types to continue");
+    ).toBeNull();
   });
 
   it("returns null when all unknown nodes are excluded", () => {

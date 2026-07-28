@@ -139,14 +139,15 @@ public class ScanController {
     }
 
     /**
-     * Creates a data source (basis=SCAN) from a completed scan. Unknown-typed
-     * discovered nodes are kept with null dataType; optional {@code typeResolutions}
-     * can assign types or exclude them. Backend handles null dataTypes as INT64 default.
+     * Creates a data source (basis=SCAN) from a completed scan. A non-neutral OPC UA
+     * declaration is retained by its original DataType NodeId; optional
+     * {@code typeResolutions} can assign a neutral type or exclude the node.
      */
     @Operation(
             summary = "Create data source from scan",
             description = "Materializes a data source from a completed scan's discovered nodes,"
-                    + " applying type resolutions for unknown-typed nodes. Returns 201 Created with a"
+                    + " preserving non-neutral OPC UA type declarations and applying optional type resolutions."
+                    + " Returns 201 Created with a"
                     + " Location header.")
     @PostMapping("/{jobId}/create")
     @PreAuthorize(SOURCE_EDIT)

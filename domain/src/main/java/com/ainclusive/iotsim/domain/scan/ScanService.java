@@ -328,8 +328,9 @@ public class ScanService implements DisposableBean {
     /**
      * Maps discovered nodes to neutral schema nodes, applying per-node type
      * resolutions to unknown-typed variables. Folders and known-typed variables pass
-     * through. Throws if a resolution targets a node that is not an unknown-typed
-     * variable, or if any unknown-typed variable is left unresolved.
+     * through. A non-neutral declaration without a user resolution is retained by
+     * its original OPC UA DataType NodeId. Throws if a resolution targets a node
+     * that is not an unknown-typed variable.
      */
     private static List<SchemaNode> populateSchema(
             List<DiscoveredNode> discovered, List<TypeResolution> resolutions) {
@@ -347,11 +348,15 @@ public class ScanService implements DisposableBean {
                                 n.dataTypeNodeId()));
                     }
                 } else if (!r.exclude()) {
-                    // User optionally resolved this unknown type
+                    // A supplied resolution may preserve the original declaration,
+                    // or replace it with an explicit neutral type.
                     if (r.dataType() != null && !r.dataType().isBlank()) {
                         nodes.add(variableNode(n, DataType.valueOf(r.dataType()),
                                 r.valueRank() == null ? valueRank(n.valueRank()) : ValueRank.valueOf(r.valueRank()),
                                 r.access() == null ? access(n.access()) : Access.valueOf(r.access()), null));
+                    } else if (n.dataTypeNodeId() != null) {
+                        nodes.add(variableNode(n, null, valueRank(n.valueRank()), access(n.access()),
+                                n.dataTypeNodeId()));
                     }
                 }
             } else if ("VARIABLE".equals(n.kind())) {
