@@ -10,10 +10,10 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
-import org.junit.jupiter.api.Test;
 import org.eclipse.milo.opcua.stack.core.types.builtin.DataValue;
 import org.eclipse.milo.opcua.stack.core.types.builtin.Variant;
 import org.eclipse.milo.opcua.stack.core.types.builtin.unsigned.Unsigned;
+import org.junit.jupiter.api.Test;
 
 /**
  * Drives {@link OpcUaCapture} as an OPC UA client against a real embedded Milo
