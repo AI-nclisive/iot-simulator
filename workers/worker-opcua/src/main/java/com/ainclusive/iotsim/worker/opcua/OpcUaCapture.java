@@ -94,7 +94,8 @@ final class OpcUaCapture {
         OpcUaClientSupport.disconnectQuietly(client);
     }
 
-    private static Value toProtoValue(NodeSpec spec, DataValue dv) {
+    /** Visible to package tests so non-neutral capture encoding remains covered. */
+    static Value toProtoValue(NodeSpec spec, DataValue dv) {
         Object neutral;
         if (spec.dataType() == null) {
             // IS-189: unknown types are stored as-is without type conversion (zero-information-loss fidelity)
