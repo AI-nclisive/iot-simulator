@@ -111,10 +111,13 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
             if ("VARIABLE".equals(node.getKind()) || "FOLDER".equals(node.getKind())
                     || "OBJECT".equals(node.getKind())) {
                 variables.add(new VarDef(node.getNodeId(), node.getParentId().isBlank() ? null : node.getParentId(),
-                        node.getName(), node.getKind(), node.getDataType()));
+                        node.getName(), node.getKind(), node.getDataType(), node.getDataTypeNodeId(), null,
+                        null, null, null, null));
             }
             if ("VARIABLE".equals(node.getKind())) {
-                nodeDataTypes.put(node.getNodeId(), node.getDataType());
+                if (!node.getDataType().isBlank()) {
+                    nodeDataTypes.put(node.getNodeId(), node.getDataType());
+                }
             }
         }
         String bindAddress = request.getOptions().getOrDefault("bindAddress", "127.0.0.1");

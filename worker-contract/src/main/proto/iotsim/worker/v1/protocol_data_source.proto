@@ -107,6 +107,10 @@ message SchemaNodeMsg {
   uint32 write_mask = 13;          // UInt32 WriteMask: which attributes are client-writable (0 if unset)
   bool historizing = 14;          // Server collects historical values?
   string reference_type = 15;      // OPC UA reference type (e.g. "HAS_PROPERTY", "HAS_COMPONENT") from parent's discovery
+  // OPC UA DataType NodeId when the declaration cannot be represented by the
+  // neutral primitive set (for example ns=0;i=28, UInteger). It is preserved
+  // verbatim rather than being coerced to a different primitive type.
+  string data_type_node_id = 16;
 }
 
 message StartRequest {}

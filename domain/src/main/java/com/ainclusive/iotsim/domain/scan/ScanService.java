@@ -339,16 +339,27 @@ public class ScanService implements DisposableBean {
             if ("VARIABLE".equals(n.kind()) && n.isUnknownType()) {
                 TypeResolution r = byNodeId.get(n.nodeId());
                 if (r == null) {
-                    // IS-189: unresolved unknown types are kept with null dataType; backend handles them as INT64 default
-                    nodes.add(variableNode(n, null, valueRank(n.valueRank()), access(n.access())));
+                    // A non-neutral OPC UA declaration (e.g. UInteger or BaseDataType)
+                    // is known precisely by its source DataType NodeId. Preserve that
+                    // declaration instead of inventing a neutral primitive.
+                    if (n.dataTypeNodeId() != null) {
+                        nodes.add(variableNode(n, null, valueRank(n.valueRank()), access(n.access()),
+                                n.dataTypeNodeId()));
+                    }
                 } else if (!r.exclude()) {
-                    nodes.add(variableNode(n, DataType.valueOf(r.dataType()),
-                            r.valueRank() == null ? valueRank(n.valueRank()) : ValueRank.valueOf(r.valueRank()),
-                            r.access() == null ? access(n.access()) : Access.valueOf(r.access())));
+                    // User optionally resolved this unknown type
+                    if (r.dataType() != null && !r.dataType().isBlank()) {
+                        nodes.add(variableNode(n, DataType.valueOf(r.dataType()),
+                                r.valueRank() == null ? valueRank(n.valueRank()) : ValueRank.valueOf(r.valueRank()),
+                                r.access() == null ? access(n.access()) : Access.valueOf(r.access()), null));
+                    }
                 }
             } else if ("VARIABLE".equals(n.kind())) {
-                nodes.add(variableNode(n, DataType.valueOf(n.dataType()),
-                        valueRank(n.valueRank()), access(n.access())));
+                // Known-typed variable with valid dataType from server
+                if (n.dataType() != null && !n.dataType().isBlank()) {
+                    nodes.add(variableNode(n, DataType.valueOf(n.dataType()),
+                            valueRank(n.valueRank()), access(n.access()), null));
+                }
             } else {
                 nodes.add(new SchemaNode(n.nodeId(), n.parentId(), n.path(), n.name(),
                         NodeKind.FOLDER, null, null, null, n.unit(), n.description()));
@@ -383,9 +394,10 @@ public class ScanService implements DisposableBean {
     }
 
     private static SchemaNode variableNode(
-            DiscoveredNode n, DataType dataType, ValueRank valueRank, Access access) {
+            DiscoveredNode n, DataType dataType, ValueRank valueRank, Access access, String dataTypeNodeId) {
         return new SchemaNode(n.nodeId(), n.parentId(), n.path(), n.name(),
-                NodeKind.VARIABLE, dataType, valueRank, access, n.unit(), n.description());
+                NodeKind.VARIABLE, dataType, valueRank, access, n.unit(), n.description(),
+                List.of(), null, List.of(), dataTypeNodeId, List.of(), null, null, null, null);
     }
 
     private static ValueRank valueRank(String raw) {

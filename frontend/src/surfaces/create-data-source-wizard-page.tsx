@@ -30,6 +30,8 @@ export type DiscoveredNodeResponse = {
   access: string | null;
   unit: string | null;
   description: string | null;
+  /** Original OPC UA DataType NodeId when no neutral primitive represents it. */
+  dataTypeNodeId?: string | null;
   unknownType: boolean;
 };
 

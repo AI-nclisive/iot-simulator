@@ -619,7 +619,7 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
         return new DiscoveredNode(
                 n.getNodeId(), emptyToNull(n.getParentId()), n.getPath(), n.getName(), n.getKind(),
                 emptyToNull(n.getDataType()), emptyToNull(n.getValueRank()), emptyToNull(n.getAccess()),
-                emptyToNull(n.getUnit()), emptyToNull(n.getDescription()));
+                emptyToNull(n.getUnit()), emptyToNull(n.getDescription()), emptyToNull(n.getDataTypeNodeId()));
     }
 
     private static ScanStatus toStatus(String wire) {
@@ -669,6 +669,7 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
                     .setName(n.name())
                     .setKind(n.kind().name())
                     .setDataType(n.dataType() == null ? "" : n.dataType().name())
+                    .setDataTypeNodeId(orEmpty(n.dataTypeNodeId()))
                     .setValueRank(n.valueRank() == null ? "" : n.valueRank().name())
                     .setAccess(n.access() == null ? "" : n.access().name())
                     .setUnit(orEmpty(n.unit()))

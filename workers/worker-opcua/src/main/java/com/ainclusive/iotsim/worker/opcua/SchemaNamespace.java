@@ -107,10 +107,12 @@ final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
                     .setAccessLevel(AccessLevel.CurrentRead, AccessLevel.CurrentWrite)
                     .setBrowseName(newQualifiedName(def.name()))
                     .setDisplayName(LocalizedText.english(def.name()))
-                    .setDataType(OpcUaTypes.dataTypeId(def.dataType()))
+                    .setDataType(declaredDataType(def))
                     .setTypeDefinition(Identifiers.BaseDataVariableType)
                     .build();
-            node.setValue(new DataValue(new Variant(OpcUaTypes.defaultValue(def.dataType()))));
+            if (!isStandardOpcUaDataType(def.dataTypeNodeId())) {
+                node.setValue(new DataValue(new Variant(OpcUaTypes.defaultValue(def.dataType()))));
+            }
             getNodeManager().addNode(node);
             var parent = def.parentId() == null ? Identifiers.ObjectsFolder
                     : parentIsFolder ? hierarchy.get(def.parentId()) : nodes.get(def.parentId()).getNodeId();
@@ -118,6 +120,22 @@ final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
             node.addReference(new Reference(node.getNodeId(), referenceType, parent.expanded(), false));
             nodes.put(def.nodeId(), node);
         }
+    }
+
+    private static org.eclipse.milo.opcua.stack.core.types.builtin.NodeId declaredDataType(VarDef def) {
+        if (isStandardOpcUaDataType(def.dataTypeNodeId())) {
+            return org.eclipse.milo.opcua.stack.core.types.builtin.NodeId.parse(def.dataTypeNodeId());
+        }
+        if (def.dataTypeNodeId() != null && !def.dataTypeNodeId().isBlank()) {
+            throw new IllegalArgumentException(
+                    "cannot simulate non-standard OPC UA DataType without its type definition: "
+                            + def.dataTypeNodeId());
+        }
+        return OpcUaTypes.dataTypeId(def.dataType());
+    }
+
+    private static boolean isStandardOpcUaDataType(String nodeId) {
+        return nodeId != null && nodeId.startsWith("ns=0;");
     }
 
     /** IS-189: Resolves a reference type name to its OPC UA NodeId. */

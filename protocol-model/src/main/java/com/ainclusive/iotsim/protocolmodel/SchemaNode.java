@@ -18,13 +18,11 @@ import java.util.Objects;
  * @param typeDefinition  free-form OPC UA HasTypeDefinition target (e.g. a built-in VariableType
  *                        NodeId string parsed from NodeSet XML); orthogonal to {@code dataType}/
  *                        {@code dataTypeNodeId} and unrelated to IS-183
- * @param dataTypeNodeId  for a {@link NodeKind#VARIABLE}, the {@code nodeId} of a custom
- *                        {@link NodeKind#DATA_TYPE} node this variable's value is shaped by, used
- *                        instead of a primitive {@code dataType} (IS-183); {@code null} for other
- *                        kinds. A dedicated field rather than reusing {@code typeDefinition}: that
- *                        field already carries an unrelated, independently-optional OPC UA concept
- *                        (see above) that pre-IS-183 tests exercise alongside a primitive
- *                        {@code dataType} on the same VARIABLE.
+ * @param dataTypeNodeId  for a {@link NodeKind#VARIABLE}, either the {@code nodeId} of a custom
+ *                        {@link NodeKind#DATA_TYPE} node or a preserved standard OPC UA DataType
+ *                        NodeId (for example {@code ns=0;i=28} for {@code UInteger}), used instead
+ *                        of a primitive {@code dataType}; {@code null} for other kinds. It preserves
+ *                        a declaration whose meaning cannot be represented by the neutral enum.
  * @param members   ordered, named+typed members of a {@link NodeKind#DATA_TYPE} node's structure
  *                  (IS-183); empty for every other kind
  * @param accessLevelFull  IEC 62541 AccessLevel 8-bit mask (nullable): bits for CurrentRead(0),

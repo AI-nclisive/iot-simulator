@@ -227,11 +227,12 @@ public class ScanController {
     public record DiscoveredNodeResponse(
             String nodeId, String parentId, String path, String name, String kind,
             String dataType, String valueRank, String access, String unit, String description,
-            boolean unknownType) {
+            String dataTypeNodeId, boolean unknownType) {
 
         static DiscoveredNodeResponse from(DiscoveredNode n) {
             return new DiscoveredNodeResponse(n.nodeId(), n.parentId(), n.path(), n.name(), n.kind(),
-                    n.dataType(), n.valueRank(), n.access(), n.unit(), n.description(), n.isUnknownType());
+                    n.dataType(), n.valueRank(), n.access(), n.unit(), n.description(),
+                    n.dataTypeNodeId(), n.isUnknownType());
         }
     }
 }

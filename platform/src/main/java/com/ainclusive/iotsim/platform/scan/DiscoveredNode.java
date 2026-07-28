@@ -8,11 +8,22 @@ package com.ainclusive.iotsim.platform.scan;
  * persisted schema (backend-specs/01 §2; resolution is IS-044).
  *
  * @param kind {@code FOLDER} or {@code VARIABLE}
- * @param dataType neutral data type for a VARIABLE, or {@code null} if unknown
+ * @param dataType neutral data type for a VARIABLE, or {@code null} if its declaration
+ *                 is represented by {@code dataTypeNodeId}
+ * @param dataTypeNodeId original native DataType NodeId for a VARIABLE whose declaration
+ *                       cannot be reduced to a neutral primitive; never a guessed type
  */
 public record DiscoveredNode(String nodeId, String parentId, String path, String name,
         String kind, String dataType, String valueRank, String access,
-        String unit, String description) {
+        String unit, String description, String dataTypeNodeId) {
+
+    /** Compatibility constructor for callers that have no native type declaration. */
+    public DiscoveredNode(String nodeId, String parentId, String path, String name,
+            String kind, String dataType, String valueRank, String access,
+            String unit, String description) {
+        this(nodeId, parentId, path, name, kind, dataType, valueRank, access,
+                unit, description, null);
+    }
 
     /** True for a VARIABLE whose type could not be mapped to the neutral set. */
     public boolean isUnknownType() {
