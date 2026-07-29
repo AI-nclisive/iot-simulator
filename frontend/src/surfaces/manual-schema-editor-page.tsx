@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ApiError, mapDataType } from "../api";
 import { resolveAccess } from "../shell/access-policy";
-import { useManualSchemasStore } from "../shell/manual-schemas-store";
+import { type NativeTypeDefinitionDto, useManualSchemasStore } from "../shell/manual-schemas-store";
 import { useNotificationStore } from "../shell/notification-store";
 import { useShellStore } from "../shell/shell-store";
 import { SharedStatePanel } from "../ui/shared-state-panel";
@@ -358,6 +358,7 @@ export function ManualSchemaEditorPage() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [nodes, setNodes] = useState<NodeDto[]>([]);
+  const [typeDefinitions, setTypeDefinitions] = useState<NativeTypeDefinitionDto[]>([]);
   const [savedSnapshot, setSavedSnapshot] = useState<{ name: string; description: string; nodes: NodeDto[] }>({
     name: "",
     description: "",
@@ -405,6 +406,7 @@ export function ManualSchemaEditorPage() {
         setName(schema.name);
         setDescription(schema.description ?? "");
         setNodes(schema.nodes);
+        setTypeDefinitions(schema.typeDefinitions ?? []);
         setSavedSnapshot({
           name: schema.name,
           description: schema.description ?? "",
@@ -431,6 +433,21 @@ export function ManualSchemaEditorPage() {
   const variableCount = nodes.filter((n) => n.kind === "VARIABLE").length;
   const containers = nodes.filter((n) => canHaveChildren(n.kind));
   const nativeTypes = nodes.filter((n) => n.kind === "DATA_TYPE");
+  const catalogNativeTypes = useMemo(() => {
+    const types = new Map(typeDefinitions.map((type) => [type.typeId, {
+      id: type.typeId,
+      name: type.displayName || type.browseName,
+      kind: type.kind,
+    }]));
+    for (const type of nativeTypes) {
+      types.set(type.nodeId, {
+        id: type.nodeId,
+        name: type.name,
+        kind: (type.enumValues ?? []).length > 0 ? "ENUM" : "STRUCTURE",
+      });
+    }
+    return [...types.values()];
+  }, [nativeTypes, typeDefinitions]);
   const isEmpty = nodes.length === 0;
   const catalogParentId = selectedNode && canHaveChildren(selectedNode.kind) ? selectedNode.nodeId : null;
   const validationIssues = useMemo(() => validateManualSchemaNodes(nodes), [nodes]);
@@ -1408,9 +1425,9 @@ export function ManualSchemaEditorPage() {
                             {typeLabel(t)}
                           </option>
                         ))}
-                        {nativeTypes.map((type) => (
-                          <option key={type.nodeId} value={`native:${type.nodeId}`}>
-                            {type.name} ({(type.enumValues ?? []).length > 0 ? "enum" : "structured type"})
+                        {catalogNativeTypes.map((type) => (
+                          <option key={type.id} value={`native:${type.id}`}>
+                            {type.name} ({type.kind.toLowerCase().replace("_", " ")})
                           </option>
                         ))}
                       </select>
