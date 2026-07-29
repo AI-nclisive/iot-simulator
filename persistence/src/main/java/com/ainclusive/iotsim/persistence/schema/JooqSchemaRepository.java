@@ -14,6 +14,7 @@ import com.ainclusive.iotsim.persistence.jooq.tables.records.SchemasRecord;
 import com.ainclusive.iotsim.platform.Ids;
 import com.ainclusive.iotsim.protocolmodel.Access;
 import com.ainclusive.iotsim.protocolmodel.DataType;
+import com.ainclusive.iotsim.protocolmodel.DataTypeEnumValue;
 import com.ainclusive.iotsim.protocolmodel.DataTypeMember;
 import com.ainclusive.iotsim.protocolmodel.NodeKind;
 import com.ainclusive.iotsim.protocolmodel.ReferenceType;
@@ -45,6 +46,8 @@ public class JooqSchemaRepository implements SchemaRepository {
             field(name("schema_nodes", "data_type_node_id"), String.class);
     private static final Field<JSONB> DATA_TYPE_MEMBERS =
             field(name("schema_nodes", "data_type_members"), JSONB.class);
+    private static final Field<JSONB> DATA_TYPE_ENUM_VALUES =
+            field(name("schema_nodes", "data_type_enum_values"), JSONB.class);
     // IS-189: Critical OPC UA attributes
     private static final Field<Integer> ACCESS_LEVEL_FULL =
             field(name("schema_nodes", "access_level_full"), Integer.class);
@@ -150,6 +153,7 @@ public class JooqSchemaRepository implements SchemaRepository {
                         .set(TYPE_DEFINITION, n.typeDefinition())
                         .set(DATA_TYPE_NODE_ID, n.dataTypeNodeId())
                         .set(DATA_TYPE_MEMBERS, json(n.members()))
+                        .set(DATA_TYPE_ENUM_VALUES, json(n.enumValues()))
                         // IS-189: Persist critical OPC UA attributes
                         .set(ACCESS_LEVEL_FULL, n.accessLevelFull())
                         .set(MINIMUM_SAMPLING_INTERVAL, n.minimumSamplingInterval())
@@ -231,6 +235,7 @@ public class JooqSchemaRepository implements SchemaRepository {
                 referencesBySource.getOrDefault(r.getNodeId(), List.of()),
                 r.get(DATA_TYPE_NODE_ID),
                 members(r.get(DATA_TYPE_MEMBERS)),
+                enumValues(r.get(DATA_TYPE_ENUM_VALUES)),
                 // IS-189: Critical OPC UA attributes
                 r.get(ACCESS_LEVEL_FULL),
                 r.get(MINIMUM_SAMPLING_INTERVAL),
@@ -238,9 +243,9 @@ public class JooqSchemaRepository implements SchemaRepository {
                 r.get(HISTORIZING));
     }
 
-    private JSONB json(List<DataTypeMember> members) {
+    private <T> JSONB json(List<T> values) {
         try {
-            return JSONB.valueOf(json.writeValueAsString(members == null ? List.of() : members));
+            return JSONB.valueOf(json.writeValueAsString(values == null ? List.of() : values));
         } catch (Exception e) {
             throw new IllegalArgumentException("cannot serialize schema data type members", e);
         }
@@ -254,6 +259,17 @@ public class JooqSchemaRepository implements SchemaRepository {
             return json.readValue(value.data(), new TypeReference<List<DataTypeMember>>() {});
         } catch (Exception e) {
             throw new IllegalStateException("cannot read schema data type members", e);
+        }
+    }
+
+    private List<DataTypeEnumValue> enumValues(JSONB value) {
+        if (value == null || value.data() == null || value.data().isBlank()) {
+            return List.of();
+        }
+        try {
+            return json.readValue(value.data(), new TypeReference<List<DataTypeEnumValue>>() {});
+        } catch (Exception e) {
+            throw new IllegalStateException("cannot read schema data type enum values", e);
         }
     }
 }

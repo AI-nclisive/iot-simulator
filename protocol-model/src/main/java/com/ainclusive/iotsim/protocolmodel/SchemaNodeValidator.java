@@ -33,6 +33,7 @@ public final class SchemaNodeValidator {
             }
             validateDataTypeNodeId(node, byId);
             validateMembers(node, byId);
+            validateEnumValues(node);
         }
         assertAcyclicDataTypes(byId);
         for (SchemaNode node : nodes) {
@@ -98,6 +99,24 @@ public final class SchemaNodeValidator {
         for (SchemaNode node : byId.values()) {
             if (node.kind() == NodeKind.DATA_TYPE) {
                 assertDataTypeAcyclic(node.nodeId(), byId, new HashSet<>(), new HashSet<>());
+            }
+        }
+    }
+
+    private static void validateEnumValues(SchemaNode node) {
+        if (node.kind() != NodeKind.DATA_TYPE || node.enumValues().isEmpty()) {
+            return;
+        }
+        Set<String> names = new HashSet<>();
+        Set<Long> values = new HashSet<>();
+        for (DataTypeEnumValue value : node.enumValues()) {
+            if (!names.add(value.name())) {
+                throw new IllegalArgumentException(
+                        "duplicate enum value name '" + value.name() + "' in DATA_TYPE node: " + node.nodeId());
+            }
+            if (!values.add(value.value())) {
+                throw new IllegalArgumentException(
+                        "duplicate enum numeric value " + value.value() + " in DATA_TYPE node: " + node.nodeId());
             }
         }
     }

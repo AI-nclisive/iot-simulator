@@ -96,7 +96,8 @@ public class SchemaController {
             nodes.add(new SchemaNode(d.nodeId(), d.parentId(), d.path(), d.name(),
                     kind, dataType, valueRank, access, d.unit(), d.description(), d.arrayDimensions(),
                     d.typeDefinition(), SchemaReferenceMapper.toModel(d.references()), d.dataTypeNodeId(),
-                    SchemaReferenceMapper.toMembers(d.members()), null, null, null, null));
+                    SchemaReferenceMapper.toMembers(d.members()), toEnumValues(d.enumValues()),
+                    null, null, null, null));
         }
         return nodes;
     }
@@ -105,6 +106,11 @@ public class SchemaController {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(field + " is required");
         }
+    }
+
+    private static List<com.ainclusive.iotsim.protocolmodel.DataTypeEnumValue> toEnumValues(
+            List<EnumValueDto> values) {
+        return values == null ? List.of() : values.stream().map(EnumValueDto::toModel).toList();
     }
 
     private static <E extends Enum<E>> E parseEnum(Class<E> type, String value, String field) {
@@ -119,12 +125,12 @@ public class SchemaController {
             String nodeId, String parentId, String path, String name, String kind,
             String dataType, String valueRank, String access, String unit, String description,
             List<Integer> arrayDimensions, String typeDefinition, List<ReferenceDto> references,
-            String dataTypeNodeId, List<MemberDto> members) {
+            String dataTypeNodeId, List<MemberDto> members, List<EnumValueDto> enumValues) {
 
         public NodeDto(String nodeId, String parentId, String path, String name, String kind,
                 String dataType, String valueRank, String access, String unit, String description) {
             this(nodeId, parentId, path, name, kind, dataType, valueRank, access, unit, description,
-                    List.of(), null, List.of(), null, List.of());
+                    List.of(), null, List.of(), null, List.of(), List.of());
         }
 
         static NodeDto from(SchemaNode n) {
@@ -135,7 +141,8 @@ public class SchemaController {
                     n.access() == null ? null : n.access().name(),
                     n.unit(), n.description(), n.arrayDimensions(), n.typeDefinition(),
                     n.references().stream().map(ReferenceDto::from).toList(),
-                    n.dataTypeNodeId(), n.members().stream().map(MemberDto::from).toList());
+                    n.dataTypeNodeId(), n.members().stream().map(MemberDto::from).toList(),
+                    n.enumValues().stream().map(EnumValueDto::from).toList());
         }
     }
 
