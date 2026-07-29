@@ -1324,8 +1324,14 @@ export function ManualSchemaEditorPage() {
                 ) : null}
                 {selectedNode.kind === "DATA_TYPE" ? (
                   <div className="flex flex-col gap-2 text-sm text-shell-muted">
-                    <span className="font-medium text-shell-ink">Members</span>
-                    {(selectedNode.members ?? []).length === 0 ? <span>No members.</span> : (
+                    <span className="font-medium text-shell-ink">{(selectedNode.enumValues ?? []).length > 0 ? "Enum values" : "Members"}</span>
+                    {(selectedNode.enumValues ?? []).length > 0 ? (
+                      <ul className="space-y-1 font-mono text-xs text-shell-ink">
+                        {selectedNode.enumValues?.map((value) => (
+                          <li key={`${value.name}-${value.value}`}>{value.name} = {value.value}{value.description ? ` — ${value.description}` : ""}</li>
+                        ))}
+                      </ul>
+                    ) : (selectedNode.members ?? []).length === 0 ? <span>No members.</span> : (
                       <ul className="space-y-1 font-mono text-xs text-shell-ink">
                         {(selectedNode.members ?? []).map((member) => (
                           <li key={member.name}>{member.name}: {member.dataType ?? member.dataTypeNodeId}</li>
