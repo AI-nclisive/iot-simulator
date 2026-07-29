@@ -6,6 +6,7 @@ import com.ainclusive.iotsim.persistence.datasource.JooqDataSourceRepository;
 import com.ainclusive.iotsim.persistence.project.JooqProjectRepository;
 import com.ainclusive.iotsim.protocolmodel.Access;
 import com.ainclusive.iotsim.protocolmodel.DataType;
+import com.ainclusive.iotsim.protocolmodel.DataTypeEnumValue;
 import com.ainclusive.iotsim.protocolmodel.DataTypeMember;
 import com.ainclusive.iotsim.protocolmodel.NodeKind;
 import com.ainclusive.iotsim.protocolmodel.ReferenceType;
@@ -129,6 +130,29 @@ class SchemaRepositoryIT {
         assertThat(restoredRange.members()).containsExactly(
                 new DataTypeMember("low", DataType.FLOAT64, null),
                 new DataTypeMember("high", DataType.FLOAT64, null));
+    }
+
+    @Test
+    void preservesEnumDataTypeLiterals() {
+        String sourceId = dataSources
+                .insert(projectId, "Enum source", "OPC_UA", "MANUAL", 4840, null, null, null, "it")
+                .id();
+        List<DataTypeEnumValue> values = List.of(
+                new DataTypeEnumValue("Stopped", 0, "The equipment is stopped"),
+                new DataTypeEnumValue("Running", 1, null));
+        SchemaNode state = new SchemaNode("ns=2;i=1001", null, "MachineState", "MachineState", NodeKind.DATA_TYPE,
+                null, null, null, null, null, List.of(), null, List.of(), null, List.of(), values,
+                null, null, null, null);
+        SchemaNode currentState = new SchemaNode("state", null, "State", "State", NodeKind.VARIABLE,
+                null, ValueRank.SCALAR, Access.READ, null, null,
+                List.of(), null, List.of(), "ns=2;i=1001", List.of(), null, null, null, null);
+
+        schemas.saveNewVersion(sourceId, List.of(state, currentState));
+
+        SchemaNode restored = schemas.findCurrent(sourceId).orElseThrow().nodes().stream()
+                .filter(node -> node.nodeId().equals("ns=2;i=1001")).findFirst().orElseThrow();
+        assertThat(restored.enumValues()).containsExactlyElementsOf(values);
+        assertThat(restored.members()).isEmpty();
     }
 
     private static void assertExtendedNodeValues(SchemaWithNodes schema, int expectedVersion) {
