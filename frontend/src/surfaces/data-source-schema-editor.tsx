@@ -136,7 +136,7 @@ function TreeNodeRow({
   const isExpanded = expandedIds.has(node.nodeId);
   const isSelected = selectedId === node.nodeId;
   const indent = depth * 16;
-  const isFolder = canHaveChildren(node.kind);
+  const isContainer = node.kind === "FOLDER" || node.kind === "OBJECT";
   const hasChildren = node.children.length > 0;
 
   // A Variable can itself have children (e.g. a structured value's component
@@ -148,16 +148,16 @@ function TreeNodeRow({
       <li>
         <button
           className={`flex w-full items-center gap-1.5 px-3 py-2 text-left text-sm transition ${
-            !isFolder && isSelected ? "bg-shell-accent/5" : "hover:bg-shell-base/50"
+            !isContainer && isSelected ? "bg-shell-accent/5" : "hover:bg-shell-base/50"
           }`}
           style={{ paddingLeft: `${12 + indent}px` }}
           type="button"
-          onClick={() => (isFolder ? onToggle(node.nodeId) : onSelect(node))}
+          onClick={() => (isContainer ? onToggle(node.nodeId) : onSelect(node))}
         >
           <span
             className="shrink-0 text-xs text-shell-muted w-3 text-center"
             onClick={
-              hasChildren && !isFolder
+              hasChildren && !isContainer
                 ? (e) => {
                     e.stopPropagation();
                     onToggle(node.nodeId);
@@ -169,19 +169,19 @@ function TreeNodeRow({
           </span>
           <span
             className={
-              isFolder
+              isContainer
                 ? "text-shell-muted font-medium truncate"
                 : "min-w-0 flex-1 truncate font-mono text-shell-ink"
             }
           >
             {node.name}
           </span>
-          {isFolder && hasChildren && (
+          {isContainer && hasChildren && (
             <span className="ml-auto shrink-0 text-xs text-shell-muted">
               {node.children.filter((c) => c.kind === "VARIABLE").length || ""}
             </span>
           )}
-          {!isFolder && node.dataType && (
+          {!isContainer && node.dataType && (
             <span className="shrink-0 text-xs text-shell-muted">
               {node.dataType.charAt(0).toUpperCase() + node.dataType.slice(1).toLowerCase()}
             </span>
@@ -236,6 +236,7 @@ export function DataSourceSchemaEditor({
   const [addName, setAddName] = useState("");
   const [addType, setAddType] = useState("FLOAT64");
   const [addUnit, setAddUnit] = useState("");
+  const isReadOnly = source.basis === "SCAN";
 
   const rawNodesRef = useRef<NodeDto[]>([]);
 
@@ -468,7 +469,15 @@ export function DataSourceSchemaEditor({
     <div className="space-y-4">
       {lockState.kind !== "unlocked" ? <EditLockBanner lock={lockState} /> : null}
 
-      {source.status === "Active" ? (
+      {isReadOnly ? (
+        <section className="rounded-md border border-shell-line bg-shell-base/30 px-4 py-3">
+          <p className="text-sm font-medium text-shell-ink">Scanned source schema</p>
+          <p className="mt-1 text-sm leading-6 text-shell-muted">
+            This is the structure discovered on the real device. It is read-only to preserve the
+            scanned schema exactly; use Rescan tags in Settings to refresh it.
+          </p>
+        </section>
+      ) : source.status === "Active" ? (
         <section className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3">
           <p className="text-sm font-medium text-amber-700">
             This source is currently active.
@@ -480,7 +489,7 @@ export function DataSourceSchemaEditor({
         </section>
       ) : null}
 
-      <div className="flex flex-wrap items-center gap-2">
+      {!isReadOnly ? <div className="flex flex-wrap items-center gap-2">
         {hasUnsavedChanges ? (
           <StatusBadge label="Unsaved changes" tone="warning" />
         ) : null}
@@ -510,7 +519,7 @@ export function DataSourceSchemaEditor({
           </button>
         ) : null}
         {saving ? <StatusBadge label="Saving…" tone="accent" /> : null}
-      </div>
+      </div> : null}
 
       {addOpen ? (
         <div className="rounded-md border border-shell-line bg-white px-4 py-4 space-y-3">
@@ -660,7 +669,7 @@ export function DataSourceSchemaEditor({
                     {selectedParam.path}
                   </p>
                 </div>
-                {!isLockedByOther && source.status !== "Active" ? (
+                {!isReadOnly && !isLockedByOther && source.status !== "Active" ? (
                   <button
                     className="shrink-0 text-xs text-shell-danger hover:underline"
                     type="button"
@@ -675,7 +684,7 @@ export function DataSourceSchemaEditor({
                   Description
                   <input
                     className="shell-field"
-                    disabled={isLockedByOther}
+                    disabled={isReadOnly || isLockedByOther}
                     type="text"
                     value={editBuffer.description}
                     onChange={(e) => {
@@ -689,7 +698,7 @@ export function DataSourceSchemaEditor({
                     Unit
                     <input
                       className="shell-field"
-                      disabled={isLockedByOther}
+                      disabled={isReadOnly || isLockedByOther}
                       type="text"
                       value={editBuffer.unit}
                       onChange={(e) => {
@@ -734,8 +743,9 @@ export function DataSourceSchemaEditor({
       </div>
 
       <p className="text-xs text-shell-muted">
-        Schema changes take effect after the source is restarted. Type changes may
-        break dependent parameters.
+        {isReadOnly
+          ? "The scanned schema is shown as discovered from the real device."
+          : "Schema changes take effect after the source is restarted. Type changes may break dependent parameters."}
       </p>
 
       <ConfirmationDialog

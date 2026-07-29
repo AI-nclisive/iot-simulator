@@ -183,6 +183,42 @@ describe("DataSourceSchemaEditor — dependency warnings in UI", () => {
   });
 });
 
+describe("DataSourceSchemaEditor — scanned source inspection", () => {
+  it("selects a variable with children and keeps a scanned schema read-only", async () => {
+    mockApiFetch.mockResolvedValue({
+      ...mockSchemaResponse,
+      nodes: [
+        {
+          ...mockSchemaResponse.nodes[0],
+          nodeId: "parent-variable",
+          name: "Measured value",
+          path: "device/measured-value",
+        },
+        {
+          ...mockSchemaResponse.nodes[0],
+          nodeId: "variable-property",
+          parentId: "parent-variable",
+          name: "Engineering unit",
+          path: "device/measured-value/engineering-unit",
+        },
+      ],
+    });
+    const scannedSource = { ...mockSource, basis: "SCAN" as const };
+
+    render(<DataSourceSchemaEditor source={scannedSource} projectId={PROJECT_ID} />);
+
+    await userEvent.click(await screen.findByText("Measured value"));
+
+    expect(screen.getByText("Parameter details")).toBeTruthy();
+    expect(screen.getByText("device/measured-value")).toBeTruthy();
+    expect(screen.getByText("Scanned source schema")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Save schema" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "+ Add parameter" })).toBeNull();
+    expect((screen.getByLabelText("Description") as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getByLabelText("Unit") as HTMLInputElement).disabled).toBe(true);
+  });
+});
+
 describe("DataSourceSchemaEditor — onUnsavedChanges callback", () => {
   it("calls onUnsavedChanges(true) when a field is edited", async () => {
     const onUnsavedChanges = vi.fn();

@@ -804,6 +804,11 @@ Primary actions:
 - discard;
 - inspect validation and dependencies.
 
+For a data source created by scanning a real device, this surface is inspection-only:
+the scanned structure and parameter details remain visible, while editing and
+save/discard actions are unavailable. Refresh that structure through the source's
+rescan flow instead, so the saved schema remains an exact device discovery.
+
 Key states:
 
 - loading;
