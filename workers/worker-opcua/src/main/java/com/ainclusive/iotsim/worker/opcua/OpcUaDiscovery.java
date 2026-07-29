@@ -376,6 +376,9 @@ final class OpcUaDiscovery {
         try {
             NodeId nodeId = NodeId.parse(typeId);
             StructureDeclaration structure = readStructureDeclaration(client, nodeId);
+            if (structure.members().isEmpty()) {
+                structure = standardStructureDeclaration(nodeId);
+            }
             List<DataTypeEnumValueMsg> enumValues = readEnumValues(client, nodeId);
             String nativeTypeKind = resolveNativeTypeKind(structure, enumValues);
             List<DataTypeMemberMsg> members = "OPTION_SET".equals(nativeTypeKind) ? List.of() : structure.members();
