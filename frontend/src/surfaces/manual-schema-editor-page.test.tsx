@@ -224,6 +224,31 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
     expect(screen.getByRole("option", { name: "Selection (union)" })).not.toBeNull();
   });
 
+  it("offers catalog types for a manually authored structure member", async () => {
+    mockLoadManualSchemaById.mockResolvedValueOnce({
+      ...schema,
+      typeDefinitions: [{
+        typeId: "ns=2;i=7001", namespaceUri: null, nativeNodeId: "ns=2;i=7001", browseName: "ServerStatus",
+        displayName: null, description: null, kind: "ENUM", baseTypeId: null,
+        defaultBinaryEncodingId: null, defaultXmlEncodingId: null, fields: [],
+        enumValues: [{ name: "Ready", value: 0, description: null }],
+        capability: { materializable: true, captureDecodable: true, replayEncodable: true, unavailableReason: null },
+      }],
+      nodes: [
+        ...schema.nodes,
+        { nodeId: "type-1", parentId: null, path: "Types/Envelope", name: "Envelope", kind: "DATA_TYPE" as const,
+          dataType: null, dataTypeNodeId: null, valueRank: null, access: null, unit: null, description: null,
+          members: [{ name: "status", dataType: "INT32", dataTypeNodeId: null }], enumValues: [] },
+      ],
+    });
+    renderPage();
+    await waitFor(() => screen.getByText("Envelope"));
+
+    fireEvent.click(screen.getByText("Envelope"));
+
+    expect(screen.getByRole("option", { name: "ServerStatus (enum)" })).not.toBeNull();
+  });
+
   it("edits structure members and enum literals before saving", async () => {
     mockLoadManualSchemaById.mockResolvedValueOnce({
       ...schema,

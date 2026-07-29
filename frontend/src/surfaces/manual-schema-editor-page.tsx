@@ -1503,7 +1503,11 @@ export function ManualSchemaEditorPage() {
                               <input aria-label={`Structure member ${index + 1} name`} className="shell-field" disabled={!access.isAdmin} value={member.name} onChange={(e) => updateDataTypeMembers((selectedNode.members ?? []).map((candidate, candidateIndex) => candidateIndex === index ? { ...candidate, name: e.target.value } : candidate))} />
                               <select aria-label={`Structure member ${index + 1} type`} className="shell-field" disabled={!access.isAdmin} value={member.dataTypeNodeId ? `native:${member.dataTypeNodeId}` : member.dataType ?? "FLOAT64"} onChange={(e) => updateDataTypeMembers((selectedNode.members ?? []).map((candidate, candidateIndex) => candidateIndex === index ? (e.target.value.startsWith("native:") ? { ...candidate, dataType: null, dataTypeNodeId: e.target.value.slice("native:".length) } : { ...candidate, dataType: e.target.value, dataTypeNodeId: null }) : candidate))}>
                                 {DATA_TYPES.map((type) => <option key={type} value={type}>{formatDataType(type)}</option>)}
-                                {nativeTypes.filter((type) => type.nodeId !== selectedNode.nodeId).map((type) => <option key={type.nodeId} value={`native:${type.nodeId}`}>{type.name}</option>)}
+                                {catalogNativeTypes.filter((type) => type.id !== selectedNode.nodeId).map((type) => (
+                                  <option key={type.id} value={`native:${type.id}`}>
+                                    {type.name} ({type.kind.toLowerCase().replace("_", " ")})
+                                  </option>
+                                ))}
                               </select>
                               <select aria-label={`Structure member ${index + 1} value shape`} className="shell-field" disabled={!access.isAdmin} value={member.valueRank ?? "SCALAR"} onChange={(e) => updateDataTypeMembers((selectedNode.members ?? []).map((candidate, candidateIndex) => candidateIndex === index ? { ...candidate, valueRank: e.target.value, arrayDimensions: e.target.value === "ARRAY" ? candidate.arrayDimensions ?? [] : [] } : candidate))}>
                                 <option value="SCALAR">Scalar</option>
