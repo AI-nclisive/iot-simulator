@@ -13,6 +13,20 @@ import org.junit.jupiter.api.Test;
 class OpcUaCaptureSchemaTest {
 
     @Test
+    void capturesKnownTypeWhenItsOriginalOpcUaDeclarationIsAlsoPresent() {
+        CaptureRequest request = CaptureRequest.newBuilder().setSchema(Schema.newBuilder()
+                .addNodes(SchemaNodeMsg.newBuilder()
+                        .setNodeId("ns=2;s=qname")
+                        .setKind("VARIABLE")
+                        .setDataType("QUALIFIED_NAME")
+                        .setDeclaredDataTypeNodeId("ns=0;i=20")))
+                .build();
+
+        assertThat(OpcUaProtocolService.captureNodes(request))
+                .containsExactly(new OpcUaCapture.NodeSpec("ns=2;s=qname", "QUALIFIED_NAME"));
+    }
+
+    @Test
     void resolvesSchemaOwnedEnumToIntegerCaptureEncoding() {
         CaptureRequest request = CaptureRequest.newBuilder().setSchema(Schema.newBuilder()
                 .addNodes(SchemaNodeMsg.newBuilder()
