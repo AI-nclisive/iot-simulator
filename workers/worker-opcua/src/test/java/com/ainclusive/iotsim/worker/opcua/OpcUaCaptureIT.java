@@ -10,6 +10,9 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import org.eclipse.milo.opcua.stack.core.types.builtin.DataValue;
+import org.eclipse.milo.opcua.stack.core.types.builtin.Variant;
+import org.eclipse.milo.opcua.stack.core.types.builtin.unsigned.Unsigned;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -19,6 +22,17 @@ import org.junit.jupiter.api.Test;
  * as neutral values, until the capture is stopped.
  */
 class OpcUaCaptureIT {
+
+    @Test
+    void encodesNonNeutralUnsignedValueWithoutCoercingItsSchemaType() {
+        Value captured = OpcUaCapture.toProtoValue(
+                new OpcUaCapture.NodeSpec("ns=2;s=counter", null),
+                new DataValue(new Variant(Unsigned.uint(42))));
+
+        assertThat(captured.getNodeId()).isEqualTo("ns=2;s=counter");
+        assertThat(ValueCodec.decode(ValueCodec.Kind.NUM, captured.getValueEnc().toByteArray()))
+                .isEqualTo(42.0d);
+    }
 
     @Test
     void capturesValueChangesFromRunningServer() throws Exception {

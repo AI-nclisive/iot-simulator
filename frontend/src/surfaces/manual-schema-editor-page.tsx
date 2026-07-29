@@ -1526,6 +1526,7 @@ export function ManualSchemaEditorPage() {
         onClose={() => setShowTemplatePickerModal(false)}
       />
 
+
       {contextMenuNode && contextMenuPos ? (
         <SchemaTreeContextMenu
           x={contextMenuPos.x}

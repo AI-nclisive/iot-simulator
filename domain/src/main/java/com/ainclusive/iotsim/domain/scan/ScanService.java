@@ -328,35 +328,47 @@ public class ScanService implements DisposableBean {
     /**
      * Maps discovered nodes to neutral schema nodes, applying per-node type
      * resolutions to unknown-typed variables. Folders and known-typed variables pass
-     * through. Throws if a resolution targets a node that is not an unknown-typed
-     * variable, or if any unknown-typed variable is left unresolved.
+     * through. A non-neutral declaration without a user resolution is retained by
+     * its original OPC UA DataType NodeId. Throws if a resolution targets a node
+     * that is not an unknown-typed variable.
      */
     private static List<SchemaNode> populateSchema(
             List<DiscoveredNode> discovered, List<TypeResolution> resolutions) {
         Map<String, TypeResolution> byNodeId = indexResolutions(discovered, resolutions);
         List<SchemaNode> nodes = new ArrayList<>();
-        List<String> unresolved = new ArrayList<>();
         for (DiscoveredNode n : discovered) {
             if ("VARIABLE".equals(n.kind()) && n.isUnknownType()) {
                 TypeResolution r = byNodeId.get(n.nodeId());
                 if (r == null) {
-                    unresolved.add(n.path() == null ? n.nodeId() : n.path());
+                    // A non-neutral OPC UA declaration (e.g. UInteger or BaseDataType)
+                    // is known precisely by its source DataType NodeId. Preserve that
+                    // declaration instead of inventing a neutral primitive.
+                    if (n.dataTypeNodeId() != null) {
+                        nodes.add(variableNode(n, null, valueRank(n.valueRank()), access(n.access()),
+                                n.dataTypeNodeId()));
+                    }
                 } else if (!r.exclude()) {
-                    nodes.add(variableNode(n, DataType.valueOf(r.dataType()),
-                            r.valueRank() == null ? valueRank(n.valueRank()) : ValueRank.valueOf(r.valueRank()),
-                            r.access() == null ? access(n.access()) : Access.valueOf(r.access())));
+                    // A supplied resolution may preserve the original declaration,
+                    // or replace it with an explicit neutral type.
+                    if (r.dataType() != null && !r.dataType().isBlank()) {
+                        nodes.add(variableNode(n, DataType.valueOf(r.dataType()),
+                                r.valueRank() == null ? valueRank(n.valueRank()) : ValueRank.valueOf(r.valueRank()),
+                                r.access() == null ? access(n.access()) : Access.valueOf(r.access()), null));
+                    } else if (n.dataTypeNodeId() != null) {
+                        nodes.add(variableNode(n, null, valueRank(n.valueRank()), access(n.access()),
+                                n.dataTypeNodeId()));
+                    }
                 }
             } else if ("VARIABLE".equals(n.kind())) {
-                nodes.add(variableNode(n, DataType.valueOf(n.dataType()),
-                        valueRank(n.valueRank()), access(n.access())));
+                // Known-typed variable with valid dataType from server
+                if (n.dataType() != null && !n.dataType().isBlank()) {
+                    nodes.add(variableNode(n, DataType.valueOf(n.dataType()),
+                            valueRank(n.valueRank()), access(n.access()), null));
+                }
             } else {
                 nodes.add(new SchemaNode(n.nodeId(), n.parentId(), n.path(), n.name(),
                         NodeKind.FOLDER, null, null, null, n.unit(), n.description()));
             }
-        }
-        if (!unresolved.isEmpty()) {
-            throw new IllegalArgumentException(
-                    "scan has unknown-typed nodes requiring resolution before create: " + unresolved);
         }
         return nodes;
     }
@@ -387,9 +399,10 @@ public class ScanService implements DisposableBean {
     }
 
     private static SchemaNode variableNode(
-            DiscoveredNode n, DataType dataType, ValueRank valueRank, Access access) {
+            DiscoveredNode n, DataType dataType, ValueRank valueRank, Access access, String dataTypeNodeId) {
         return new SchemaNode(n.nodeId(), n.parentId(), n.path(), n.name(),
-                NodeKind.VARIABLE, dataType, valueRank, access, n.unit(), n.description());
+                NodeKind.VARIABLE, dataType, valueRank, access, n.unit(), n.description(),
+                List.of(), null, List.of(), dataTypeNodeId, List.of(), null, null, null, null);
     }
 
     private static ValueRank valueRank(String raw) {

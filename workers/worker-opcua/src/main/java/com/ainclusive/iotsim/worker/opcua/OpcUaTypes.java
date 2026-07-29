@@ -60,6 +60,7 @@ final class OpcUaTypes {
      * IS-044), these are fixed, spec-defined, and safe to alias permanently.
      */
     private static final Map<NodeId, String> WELL_KNOWN_SUBTYPES = Map.ofEntries(
+            // Standard subtypes (OPC UA Part 3 §8)
             Map.entry(Identifiers.Date, "DATETIME"),
             Map.entry(Identifiers.UtcTime, "DATETIME"),
             Map.entry(Identifiers.Duration, "FLOAT64"),
@@ -76,18 +77,19 @@ final class OpcUaTypes {
 
     /**
      * Reverse mapping used by scan/discovery: an OPC UA DataType node id back to a
-     * protocol-neutral data type, or {@code null} when the type isn't one of the
-     * neutral types this worker maps to (surfaced as "unknown" in scan results, per
-     * backend-specs/01 §2). Built-ins and the fixed set of well-known standard
-     * subtypes ({@link #WELL_KNOWN_SUBTYPES}) map; other subtypes/structs are left
-     * unknown for the user to resolve (IS-044).
+     * protocol-neutral data type, or {@code null} when the declared type cannot
+     * be represented by a neutral primitive. The caller preserves its NodeId;
+     * it must never silently coerce it to {@code BYTES} or another default.
      */
     static String neutralTypeOf(NodeId dataTypeId) {
         if (dataTypeId == null) {
             return null;
         }
         String builtin = BUILTIN_TYPES.get(dataTypeId);
-        return builtin != null ? builtin : WELL_KNOWN_SUBTYPES.get(dataTypeId);
+        if (builtin != null) {
+            return builtin;
+        }
+        return WELL_KNOWN_SUBTYPES.get(dataTypeId);
     }
 
     static NodeId dataTypeId(String dataType) {

@@ -65,7 +65,7 @@ final class OpcUaDiscovery {
      *  minimumSamplingInterval is a Double per OPC UA §5.6.2 (server minimum sampling interval in milliseconds).
      */
     record VariableAttributes(Integer accessLevel, Double minimumSamplingInterval,
-            Boolean historizing, Integer writeMask, Integer userAccessLevel) {}
+            Boolean historizing, Integer writeMask, Integer userAccessLevel, Integer valueRank) {}
 
     /** Reachability/auth probe: connect then disconnect, classifying any failure. */
     static ConnectionTest testConnection(String endpointUrl, Credentials credentials) {
@@ -118,15 +118,16 @@ final class OpcUaDiscovery {
                     new ReadValueId(nodeId, AttributeId.MinimumSamplingInterval.uid(), null, QualifiedName.NULL_VALUE),
                     new ReadValueId(nodeId, AttributeId.Historizing.uid(), null, QualifiedName.NULL_VALUE),
                     new ReadValueId(nodeId, AttributeId.WriteMask.uid(), null, QualifiedName.NULL_VALUE),
-                    new ReadValueId(nodeId, AttributeId.UserAccessLevel.uid(), null, QualifiedName.NULL_VALUE)
+                    new ReadValueId(nodeId, AttributeId.UserAccessLevel.uid(), null, QualifiedName.NULL_VALUE),
+                    new ReadValueId(nodeId, AttributeId.ValueRank.uid(), null, QualifiedName.NULL_VALUE)
             );
 
             ReadResponse response = client.read(0.0, TimestampsToReturn.Neither, toRead)
                     .get(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS);
             DataValue[] results = response.getResults();
 
-            if (results == null || results.length < 5) {
-                return new VariableAttributes(null, null, null, null, null);
+            if (results == null || results.length < 6) {
+                return new VariableAttributes(null, null, null, null, null, null);
             }
 
             Integer accessLevel = extractIntValue(results[0]);
@@ -134,10 +135,12 @@ final class OpcUaDiscovery {
             Boolean historizing = extractBoolValue(results[2]);
             Integer writeMask = extractIntValue(results[3]);
             Integer userAccessLevel = extractIntValue(results[4]);
+            Integer valueRank = extractIntValue(results[5]);
 
-            return new VariableAttributes(accessLevel, minimumSamplingInterval, historizing, writeMask, userAccessLevel);
+            return new VariableAttributes(accessLevel, minimumSamplingInterval, historizing, writeMask,
+                    userAccessLevel, valueRank);
         } catch (Exception e) {
-            return new VariableAttributes(null, null, null, null, null);
+            return new VariableAttributes(null, null, null, null, null, null);
         }
     }
 
@@ -243,8 +246,10 @@ final class OpcUaDiscovery {
                     attrs = readVariableAttributes(client, childId);
                 }
 
+                DataTypeDeclaration declaration = isVariable
+                        ? dataTypeOf(client, childId, unknown) : null;
                 nodes.add(toNode(neutralId, frame.parentId(), path, name, isVariable,
-                        isVariable ? neutralTypeOf(client, childId, unknown) : null, referenceType, attrs));
+                        declaration, referenceType, attrs));
 
                 // A Variable can itself have children (e.g. a structured/complex
                 // value's component Variables via HasComponent), not just
@@ -295,8 +300,11 @@ final class OpcUaDiscovery {
         }
     }
 
-    /** Reads a variable's DataType attribute and reverse-maps it; counts unknowns. */
-    private static String neutralTypeOf(OpcUaClient client, NodeId nodeId, int[] unknown)
+    /** The neutral mapping plus the original DataType attribute, when it needs preserving. */
+    private record DataTypeDeclaration(String neutralType, String dataTypeNodeId) {}
+
+    /** Reads a variable's DataType attribute and reverse-maps it; counts non-neutral declarations. */
+    private static DataTypeDeclaration dataTypeOf(OpcUaClient client, NodeId nodeId, int[] unknown)
             throws Exception {
         ReadValueId rv = new ReadValueId(
                 nodeId, AttributeId.DataType.uid(), null, QualifiedName.NULL_VALUE);
@@ -309,11 +317,12 @@ final class OpcUaDiscovery {
         if (neutral == null) {
             unknown[0]++;
         }
-        return neutral;
+        return new DataTypeDeclaration(neutral,
+                neutral == null && dataTypeId != null ? dataTypeId.toParseableString() : null);
     }
 
     private static SchemaNodeMsg toNode(String nodeId, String parentId, String path, String name,
-            boolean variable, String dataType, String referenceType, VariableAttributes attrs) {
+            boolean variable, DataTypeDeclaration declaration, String referenceType, VariableAttributes attrs) {
         SchemaNodeMsg.Builder b = SchemaNodeMsg.newBuilder()
                 .setNodeId(nodeId)
                 .setParentId(parentId == null ? "" : parentId)
@@ -321,8 +330,12 @@ final class OpcUaDiscovery {
                 .setName(name)
                 .setKind(variable ? "VARIABLE" : "FOLDER");
         if (variable) {
-            b.setDataType(dataType == null ? "" : dataType) // empty = unknown type
-                    .setValueRank("SCALAR")
+            b.setDataType(declaration == null || declaration.neutralType() == null
+                            ? "" : declaration.neutralType())
+                    .setDataTypeNodeId(declaration == null || declaration.dataTypeNodeId() == null
+                            ? "" : declaration.dataTypeNodeId())
+                    .setValueRank(attrs != null && attrs.valueRank() != null && attrs.valueRank() >= 0
+                            ? "ARRAY" : "SCALAR")
                     .setAccess("READ");
 
             // IS-189: Add critical OPC UA attributes if available

@@ -166,13 +166,22 @@ class ScanServiceTest {
     }
 
     @Test
-    void createFromScanRejectsUnresolvedUnknownNode() {
-        scanner.scanResult = okResult();
+    void createFromScanPreservesNonNeutralOpcUaDataTypeWithoutResolution() {
+        scanner.scanResult = nonNeutralTypeResult();
         ScanJob job = service.startScan(
                 PROJECT, "OPC_UA", "opc.tcp://h", ConnectionCredentials.anonymous(), 0);
-        assertThatThrownBy(() -> service.createFromScan(PROJECT, job.jobId(), "x", null, List.of(), "a"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("requiring resolution");
+
+        DataSource created = service.createFromScan(PROJECT, job.jobId(), "x", null, List.of(), "a");
+
+        Schema schema = new SchemaService(schemaRepo, dataSourceRepo, new ObjectMapper()).get(PROJECT, created.id());
+        assertThat(schema.nodes())
+                .filteredOn(n -> "variantArray".equals(n.name()))
+                .singleElement()
+                .satisfies(n -> {
+                    assertThat(n.dataType()).isNull();
+                    assertThat(n.dataTypeNodeId()).isEqualTo("ns=0;i=28");
+                    assertThat(n.valueRank()).isEqualTo(ValueRank.ARRAY);
+                });
     }
 
     @Test
@@ -421,19 +430,19 @@ class ScanServiceTest {
     }
 
     @Test
-    void applyRescanRejectsUnresolvedUnknownNode() {
-        scanner.scanResult = okResult();
+    void applyRescanPreservesNonNeutralOpcUaDataTypeWithoutResolution() {
+        scanner.scanResult = nonNeutralTypeResult();
         ScanJob createJob = service.startScan(
                 PROJECT, "OPC_UA", "opc.tcp://h", ConnectionCredentials.anonymous(), 0);
         DataSource source = service.createFromScan(PROJECT, createJob.jobId(), "Scanned Pump", "opc.tcp://h",
-                List.of(new TypeResolution("ns=2;s=x", "INT32", null, null, false)), "alice");
+                List.of(), "alice");
 
-        scanner.scanResult = okResult();
+        scanner.scanResult = nonNeutralTypeResult();
         ScanJob rescanJob = service.startRescan(PROJECT, source.id());
 
-        assertThatThrownBy(() -> service.applyRescan(PROJECT, source.id(), rescanJob.jobId(), List.of()))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("requiring resolution");
+        DataSource updated = service.applyRescan(PROJECT, source.id(), rescanJob.jobId(), List.of());
+        Schema schema = new SchemaService(schemaRepo, dataSourceRepo, new ObjectMapper()).get(PROJECT, updated.id());
+        assertThat(schema.nodes()).anySatisfy(n -> assertThat(n.dataTypeNodeId()).isEqualTo("ns=0;i=28"));
     }
 
     @Test
@@ -464,6 +473,15 @@ class ScanServiceTest {
                 new DiscoveredNode("ns=2;s=x", "ns=2;s=plant", "Plant/unknownVar", "unknownVar", "VARIABLE",
                         null, null, null, null, null)),
                 false, 1, "discovered 3 nodes; 1 of unknown type");
+    }
+
+    private static ScanResult nonNeutralTypeResult() {
+        return new ScanResult(ScanStatus.OK, List.of(
+                new DiscoveredNode("ns=2;s=plant", null, "Plant", "Plant", "FOLDER",
+                        null, null, null, null, null),
+                new DiscoveredNode("ns=2;s=variantArray", "ns=2;s=plant", "Plant/VariantArray",
+                        "variantArray", "VARIABLE", null, "ARRAY", "READ", null, null, "ns=0;i=28")),
+                false, 1, "discovered 2 nodes; 1 non-neutral type");
     }
 
     // ---- fakes ----

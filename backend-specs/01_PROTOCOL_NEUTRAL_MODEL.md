@@ -85,8 +85,17 @@ shape isn't spec-fixed, so aliasing them would be a guess).
 - No nested structs in v1 (kept out to bound worker complexity; revisit with
   approval if a real source needs it). Discovered struct-like OPC UA nodes are
   flattened into folders + variables during scan.
-- Unknown discovered types are surfaced as `unknown` in scan results (the UI has
-  an "unknown data type" state) and require user resolution before create.
+- When a scan encounters an OPC UA declaration that cannot be represented by a
+  neutral primitive (for example `UInteger`, `BaseDataType`, `Variant`, or a
+  vendor type), it preserves the original OPC UA `DataType` NodeId in
+  `dataTypeNodeId` instead of guessing a primitive. The UI may show it as a
+  non-neutral type, but it does not require a lossy user resolution before
+  create. Synthetic generation is unavailable for such a node until an explicit
+  value strategy exists; recordings/replay never change the declared schema type.
+  Standard namespace-zero declarations can be projected by the OPC UA worker.
+  A vendor DataType is preserved in the schema but cannot be simulated until its
+  full DataType definition is also imported; the worker rejects starting it
+  rather than silently exposing a different type.
 
 ## 3. Value model
 

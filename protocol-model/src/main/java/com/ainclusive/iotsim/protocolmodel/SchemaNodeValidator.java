@@ -39,13 +39,16 @@ public final class SchemaNodeValidator {
         }
     }
 
-    /** IS-183: a VARIABLE's dataTypeNodeId, if set, must point to an existing DATA_TYPE node. */
+    /** A VARIABLE can reference a schema DATA_TYPE or a preserved standard OPC UA type NodeId. */
     private static void validateDataTypeNodeId(SchemaNode node, Map<String, SchemaNode> byId) {
         if (node.kind() != NodeKind.VARIABLE || node.dataTypeNodeId() == null) {
             return;
         }
         SchemaNode target = byId.get(node.dataTypeNodeId());
         if (target == null) {
+            if (node.dataTypeNodeId().matches("ns=\\d+;[isgb]=.+")) {
+                return;
+            }
             throw new IllegalArgumentException("dataTypeNodeId target does not exist: " + node.dataTypeNodeId());
         }
         if (target.kind() != NodeKind.DATA_TYPE) {

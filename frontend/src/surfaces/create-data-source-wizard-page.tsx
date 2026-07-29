@@ -30,6 +30,8 @@ export type DiscoveredNodeResponse = {
   access: string | null;
   unit: string | null;
   description: string | null;
+  /** Original OPC UA DataType NodeId when no neutral primitive represents it. */
+  dataTypeNodeId?: string | null;
   unknownType: boolean;
 };
 
@@ -425,18 +427,6 @@ export function scanStepValidationMessage(
   if (scanStatus === "error") return "Scan failed";
   if (scanStatus === "cancelled") return "Scan was stopped";
   if (scanStatus === "idle") return "Scan has not started yet";
-  // complete or partial
-  if (scanResult) {
-    const unknownUnresolved = scanResult.nodes.filter((n) => {
-      if (!n.unknownType) return false;
-      const res = typeResolutions.find((r) => r.nodeId === n.nodeId);
-      if (!res) return true;
-      if (res.exclude) return false;
-      if (!res.dataType) return true;
-      return false;
-    });
-    if (unknownUnresolved.length > 0) return "Resolve all unknown node types to continue";
-  }
   return null;
 }
 
@@ -1620,10 +1610,10 @@ export function CreateDataSourceWizardPage() {
         {unknownNodes.length > 0 ? (
           <div className="space-y-3">
             <p className="text-sm font-medium text-shell-ink">
-              Resolve unknown node types
+              Unknown node types (optional)
             </p>
             <p className="text-sm text-shell-muted">
-              The following nodes have unknown types. Choose a data type or exclude them from the source.
+              The following nodes have unknown types. You can optionally assign a type or exclude them — they will be preserved as-is if left unresolved.
             </p>
             <div className="flex flex-wrap items-center gap-3 rounded-md border border-shell-line bg-shell-line/10 px-4 py-3">
               <span className="text-sm text-shell-muted">Set all to</span>
@@ -1656,6 +1646,10 @@ export function CreateDataSourceWizardPage() {
             />
           </div>
         ) : null}
+
+        <button className="shell-action-secondary" type="button" onClick={retryScan}>
+          Scan again
+        </button>
       </div>
     );
   }

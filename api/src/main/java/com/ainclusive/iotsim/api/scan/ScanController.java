@@ -139,14 +139,15 @@ public class ScanController {
     }
 
     /**
-     * Creates a data source (basis=SCAN) from a completed scan. Unknown-typed
-     * discovered nodes must be addressed via {@code typeResolutions} (assign a type
-     * or exclude); an unresolved unknown node rejects the request (400).
+     * Creates a data source (basis=SCAN) from a completed scan. A non-neutral OPC UA
+     * declaration is retained by its original DataType NodeId; optional
+     * {@code typeResolutions} can assign a neutral type or exclude the node.
      */
     @Operation(
             summary = "Create data source from scan",
             description = "Materializes a data source from a completed scan's discovered nodes,"
-                    + " applying type resolutions for unknown-typed nodes. Returns 201 Created with a"
+                    + " preserving non-neutral OPC UA type declarations and applying optional type resolutions."
+                    + " Returns 201 Created with a"
                     + " Location header.")
     @PostMapping("/{jobId}/create")
     @PreAuthorize(SOURCE_EDIT)
@@ -227,11 +228,12 @@ public class ScanController {
     public record DiscoveredNodeResponse(
             String nodeId, String parentId, String path, String name, String kind,
             String dataType, String valueRank, String access, String unit, String description,
-            boolean unknownType) {
+            String dataTypeNodeId, boolean unknownType) {
 
         static DiscoveredNodeResponse from(DiscoveredNode n) {
             return new DiscoveredNodeResponse(n.nodeId(), n.parentId(), n.path(), n.name(), n.kind(),
-                    n.dataType(), n.valueRank(), n.access(), n.unit(), n.description(), n.isUnknownType());
+                    n.dataType(), n.valueRank(), n.access(), n.unit(), n.description(),
+                    n.dataTypeNodeId(), n.isUnknownType());
         }
     }
 }
