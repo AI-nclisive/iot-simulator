@@ -341,6 +341,9 @@ final class OpcUaDiscovery {
         StructureDeclaration structure = nativeTypeId == null
                 ? StructureDeclaration.EMPTY
                 : readStructureDeclaration(client, dataTypeId);
+        if (nativeTypeId != null && structure.members().isEmpty()) {
+            structure = standardStructureDeclaration(dataTypeId);
+        }
         List<DataTypeEnumValueMsg> enumValues = nativeTypeId == null ? List.of() : readEnumValues(client, dataTypeId);
         String nativeTypeKind = nativeTypeId == null ? null : resolveNativeTypeKind(structure, enumValues);
         List<DataTypeMemberMsg> members = "OPTION_SET".equals(nativeTypeKind) ? List.of() : structure.members();
@@ -450,6 +453,43 @@ final class OpcUaDiscovery {
                 structure.getBaseDataType() != null && structure.getBaseDataType().equals(Identifiers.OptionSet)
                         ? "OPTION_SET"
                         : structure.getStructureType() == StructureType.Union ? "UNION" : "STRUCTURE");
+    }
+
+    /**
+     * Standard Part 3 declarations that many servers omit from DataTypeDefinition.
+     * Their NodeIds, encodings, and fields are fixed by OPC UA, so this retains an
+     * exact standard declaration rather than applying a primitive fallback.
+     */
+    private static StructureDeclaration standardStructureDeclaration(NodeId dataTypeId) {
+        if (dataTypeId == null) {
+            return StructureDeclaration.EMPTY;
+        }
+        return switch (dataTypeId.toParseableString()) {
+            case "ns=0;i=884" -> standardStructure("ns=0;i=886",
+                    member("low", "FLOAT64"), member("high", "FLOAT64"));
+            case "ns=0;i=8912" -> standardStructure("ns=0;i=8917",
+                    member("offset", "INT16"), member("daylightSavingInOffset", "BOOL"));
+            case "ns=0;i=887" -> standardStructure("ns=0;i=889",
+                    member("namespaceUri", "STRING"), member("unitId", "INT32"),
+                    member("displayName", "LOCALIZED_TEXT"), member("description", "LOCALIZED_TEXT"));
+            case "ns=0;i=338" -> standardStructure("ns=0;i=340",
+                    member("productUri", "STRING"), member("manufacturerName", "STRING"),
+                    member("productName", "STRING"), member("softwareVersion", "STRING"),
+                    member("buildNumber", "STRING"), member("buildDate", "DATETIME"));
+            case "ns=0;i=296" -> standardStructure("ns=0;i=298",
+                    member("name", "STRING"), member("dataType", "NODE_ID"), member("valueRank", "INT32"),
+                    member("arrayDimensions", "UINT32"), member("description", "LOCALIZED_TEXT"));
+            default -> StructureDeclaration.EMPTY;
+        };
+    }
+
+    private static StructureDeclaration standardStructure(String encodingId, DataTypeMemberMsg... members) {
+        return new StructureDeclaration(List.of(members), encodingId, "STRUCTURE");
+    }
+
+    private static DataTypeMemberMsg member(String name, String dataType) {
+        return DataTypeMemberMsg.newBuilder().setName(name).setDataType(dataType)
+                .setValueRank("SCALAR").setOptional(false).build();
     }
 
     /**
