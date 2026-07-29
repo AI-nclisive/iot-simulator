@@ -13,6 +13,7 @@ import org.eclipse.milo.opcua.sdk.client.OpcUaClient;
 import org.eclipse.milo.opcua.sdk.client.subscriptions.ManagedSubscription;
 import org.eclipse.milo.opcua.stack.core.types.builtin.DataValue;
 import org.eclipse.milo.opcua.stack.core.types.builtin.DateTime;
+import org.eclipse.milo.opcua.stack.core.types.builtin.ExtensionObject;
 import org.eclipse.milo.opcua.stack.core.types.builtin.NodeId;
 import org.eclipse.milo.opcua.stack.core.types.builtin.StatusCode;
 
@@ -40,7 +41,16 @@ final class OpcUaCapture {
     }
 
     /** A variable to capture: its neutral node id (parseable OPC UA NodeId) and neutral type. */
-    record NodeSpec(String nodeId, String dataType) {}
+    record NodeSpec(String nodeId, String dataType, String defaultEncodingId) {
+        NodeSpec(String nodeId, String dataType) {
+            this(nodeId, dataType, null);
+        }
+
+        boolean isNativeStructure() {
+            return (dataType == null || dataType.isBlank())
+                    && defaultEncodingId != null && !defaultEncodingId.isBlank();
+        }
+    }
 
     /**
      * Connects, subscribes to the given variables, and starts streaming changes to
@@ -96,13 +106,27 @@ final class OpcUaCapture {
 
     /** Visible to package tests so non-neutral capture encoding remains covered. */
     static Value toProtoValue(NodeSpec spec, DataValue dv) {
-        Object neutral;
-        if (spec.dataType() == null) {
-            // IS-189: unknown types are stored as-is without type conversion (zero-information-loss fidelity)
-            neutral = dv.getValue().getValue();
-        } else {
-            neutral = OpcUaTypes.fromOpcUaValue(spec.dataType(), dv.getValue().getValue());
+        if (spec.isNativeStructure()) {
+            Object raw = dv.getValue().getValue();
+            if (!(raw instanceof ExtensionObject extension)
+                    || !(extension.getBody() instanceof org.eclipse.milo.opcua.stack.core.types.builtin.ByteString body)) {
+                throw new IllegalArgumentException(
+                        "capture expected a binary ExtensionObject for native structure node " + spec.nodeId());
+            }
+            ValueCodec.Encoded enc = ValueCodec.encode(body.bytes());
+            return Value.newBuilder()
+                    .setNodeId(spec.nodeId())
+                    .setSourceTimeMicros(sourceMicros(dv))
+                    .setValueEnc(ByteString.copyFrom(enc.bytes()))
+                    .setQuality(quality(dv.getStatusCode()))
+                    .build();
         }
+        if (spec.dataType() == null || spec.dataType().isBlank()) {
+            throw new IllegalArgumentException(
+                    "capture cannot encode native DataType without an executable encoding for node "
+                            + spec.nodeId());
+        }
+        Object neutral = OpcUaTypes.fromOpcUaValue(spec.dataType(), dv.getValue().getValue());
         ValueCodec.Encoded enc = ValueCodec.encode(neutral);
         return Value.newBuilder()
                 .setNodeId(spec.nodeId())

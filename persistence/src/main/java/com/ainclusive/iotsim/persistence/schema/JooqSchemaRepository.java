@@ -48,6 +48,8 @@ public class JooqSchemaRepository implements SchemaRepository {
             field(name("schema_nodes", "data_type_members"), JSONB.class);
     private static final Field<JSONB> DATA_TYPE_ENUM_VALUES =
             field(name("schema_nodes", "data_type_enum_values"), JSONB.class);
+    private static final Field<String> DATA_TYPE_DEFAULT_ENCODING_ID =
+            field(name("schema_nodes", "data_type_default_encoding_id"), String.class);
     // IS-189: Critical OPC UA attributes
     private static final Field<Integer> ACCESS_LEVEL_FULL =
             field(name("schema_nodes", "access_level_full"), Integer.class);
@@ -154,6 +156,7 @@ public class JooqSchemaRepository implements SchemaRepository {
                         .set(DATA_TYPE_NODE_ID, n.dataTypeNodeId())
                         .set(DATA_TYPE_MEMBERS, json(n.members()))
                         .set(DATA_TYPE_ENUM_VALUES, json(n.enumValues()))
+                        .set(DATA_TYPE_DEFAULT_ENCODING_ID, n.defaultEncodingId())
                         // IS-189: Persist critical OPC UA attributes
                         .set(ACCESS_LEVEL_FULL, n.accessLevelFull())
                         .set(MINIMUM_SAMPLING_INTERVAL, n.minimumSamplingInterval())
@@ -236,6 +239,7 @@ public class JooqSchemaRepository implements SchemaRepository {
                 r.get(DATA_TYPE_NODE_ID),
                 members(r.get(DATA_TYPE_MEMBERS)),
                 enumValues(r.get(DATA_TYPE_ENUM_VALUES)),
+                r.get(DATA_TYPE_DEFAULT_ENCODING_ID),
                 // IS-189: Critical OPC UA attributes
                 r.get(ACCESS_LEVEL_FULL),
                 r.get(MINIMUM_SAMPLING_INTERVAL),

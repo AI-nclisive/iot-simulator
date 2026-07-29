@@ -53,6 +53,7 @@ public record SchemaNode(
         String dataTypeNodeId,
         List<DataTypeMember> members,
         List<DataTypeEnumValue> enumValues,
+        String defaultEncodingId,
         Integer accessLevelFull,
         Integer minimumSamplingInterval,
         Integer writeMask,
@@ -108,8 +109,12 @@ public record SchemaNode(
             if (dataType != null) {
                 throw new IllegalArgumentException("DATA_TYPE nodes cannot have a dataType field");
             }
-        } else if (!members.isEmpty() || !enumValues.isEmpty()) {
-            throw new IllegalArgumentException(kind + " nodes cannot have members or enum values");
+            if (defaultEncodingId != null && members.isEmpty()) {
+                throw new IllegalArgumentException(
+                        "DATA_TYPE node '" + nodeId + "' may have a default encoding only for a structure");
+            }
+        } else if (!members.isEmpty() || !enumValues.isEmpty() || defaultEncodingId != null) {
+            throw new IllegalArgumentException(kind + " nodes cannot have members, enum values, or a default encoding");
         }
     }
 
@@ -119,7 +124,7 @@ public record SchemaNode(
             List<Integer> arrayDimensions, String typeDefinition, List<SchemaReference> references) {
         this(nodeId, parentId, path, name, kind, dataType, valueRank, access, unit, description,
                 arrayDimensions, typeDefinition, references, null, List.of(),
-                List.of(), null, null, null, null);  // IS-189 fields = null
+                List.of(), null, null, null, null, null);  // IS-189 fields = null
     }
 
     /** Compatibility constructor for callers that do not declare enum values. */
@@ -130,7 +135,18 @@ public record SchemaNode(
             Integer minimumSamplingInterval, Integer writeMask, Boolean historizing) {
         this(nodeId, parentId, path, name, kind, dataType, valueRank, access, unit, description,
                 arrayDimensions, typeDefinition, references, dataTypeNodeId, members, List.of(),
-                accessLevelFull, minimumSamplingInterval, writeMask, historizing);
+                null, accessLevelFull, minimumSamplingInterval, writeMask, historizing);
+    }
+
+    /** Compatibility constructor for callers that do not declare a structure encoding. */
+    public SchemaNode(String nodeId, String parentId, String path, String name, NodeKind kind,
+            DataType dataType, ValueRank valueRank, Access access, String unit, String description,
+            List<Integer> arrayDimensions, String typeDefinition, List<SchemaReference> references,
+            String dataTypeNodeId, List<DataTypeMember> members, List<DataTypeEnumValue> enumValues,
+            Integer accessLevelFull, Integer minimumSamplingInterval, Integer writeMask, Boolean historizing) {
+        this(nodeId, parentId, path, name, kind, dataType, valueRank, access, unit, description,
+                arrayDimensions, typeDefinition, references, dataTypeNodeId, members, enumValues,
+                null, accessLevelFull, minimumSamplingInterval, writeMask, historizing);
     }
 
     /** Backward-compatible constructor for folders and scalar/array variables authored before IS-176. */
@@ -138,6 +154,6 @@ public record SchemaNode(
             DataType dataType, ValueRank valueRank, Access access, String unit, String description) {
         this(nodeId, parentId, path, name, kind, dataType, valueRank, access, unit, description,
                 List.of(), null, List.of(), null, List.of(),
-                List.of(), null, null, null, null);  // IS-183 + IS-189 fields = null
+                List.of(), null, null, null, null, null);  // IS-183 + IS-189 fields = null
     }
 }

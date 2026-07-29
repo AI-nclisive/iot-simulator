@@ -72,6 +72,9 @@ type StructureTemplate = {
   variables: Array<{ name: string; dataType: string; description: string; unit?: string }>;
 };
 
+type StructureMemberDraft = { id: string; name: string; dataType: string };
+type EnumValueDraft = { id: string; name: string; value: string; description: string };
+
 const STRUCTURE_TEMPLATES = [
   {
     group: "Process equipment", name: "Tank / vessel", description: "A vessel with level, process measurements, limits, and status.",
@@ -203,6 +206,12 @@ const STANDARD_OPC_UA_TYPE_TEMPLATES = [
     { name: "offset", dataType: "INT16", dataTypeNodeId: null },
     { name: "daylightSavingInOffset", dataType: "BOOL", dataTypeNodeId: null },
   ] },
+  { nodeId: "ns=0;i=887", name: "EUInformation", description: "Standard OPC UA engineering-unit metadata.", members: [
+    { name: "namespaceUri", dataType: "STRING", dataTypeNodeId: null },
+    { name: "unitId", dataType: "INT32", dataTypeNodeId: null },
+    { name: "displayName", dataType: "LOCALIZED_TEXT", dataTypeNodeId: null },
+    { name: "description", dataType: "LOCALIZED_TEXT", dataTypeNodeId: null },
+  ] },
   { nodeId: "ns=0;i=340", name: "BuildInfo", description: "Standard OPC UA server build identity.", members: [
     { name: "productUri", dataType: "STRING", dataTypeNodeId: null },
     { name: "manufacturerName", dataType: "STRING", dataTypeNodeId: null },
@@ -210,6 +219,25 @@ const STANDARD_OPC_UA_TYPE_TEMPLATES = [
     { name: "softwareVersion", dataType: "STRING", dataTypeNodeId: null },
     { name: "buildNumber", dataType: "STRING", dataTypeNodeId: null },
     { name: "buildDate", dataType: "DATETIME", dataTypeNodeId: null },
+  ] },
+  { nodeId: "ns=0;i=296", name: "Argument", description: "Standard OPC UA method argument declaration.", members: [
+    { name: "name", dataType: "STRING", dataTypeNodeId: null },
+    { name: "dataType", dataType: "NODE_ID", dataTypeNodeId: null },
+    { name: "valueRank", dataType: "INT32", dataTypeNodeId: null },
+    { name: "arrayDimensions", dataType: "UINT32", dataTypeNodeId: null },
+    { name: "description", dataType: "LOCALIZED_TEXT", dataTypeNodeId: null },
+  ] },
+  { nodeId: "ns=0;i=302", name: "MessageSecurityMode", description: "OPC UA message security mode enum.", enumValues: [
+    { name: "Invalid", value: 0, description: "Invalid or unspecified mode." },
+    { name: "None", value: 1, description: "No message security." },
+    { name: "Sign", value: 2, description: "Messages are signed." },
+    { name: "SignAndEncrypt", value: 3, description: "Messages are signed and encrypted." },
+  ] },
+  { nodeId: "ns=0;i=307", name: "ApplicationType", description: "OPC UA application role enum.", enumValues: [
+    { name: "Server", value: 0, description: "Server application." },
+    { name: "Client", value: 1, description: "Client application." },
+    { name: "ClientAndServer", value: 2, description: "Combined client and server." },
+    { name: "DiscoveryServer", value: 3, description: "Discovery server application." },
   ] },
 ] as const;
 
@@ -252,6 +280,25 @@ export function validateManualSchemaNodes(nodes: NodeDto[]): ValidationIssue[] {
     const ids = siblingNames.get(key) ?? new Set<string>();
     ids.add(node.nodeId);
     siblingNames.set(key, ids);
+    if (node.kind === "DATA_TYPE") {
+      const memberNames = new Set<string>();
+      for (const member of node.members ?? []) {
+        if (!member.name.trim()) issues.push({ nodeId: node.nodeId, message: "A structure member needs a name." });
+        else if (memberNames.has(member.name.trim())) issues.push({ nodeId: node.nodeId, message: "Structure members must have unique names." });
+        memberNames.add(member.name.trim());
+        if (!member.dataType && !member.dataTypeNodeId) issues.push({ nodeId: node.nodeId, message: "Each structure member needs a data type." });
+      }
+      const enumNames = new Set<string>();
+      const enumNumbers = new Set<number>();
+      for (const enumValue of node.enumValues ?? []) {
+        if (!enumValue.name.trim()) issues.push({ nodeId: node.nodeId, message: "An enum value needs a name." });
+        else if (enumNames.has(enumValue.name.trim())) issues.push({ nodeId: node.nodeId, message: "Enum values must have unique names." });
+        if (!Number.isInteger(enumValue.value)) issues.push({ nodeId: node.nodeId, message: "Enum values must be integers." });
+        else if (enumNumbers.has(enumValue.value)) issues.push({ nodeId: node.nodeId, message: "Enum values must have unique numeric values." });
+        enumNames.add(enumValue.name.trim());
+        enumNumbers.add(enumValue.value);
+      }
+    }
   }
   for (const ids of siblingNames.values()) {
     if (ids.size > 1) ids.forEach((nodeId) => issues.push({ nodeId, message: "Sibling nodes must have unique browse names." }));
@@ -325,8 +372,12 @@ export function ManualSchemaEditorPage() {
   const [addAccess, setAddAccess] = useState<string>("READ");
   const [addUnit, setAddUnit] = useState("");
   const [addDescription, setAddDescription] = useState("");
+  const [addDataTypeKind, setAddDataTypeKind] = useState<"STRUCTURE" | "ENUM">("STRUCTURE");
   const [addMemberName, setAddMemberName] = useState("value");
   const [addMemberType, setAddMemberType] = useState<string>("FLOAT64");
+  const [addEnumValues, setAddEnumValues] = useState<EnumValueDraft[]>([
+    { id: newNodeId(), name: "Value", value: "0", description: "" },
+  ]);
   const [selectedSuggestion, setSelectedSuggestion] = useState("");
   const [addParentId, setAddParentId] = useState<string | null>(null);
   const [addRefTargetId, setAddRefTargetId] = useState<string>("");
@@ -626,6 +677,21 @@ export function ManualSchemaEditorPage() {
   function handleAddNode() {
     const trimmed = addName.trim();
     if (!trimmed || !addKind) return;
+    if (addKind === "DATA_TYPE" && addDataTypeKind === "ENUM") {
+      const names = new Set<string>();
+      const values = new Set<number>();
+      const invalid = addEnumValues.some((value) => {
+        const numericValue = Number(value.value);
+        const duplicate = names.has(value.name.trim()) || values.has(numericValue);
+        names.add(value.name.trim());
+        values.add(numericValue);
+        return !value.name.trim() || !Number.isInteger(numericValue) || duplicate;
+      });
+      if (invalid) {
+        push({ tone: "error", title: "Enum values need unique names and integer values." });
+        return;
+      }
+    }
     const parentId = addParentId;
     const node: NodeDto = {
       nodeId: newNodeId(),
@@ -640,8 +706,17 @@ export function ManualSchemaEditorPage() {
       access: addKind === "VARIABLE" ? addAccess : null,
       unit: addKind === "VARIABLE" ? addUnit || null : null,
       description: addDescription || null,
-      members: addKind === "DATA_TYPE"
+      members: addKind === "DATA_TYPE" && addDataTypeKind === "STRUCTURE"
         ? [{ name: addMemberName.trim() || "value", dataType: addMemberType, dataTypeNodeId: null }]
+        : [],
+      enumValues: addKind === "DATA_TYPE" && addDataTypeKind === "ENUM"
+        ? addEnumValues
+          .filter((value) => value.name.trim() && Number.isInteger(Number(value.value)))
+          .map((value) => ({
+            name: value.name.trim(),
+            value: Number(value.value),
+            description: value.description.trim() || null,
+          }))
         : [],
       accessLevelFull: null,
       minimumSamplingInterval: null,
@@ -654,6 +729,8 @@ export function ManualSchemaEditorPage() {
     setAddName("");
     setAddUnit("");
     setAddDescription("");
+    setAddDataTypeKind("STRUCTURE");
+    setAddEnumValues([{ id: newNodeId(), name: "Value", value: "0", description: "" }]);
     setAddKind(null);
   }
 
@@ -674,10 +751,19 @@ export function ManualSchemaEditorPage() {
       access: null,
       unit: null,
       description: template.description,
-      members: template.members.map((member) => ({ ...member })),
+      members: "members" in template ? template.members.map((member) => ({ ...member })) : [],
+      enumValues: "enumValues" in template ? template.enumValues.map((value) => ({ ...value })) : [],
     };
     setNodes((previous) => [...previous, type]);
     setSelectedId(type.nodeId);
+  }
+
+  function updateDataTypeMembers(members: NodeDto["members"]) {
+    updateSelectedNode({ members: members ?? [], enumValues: [] });
+  }
+
+  function updateDataTypeEnumValues(enumValues: NodeDto["enumValues"]) {
+    updateSelectedNode({ enumValues: enumValues ?? [], members: [] });
   }
 
   function applySuggestedVariable(name: string) {
@@ -1022,17 +1108,41 @@ export function ManualSchemaEditorPage() {
               ) : null}
             </div>
             {addKind === "DATA_TYPE" ? (
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="flex flex-col gap-1.5 text-sm text-shell-muted">
-                  First member name
-                  <input className="shell-field" value={addMemberName} onChange={(e) => setAddMemberName(e.target.value)} />
-                </label>
-                <label className="flex flex-col gap-1.5 text-sm text-shell-muted">
-                  First member type
-                  <select className="shell-field" value={addMemberType} onChange={(e) => setAddMemberType(e.target.value)}>
-                    {DATA_TYPES.map((type) => <option key={type} value={type}>{formatDataType(type)}</option>)}
-                  </select>
-                </label>
+              <div className="space-y-3">
+                <fieldset>
+                  <legend className="text-sm font-medium text-shell-ink">Data type kind</legend>
+                  <div className="mt-2 flex gap-4 text-sm text-shell-muted">
+                    <label><input checked={addDataTypeKind === "STRUCTURE"} name="data-type-kind" type="radio" value="STRUCTURE" onChange={() => setAddDataTypeKind("STRUCTURE")} /> Structure</label>
+                    <label><input checked={addDataTypeKind === "ENUM"} name="data-type-kind" type="radio" value="ENUM" onChange={() => setAddDataTypeKind("ENUM")} /> Enum</label>
+                  </div>
+                </fieldset>
+                {addDataTypeKind === "STRUCTURE" ? (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="flex flex-col gap-1.5 text-sm text-shell-muted">
+                      First member name
+                      <input className="shell-field" value={addMemberName} onChange={(e) => setAddMemberName(e.target.value)} />
+                    </label>
+                    <label className="flex flex-col gap-1.5 text-sm text-shell-muted">
+                      First member type
+                      <select className="shell-field" value={addMemberType} onChange={(e) => setAddMemberType(e.target.value)}>
+                        {DATA_TYPES.map((type) => <option key={type} value={type}>{formatDataType(type)}</option>)}
+                      </select>
+                    </label>
+                  </div>
+                ) : (
+                  <div className="space-y-2 rounded-md border border-shell-line p-3">
+                    <p className="text-sm font-medium text-shell-ink">Enum values</p>
+                    {addEnumValues.map((value, index) => (
+                      <div className="grid gap-2 sm:grid-cols-[minmax(8rem,1fr)_7rem_minmax(10rem,1fr)_auto]" key={value.id}>
+                        <label className="text-xs text-shell-muted">Name<input aria-label={`Enum value ${index + 1} name`} className="shell-field mt-1 w-full" value={value.name} onChange={(e) => setAddEnumValues((prev) => prev.map((candidate) => candidate.id === value.id ? { ...candidate, name: e.target.value } : candidate))} /></label>
+                        <label className="text-xs text-shell-muted">Value<input aria-label={`Enum value ${index + 1} numeric value`} className="shell-field mt-1 w-full" inputMode="numeric" value={value.value} onChange={(e) => setAddEnumValues((prev) => prev.map((candidate) => candidate.id === value.id ? { ...candidate, value: e.target.value } : candidate))} /></label>
+                        <label className="text-xs text-shell-muted">Description<input aria-label={`Enum value ${index + 1} description`} className="shell-field mt-1 w-full" value={value.description} onChange={(e) => setAddEnumValues((prev) => prev.map((candidate) => candidate.id === value.id ? { ...candidate, description: e.target.value } : candidate))} /></label>
+                        <button aria-label={`Remove enum value ${index + 1}`} className="shell-text-action self-end" disabled={addEnumValues.length === 1} type="button" onClick={() => setAddEnumValues((prev) => prev.filter((candidate) => candidate.id !== value.id))}>Remove</button>
+                      </div>
+                    ))}
+                    <button className="shell-text-action" type="button" onClick={() => setAddEnumValues((prev) => [...prev, { id: newNodeId(), name: "", value: String(prev.length), description: "" }])}>+ Add enum value</button>
+                  </div>
+                )}
               </div>
             ) : addKind === "VARIABLE" ? (
               <div className="grid gap-3 sm:grid-cols-2">
@@ -1288,12 +1398,19 @@ export function ManualSchemaEditorPage() {
                       <select
                         className="shell-field"
                         disabled={!access.isAdmin}
-                        value={selectedNode.dataType ?? "FLOAT64"}
-                        onChange={(e) => updateSelectedNode({ dataType: e.target.value })}
+                        value={selectedNode.dataTypeNodeId ? `native:${selectedNode.dataTypeNodeId}` : selectedNode.dataType ?? "FLOAT64"}
+                        onChange={(e) => updateSelectedNode(e.target.value.startsWith("native:")
+                          ? { dataType: null, dataTypeNodeId: e.target.value.slice("native:".length) }
+                          : { dataType: e.target.value, dataTypeNodeId: null })}
                       >
                         {DATA_TYPES.map((t) => (
                           <option key={t} value={t}>
                             {typeLabel(t)}
+                          </option>
+                        ))}
+                        {nativeTypes.map((type) => (
+                          <option key={type.nodeId} value={`native:${type.nodeId}`}>
+                            {type.name} ({(type.enumValues ?? []).length > 0 ? "enum" : "structured type"})
                           </option>
                         ))}
                       </select>
@@ -1322,24 +1439,44 @@ export function ManualSchemaEditorPage() {
                     </label>
                   </>
                 ) : null}
-                {selectedNode.kind === "DATA_TYPE" ? (
-                  <div className="flex flex-col gap-2 text-sm text-shell-muted">
-                    <span className="font-medium text-shell-ink">{(selectedNode.enumValues ?? []).length > 0 ? "Enum values" : "Members"}</span>
-                    {(selectedNode.enumValues ?? []).length > 0 ? (
-                      <ul className="space-y-1 font-mono text-xs text-shell-ink">
-                        {selectedNode.enumValues?.map((value) => (
-                          <li key={`${value.name}-${value.value}`}>{value.name} = {value.value}{value.description ? ` — ${value.description}` : ""}</li>
-                        ))}
-                      </ul>
-                    ) : (selectedNode.members ?? []).length === 0 ? <span>No members.</span> : (
-                      <ul className="space-y-1 font-mono text-xs text-shell-ink">
-                        {(selectedNode.members ?? []).map((member) => (
-                          <li key={member.name}>{member.name}: {member.dataType ?? member.dataTypeNodeId}</li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                ) : null}
+                {selectedNode.kind === "DATA_TYPE" ? (() => {
+                  const isEnum = (selectedNode.enumValues ?? []).length > 0;
+                  return (
+                    <div className="flex flex-col gap-2 text-sm text-shell-muted">
+                      <span className="font-medium text-shell-ink">{isEnum ? "Enum values" : "Structure members"}</span>
+                      {isEnum ? (
+                        <div className="space-y-2">
+                          {(selectedNode.enumValues ?? []).map((value, index) => (
+                            <div className="grid gap-2 sm:grid-cols-[minmax(7rem,1fr)_5rem_minmax(8rem,1fr)_auto]" key={`${value.name}-${value.value}-${index}`}>
+                              <input aria-label={`Enum value ${index + 1} name`} className="shell-field" disabled={!access.isAdmin} value={value.name} onChange={(e) => updateDataTypeEnumValues((selectedNode.enumValues ?? []).map((candidate, candidateIndex) => candidateIndex === index ? { ...candidate, name: e.target.value } : candidate))} />
+                              <input aria-label={`Enum value ${index + 1} numeric value`} className="shell-field" disabled={!access.isAdmin} inputMode="numeric" value={value.value} onChange={(e) => {
+                                const next = Number(e.target.value);
+                                if (Number.isInteger(next)) updateDataTypeEnumValues((selectedNode.enumValues ?? []).map((candidate, candidateIndex) => candidateIndex === index ? { ...candidate, value: next } : candidate));
+                              }} />
+                              <input aria-label={`Enum value ${index + 1} description`} className="shell-field" disabled={!access.isAdmin} value={value.description ?? ""} onChange={(e) => updateDataTypeEnumValues((selectedNode.enumValues ?? []).map((candidate, candidateIndex) => candidateIndex === index ? { ...candidate, description: e.target.value || null } : candidate))} />
+                              {access.isAdmin ? <button aria-label={`Remove enum value ${index + 1}`} className="shell-text-action" disabled={(selectedNode.enumValues ?? []).length === 1} type="button" onClick={() => updateDataTypeEnumValues((selectedNode.enumValues ?? []).filter((_, candidateIndex) => candidateIndex !== index))}>Remove</button> : null}
+                            </div>
+                          ))}
+                          {access.isAdmin ? <button className="shell-text-action" type="button" onClick={() => updateDataTypeEnumValues([...(selectedNode.enumValues ?? []), { name: "Value", value: (selectedNode.enumValues ?? []).length, description: null }])}>+ Add enum value</button> : null}
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {(selectedNode.members ?? []).map((member, index) => (
+                            <div className="grid gap-2 sm:grid-cols-[minmax(8rem,1fr)_minmax(8rem,1fr)_auto]" key={`${member.name}-${index}`}>
+                              <input aria-label={`Structure member ${index + 1} name`} className="shell-field" disabled={!access.isAdmin} value={member.name} onChange={(e) => updateDataTypeMembers((selectedNode.members ?? []).map((candidate, candidateIndex) => candidateIndex === index ? { ...candidate, name: e.target.value } : candidate))} />
+                              <select aria-label={`Structure member ${index + 1} type`} className="shell-field" disabled={!access.isAdmin} value={member.dataTypeNodeId ? `native:${member.dataTypeNodeId}` : member.dataType ?? "FLOAT64"} onChange={(e) => updateDataTypeMembers((selectedNode.members ?? []).map((candidate, candidateIndex) => candidateIndex === index ? (e.target.value.startsWith("native:") ? { ...candidate, dataType: null, dataTypeNodeId: e.target.value.slice("native:".length) } : { ...candidate, dataType: e.target.value, dataTypeNodeId: null }) : candidate))}>
+                                {DATA_TYPES.map((type) => <option key={type} value={type}>{formatDataType(type)}</option>)}
+                                {nativeTypes.filter((type) => type.nodeId !== selectedNode.nodeId).map((type) => <option key={type.nodeId} value={`native:${type.nodeId}`}>{type.name}</option>)}
+                              </select>
+                              {access.isAdmin ? <button aria-label={`Remove structure member ${index + 1}`} className="shell-text-action" disabled={(selectedNode.members ?? []).length === 1} type="button" onClick={() => updateDataTypeMembers((selectedNode.members ?? []).filter((_, candidateIndex) => candidateIndex !== index))}>Remove</button> : null}
+                            </div>
+                          ))}
+                          {access.isAdmin ? <button className="shell-text-action" type="button" onClick={() => updateDataTypeMembers([...(selectedNode.members ?? []), { name: "member", dataType: "FLOAT64", dataTypeNodeId: null }])}>+ Add member</button> : null}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })() : null}
                 <label className="flex flex-col gap-2 text-sm text-shell-muted">
                   Description
                   <input

@@ -388,7 +388,7 @@ public class ScanService implements DisposableBean {
         String description = members.isEmpty() ? "Imported OPC UA enum DataType" : "Imported OPC UA structured DataType";
         nodes.add(new SchemaNode(typeId, null, "Types/" + typeId, node.name(), NodeKind.DATA_TYPE,
                 null, null, null, null, description, List.of(), null,
-                List.of(), null, members, enumValues, null, null, null, null));
+                List.of(), null, members, enumValues, node.dataTypeDefaultEncodingId(), null, null, null, null));
     }
 
     /** Indexes resolutions by nodeId, rejecting duplicates and non-unknown targets. */

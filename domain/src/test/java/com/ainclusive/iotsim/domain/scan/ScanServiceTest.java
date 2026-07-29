@@ -192,7 +192,7 @@ class ScanServiceTest {
                 new DiscoveredNode("ns=2;s=range", null, "Range", "Range", "VARIABLE",
                         null, "SCALAR", "READ", null, null, "ns=0;i=884",
                         List.of(new DataTypeMember("low", DataType.FLOAT64, null),
-                                new DataTypeMember("high", DataType.FLOAT64, null)))),
+                                new DataTypeMember("high", DataType.FLOAT64, null)), List.of(), "ns=2;i=5002")),
                 false, 1, "discovered structured type");
         ScanJob job = service.startScan(PROJECT, "OPC_UA", "opc.tcp://h", ConnectionCredentials.anonymous(), 0);
 
@@ -205,6 +205,7 @@ class ScanServiceTest {
             assertThat(node.members()).containsExactly(
                     new DataTypeMember("low", DataType.FLOAT64, null),
                     new DataTypeMember("high", DataType.FLOAT64, null));
+            assertThat(node.defaultEncodingId()).isEqualTo("ns=2;i=5002");
         });
     }
 

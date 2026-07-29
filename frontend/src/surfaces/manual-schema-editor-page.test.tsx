@@ -128,7 +128,61 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
 
     await waitFor(() => expect(screen.getAllByText("PumpState").length).toBeGreaterThan(0));
-    expect(screen.getByText("mode: INT32")).not.toBeNull();
+    expect(screen.getByDisplayValue("mode")).not.toBeNull();
+    expect((screen.getByLabelText("Structure member 1 type") as HTMLSelectElement).value).toBe("INT32");
+  });
+
+  it("creates a manual enum DATA_TYPE with editable numeric literals", async () => {
+    mockLoadManualSchemaById.mockResolvedValueOnce(schema);
+    renderPage();
+    await waitFor(() => screen.getByText("Level"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Add folder" }));
+    fireEvent.click(screen.getByRole("radio", { name: /Data type/ }));
+    fireEvent.change(screen.getAllByLabelText("Name")[1], { target: { value: "PumpMode" } });
+    fireEvent.click(screen.getByRole("radio", { name: "Enum" }));
+    fireEvent.change(screen.getByLabelText("Enum value 1 name"), { target: { value: "Automatic" } });
+    fireEvent.change(screen.getByLabelText("Enum value 1 numeric value"), { target: { value: "2" } });
+    fireEvent.change(screen.getByLabelText("Enum value 1 description"), { target: { value: "Automatic control" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+
+    await waitFor(() => expect(screen.getAllByText("PumpMode").length).toBeGreaterThan(0));
+    expect(screen.getByDisplayValue("Automatic")).not.toBeNull();
+    expect(screen.getByDisplayValue("2")).not.toBeNull();
+  });
+
+  it("edits structure members and enum literals before saving", async () => {
+    mockLoadManualSchemaById.mockResolvedValueOnce({
+      ...schema,
+      nodes: [
+        ...schema.nodes,
+        { nodeId: "type-1", parentId: null, path: "Types/State", name: "State", kind: "DATA_TYPE" as const,
+          dataType: null, dataTypeNodeId: null, valueRank: null, access: null, unit: null, description: null,
+          members: [{ name: "code", dataType: "INT32", dataTypeNodeId: null }], enumValues: [] },
+      ],
+    });
+    mockUpdateManualSchema.mockResolvedValueOnce(schema);
+    renderPage();
+    await waitFor(() => screen.getByText("State"));
+
+    fireEvent.click(screen.getByText("State"));
+    fireEvent.change(screen.getByLabelText("Structure member 1 name"), { target: { value: "statusCode" } });
+    fireEvent.click(screen.getByRole("button", { name: "+ Add member" }));
+    fireEvent.change(screen.getByLabelText("Structure member 2 name"), { target: { value: "message" } });
+    fireEvent.change(screen.getByLabelText("Structure member 2 type"), { target: { value: "LOCALIZED_TEXT" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByLabelText(/Save in this schema/));
+    fireEvent.click(screen.getAllByRole("button", { name: "Save" })[1]);
+
+    await waitFor(() => expect(mockUpdateManualSchema).toHaveBeenCalledWith(
+      "proj-1", "ms-1", expect.objectContaining({ nodes: expect.arrayContaining([
+        expect.objectContaining({ nodeId: "type-1", members: [
+          { name: "statusCode", dataType: "INT32", dataTypeNodeId: null },
+          { name: "message", dataType: "LOCALIZED_TEXT", dataTypeNodeId: null },
+        ] }),
+      ]) }),
+    ));
   });
 
   it("saves in place when the user picks 'Save in this schema'", async () => {

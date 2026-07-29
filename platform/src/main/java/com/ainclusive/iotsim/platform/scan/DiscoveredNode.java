@@ -20,7 +20,7 @@ import java.util.List;
 public record DiscoveredNode(String nodeId, String parentId, String path, String name,
         String kind, String dataType, String valueRank, String access,
         String unit, String description, String dataTypeNodeId, List<DataTypeMember> dataTypeMembers,
-        List<DataTypeEnumValue> dataTypeEnumValues) {
+        List<DataTypeEnumValue> dataTypeEnumValues, String dataTypeDefaultEncodingId) {
 
     public DiscoveredNode {
         dataTypeMembers = dataTypeMembers == null ? List.of() : List.copyOf(dataTypeMembers);
@@ -49,6 +49,15 @@ public record DiscoveredNode(String nodeId, String parentId, String path, String
             String unit, String description, String dataTypeNodeId, List<DataTypeMember> dataTypeMembers) {
         this(nodeId, parentId, path, name, kind, dataType, valueRank, access,
                 unit, description, dataTypeNodeId, dataTypeMembers, List.of());
+    }
+
+    /** Compatibility constructor for a native declaration without structure encoding metadata. */
+    public DiscoveredNode(String nodeId, String parentId, String path, String name,
+            String kind, String dataType, String valueRank, String access,
+            String unit, String description, String dataTypeNodeId, List<DataTypeMember> dataTypeMembers,
+            List<DataTypeEnumValue> dataTypeEnumValues) {
+        this(nodeId, parentId, path, name, kind, dataType, valueRank, access, unit, description,
+                dataTypeNodeId, dataTypeMembers, dataTypeEnumValues, null);
     }
 
     /** True for a VARIABLE whose type could not be mapped to the neutral set. */

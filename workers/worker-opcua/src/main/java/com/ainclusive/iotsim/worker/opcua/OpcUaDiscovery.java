@@ -308,7 +308,13 @@ final class OpcUaDiscovery {
 
     /** The neutral mapping plus the original DataType attribute, when it needs preserving. */
     private record DataTypeDeclaration(String neutralType, String dataTypeNodeId,
-            List<DataTypeMemberMsg> members, List<DataTypeEnumValueMsg> enumValues) {}
+            List<DataTypeMemberMsg> members, List<DataTypeEnumValueMsg> enumValues,
+            String defaultEncodingId) {}
+
+    /** The fields and binary encoding supplied by a native StructureDefinition. */
+    private record StructureDeclaration(List<DataTypeMemberMsg> members, String defaultEncodingId) {
+        private static final StructureDeclaration EMPTY = new StructureDeclaration(List.of(), null);
+    }
 
     /** Reads a variable's DataType attribute and reverse-maps it; counts non-neutral declarations. */
     private static DataTypeDeclaration dataTypeOf(OpcUaClient client, NodeId nodeId, int[] unknown)
@@ -318,20 +324,24 @@ final class OpcUaDiscovery {
         ReadResponse response = client.read(0.0, TimestampsToReturn.Neither, List.of(rv))
                 .get(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS);
         DataValue[] results = response.getResults();
-        NodeId dataTypeId = results != null && results.length > 0
-                && results[0].getValue().getValue() instanceof NodeId id ? id : null;
+        DataValue dataTypeValue = results != null && results.length > 0 ? results[0] : null;
+        NodeId dataTypeId = dataTypeValue != null && dataTypeValue.getValue() != null
+                && dataTypeValue.getValue().getValue() instanceof NodeId id ? id : null;
         String neutral = OpcUaTypes.neutralTypeOf(dataTypeId);
         if (neutral == null) {
             unknown[0]++;
         }
         String nativeTypeId = neutral == null && dataTypeId != null ? dataTypeId.toParseableString() : null;
+        StructureDeclaration structure = nativeTypeId == null
+                ? StructureDeclaration.EMPTY
+                : readStructureDeclaration(client, dataTypeId);
         return new DataTypeDeclaration(neutral, nativeTypeId,
-                nativeTypeId == null ? List.of() : readStructureFields(client, dataTypeId),
-                nativeTypeId == null ? List.of() : readEnumValues(client, dataTypeId));
+                structure.members(), nativeTypeId == null ? List.of() : readEnumValues(client, dataTypeId),
+                structure.defaultEncodingId());
     }
 
-    /** Imports the server-provided field definitions when this native type is a structure. */
-    private static List<DataTypeMemberMsg> readStructureFields(OpcUaClient client, NodeId dataTypeId)
+    /** Imports fields and the binary encoding required for lossless structure replay. */
+    private static StructureDeclaration readStructureDeclaration(OpcUaClient client, NodeId dataTypeId)
             throws Exception {
         // DataTypeDefinition is AttributeId 23 in OPC UA 1.04. Milo 0.6 predates
         // that enum constant, but accepts the standard numeric id on the wire.
@@ -344,7 +354,7 @@ final class OpcUaDiscovery {
                 ? definitionValue.getValue().getValue()
                 : null;
         if (!(definition instanceof StructureDefinition structure) || structure.getFields() == null) {
-            return List.of();
+            return StructureDeclaration.EMPTY;
         }
         List<DataTypeMemberMsg> members = new ArrayList<>();
         for (StructureField field : structure.getFields()) {
@@ -364,7 +374,9 @@ final class OpcUaDiscovery {
             }
             members.add(member.build());
         }
-        return List.copyOf(members);
+        NodeId encodingId = structure.getDefaultEncodingId();
+        return new StructureDeclaration(List.copyOf(members),
+                encodingId == null ? null : encodingId.toParseableString());
     }
 
     /** Imports numeric enum/option-set literals when the server exposes EnumValues. */
@@ -416,6 +428,8 @@ final class OpcUaDiscovery {
                             ? "" : declaration.dataTypeNodeId())
                     .addAllDataTypeMembers(declaration == null ? List.of() : declaration.members())
                     .addAllDataTypeEnumValues(declaration == null ? List.of() : declaration.enumValues())
+                    .setDataTypeDefaultEncodingId(declaration == null || declaration.defaultEncodingId() == null
+                            ? "" : declaration.defaultEncodingId())
                     .setValueRank(attrs != null && attrs.valueRank() != null && attrs.valueRank() >= 0
                             ? "ARRAY" : "SCALAR")
                     .setAccess("READ");

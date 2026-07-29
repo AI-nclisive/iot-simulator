@@ -654,7 +654,8 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
                         member.getName(), member.getDataType().isBlank() ? null : DataType.valueOf(member.getDataType()),
                         emptyToNull(member.getDataTypeNodeId()))).toList(),
                 n.getDataTypeEnumValuesList().stream().map(value -> new DataTypeEnumValue(
-                        value.getName(), value.getValue(), emptyToNull(value.getDescription()))).toList());
+                        value.getName(), value.getValue(), emptyToNull(value.getDescription()))).toList(),
+                emptyToNull(n.getDataTypeDefaultEncodingId()));
     }
 
     private static ScanStatus toStatus(String wire) {
@@ -719,6 +720,7 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
                                     .setDescription(orEmpty(value.description()))
                                     .build())
                             .toList())
+                    .setDataTypeDefaultEncodingId(orEmpty(n.defaultEncodingId()))
                     .setValueRank(n.valueRank() == null ? "" : n.valueRank().name())
                     .setAccess(n.access() == null ? "" : n.access().name())
                     .setUnit(orEmpty(n.unit()))

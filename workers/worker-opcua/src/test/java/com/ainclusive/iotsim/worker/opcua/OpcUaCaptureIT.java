@@ -1,6 +1,7 @@
 package com.ainclusive.iotsim.worker.opcua;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
 import com.ainclusive.iotsim.protocolmodel.ValueCodec;
 import com.ainclusive.iotsim.workercontract.v1.Quality;
@@ -24,14 +25,23 @@ import org.junit.jupiter.api.Test;
 class OpcUaCaptureIT {
 
     @Test
-    void encodesNonNeutralUnsignedValueWithoutCoercingItsSchemaType() {
+    void encodesNativeEnumValuesAsIntegerLiterals() {
         Value captured = OpcUaCapture.toProtoValue(
-                new OpcUaCapture.NodeSpec("ns=2;s=counter", null),
+                new OpcUaCapture.NodeSpec("ns=2;s=counter", "INT32"),
                 new DataValue(new Variant(Unsigned.uint(42))));
 
         assertThat(captured.getNodeId()).isEqualTo("ns=2;s=counter");
-        assertThat(ValueCodec.decode(ValueCodec.Kind.NUM, captured.getValueEnc().toByteArray()))
-                .isEqualTo(42.0d);
+        assertThat(ValueCodec.decode(ValueCodec.Kind.INT, captured.getValueEnc().toByteArray()))
+                .isEqualTo(42L);
+    }
+
+    @Test
+    void rejectsOpaqueNativeValueInsteadOfGuessingAnEncoding() {
+        assertThatIllegalArgumentException().isThrownBy(() -> OpcUaCapture.toProtoValue(
+                new OpcUaCapture.NodeSpec("ns=2;s=opaque", null),
+                new DataValue(new Variant(Unsigned.uint(42)))))
+                .withMessageContaining("without an executable encoding")
+                .withMessageContaining("ns=2;s=opaque");
     }
 
     @Test
