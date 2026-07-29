@@ -119,6 +119,7 @@ function formatDuration(startedAt?: string, endedAt?: string | null): string {
   const end = new Date(endedAt).getTime();
   if (Number.isNaN(start) || Number.isNaN(end) || end < start) return "Not available";
   const seconds = Math.round((end - start) / 1000);
+  if (seconds < 60) return `${seconds}s`;
   return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
 }
 
