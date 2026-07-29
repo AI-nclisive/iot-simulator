@@ -1471,6 +1471,13 @@ export function ManualSchemaEditorPage() {
                   return (
                     <div className="flex flex-col gap-2 text-sm text-shell-muted">
                       <span className="font-medium text-shell-ink">{isEnum ? "Enum values" : "Structure members"}</span>
+                      {!isEnum ? (
+                        <label className="flex max-w-xl flex-col gap-1 text-xs">
+                          Default binary encoding NodeId
+                          <input aria-label="Default binary encoding NodeId" className="shell-field" disabled={!access.isAdmin} placeholder="e.g. ns=2;i=5002" value={selectedNode.defaultEncodingId ?? ""} onChange={(e) => updateSelectedNode({ defaultEncodingId: e.target.value || null })} />
+                          <span>Needed for binary capture and replay. Leave empty only when the source does not expose an executable encoding.</span>
+                        </label>
+                      ) : null}
                       {isEnum ? (
                         <div className="space-y-2">
                           {(selectedNode.enumValues ?? []).map((value, index) => (

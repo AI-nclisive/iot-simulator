@@ -198,6 +198,7 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
     await waitFor(() => screen.getByText("State"));
 
     fireEvent.click(screen.getByText("State"));
+    fireEvent.change(screen.getByLabelText("Default binary encoding NodeId"), { target: { value: "ns=2;i=5002" } });
     fireEvent.change(screen.getByLabelText("Structure member 1 name"), { target: { value: "statusCode" } });
     fireEvent.click(screen.getByRole("button", { name: "+ Add member" }));
     fireEvent.change(screen.getByLabelText("Structure member 2 name"), { target: { value: "message" } });
@@ -215,7 +216,7 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
         expect.objectContaining({ nodeId: "type-1", members: [
           { name: "statusCode", dataType: "INT32", dataTypeNodeId: null },
           { name: "message", dataType: "LOCALIZED_TEXT", dataTypeNodeId: null, valueRank: "ARRAY", arrayDimensions: [3], optional: true },
-        ] }),
+        ], defaultEncodingId: "ns=2;i=5002" }),
       ]) }),
     ));
   });
