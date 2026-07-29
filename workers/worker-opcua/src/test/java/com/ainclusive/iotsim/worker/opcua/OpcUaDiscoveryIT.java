@@ -2,6 +2,7 @@ package com.ainclusive.iotsim.worker.opcua;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.ainclusive.iotsim.workercontract.v1.DataTypeEnumValueMsg;
 import com.ainclusive.iotsim.workercontract.v1.SchemaNodeMsg;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -67,6 +68,35 @@ class OpcUaDiscoveryIT {
             assertThat(byName.get("Xml").getDataType()).isEqualTo("XML_ELEMENT");
             assertThat(byName.get("Temperature").getAccess()).isEqualTo("READ");
             assertThat(byName.get("Temperature").getValueRank()).isEqualTo("SCALAR");
+        } finally {
+            runtime.stop();
+        }
+    }
+
+    @Test
+    void servesVariableDeclaredWithSchemaOwnedEnumType() throws Exception {
+        int port = freePort();
+        NativeDataTypeDef state = new NativeDataTypeDef(
+                "ns=2;i=5001",
+                "MachineState",
+                List.of(),
+                List.of(
+                        DataTypeEnumValueMsg.newBuilder().setName("Stopped").setValue(0).build(),
+                        DataTypeEnumValueMsg.newBuilder().setName("Running").setValue(1).build()));
+        OpcUaServerRuntime runtime = new OpcUaServerRuntime(
+                port,
+                "127.0.0.1",
+                "127.0.0.1",
+                List.of(new VarDef("state", null, "State", "VARIABLE", "", "ns=2;i=5001", null,
+                        null, null, null, null)),
+                List.of(state),
+                AuthConfig.anonymous(),
+                event -> { },
+                event -> { });
+        runtime.start();
+        try {
+            assertThat(OpcUaDiscovery.testConnection(runtime.endpointUrl(), ANON).status())
+                    .isEqualTo(OpcUaDiscovery.OK);
         } finally {
             runtime.stop();
         }

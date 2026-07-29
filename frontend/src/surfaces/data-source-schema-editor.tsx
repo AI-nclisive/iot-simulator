@@ -30,6 +30,7 @@ export type NodeDto = {
   references?: ReferenceDto[];
   dataTypeNodeId?: string | null;
   members?: Array<{ name: string; dataType: string | null; dataTypeNodeId: string | null }>;
+  enumValues?: Array<{ name: string; value: number; description: string | null }>;
   accessLevelFull?: number | null;
   minimumSamplingInterval?: number | null;
   writeMask?: number | null;

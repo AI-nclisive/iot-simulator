@@ -26,6 +26,7 @@ import com.ainclusive.iotsim.platform.scan.ScanStatus;
 import com.ainclusive.iotsim.platform.scan.SourceScanner;
 import com.ainclusive.iotsim.platform.secret.ConnectionCredentials;
 import com.ainclusive.iotsim.protocolmodel.DataType;
+import com.ainclusive.iotsim.protocolmodel.DataTypeEnumValue;
 import com.ainclusive.iotsim.protocolmodel.DataTypeMember;
 import com.ainclusive.iotsim.protocolmodel.NeutralValue;
 import com.ainclusive.iotsim.protocolmodel.NodeKind;
@@ -34,6 +35,8 @@ import com.ainclusive.iotsim.protocolmodel.ValueCodec;
 import com.ainclusive.iotsim.workercontract.v1.CaptureRequest;
 import com.ainclusive.iotsim.workercontract.v1.ClientEvent;
 import com.ainclusive.iotsim.workercontract.v1.ConnectionConfigMsg;
+import com.ainclusive.iotsim.workercontract.v1.DataTypeEnumValueMsg;
+import com.ainclusive.iotsim.workercontract.v1.DataTypeMemberMsg;
 import com.ainclusive.iotsim.workercontract.v1.Quality;
 import com.ainclusive.iotsim.workercontract.v1.RuntimeEvent;
 import com.ainclusive.iotsim.workercontract.v1.ScanProgress;
@@ -426,12 +429,7 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
         if (isExternalRef(spec.credentials())) {
             throw new CaptureException(CaptureException.Kind.UNSUPPORTED, EXTERNAL_REF_UNSUPPORTED);
         }
-        Map<String, ValueCodec.Kind> kinds = new HashMap<>();
-        for (SchemaNode n : spec.schemaNodes()) {
-            if (n.kind() == NodeKind.VARIABLE && n.dataType() != null) {
-                kinds.put(n.nodeId(), ValueCodec.kindOf(n.dataType()));
-            }
-        }
+        Map<String, ValueCodec.Kind> kinds = captureValueKinds(spec.schemaNodes());
         CaptureRequest request = CaptureRequest.newBuilder()
                 .setEndpointUrl(orEmpty(spec.endpointUrl()))
                 .setCredentials(toCredentialMsg(spec.credentials()))
@@ -516,6 +514,36 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
             out.add(new NeutralValue(v.getNodeId(), sourceTime, value, neutralQuality(v.getQuality()), reason));
         }
         return out;
+    }
+
+    private static Map<String, ValueCodec.Kind> captureValueKinds(List<SchemaNode> nodes) {
+        Map<String, SchemaNode> declarations = new HashMap<>();
+        for (SchemaNode node : nodes) {
+            if (node.kind() == NodeKind.DATA_TYPE) {
+                declarations.put(node.nodeId(), node);
+            }
+        }
+        Map<String, ValueCodec.Kind> kinds = new HashMap<>();
+        for (SchemaNode node : nodes) {
+            if (node.kind() != NodeKind.VARIABLE) {
+                continue;
+            }
+            if (node.dataType() != null) {
+                kinds.put(node.nodeId(), ValueCodec.kindOf(node.dataType()));
+                continue;
+            }
+            SchemaNode declaration = declarations.get(node.dataTypeNodeId());
+            if (declaration != null && !declaration.enumValues().isEmpty()) {
+                kinds.put(node.nodeId(), ValueCodec.Kind.INT);
+                continue;
+            }
+            if (declaration != null) {
+                throw new CaptureException(CaptureException.Kind.UNSUPPORTED,
+                        "capture cannot decode native DataType without an executable encoding: "
+                                + declaration.name());
+            }
+        }
+        return kinds;
     }
 
     /**
@@ -624,7 +652,10 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
                 emptyToNull(n.getUnit()), emptyToNull(n.getDescription()), emptyToNull(n.getDataTypeNodeId()),
                 n.getDataTypeMembersList().stream().map(member -> new DataTypeMember(
                         member.getName(), member.getDataType().isBlank() ? null : DataType.valueOf(member.getDataType()),
-                        emptyToNull(member.getDataTypeNodeId()))).toList());
+                        emptyToNull(member.getDataTypeNodeId()))).toList(),
+                n.getDataTypeEnumValuesList().stream().map(value -> new DataTypeEnumValue(
+                        value.getName(), value.getValue(), emptyToNull(value.getDescription()))).toList(),
+                emptyToNull(n.getDataTypeDefaultEncodingId()));
     }
 
     private static ScanStatus toStatus(String wire) {
@@ -675,6 +706,21 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
                     .setKind(n.kind().name())
                     .setDataType(n.dataType() == null ? "" : n.dataType().name())
                     .setDataTypeNodeId(orEmpty(n.dataTypeNodeId()))
+                    .addAllDataTypeMembers(n.members().stream()
+                            .map(member -> DataTypeMemberMsg.newBuilder()
+                                    .setName(member.name())
+                                    .setDataType(member.dataType() == null ? "" : member.dataType().name())
+                                    .setDataTypeNodeId(orEmpty(member.dataTypeNodeId()))
+                                    .build())
+                            .toList())
+                    .addAllDataTypeEnumValues(n.enumValues().stream()
+                            .map(value -> DataTypeEnumValueMsg.newBuilder()
+                                    .setName(value.name())
+                                    .setValue(value.value())
+                                    .setDescription(orEmpty(value.description()))
+                                    .build())
+                            .toList())
+                    .setDataTypeDefaultEncodingId(orEmpty(n.defaultEncodingId()))
                     .setValueRank(n.valueRank() == null ? "" : n.valueRank().name())
                     .setAccess(n.access() == null ? "" : n.access().name())
                     .setUnit(orEmpty(n.unit()))

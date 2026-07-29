@@ -114,7 +114,7 @@ class SchemaRepositoryIT {
                 null, null, null, null, "OPC UA Range", List.of(), null, List.of(), null,
                 List.of(new DataTypeMember("low", DataType.FLOAT64, null),
                         new DataTypeMember("high", DataType.FLOAT64, null)),
-                null, null, null, null);
+                List.of(), "ns=2;i=5002", null, null, null, null);
         SchemaNode value = new SchemaNode("range-value", null, "RangeValue", "RangeValue",
                 NodeKind.VARIABLE, null, ValueRank.SCALAR, Access.READ, null, null,
                 List.of(), null, List.of(), "ns=0;i=884", List.of(), null, null, null, null);
@@ -130,6 +130,7 @@ class SchemaRepositoryIT {
         assertThat(restoredRange.members()).containsExactly(
                 new DataTypeMember("low", DataType.FLOAT64, null),
                 new DataTypeMember("high", DataType.FLOAT64, null));
+        assertThat(restoredRange.defaultEncodingId()).isEqualTo("ns=2;i=5002");
     }
 
     @Test

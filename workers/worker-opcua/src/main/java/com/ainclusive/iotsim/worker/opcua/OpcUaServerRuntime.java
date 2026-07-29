@@ -65,6 +65,12 @@ final class OpcUaServerRuntime {
 
     OpcUaServerRuntime(int port, String bindAddress, String advertisedHost, List<VarDef> variables,
             AuthConfig auth, Consumer<ClientEvent> clientEventSink, Consumer<RuntimeEvent> runtimeEventSink) {
+        this(port, bindAddress, advertisedHost, variables, List.of(), auth, clientEventSink, runtimeEventSink);
+    }
+
+    OpcUaServerRuntime(int port, String bindAddress, String advertisedHost, List<VarDef> variables,
+            List<NativeDataTypeDef> typeDefinitions, AuthConfig auth, Consumer<ClientEvent> clientEventSink,
+            Consumer<RuntimeEvent> runtimeEventSink) {
         this.runtimeEventSink = runtimeEventSink;
         this.port = port;
         try {
@@ -131,7 +137,7 @@ final class OpcUaServerRuntime {
                     clientEventSink.accept(clientEvent(ClientEvent.Kind.DISCONNECTED, session));
                 }
             });
-            this.namespace = new SchemaNamespace(server, variables);
+            this.namespace = new SchemaNamespace(server, variables, typeDefinitions);
             this.endpointUrl = "opc.tcp://" + advertisedHost + ":" + port + "/iotsim";
         } catch (IOException e) {
             throw new UncheckedIOException("failed to prepare OPC UA server", e);

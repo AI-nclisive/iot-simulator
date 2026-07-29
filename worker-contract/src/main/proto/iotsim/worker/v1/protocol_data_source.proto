@@ -112,6 +112,11 @@ message SchemaNodeMsg {
   // verbatim rather than being coerced to a different primitive type.
   string data_type_node_id = 16;
   repeated DataTypeMemberMsg data_type_members = 17;
+  repeated DataTypeEnumValueMsg data_type_enum_values = 18;
+  // For a structured native DataType, the server-provided binary encoding NodeId.
+  // This is required to transport an opaque ExtensionObject losslessly; it is
+  // deliberately kept separate from the DataType NodeId.
+  string data_type_default_encoding_id = 19;
 }
 
 // The declared fields of a native OPC UA structured DataType. Exactly one of
@@ -121,6 +126,13 @@ message DataTypeMemberMsg {
   string name = 1;
   string data_type = 2;
   string data_type_node_id = 3;
+}
+
+// Exact literals of a native OPC UA enum or option-set declaration.
+message DataTypeEnumValueMsg {
+  string name = 1;
+  int64 value = 2;
+  string description = 3;
 }
 
 message StartRequest {}
