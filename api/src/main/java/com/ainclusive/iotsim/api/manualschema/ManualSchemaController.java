@@ -187,7 +187,7 @@ public class ManualSchemaController {
                     kind, dataType, valueRank, access, d.unit(), d.description(), d.arrayDimensions(),
                     d.typeDefinition(), SchemaReferenceMapper.toModel(d.references()), d.dataTypeNodeId(),
                     SchemaReferenceMapper.toMembers(d.members()), toEnumValues(d.enumValues()),
-                    d.accessLevelFull(), d.minimumSamplingInterval(),
+                    d.defaultEncodingId(), d.accessLevelFull(), d.minimumSamplingInterval(),
                     d.writeMask(), d.historizing()));
         }
         return nodes;
@@ -244,13 +244,13 @@ public class ManualSchemaController {
             String dataType, String valueRank, String access, String unit, String description,
             List<Integer> arrayDimensions, String typeDefinition, List<ReferenceDto> references,
             String dataTypeNodeId, List<MemberDto> members,
-            List<EnumValueDto> enumValues,
+            List<EnumValueDto> enumValues, String defaultEncodingId,
             Integer accessLevelFull, Integer minimumSamplingInterval, Integer writeMask, Boolean historizing) {
 
         public NodeDto(String nodeId, String parentId, String path, String name, String kind,
                 String dataType, String valueRank, String access, String unit, String description) {
             this(nodeId, parentId, path, name, kind, dataType, valueRank, access, unit, description,
-                    List.of(), null, List.of(), null, List.of(), List.of(), null, null, null, null);
+                    List.of(), null, List.of(), null, List.of(), List.of(), null, null, null, null, null);
         }
 
         /** Compatibility constructor for clients written before enum literals were exposed. */
@@ -261,7 +261,7 @@ public class ManualSchemaController {
                 Integer minimumSamplingInterval, Integer writeMask, Boolean historizing) {
             this(nodeId, parentId, path, name, kind, dataType, valueRank, access, unit, description,
                     arrayDimensions, typeDefinition, references, dataTypeNodeId, members, List.of(),
-                    accessLevelFull, minimumSamplingInterval, writeMask, historizing);
+                    null, accessLevelFull, minimumSamplingInterval, writeMask, historizing);
         }
 
         static NodeDto from(SchemaNode n) {
@@ -274,7 +274,7 @@ public class ManualSchemaController {
                     n.references().stream().map(ReferenceDto::from).toList(),
                     n.dataTypeNodeId(), n.members().stream().map(MemberDto::from).toList(),
                     n.enumValues().stream().map(EnumValueDto::from).toList(),
-                    n.accessLevelFull(), n.minimumSamplingInterval(), n.writeMask(), n.historizing());
+                    n.defaultEncodingId(), n.accessLevelFull(), n.minimumSamplingInterval(), n.writeMask(), n.historizing());
         }
     }
 

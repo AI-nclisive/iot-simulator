@@ -38,6 +38,7 @@ export type NodeDto = {
     optional?: boolean | null;
   }>;
   enumValues?: Array<{ name: string; value: number; description: string | null }>;
+  defaultEncodingId?: string | null;
   accessLevelFull?: number | null;
   minimumSamplingInterval?: number | null;
   writeMask?: number | null;

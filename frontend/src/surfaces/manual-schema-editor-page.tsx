@@ -207,21 +207,21 @@ const STANDARD_OPC_UA_TYPE_TEMPLATES = [
   { nodeId: "ns=0;i=27", name: "Integer", description: "OPC UA abstract signed-integer base type (opaque; no concrete value encoding)." },
   { nodeId: "ns=0;i=28", name: "UInteger", description: "OPC UA abstract unsigned-integer base type (opaque; no concrete value encoding)." },
   { nodeId: "ns=0;i=29", name: "Enumeration", description: "OPC UA abstract enumeration base type (opaque; add a concrete enum when values are known)." },
-  { nodeId: "ns=0;i=884", name: "Range", description: "OPC UA numeric engineering range.", members: [
+  { nodeId: "ns=0;i=884", name: "Range", description: "OPC UA numeric engineering range.", defaultEncodingId: "ns=0;i=886", members: [
     { name: "low", dataType: "FLOAT64", dataTypeNodeId: null },
     { name: "high", dataType: "FLOAT64", dataTypeNodeId: null },
   ] },
-  { nodeId: "ns=0;i=889", name: "TimeZoneDataType", description: "UTC offset and daylight-saving flag.", members: [
+  { nodeId: "ns=0;i=8912", name: "TimeZoneDataType", description: "UTC offset and daylight-saving flag.", defaultEncodingId: "ns=0;i=8917", members: [
     { name: "offset", dataType: "INT16", dataTypeNodeId: null },
     { name: "daylightSavingInOffset", dataType: "BOOL", dataTypeNodeId: null },
   ] },
-  { nodeId: "ns=0;i=887", name: "EUInformation", description: "Standard OPC UA engineering-unit metadata.", members: [
+  { nodeId: "ns=0;i=887", name: "EUInformation", description: "Standard OPC UA engineering-unit metadata.", defaultEncodingId: "ns=0;i=889", members: [
     { name: "namespaceUri", dataType: "STRING", dataTypeNodeId: null },
     { name: "unitId", dataType: "INT32", dataTypeNodeId: null },
     { name: "displayName", dataType: "LOCALIZED_TEXT", dataTypeNodeId: null },
     { name: "description", dataType: "LOCALIZED_TEXT", dataTypeNodeId: null },
   ] },
-  { nodeId: "ns=0;i=340", name: "BuildInfo", description: "Standard OPC UA server build identity.", members: [
+  { nodeId: "ns=0;i=338", name: "BuildInfo", description: "Standard OPC UA server build identity.", defaultEncodingId: "ns=0;i=340", members: [
     { name: "productUri", dataType: "STRING", dataTypeNodeId: null },
     { name: "manufacturerName", dataType: "STRING", dataTypeNodeId: null },
     { name: "productName", dataType: "STRING", dataTypeNodeId: null },
@@ -229,7 +229,7 @@ const STANDARD_OPC_UA_TYPE_TEMPLATES = [
     { name: "buildNumber", dataType: "STRING", dataTypeNodeId: null },
     { name: "buildDate", dataType: "DATETIME", dataTypeNodeId: null },
   ] },
-  { nodeId: "ns=0;i=296", name: "Argument", description: "Standard OPC UA method argument declaration.", members: [
+  { nodeId: "ns=0;i=296", name: "Argument", description: "Standard OPC UA method argument declaration.", defaultEncodingId: "ns=0;i=298", members: [
     { name: "name", dataType: "STRING", dataTypeNodeId: null },
     { name: "dataType", dataType: "NODE_ID", dataTypeNodeId: null },
     { name: "valueRank", dataType: "INT32", dataTypeNodeId: null },
@@ -777,6 +777,7 @@ export function ManualSchemaEditorPage() {
       access: null,
       unit: null,
       description: template.description,
+      defaultEncodingId: "defaultEncodingId" in template ? template.defaultEncodingId : null,
       members: "members" in template ? template.members.map((member) => ({ ...member })) : [],
       enumValues: "enumValues" in template ? template.enumValues.map((value) => ({ ...value })) : [],
     };

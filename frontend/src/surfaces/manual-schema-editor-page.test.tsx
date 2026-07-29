@@ -111,6 +111,15 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add Range" }));
     await waitFor(() => expect(screen.getAllByText("Range").length).toBeGreaterThan(0));
 
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByLabelText(/Save in this schema/));
+    fireEvent.click(screen.getAllByRole("button", { name: "Save" })[1]);
+    await waitFor(() => expect(mockUpdateManualSchema).toHaveBeenCalledWith(
+      "proj-1", "ms-1", expect.objectContaining({ nodes: expect.arrayContaining([
+        expect.objectContaining({ nodeId: "ns=0;i=884", defaultEncodingId: "ns=0;i=886" }),
+      ]) }),
+    ));
+
     fireEvent.click(screen.getByRole("button", { name: "Add Range" }));
     expect(mockPushNotification).toHaveBeenCalledWith(expect.objectContaining({ title: "Type already added" }));
   });
