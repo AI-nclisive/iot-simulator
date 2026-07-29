@@ -582,6 +582,8 @@ Shared behavior:
 - this is a read-only surface for shared visibility;
 - runtime events remain separate from user activity and are not merged into one
   undifferentiated stream.
+- terminal run events show the run type, duration, schema parameter count, sent
+  value count, and a link to the associated evidence when that metadata exists.
 
 Complete when:
 
