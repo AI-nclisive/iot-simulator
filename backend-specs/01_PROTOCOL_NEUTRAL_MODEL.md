@@ -52,11 +52,9 @@ an intersection every protocol must fill:
 FLOAT64, STRING, BYTES, DATETIME, LOCALIZED_TEXT, GUID, STATUS_CODE,
 QUALIFIED_NAME, NODE_ID, EXPANDED_NODE_ID, XML_ELEMENT`
 
-This covers every concrete OPC UA built-in type usable as a Variable's `DataType`
-attribute except the structural/complex ones (`Structure`/`ExtensionObject`, kept
-out per the no-nested-structs rule below) and the protocol-machinery container
-types (`DataValue`, `Variant`, `DiagnosticInfo`) that a real server's Variable
-never literally declares as its `DataType` in practice.
+This covers every concrete scalar OPC UA built-in type. A variable whose
+declaration is not one of these scalars references a schema-owned native type
+definition instead of being coerced to a scalar.
 
 A schema/recording/data-source is always scoped to a single protocol (`ReplayGuards`
 rejects replaying a recording against a different protocol's data source), so a
@@ -65,11 +63,9 @@ referenced by other protocols' workers — harmless dead weight, not a correctne
 concern. Each protocol worker's own `XxxTypes` mapper (e.g. `OpcUaTypes`) reverse-maps
 its native types onto whichever subset of this enum it needs.
 
-A native type is promoted to a first-class entry here only when (a) it carries
-information the user needs to interact with directly (e.g. `LOCALIZED_TEXT` is
-user-visible display text) and (b) it's a bounded, well-known type — not a general
-structure/variant. Anything else (structs, `ExtensionObject`, arrays-of-structs,
-enums, etc.) stays unresolved, per the rules below.
+A native scalar is promoted to a first-class entry here only when it has a
+bounded, protocol-neutral representation. Enums, structures, unions, option
+sets, and custom protocol-native types use the type-definition catalog below.
 
 OPC UA also defines standard *named subtypes* of these built-ins with a distinct
 `DataType` NodeId but an identical wire/value encoding to their parent (e.g.
@@ -81,21 +77,40 @@ their own `DataType` entry since there's nothing distinct to represent. This is
 different from vendor/custom subtypes of a built-in, which stay "unknown" (their
 shape isn't spec-fixed, so aliasing them would be a guess).
 
-- `valueRank = ARRAY` wraps any primitive into a homogeneous array.
-- No nested structs in v1 (kept out to bound worker complexity; revisit with
-  approval if a real source needs it). Discovered struct-like OPC UA nodes are
-  flattened into folders + variables during scan.
-- When a scan encounters an OPC UA declaration that cannot be represented by a
-  neutral primitive (for example `UInteger`, `BaseDataType`, `Variant`, or a
-  vendor type), it preserves the original OPC UA `DataType` NodeId in
-  `dataTypeNodeId` instead of guessing a primitive. The UI may show it as a
-  non-neutral type, but it does not require a lossy user resolution before
-  create. Synthetic generation is unavailable for such a node until an explicit
-  value strategy exists; recordings/replay never change the declared schema type.
-  Standard namespace-zero declarations can be projected by the OPC UA worker.
-  A vendor DataType is preserved in the schema but cannot be simulated until its
-  full DataType definition is also imported; the worker rejects starting it
-  rather than silently exposing a different type.
+- `valueRank = ARRAY` wraps any scalar or native type into a homogeneous array.
+
+### Native type-definition catalog
+
+Every schema owns a catalog of native type definitions. A variable has either a
+neutral scalar `dataType`, or a `dataTypeNodeId` that references one catalog
+entry. A catalog entry contains a stable schema-local type id plus its OPC UA
+namespace URI, native NodeId, browse/display names, base type, kind, fields or
+enum literals, optional encoding id, and raw source metadata needed for a
+lossless re-export.
+
+Kinds are:
+
+- `ENUM` — ordered integer value/name pairs;
+- `STRUCTURE` — ordered named fields, each referencing a neutral scalar or a
+  catalog type; nesting and arrays are supported;
+- `UNION` and `OPTION_SET` — retained with their discriminator/bit metadata;
+- `OPAQUE` — a native declaration for which the endpoint did not expose enough
+  definition or an executable encoding.
+
+The scan worker imports the transitive closure of every referenced type
+definition. Standard namespace-zero definitions such as `Range` are imported
+the same way as vendor types: `Range` is a structure with `low` and `high`
+`Float64` fields, never a guessed `Float64` variable. A source that exposes a
+property named `EURange` with `DataType=Range` therefore keeps both names and
+the full value shape.
+
+Recording stores a canonical typed tree/array encoding along with the catalog
+reference; replay passes that same value shape to the worker. A worker may
+materialize a definition only when it has a usable OPC UA encoding. An `OPAQUE`
+declaration is still preserved, inspectable, editable, exportable, and safe to
+scan, but generation, capture decoding, or replay is rejected with an explicit
+per-type capability error — never silently converted to bytes, text, or a
+primitive default.
 
 ## 3. Value model
 

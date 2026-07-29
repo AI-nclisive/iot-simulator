@@ -23,7 +23,8 @@ TimescaleDB or any required extension.
 | `projects` | `name`, `description`, `status`, `settings_id`, `version` |
 | `data_sources` | `project_id`→projects, `protocol`, `basis`, `schema_id`, `schema_version`, `endpoint` (jsonb), `runtime_config` (jsonb), `enabled`, `version` |
 | `schemas` | `data_source_id`, `version` (int), `created_at`; unique (`data_source_id`,`version`) |
-| `schema_nodes` | `schema_id`, `node_id`, `parent_id`, `path`, `name`, `kind`, `data_type`, `value_rank`, `access`, `unit`, `description`, `protocol_bindings` (jsonb); unique (`schema_id`,`node_id`) |
+| `schema_nodes` | `schema_id`, `node_id`, `parent_id`, `path`, `name`, `kind`, `data_type`, `data_type_node_id`, `value_rank`, `access`, `unit`, `description`, `protocol_bindings` (jsonb); unique (`schema_id`,`node_id`) |
+| `schema_type_definitions` | `schema_id`, stable `type_id`, namespace URI, native NodeId, browse/display names, kind (`PRIMITIVE \| ENUM \| STRUCTURE \| OPAQUE`), base type, enum fields, structure fields, encoding id, and raw definition metadata (jsonb); unique (`schema_id`,`type_id`) and (`schema_id`,`native_node_id`) when native id is present. A schema variable references this catalog through `data_type_node_id`. |
 | `manual_schemas` | `project_id`→projects, `protocol`, `name`, `description`, `nodes` (jsonb array of `SchemaNode`, same shape/precedent as `recordings.schema_nodes` — no normalized node rows), `version` |
 | `recordings` | `project_id`, `data_source_id`, `schema_version`, `origin`, `time_start`, `time_end`, `value_count`, `size_bytes`, `tags` (jsonb), `version` |
 | `samples` | `project_id`, `derived_from_recording_id`, `selection` (jsonb), `name`, `tags`, `version` |

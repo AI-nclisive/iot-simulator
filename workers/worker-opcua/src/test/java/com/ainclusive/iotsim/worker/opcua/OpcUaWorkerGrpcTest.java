@@ -57,7 +57,9 @@ class OpcUaWorkerGrpcTest {
 
     @Test
     void lifecycleTransitionsAreReflectedInHealth() {
-        stub.configure(ConfigureRequest.newBuilder().setListenPort(48400).build());
+        // Let the OS choose a free port: this test verifies lifecycle state, not a
+        // particular endpoint, and a fixed port is susceptible to CI contention.
+        stub.configure(ConfigureRequest.newBuilder().setListenPort(0).build());
         stub.start(StartRequest.getDefaultInstance());
         assertThat(stub.health(HealthRequest.getDefaultInstance()).getState()).isEqualTo("RUNNING");
 

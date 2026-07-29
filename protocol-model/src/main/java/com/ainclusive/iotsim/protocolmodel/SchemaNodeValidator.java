@@ -33,7 +33,9 @@ public final class SchemaNodeValidator {
             }
             validateDataTypeNodeId(node, byId);
             validateMembers(node, byId);
+            validateEnumValues(node);
         }
+        assertAcyclicDataTypes(byId);
         for (SchemaNode node : nodes) {
             assertAcyclic(node, byId, new HashSet<>());
         }
@@ -46,7 +48,7 @@ public final class SchemaNodeValidator {
         }
         SchemaNode target = byId.get(node.dataTypeNodeId());
         if (target == null) {
-            if (node.dataTypeNodeId().matches("ns=\\d+;[isgb]=.+")) {
+            if (node.dataTypeNodeId().matches("(?:ns=\\d+;)?[isgb]=.+")) {
                 return;
             }
             throw new IllegalArgumentException("dataTypeNodeId target does not exist: " + node.dataTypeNodeId());
@@ -57,12 +59,7 @@ public final class SchemaNodeValidator {
         }
     }
 
-    /**
-     * IS-183: a DATA_TYPE node's members must have unique names, and any member nesting another
-     * DATA_TYPE must reference an existing, distinct DATA_TYPE node whose own members are all
-     * primitives — v1 keeps custom types to one level of struct-of-primitives, so no
-     * self-reference and no multi-level nesting.
-     */
+    /** A DATA_TYPE's members must have unique names and valid local/native type references. */
     private static void validateMembers(SchemaNode node, Map<String, SchemaNode> byId) {
         if (node.kind() != NodeKind.DATA_TYPE) {
             return;
@@ -83,6 +80,9 @@ public final class SchemaNodeValidator {
             }
             SchemaNode target = byId.get(member.dataTypeNodeId());
             if (target == null) {
+                if (member.dataTypeNodeId().matches("(?:ns=\\d+;)?[isgb]=.+")) {
+                    continue; // a standard or vendor-native declaration, preserved verbatim
+                }
                 throw new IllegalArgumentException(
                         "member '" + member.name() + "' dataTypeNodeId does not exist: "
                                 + member.dataTypeNodeId());
@@ -92,15 +92,51 @@ public final class SchemaNodeValidator {
                         "member '" + member.name() + "' dataTypeNodeId must be a DATA_TYPE node: "
                                 + member.dataTypeNodeId());
             }
-            boolean targetNestsCustomType =
-                    target.members().stream().anyMatch(m -> m.dataTypeNodeId() != null);
-            if (targetNestsCustomType) {
-                throw new IllegalArgumentException(
-                        "member '" + member.name() + "' nests DATA_TYPE '" + target.nodeId()
-                                + "' which itself nests another custom type — only one level of"
-                                + " struct-of-primitives is supported");
+        }
+    }
+
+    private static void assertAcyclicDataTypes(Map<String, SchemaNode> byId) {
+        for (SchemaNode node : byId.values()) {
+            if (node.kind() == NodeKind.DATA_TYPE) {
+                assertDataTypeAcyclic(node.nodeId(), byId, new HashSet<>(), new HashSet<>());
             }
         }
+    }
+
+    private static void validateEnumValues(SchemaNode node) {
+        if (node.kind() != NodeKind.DATA_TYPE || node.enumValues().isEmpty()) {
+            return;
+        }
+        Set<String> names = new HashSet<>();
+        Set<Long> values = new HashSet<>();
+        for (DataTypeEnumValue value : node.enumValues()) {
+            if (!names.add(value.name())) {
+                throw new IllegalArgumentException(
+                        "duplicate enum value name '" + value.name() + "' in DATA_TYPE node: " + node.nodeId());
+            }
+            if (!values.add(value.value())) {
+                throw new IllegalArgumentException(
+                        "duplicate enum numeric value " + value.value() + " in DATA_TYPE node: " + node.nodeId());
+            }
+        }
+    }
+
+    private static void assertDataTypeAcyclic(String id, Map<String, SchemaNode> byId,
+            Set<String> visiting, Set<String> complete) {
+        if (complete.contains(id)) {
+            return;
+        }
+        if (!visiting.add(id)) {
+            throw new IllegalArgumentException("cyclic DATA_TYPE member reference at: " + id);
+        }
+        SchemaNode type = byId.get(id);
+        for (DataTypeMember member : type.members()) {
+            if (member.dataTypeNodeId() != null && byId.containsKey(member.dataTypeNodeId())) {
+                assertDataTypeAcyclic(member.dataTypeNodeId(), byId, visiting, complete);
+            }
+        }
+        visiting.remove(id);
+        complete.add(id);
     }
 
     private static void validateParent(SchemaNode node, Map<String, SchemaNode> byId) {

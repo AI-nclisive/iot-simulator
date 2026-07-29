@@ -57,6 +57,21 @@ P0
 Implementation Status:
 ToDo
 
+### Capability: Preserve OPC UA Type Fidelity
+
+Explanation:
+Users can scan, save, record, replay, and manually author OPC UA schemas with
+their declared primitive, enum, structured, and imported custom DataTypes. The
+simulator preserves a type definition and its value shape instead of coercing
+it to an unrelated primitive; unsupported executable encodings remain visible
+as preserved opaque declarations with an explicit runtime limitation.
+
+Priority:
+P0
+
+Implementation Status:
+ToDo
+
 ### Capability: Manually Create Data Source Schemas
 
 Explanation:

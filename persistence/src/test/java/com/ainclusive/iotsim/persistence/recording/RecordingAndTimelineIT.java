@@ -28,6 +28,7 @@ import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import tools.jackson.databind.ObjectMapper;
 
 /** Recording metadata + append-optimized value timeline against real Postgres. */
 @Testcontainers(disabledWithoutDocker = true)
@@ -56,7 +57,7 @@ class RecordingAndTimelineIT {
                 .insert(projectId, "Pump", "OPC_UA", "MANUAL", 4840, null, null, null, "it").id();
         recordings = new JooqRecordingRepository(dsl);
         timeline = new JooqValueTimelineRepository(dsl);
-        SchemaRepository schemas = new JooqSchemaRepository(dsl);
+        SchemaRepository schemas = new JooqSchemaRepository(dsl, new ObjectMapper());
         List<SchemaNode> nodes = List.of(
                 new SchemaNode("temp", null, "Plant/Temp", "Temp",
                         NodeKind.VARIABLE, DataType.FLOAT64, ValueRank.SCALAR, Access.READ, "degC", null),

@@ -7,9 +7,9 @@ import java.util.Objects;
  * "x" member of a "Vector3D" struct.
  *
  * <p>Exactly one of {@code dataType} (a primitive) or {@code dataTypeNodeId} (the {@code nodeId}
- * of another {@link NodeKind#DATA_TYPE} node) must be set — v1 keeps custom types to one level of
- * struct-of-primitives, so a member that nests another custom type may not itself nest a further
- * custom type; see {@link SchemaNodeValidator}.
+ * of another {@link NodeKind#DATA_TYPE} node or a preserved OPC UA DataType NodeId) must be set.
+ * Structured declarations may nest to any finite depth; {@link SchemaNodeValidator} rejects only
+ * cycles, because a cycle has no materializable value shape.
  */
 public record DataTypeMember(String name, DataType dataType, String dataTypeNodeId) {
     public DataTypeMember {

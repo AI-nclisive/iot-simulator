@@ -100,6 +100,15 @@ class SchemaNodeValidatorTest {
     }
 
     @Test
+    void acceptsStandardDataTypeNodeIdInShortForm() {
+        SchemaNode variable = new SchemaNode("v1", null, "v1", "V1", NodeKind.VARIABLE,
+                null, ValueRank.SCALAR, Access.READ, null, null, List.of(), null, List.of(), "i=884", List.of(),
+                null, null, null, null);
+
+        SchemaNodeValidator.validate(List.of(variable));
+    }
+
+    @Test
     void rejectsDuplicateMemberNames() {
         SchemaNode dataType = dataTypeNode("dt1", "Vector3D",
                 List.of(new DataTypeMember("x", DataType.FLOAT64, null),
@@ -135,13 +144,48 @@ class SchemaNodeValidatorTest {
     }
 
     @Test
-    void rejectsNestingADataTypeThatItselfNestsAnotherCustomType() {
+    void acceptsNestedStructuredDataTypesAtAnyFiniteDepth() {
         SchemaNode leaf = dataTypeNode("dtLeaf", "Leaf", List.of(new DataTypeMember("v", DataType.FLOAT64, null)));
         SchemaNode middle = dataTypeNode("dtMiddle", "Middle", List.of(new DataTypeMember("leaf", null, "dtLeaf")));
         SchemaNode outer = dataTypeNode("dtOuter", "Outer", List.of(new DataTypeMember("middle", null, "dtMiddle")));
 
-        assertThatThrownBy(() -> SchemaNodeValidator.validate(List.of(leaf, middle, outer)))
-                .hasMessageContaining("only one level of");
+        SchemaNodeValidator.validate(List.of(leaf, middle, outer));
+    }
+
+    @Test
+    void rejectsCyclicStructuredDataTypes() {
+        SchemaNode first = dataTypeNode("first", "First", List.of(new DataTypeMember("second", null, "second")));
+        SchemaNode second = dataTypeNode("second", "Second", List.of(new DataTypeMember("first", null, "first")));
+
+        assertThatThrownBy(() -> SchemaNodeValidator.validate(List.of(first, second)))
+                .hasMessageContaining("cyclic DATA_TYPE member reference");
+    }
+
+    @Test
+    void acceptsEnumDataTypeAndRejectsDuplicateEnumNamesOrValues() {
+        SchemaNode enumType = enumDataTypeNode("dtState", List.of(
+                new DataTypeEnumValue("Stopped", 0, "Not running"),
+                new DataTypeEnumValue("Running", 1, "Running")));
+        SchemaNodeValidator.validate(List.of(enumType));
+
+        SchemaNode duplicateName = enumDataTypeNode("dtDuplicateName", List.of(
+                new DataTypeEnumValue("Stopped", 0, null), new DataTypeEnumValue("Stopped", 1, null)));
+        assertThatThrownBy(() -> SchemaNodeValidator.validate(List.of(duplicateName)))
+                .hasMessageContaining("duplicate enum value name");
+
+        SchemaNode duplicateValue = enumDataTypeNode("dtDuplicateValue", List.of(
+                new DataTypeEnumValue("Stopped", 0, null), new DataTypeEnumValue("Running", 0, null)));
+        assertThatThrownBy(() -> SchemaNodeValidator.validate(List.of(duplicateValue)))
+                .hasMessageContaining("duplicate enum numeric value");
+    }
+
+    @Test
+    void rejectsDataTypeThatMixesMembersAndEnumValues() {
+        assertThatThrownBy(() -> new SchemaNode("dtMixed", null, "Mixed", "Mixed", NodeKind.DATA_TYPE,
+                null, null, null, null, null, List.of(), null, List.of(), null,
+                List.of(new DataTypeMember("member", DataType.STRING, null)),
+                List.of(new DataTypeEnumValue("Value", 0, null)), null, null, null, null))
+                .hasMessageContaining("cannot mix structured members and enum values");
     }
 
     private static SchemaNode node(String id, String parentId, NodeKind kind) {
@@ -152,6 +196,12 @@ class SchemaNodeValidatorTest {
     private static SchemaNode dataTypeNode(String id, String name, List<DataTypeMember> members) {
         return new SchemaNode(id, null, id, name, NodeKind.DATA_TYPE,
                 null, null, null, null, null, List.of(), null, List.of(), null, members,
+                null, null, null, null);
+    }
+
+    private static SchemaNode enumDataTypeNode(String id, List<DataTypeEnumValue> values) {
+        return new SchemaNode(id, null, id, id, NodeKind.DATA_TYPE,
+                null, null, null, null, null, List.of(), null, List.of(), null, List.of(), values,
                 null, null, null, null);
     }
 }

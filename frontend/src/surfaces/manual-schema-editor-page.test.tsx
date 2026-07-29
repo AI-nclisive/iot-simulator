@@ -51,10 +51,11 @@ const schemaWithFolder = {
   ],
 };
 
-const { mockLoadManualSchemaById, mockUpdateManualSchema, mockCreateManualSchema } = vi.hoisted(() => ({
+const { mockLoadManualSchemaById, mockUpdateManualSchema, mockCreateManualSchema, mockPushNotification } = vi.hoisted(() => ({
   mockLoadManualSchemaById: vi.fn(),
   mockUpdateManualSchema: vi.fn(),
   mockCreateManualSchema: vi.fn(),
+  mockPushNotification: vi.fn(),
 }));
 
 vi.mock("../shell/shell-store", () => ({
@@ -73,7 +74,7 @@ vi.mock("../shell/manual-schemas-store", () => ({
 
 vi.mock("../shell/notification-store", () => ({
   useNotificationStore: (selector: (s: Record<string, unknown>) => unknown) =>
-    selector({ push: vi.fn() }),
+    selector({ push: mockPushNotification }),
 }));
 
 afterEach(() => {
@@ -99,6 +100,35 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
       expect(screen.getByDisplayValue("Boiler layout")).not.toBeNull();
     });
     expect(screen.getByText("Level")).not.toBeNull();
+  });
+
+  it("adds Range from the standard OPC UA type catalog and prevents a duplicate", async () => {
+    mockLoadManualSchemaById.mockResolvedValueOnce(schema);
+    renderPage();
+    await waitFor(() => screen.getByText("Level"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Add folder" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add Range" }));
+    await waitFor(() => expect(screen.getAllByText("Range").length).toBeGreaterThan(0));
+
+    fireEvent.click(screen.getByRole("button", { name: "Add Range" }));
+    expect(mockPushNotification).toHaveBeenCalledWith(expect.objectContaining({ title: "Type already added" }));
+  });
+
+  it("creates a manual structured DATA_TYPE with its first member", async () => {
+    mockLoadManualSchemaById.mockResolvedValueOnce(schema);
+    renderPage();
+    await waitFor(() => screen.getByText("Level"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Add folder" }));
+    fireEvent.click(screen.getByRole("radio", { name: /Data type/ }));
+    fireEvent.change(screen.getAllByLabelText("Name")[1], { target: { value: "PumpState" } });
+    fireEvent.change(screen.getByLabelText("First member name"), { target: { value: "mode" } });
+    fireEvent.change(screen.getByLabelText("First member type"), { target: { value: "INT32" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+
+    await waitFor(() => expect(screen.getAllByText("PumpState").length).toBeGreaterThan(0));
+    expect(screen.getByText("mode: INT32")).not.toBeNull();
   });
 
   it("saves in place when the user picks 'Save in this schema'", async () => {
@@ -265,7 +295,7 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add variable" }));
 
     expect(screen.getByText("Coming soon:")).toBeTruthy();
-    expect(screen.getByText(/For now, create folders, objects, and variables/i)).toBeTruthy();
+    expect(screen.getByText(/Data types can be defined here and selected by variables/i)).toBeTruthy();
     expect(screen.queryByText(/address-space model/i)).toBeNull();
   });
 
@@ -614,6 +644,22 @@ describe("Context menu operations (UI-506)", () => {
       expect(result.length).toBe(baseNodes.length + 1);
       const original = result.find(n => n.nodeId === "child");
       expect(original?.parentId).toBe("root");
+    });
+
+    it("pasteNode with copy: rewrites a copied subtree root name and descendant paths", () => {
+      const subtree = [
+        node("root", null, "FOLDER"),
+        node("group", "root", "FOLDER"),
+        { ...node("leaf", "group", "VARIABLE"), path: "/root/group/leaf" },
+      ];
+      const result = pasteNodeOperation(subtree, { mode: "copy", nodeId: "group" }, "root");
+
+      const copiedRoot = result.find((n) => n.nodeId !== "group" && n.name === "group (copy)");
+      expect(copiedRoot).toBeDefined();
+      expect(copiedRoot?.path).toBe("/root/group (copy)");
+      const copiedLeaf = result.find((n) => n.nodeId !== "leaf" && n.parentId === copiedRoot?.nodeId);
+      expect(copiedLeaf?.path).toBe("/root/group (copy)/leaf");
+      expect(validateManualSchemaNodes(result)).toHaveLength(0);
     });
   });
 });

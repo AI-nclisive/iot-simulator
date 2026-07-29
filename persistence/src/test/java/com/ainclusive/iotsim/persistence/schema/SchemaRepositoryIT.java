@@ -6,6 +6,8 @@ import com.ainclusive.iotsim.persistence.datasource.JooqDataSourceRepository;
 import com.ainclusive.iotsim.persistence.project.JooqProjectRepository;
 import com.ainclusive.iotsim.protocolmodel.Access;
 import com.ainclusive.iotsim.protocolmodel.DataType;
+import com.ainclusive.iotsim.protocolmodel.DataTypeEnumValue;
+import com.ainclusive.iotsim.protocolmodel.DataTypeMember;
 import com.ainclusive.iotsim.protocolmodel.NodeKind;
 import com.ainclusive.iotsim.protocolmodel.ReferenceType;
 import com.ainclusive.iotsim.protocolmodel.SchemaNode;
@@ -22,6 +24,7 @@ import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import tools.jackson.databind.ObjectMapper;
 
 /** Schema versioning + node round-trip against real Postgres. */
 @Testcontainers(disabledWithoutDocker = true)
@@ -46,7 +49,7 @@ class SchemaRepositoryIT {
         projectId = new JooqProjectRepository(dsl).insert("Plant", null, "it").id();
         dataSources = new JooqDataSourceRepository(dsl);
         dataSourceId = dataSources.insert(projectId, "Pump", "OPC_UA", "MANUAL", 4840, null, null, null, "it").id();
-        schemas = new JooqSchemaRepository(dsl);
+        schemas = new JooqSchemaRepository(dsl, new ObjectMapper());
     }
 
     private static List<SchemaNode> sampleNodes() {
@@ -100,6 +103,56 @@ class SchemaRepositoryIT {
 
         assertExtendedNodeValues(schemas.findCurrent(sourceId).orElseThrow(), saved.version());
         assertExtendedNodeValues(schemas.findByVersion(sourceId, saved.version()).orElseThrow(), saved.version());
+    }
+
+    @Test
+    void preservesNativeDataTypeDeclarationAndStructuredMembers() {
+        String sourceId = dataSources
+                .insert(projectId, "Typed source", "OPC_UA", "MANUAL", 4840, null, null, null, "it")
+                .id();
+        SchemaNode range = new SchemaNode("ns=0;i=884", null, "Range", "Range", NodeKind.DATA_TYPE,
+                null, null, null, null, "OPC UA Range", List.of(), null, List.of(), null,
+                List.of(new DataTypeMember("low", DataType.FLOAT64, null),
+                        new DataTypeMember("high", DataType.FLOAT64, null)),
+                null, null, null, null);
+        SchemaNode value = new SchemaNode("range-value", null, "RangeValue", "RangeValue",
+                NodeKind.VARIABLE, null, ValueRank.SCALAR, Access.READ, null, null,
+                List.of(), null, List.of(), "ns=0;i=884", List.of(), null, null, null, null);
+
+        schemas.saveNewVersion(sourceId, List.of(range, value));
+
+        SchemaWithNodes restored = schemas.findCurrent(sourceId).orElseThrow();
+        SchemaNode restoredRange = restored.nodes().stream()
+                .filter(node -> node.nodeId().equals("ns=0;i=884")).findFirst().orElseThrow();
+        SchemaNode restoredValue = restored.nodes().stream()
+                .filter(node -> node.nodeId().equals("range-value")).findFirst().orElseThrow();
+        assertThat(restoredValue.dataTypeNodeId()).isEqualTo("ns=0;i=884");
+        assertThat(restoredRange.members()).containsExactly(
+                new DataTypeMember("low", DataType.FLOAT64, null),
+                new DataTypeMember("high", DataType.FLOAT64, null));
+    }
+
+    @Test
+    void preservesEnumDataTypeLiterals() {
+        String sourceId = dataSources
+                .insert(projectId, "Enum source", "OPC_UA", "MANUAL", 4840, null, null, null, "it")
+                .id();
+        List<DataTypeEnumValue> values = List.of(
+                new DataTypeEnumValue("Stopped", 0, "The equipment is stopped"),
+                new DataTypeEnumValue("Running", 1, null));
+        SchemaNode state = new SchemaNode("ns=2;i=1001", null, "MachineState", "MachineState", NodeKind.DATA_TYPE,
+                null, null, null, null, null, List.of(), null, List.of(), null, List.of(), values,
+                null, null, null, null);
+        SchemaNode currentState = new SchemaNode("state", null, "State", "State", NodeKind.VARIABLE,
+                null, ValueRank.SCALAR, Access.READ, null, null,
+                List.of(), null, List.of(), "ns=2;i=1001", List.of(), null, null, null, null);
+
+        schemas.saveNewVersion(sourceId, List.of(state, currentState));
+
+        SchemaNode restored = schemas.findCurrent(sourceId).orElseThrow().nodes().stream()
+                .filter(node -> node.nodeId().equals("ns=2;i=1001")).findFirst().orElseThrow();
+        assertThat(restored.enumValues()).containsExactlyElementsOf(values);
+        assertThat(restored.members()).isEmpty();
     }
 
     private static void assertExtendedNodeValues(SchemaWithNodes schema, int expectedVersion) {

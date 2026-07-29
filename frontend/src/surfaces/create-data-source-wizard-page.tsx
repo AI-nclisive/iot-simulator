@@ -1591,7 +1591,7 @@ export function CreateDataSourceWizardPage() {
           </p>
           {scanResult.unknownCount > 0 ? (
             <p className="mt-1 text-sm text-shell-muted">
-              {scanResult.unknownCount} unknown types need resolution
+              {scanResult.unknownCount} native OPC UA type declarations preserved
             </p>
           ) : null}
           {scanStatus === "partial" ? (
@@ -1610,10 +1610,10 @@ export function CreateDataSourceWizardPage() {
         {unknownNodes.length > 0 ? (
           <div className="space-y-3">
             <p className="text-sm font-medium text-shell-ink">
-              Unknown node types (optional)
+              Native OPC UA types (optional mapping)
             </p>
             <p className="text-sm text-shell-muted">
-              The following nodes have unknown types. You can optionally assign a type or exclude them — they will be preserved as-is if left unresolved.
+              The server declared these types outside the neutral scalar set. Their original OPC UA DataType NodeId is saved unchanged; optionally map a node to a scalar only when that is intentional, or exclude it.
             </p>
             <div className="flex flex-wrap items-center gap-3 rounded-md border border-shell-line bg-shell-line/10 px-4 py-3">
               <span className="text-sm text-shell-muted">Set all to</span>

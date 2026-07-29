@@ -15,9 +15,9 @@ prior ADRs live in git history.
 A modular monolith: a Java + Spring Boot backend with a React/TypeScript Web UI.
 The backend hosts the domain modules and a runtime supervisor. The supervisor
 runs each protocol data-source as an isolated, out-of-process worker, so one
-worker crash cannot take down the backend. A single protocol-neutral schema and
-value model is the source of truth; each worker projects it onto its native
-protocol address model. Persistence is split by data shape: a relational store
+worker crash cannot take down the backend. A single protocol-neutral schema,
+native type-definition, and value model is the source of truth; each worker
+projects it onto its native protocol address model. Persistence is split by data shape: a relational store
 holds entities and value timelines, with an object-storage abstraction for large
 artifacts. The core risk is a reliable simulator runtime — fidelity, fault
 isolation, determinism, and reproducible evidence rank above CRUD convenience.
@@ -56,9 +56,11 @@ and runtime modules must not depend on UI-facing modules.
 
 ## Data and persistence
 
-- The protocol-neutral model is the single source of truth. Recording, replay,
-  synthetic generation, scenarios, and faults operate only on it — never
-  per-protocol.
+- The protocol-neutral model, including imported native type definitions, is the
+  single source of truth. Recording, replay, synthetic generation, scenarios,
+  and faults operate only on it — never per-protocol. A worker must reject an
+  unmaterializable native type explicitly rather than coercing its declaration
+  or value.
 - Recordings are scoped to a protocol type, not to the data source instance they
   were captured from; replay/import binds to any compatible data source of that
   type at run time, never at capture/import time.

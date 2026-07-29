@@ -19,6 +19,7 @@ import com.ainclusive.iotsim.platform.secret.ConnectionCredentials;
 import com.ainclusive.iotsim.platform.secret.CredentialStore;
 import com.ainclusive.iotsim.protocolmodel.Access;
 import com.ainclusive.iotsim.protocolmodel.DataType;
+import com.ainclusive.iotsim.protocolmodel.DataTypeMember;
 import com.ainclusive.iotsim.protocolmodel.NodeKind;
 import com.ainclusive.iotsim.protocolmodel.SchemaNode;
 import com.ainclusive.iotsim.protocolmodel.ValueRank;
@@ -336,6 +337,7 @@ public class ScanService implements DisposableBean {
             List<DiscoveredNode> discovered, List<TypeResolution> resolutions) {
         Map<String, TypeResolution> byNodeId = indexResolutions(discovered, resolutions);
         List<SchemaNode> nodes = new ArrayList<>();
+        Set<String> importedTypeIds = new HashSet<>();
         for (DiscoveredNode n : discovered) {
             if ("VARIABLE".equals(n.kind()) && n.isUnknownType()) {
                 TypeResolution r = byNodeId.get(n.nodeId());
@@ -344,6 +346,7 @@ public class ScanService implements DisposableBean {
                     // is known precisely by its source DataType NodeId. Preserve that
                     // declaration instead of inventing a neutral primitive.
                     if (n.dataTypeNodeId() != null) {
+                        addImportedType(nodes, importedTypeIds, n);
                         nodes.add(variableNode(n, null, valueRank(n.valueRank()), access(n.access()),
                                 n.dataTypeNodeId()));
                     }
@@ -355,6 +358,7 @@ public class ScanService implements DisposableBean {
                                 r.valueRank() == null ? valueRank(n.valueRank()) : ValueRank.valueOf(r.valueRank()),
                                 r.access() == null ? access(n.access()) : Access.valueOf(r.access()), null));
                     } else if (n.dataTypeNodeId() != null) {
+                        addImportedType(nodes, importedTypeIds, n);
                         nodes.add(variableNode(n, null, valueRank(n.valueRank()), access(n.access()),
                                 n.dataTypeNodeId()));
                     }
@@ -371,6 +375,18 @@ public class ScanService implements DisposableBean {
             }
         }
         return nodes;
+    }
+
+    /** Adds one top-level schema type for a scanned structured native declaration. */
+    private static void addImportedType(List<SchemaNode> nodes, Set<String> importedTypeIds, DiscoveredNode node) {
+        String typeId = node.dataTypeNodeId();
+        List<DataTypeMember> members = node.dataTypeMembers();
+        if (typeId == null || members.isEmpty() || !importedTypeIds.add(typeId)) {
+            return;
+        }
+        nodes.add(new SchemaNode(typeId, null, "Types/" + typeId, node.name(), NodeKind.DATA_TYPE,
+                null, null, null, null, "Imported OPC UA structured DataType", List.of(), null,
+                List.of(), null, members, null, null, null, null));
     }
 
     /** Indexes resolutions by nodeId, rejecting duplicates and non-unknown targets. */

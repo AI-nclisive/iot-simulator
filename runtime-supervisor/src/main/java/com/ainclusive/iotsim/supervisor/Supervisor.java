@@ -25,6 +25,8 @@ import com.ainclusive.iotsim.platform.scan.ScanSpec;
 import com.ainclusive.iotsim.platform.scan.ScanStatus;
 import com.ainclusive.iotsim.platform.scan.SourceScanner;
 import com.ainclusive.iotsim.platform.secret.ConnectionCredentials;
+import com.ainclusive.iotsim.protocolmodel.DataType;
+import com.ainclusive.iotsim.protocolmodel.DataTypeMember;
 import com.ainclusive.iotsim.protocolmodel.NeutralValue;
 import com.ainclusive.iotsim.protocolmodel.NodeKind;
 import com.ainclusive.iotsim.protocolmodel.SchemaNode;
@@ -619,7 +621,10 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
         return new DiscoveredNode(
                 n.getNodeId(), emptyToNull(n.getParentId()), n.getPath(), n.getName(), n.getKind(),
                 emptyToNull(n.getDataType()), emptyToNull(n.getValueRank()), emptyToNull(n.getAccess()),
-                emptyToNull(n.getUnit()), emptyToNull(n.getDescription()), emptyToNull(n.getDataTypeNodeId()));
+                emptyToNull(n.getUnit()), emptyToNull(n.getDescription()), emptyToNull(n.getDataTypeNodeId()),
+                n.getDataTypeMembersList().stream().map(member -> new DataTypeMember(
+                        member.getName(), member.getDataType().isBlank() ? null : DataType.valueOf(member.getDataType()),
+                        emptyToNull(member.getDataTypeNodeId()))).toList());
     }
 
     private static ScanStatus toStatus(String wire) {

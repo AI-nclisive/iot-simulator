@@ -210,7 +210,7 @@ export function DataSourceRescanPanel({
           <p className="text-sm text-shell-muted">
             {summary.discoveredCount} node{summary.discoveredCount === 1 ? "" : "s"} discovered
             {summary.unknownCount > 0
-              ? ` — ${summary.unknownCount} need${summary.unknownCount === 1 ? "s" : ""} a type below.`
+              ? ` — ${summary.unknownCount} native OPC UA type declaration${summary.unknownCount === 1 ? " is" : "s are"} preserved below.`
               : "."}
           </p>
           {summary.unknownCount > 0 ? (

@@ -671,7 +671,7 @@ describe("CreateDataSourceWizardPage — scan step (UI-458)", () => {
     expect(secondBody.endpointUrl).toBe("opc.tcp://a-different-host:4840");
   });
 
-  it("Next is disabled when there are unresolved unknown types", async () => {
+  it("Next remains enabled when native types are preserved without mapping", async () => {
     mockApiFetch
       .mockImplementationOnce(() => Promise.resolve({ jobId: "job-1", status: "RUNNING" }))
       .mockImplementationOnce(() =>
@@ -689,14 +689,14 @@ describe("CreateDataSourceWizardPage — scan step (UI-458)", () => {
     await navigateToScanStep();
     await advanceIntervalAndFlush(2000);
 
-    expect(screen.getByText(/unknown types need resolution/i)).toBeTruthy();
-    // Unknown nodes default to unresolved, so Next stays disabled until the
-    // user assigns a type or excludes them.
+    expect(screen.getByText(/native OPC UA type declarations preserved/i)).toBeTruthy();
+    // The original DataType NodeId is enough to preserve the declaration; a
+    // scalar mapping is optional and must not block creation.
     const btn = screen.getAllByRole("button", { name: "Next" })[0] as HTMLButtonElement;
-    expect(btn.disabled).toBe(true);
+    expect(btn.disabled).toBe(false);
   });
 
-  it("resolving unknown type enables Next", async () => {
+  it("optionally maps a preserved native type to a neutral scalar", async () => {
     mockApiFetch
       .mockImplementationOnce(() => Promise.resolve({ jobId: "job-1", status: "RUNNING" }))
       .mockImplementationOnce(() =>
@@ -716,13 +716,12 @@ describe("CreateDataSourceWizardPage — scan step (UI-458)", () => {
 
     expect(screen.getByLabelText(/Data type for/i)).toBeTruthy();
 
-    // Unresolved unknown type — Next starts disabled
-    expect((screen.getAllByRole("button", { name: "Next" })[0] as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getAllByRole("button", { name: "Next" })[0] as HTMLButtonElement).disabled).toBe(false);
 
     // Resolve the unknown type
     await userEvent.selectOptions(screen.getByLabelText(/Data type for/i), "FLOAT64");
 
-    // Now Next should be enabled
+    // Mapping remains optional and keeps Next enabled.
     expect((screen.getAllByRole("button", { name: "Next" })[0] as HTMLButtonElement).disabled).toBe(false);
   });
 

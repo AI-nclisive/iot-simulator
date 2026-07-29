@@ -763,7 +763,8 @@ Key states:
 - authentication failure;
 - partial scan;
 - large schema;
-- unknown data type;
+- imported native type definition;
+- opaque native type with an explicit capture/replay limitation;
 - stale scan result.
 
 Shared behavior:
@@ -775,6 +776,9 @@ Complete when:
 
 - users can clearly tell what real endpoint was scanned, what was found, and
   what still needs review before source creation.
+- standard and custom OPC UA types are shown by their declared name and shape;
+  a `Range` declaration is not presented as an unknown primitive or a required
+  manual resolution.
 
 ### Full Schema Editor
 
@@ -795,6 +799,8 @@ Must show:
 - editing toolbar;
 - structure tree or table built for large parameter sets;
 - details panel;
+- type catalog for neutral scalars, imported OPC UA types, enums, structures,
+  arrays, and explicitly opaque definitions;
 - validation summary;
 - unsaved-change indicator.
 
@@ -802,6 +808,7 @@ Primary actions:
 
 - edit structure;
 - edit parameter details;
+- inspect imported type definitions and create/edit enums and structures;
 - save;
 - discard;
 - inspect validation and dependencies.

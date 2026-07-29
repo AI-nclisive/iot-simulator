@@ -52,6 +52,7 @@ public record SchemaNode(
         List<SchemaReference> references,
         String dataTypeNodeId,
         List<DataTypeMember> members,
+        List<DataTypeEnumValue> enumValues,
         Integer accessLevelFull,
         Integer minimumSamplingInterval,
         Integer writeMask,
@@ -65,6 +66,7 @@ public record SchemaNode(
         arrayDimensions = arrayDimensions == null ? List.of() : List.copyOf(arrayDimensions);
         references = references == null ? List.of() : List.copyOf(references);
         members = members == null ? List.of() : List.copyOf(members);
+        enumValues = enumValues == null ? List.of() : List.copyOf(enumValues);
         if (kind == NodeKind.VARIABLE) {
             if ((dataType == null) == (dataTypeNodeId == null)) {
                 throw new IllegalArgumentException(
@@ -95,14 +97,19 @@ public record SchemaNode(
             if (parentId != null) {
                 throw new IllegalArgumentException("DATA_TYPE nodes must be top-level (parentId must be null)");
             }
-            if (members.isEmpty()) {
-                throw new IllegalArgumentException("DATA_TYPE node '" + nodeId + "' requires at least one member");
+            if (members.isEmpty() && enumValues.isEmpty()) {
+                throw new IllegalArgumentException(
+                        "DATA_TYPE node '" + nodeId + "' requires at least one member or enum value");
+            }
+            if (!members.isEmpty() && !enumValues.isEmpty()) {
+                throw new IllegalArgumentException("DATA_TYPE node '" + nodeId
+                        + "' cannot mix structured members and enum values");
             }
             if (dataType != null) {
                 throw new IllegalArgumentException("DATA_TYPE nodes cannot have a dataType field");
             }
-        } else if (!members.isEmpty()) {
-            throw new IllegalArgumentException(kind + " nodes cannot have members");
+        } else if (!members.isEmpty() || !enumValues.isEmpty()) {
+            throw new IllegalArgumentException(kind + " nodes cannot have members or enum values");
         }
     }
 
@@ -112,7 +119,18 @@ public record SchemaNode(
             List<Integer> arrayDimensions, String typeDefinition, List<SchemaReference> references) {
         this(nodeId, parentId, path, name, kind, dataType, valueRank, access, unit, description,
                 arrayDimensions, typeDefinition, references, null, List.of(),
-                null, null, null, null);  // IS-189 fields = null
+                List.of(), null, null, null, null);  // IS-189 fields = null
+    }
+
+    /** Compatibility constructor for callers that do not declare enum values. */
+    public SchemaNode(String nodeId, String parentId, String path, String name, NodeKind kind,
+            DataType dataType, ValueRank valueRank, Access access, String unit, String description,
+            List<Integer> arrayDimensions, String typeDefinition, List<SchemaReference> references,
+            String dataTypeNodeId, List<DataTypeMember> members, Integer accessLevelFull,
+            Integer minimumSamplingInterval, Integer writeMask, Boolean historizing) {
+        this(nodeId, parentId, path, name, kind, dataType, valueRank, access, unit, description,
+                arrayDimensions, typeDefinition, references, dataTypeNodeId, members, List.of(),
+                accessLevelFull, minimumSamplingInterval, writeMask, historizing);
     }
 
     /** Backward-compatible constructor for folders and scalar/array variables authored before IS-176. */
@@ -120,6 +138,6 @@ public record SchemaNode(
             DataType dataType, ValueRank valueRank, Access access, String unit, String description) {
         this(nodeId, parentId, path, name, kind, dataType, valueRank, access, unit, description,
                 List.of(), null, List.of(), null, List.of(),
-                null, null, null, null);  // IS-183 + IS-189 fields = null
+                List.of(), null, null, null, null);  // IS-183 + IS-189 fields = null
     }
 }

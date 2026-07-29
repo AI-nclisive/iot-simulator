@@ -1,6 +1,7 @@
 package com.ainclusive.iotsim.api.manualschema;
 
 import com.ainclusive.iotsim.api.error.PreconditionRequiredException;
+import com.ainclusive.iotsim.api.schema.EnumValueDto;
 import com.ainclusive.iotsim.api.schema.MemberDto;
 import com.ainclusive.iotsim.api.schema.ReferenceDto;
 import com.ainclusive.iotsim.api.schema.SchemaReferenceMapper;
@@ -184,7 +185,8 @@ public class ManualSchemaController {
                     d.nodeId(), d.parentId(), d.path(), d.name(),
                     kind, dataType, valueRank, access, d.unit(), d.description(), d.arrayDimensions(),
                     d.typeDefinition(), SchemaReferenceMapper.toModel(d.references()), d.dataTypeNodeId(),
-                    SchemaReferenceMapper.toMembers(d.members()), d.accessLevelFull(), d.minimumSamplingInterval(),
+                    SchemaReferenceMapper.toMembers(d.members()), toEnumValues(d.enumValues()),
+                    d.accessLevelFull(), d.minimumSamplingInterval(),
                     d.writeMask(), d.historizing()));
         }
         return nodes;
@@ -194,6 +196,11 @@ public class ManualSchemaController {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(field + " is required");
         }
+    }
+
+    private static List<com.ainclusive.iotsim.protocolmodel.DataTypeEnumValue> toEnumValues(
+            List<EnumValueDto> values) {
+        return values == null ? List.of() : values.stream().map(EnumValueDto::toModel).toList();
     }
 
     private static <E extends Enum<E>> E parseEnum(Class<E> type, String value, String field) {
@@ -236,12 +243,24 @@ public class ManualSchemaController {
             String dataType, String valueRank, String access, String unit, String description,
             List<Integer> arrayDimensions, String typeDefinition, List<ReferenceDto> references,
             String dataTypeNodeId, List<MemberDto> members,
+            List<EnumValueDto> enumValues,
             Integer accessLevelFull, Integer minimumSamplingInterval, Integer writeMask, Boolean historizing) {
 
         public NodeDto(String nodeId, String parentId, String path, String name, String kind,
                 String dataType, String valueRank, String access, String unit, String description) {
             this(nodeId, parentId, path, name, kind, dataType, valueRank, access, unit, description,
-                    List.of(), null, List.of(), null, List.of(), null, null, null, null);
+                    List.of(), null, List.of(), null, List.of(), List.of(), null, null, null, null);
+        }
+
+        /** Compatibility constructor for clients written before enum literals were exposed. */
+        public NodeDto(String nodeId, String parentId, String path, String name, String kind,
+                String dataType, String valueRank, String access, String unit, String description,
+                List<Integer> arrayDimensions, String typeDefinition, List<ReferenceDto> references,
+                String dataTypeNodeId, List<MemberDto> members, Integer accessLevelFull,
+                Integer minimumSamplingInterval, Integer writeMask, Boolean historizing) {
+            this(nodeId, parentId, path, name, kind, dataType, valueRank, access, unit, description,
+                    arrayDimensions, typeDefinition, references, dataTypeNodeId, members, List.of(),
+                    accessLevelFull, minimumSamplingInterval, writeMask, historizing);
         }
 
         static NodeDto from(SchemaNode n) {
@@ -253,6 +272,7 @@ public class ManualSchemaController {
                     n.unit(), n.description(), n.arrayDimensions(), n.typeDefinition(),
                     n.references().stream().map(ReferenceDto::from).toList(),
                     n.dataTypeNodeId(), n.members().stream().map(MemberDto::from).toList(),
+                    n.enumValues().stream().map(EnumValueDto::from).toList(),
                     n.accessLevelFull(), n.minimumSamplingInterval(), n.writeMask(), n.historizing());
         }
     }
