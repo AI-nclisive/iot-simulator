@@ -26,12 +26,14 @@ public final class NativeTypeCatalog {
     private static NativeTypeDefinition fromSchemaNode(SchemaNode node) {
         NativeTypeKind kind = !node.enumValues().isEmpty()
                 ? NativeTypeKind.ENUM
-                : NativeTypeKind.STRUCTURE;
+                : node.members().isEmpty() ? NativeTypeKind.OPAQUE : NativeTypeKind.STRUCTURE;
         List<NativeTypeField> fields = node.members().stream()
                 .map(member -> new NativeTypeField(member.name(), member.dataType(), member.dataTypeNodeId(),
                         ValueRank.SCALAR, List.of(), false, null))
                 .toList();
-        NativeTypeCapability capability = kind == NativeTypeKind.STRUCTURE
+        NativeTypeCapability capability = kind == NativeTypeKind.OPAQUE
+                ? NativeTypeCapability.unsupported("the source did not supply a native type definition")
+                : kind == NativeTypeKind.STRUCTURE
                         && (node.defaultEncodingId() == null || node.defaultEncodingId().isBlank())
                 ? NativeTypeCapability.unsupported("no default binary encoding was supplied")
                 : NativeTypeCapability.supported();

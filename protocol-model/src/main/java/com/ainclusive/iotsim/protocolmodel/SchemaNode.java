@@ -98,10 +98,6 @@ public record SchemaNode(
             if (parentId != null) {
                 throw new IllegalArgumentException("DATA_TYPE nodes must be top-level (parentId must be null)");
             }
-            if (members.isEmpty() && enumValues.isEmpty()) {
-                throw new IllegalArgumentException(
-                        "DATA_TYPE node '" + nodeId + "' requires at least one member or enum value");
-            }
             if (!members.isEmpty() && !enumValues.isEmpty()) {
                 throw new IllegalArgumentException("DATA_TYPE node '" + nodeId
                         + "' cannot mix structured members and enum values");

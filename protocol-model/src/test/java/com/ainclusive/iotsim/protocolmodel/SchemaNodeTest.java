@@ -49,13 +49,12 @@ class SchemaNodeTest {
     }
 
     @Test
-    void dataTypeNodeRequiresAtLeastOneMemberAndNoParent() {
-        assertThatThrownBy(() -> new SchemaNode(
-                        "dt1", null, "Vector3D", "Vector3D", NodeKind.DATA_TYPE, null, null, null, null, null,
-                        java.util.List.of(), null, java.util.List.of(), null, java.util.List.of(),
-                        null, null, null, null))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("at least one member");
+    void dataTypeNodeMayBeOpaqueButCannotHaveParent() {
+        var opaque = new SchemaNode(
+                "dt1", null, "Vector3D", "Vector3D", NodeKind.DATA_TYPE, null, null, null, null, null,
+                java.util.List.of(), null, java.util.List.of(), null, java.util.List.of(),
+                null, null, null, null);
+        assertThat(opaque.members()).isEmpty();
 
         assertThatThrownBy(() -> new SchemaNode(
                         "dt1", "someParent", "Vector3D", "Vector3D", NodeKind.DATA_TYPE, null, null, null, null,

@@ -210,6 +210,26 @@ class ScanServiceTest {
     }
 
     @Test
+    void createFromScanPreservesUnresolvedStructuredMemberTypeAsOpaqueDefinition() {
+        scanner.scanResult = new ScanResult(ScanStatus.OK, List.of(
+                new DiscoveredNode("ns=2;s=value", null, "Value", "Value", "VARIABLE",
+                        null, "SCALAR", "READ", null, null, "ns=2;i=1001",
+                        List.of(new DataTypeMember("payload", null, "ns=2;i=2002")), List.of(), "ns=2;i=5002")),
+                false, 1, "discovered structured type");
+        ScanJob job = service.startScan(PROJECT, "OPC_UA", "opc.tcp://h", ConnectionCredentials.anonymous(), 0);
+
+        DataSource created = service.createFromScan(PROJECT, job.jobId(), "Nested source", null, List.of(), "a");
+
+        Schema schema = new SchemaService(schemaRepo, dataSourceRepo, new ObjectMapper()).get(PROJECT, created.id());
+        assertThat(schema.nodes()).anySatisfy(node -> {
+            assertThat(node.kind()).isEqualTo(NodeKind.DATA_TYPE);
+            assertThat(node.nodeId()).isEqualTo("ns=2;i=2002");
+            assertThat(node.members()).isEmpty();
+            assertThat(node.enumValues()).isEmpty();
+        });
+    }
+
+    @Test
     void createFromScanImportsNativeEnumDefinition() {
         scanner.scanResult = new ScanResult(ScanStatus.OK, List.of(
                 new DiscoveredNode("ns=2;s=state", null, "State", "State", "VARIABLE",

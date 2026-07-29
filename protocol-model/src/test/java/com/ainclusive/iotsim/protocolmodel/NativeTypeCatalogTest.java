@@ -26,4 +26,16 @@ class NativeTypeCatalogTest {
         assertThat(entries.getFirst().fields()).hasSize(2);
         assertThat(entries.getFirst().capability().replayEncodable()).isTrue();
     }
+
+    @Test
+    void exposesDefinitionlessDataTypeAsOpaqueAndUnsupported() {
+        SchemaNode opaque = new SchemaNode("ns=2;i=2002", null, "Types/ns=2;i=2002", "ns=2;i=2002",
+                NodeKind.DATA_TYPE, null, null, null, null, "source omitted declaration", List.of(), null,
+                List.of(), null, List.of(), List.of(), null, null, null, null, null);
+
+        NativeTypeDefinition entry = NativeTypeCatalog.fromSchemaNodes(List.of(opaque)).getFirst();
+
+        assertThat(entry.kind()).isEqualTo(NativeTypeKind.OPAQUE);
+        assertThat(entry.capability().materializable()).isFalse();
+    }
 }

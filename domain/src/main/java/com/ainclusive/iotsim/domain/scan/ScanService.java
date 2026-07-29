@@ -389,6 +389,27 @@ public class ScanService implements DisposableBean {
         nodes.add(new SchemaNode(typeId, null, "Types/" + typeId, node.name(), NodeKind.DATA_TYPE,
                 null, null, null, null, description, List.of(), null,
                 List.of(), null, members, enumValues, node.dataTypeDefaultEncodingId(), null, null, null, null));
+        addOpaqueMemberTypes(nodes, importedTypeIds, members);
+    }
+
+    /**
+     * Preserves identities referenced by a structure even when the server did not return their
+     * declarations. Those entries remain explicitly opaque instead of being silently replaced by
+     * a primitive fallback.
+     */
+    private static void addOpaqueMemberTypes(
+            List<SchemaNode> nodes, Set<String> importedTypeIds, List<DataTypeMember> members) {
+        for (DataTypeMember member : members) {
+            String memberTypeId = member.dataTypeNodeId();
+            if (memberTypeId == null || !importedTypeIds.add(memberTypeId)) {
+                continue;
+            }
+            nodes.add(new SchemaNode(memberTypeId, null, "Types/" + memberTypeId, memberTypeId,
+                    NodeKind.DATA_TYPE, null, null, null, null,
+                    "Opaque OPC UA DataType referenced by an imported structure; its definition was not supplied by the source",
+                    List.of(), null, List.of(), null, List.of(), List.of(), null,
+                    null, null, null, null));
+        }
     }
 
     /** Indexes resolutions by nodeId, rejecting duplicates and non-unknown targets. */
