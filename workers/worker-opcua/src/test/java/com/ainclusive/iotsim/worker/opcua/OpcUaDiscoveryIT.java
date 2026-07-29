@@ -133,6 +133,38 @@ class OpcUaDiscoveryIT {
     }
 
     @Test
+    void scanMaterializesStandardRangeWhenServerOmitsItsDefinition() throws Exception {
+        int port = freePort();
+        OpcUaServerRuntime runtime = new OpcUaServerRuntime(
+                port,
+                "127.0.0.1",
+                "127.0.0.1",
+                List.of(new VarDef("range", null, "Range", "VARIABLE", "", "ns=0;i=884", null,
+                        null, null, null, null)),
+                List.of(),
+                AuthConfig.anonymous(),
+                event -> { },
+                event -> { });
+        runtime.start();
+        try {
+            OpcUaDiscovery.ScanOutcome outcome = OpcUaDiscovery.scan(
+                    runtime.endpointUrl(), ANON, 0, () -> { }, soFar -> { });
+
+            SchemaNodeMsg range = outcome.nodes().stream()
+                    .filter(node -> "Range".equals(node.getName()))
+                    .findFirst()
+                    .orElseThrow();
+            assertThat(range.getDataTypeNodeId()).isEqualTo("ns=0;i=884");
+            assertThat(range.getNativeTypeKind()).isEqualTo("STRUCTURE");
+            assertThat(range.getDataTypeDefaultEncodingId()).isEqualTo("ns=0;i=886");
+            assertThat(range.getDataTypeMembersList()).extracting(member -> member.getName())
+                    .containsExactly("low", "high");
+        } finally {
+            runtime.stop();
+        }
+    }
+
+    @Test
     void scanStopsAtNodeCapAndReportsPartial() throws Exception {
         int port = freePort();
         OpcUaServerRuntime runtime = new OpcUaServerRuntime(port, List.of(
