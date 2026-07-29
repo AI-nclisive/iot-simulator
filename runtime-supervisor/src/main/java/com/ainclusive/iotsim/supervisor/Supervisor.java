@@ -429,12 +429,7 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
         if (isExternalRef(spec.credentials())) {
             throw new CaptureException(CaptureException.Kind.UNSUPPORTED, EXTERNAL_REF_UNSUPPORTED);
         }
-        Map<String, ValueCodec.Kind> kinds = new HashMap<>();
-        for (SchemaNode n : spec.schemaNodes()) {
-            if (n.kind() == NodeKind.VARIABLE && n.dataType() != null) {
-                kinds.put(n.nodeId(), ValueCodec.kindOf(n.dataType()));
-            }
-        }
+        Map<String, ValueCodec.Kind> kinds = captureValueKinds(spec.schemaNodes());
         CaptureRequest request = CaptureRequest.newBuilder()
                 .setEndpointUrl(orEmpty(spec.endpointUrl()))
                 .setCredentials(toCredentialMsg(spec.credentials()))
@@ -519,6 +514,36 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
             out.add(new NeutralValue(v.getNodeId(), sourceTime, value, neutralQuality(v.getQuality()), reason));
         }
         return out;
+    }
+
+    private static Map<String, ValueCodec.Kind> captureValueKinds(List<SchemaNode> nodes) {
+        Map<String, SchemaNode> declarations = new HashMap<>();
+        for (SchemaNode node : nodes) {
+            if (node.kind() == NodeKind.DATA_TYPE) {
+                declarations.put(node.nodeId(), node);
+            }
+        }
+        Map<String, ValueCodec.Kind> kinds = new HashMap<>();
+        for (SchemaNode node : nodes) {
+            if (node.kind() != NodeKind.VARIABLE) {
+                continue;
+            }
+            if (node.dataType() != null) {
+                kinds.put(node.nodeId(), ValueCodec.kindOf(node.dataType()));
+                continue;
+            }
+            SchemaNode declaration = declarations.get(node.dataTypeNodeId());
+            if (declaration != null && !declaration.enumValues().isEmpty()) {
+                kinds.put(node.nodeId(), ValueCodec.Kind.INT);
+                continue;
+            }
+            if (declaration != null) {
+                throw new CaptureException(CaptureException.Kind.UNSUPPORTED,
+                        "capture cannot decode native DataType without an executable encoding: "
+                                + declaration.name());
+            }
+        }
+        return kinds;
     }
 
     /**
