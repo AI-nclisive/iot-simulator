@@ -1250,7 +1250,8 @@ export function ManualSchemaEditorPage() {
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="text-xs font-semibold uppercase tracking-[0.08em] text-shell-muted">
-                    {selectedNode.kind === "FOLDER" ? "Folder" : selectedNode.kind === "OBJECT" ? "Object" : "Variable"}
+                    {selectedNode.kind === "FOLDER" ? "Folder" : selectedNode.kind === "OBJECT" ? "Object"
+                      : selectedNode.kind === "DATA_TYPE" ? "Data type" : "Variable"}
                   </p>
                   <p className="mt-2 truncate font-mono text-sm text-shell-ink">{selectedNode.path}</p>
                   {selectedNode.parentId && nodes.find((n) => n.nodeId === selectedNode.parentId)?.kind === "VARIABLE" ? (
@@ -1320,6 +1321,18 @@ export function ManualSchemaEditorPage() {
                       />
                     </label>
                   </>
+                ) : null}
+                {selectedNode.kind === "DATA_TYPE" ? (
+                  <div className="flex flex-col gap-2 text-sm text-shell-muted">
+                    <span className="font-medium text-shell-ink">Members</span>
+                    {(selectedNode.members ?? []).length === 0 ? <span>No members.</span> : (
+                      <ul className="space-y-1 font-mono text-xs text-shell-ink">
+                        {(selectedNode.members ?? []).map((member) => (
+                          <li key={member.name}>{member.name}: {member.dataType ?? member.dataTypeNodeId}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
                 ) : null}
                 <label className="flex flex-col gap-2 text-sm text-shell-muted">
                   Description
