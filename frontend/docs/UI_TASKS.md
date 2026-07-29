@@ -1294,6 +1294,10 @@ Parallel execution:
   source schema was used, and how many values were sent. Link to the schema
   and the run's evidence when available.
 
+- [x] `UI-509` Data source wizard — make repeat scan action prominent
+  Goal: after a completed scan, clearly distinguish the action that starts a
+  fresh endpoint scan and explain that it replaces the current discovery result.
+
 ## Recommended Sequence
 
 1. Complete the P0 shell and shared-pattern tasks first.
