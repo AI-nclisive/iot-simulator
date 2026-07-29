@@ -384,10 +384,15 @@ final class OpcUaDiscovery {
                 if (value == null || value.getValue() == null || value.getDisplayName() == null) {
                     continue;
                 }
+                String name = value.getDisplayName().getText();
+                if (name == null || name.isBlank()) {
+                    continue;
+                }
+                String description = value.getDescription() == null ? "" : value.getDescription().getText();
                 literals.add(DataTypeEnumValueMsg.newBuilder()
-                        .setName(value.getDisplayName().getText())
+                        .setName(name)
                         .setValue(value.getValue())
-                        .setDescription(value.getDescription() == null ? "" : value.getDescription().getText())
+                        .setDescription(description == null ? "" : description)
                         .build());
             }
             return List.copyOf(literals);
