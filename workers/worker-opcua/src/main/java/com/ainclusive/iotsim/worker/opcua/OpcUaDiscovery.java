@@ -335,7 +335,10 @@ final class OpcUaDiscovery {
         ReadResponse response = client.read(0.0, TimestampsToReturn.Neither, List.of(request))
                 .get(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS);
         DataValue[] results = response.getResults();
-        Object definition = results != null && results.length > 0 ? results[0].getValue().getValue() : null;
+        DataValue definitionValue = results != null && results.length > 0 ? results[0] : null;
+        Object definition = definitionValue != null && definitionValue.getValue() != null
+                ? definitionValue.getValue().getValue()
+                : null;
         if (!(definition instanceof StructureDefinition structure) || structure.getFields() == null) {
             return List.of();
         }
