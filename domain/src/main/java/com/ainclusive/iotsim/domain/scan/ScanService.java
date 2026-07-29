@@ -384,7 +384,7 @@ public class ScanService implements DisposableBean {
         if (typeId == null || members.isEmpty() || !importedTypeIds.add(typeId)) {
             return;
         }
-        nodes.add(new SchemaNode(typeId, null, "Types/" + typeId, typeId, NodeKind.DATA_TYPE,
+        nodes.add(new SchemaNode(typeId, null, "Types/" + typeId, node.name(), NodeKind.DATA_TYPE,
                 null, null, null, null, "Imported OPC UA structured DataType", List.of(), null,
                 List.of(), null, members, null, null, null, null));
     }

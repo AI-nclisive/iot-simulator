@@ -344,9 +344,13 @@ final class OpcUaDiscovery {
         }
         List<DataTypeMemberMsg> members = new ArrayList<>();
         for (StructureField field : structure.getFields()) {
+            String fieldName = field.getName();
+            if (fieldName == null || fieldName.isBlank()) {
+                continue;
+            }
             NodeId fieldType = field.getDataType();
             String neutral = OpcUaTypes.neutralTypeOf(fieldType);
-            DataTypeMemberMsg.Builder member = DataTypeMemberMsg.newBuilder().setName(field.getName());
+            DataTypeMemberMsg.Builder member = DataTypeMemberMsg.newBuilder().setName(fieldName);
             if (neutral != null) {
                 member.setDataType(neutral);
             } else if (fieldType != null) {
