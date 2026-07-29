@@ -113,7 +113,7 @@ function isTerminalRunEvent(event: RuntimeEvent): boolean {
   return event.runId !== null && ["RUN_COMPLETED", "RUN_STOPPED", "RUN_FAILED"].includes(event.type);
 }
 
-function formatDuration(startedAt?: string, endedAt?: string | null): string {
+function formatDuration(startedAt?: string | null, endedAt?: string | null): string {
   if (!startedAt || !endedAt) return "Not available";
   const start = new Date(startedAt).getTime();
   const end = new Date(endedAt).getTime();
