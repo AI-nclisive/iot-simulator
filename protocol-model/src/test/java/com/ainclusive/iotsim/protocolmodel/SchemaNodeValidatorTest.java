@@ -135,13 +135,21 @@ class SchemaNodeValidatorTest {
     }
 
     @Test
-    void rejectsNestingADataTypeThatItselfNestsAnotherCustomType() {
+    void acceptsNestedStructuredDataTypesAtAnyFiniteDepth() {
         SchemaNode leaf = dataTypeNode("dtLeaf", "Leaf", List.of(new DataTypeMember("v", DataType.FLOAT64, null)));
         SchemaNode middle = dataTypeNode("dtMiddle", "Middle", List.of(new DataTypeMember("leaf", null, "dtLeaf")));
         SchemaNode outer = dataTypeNode("dtOuter", "Outer", List.of(new DataTypeMember("middle", null, "dtMiddle")));
 
-        assertThatThrownBy(() -> SchemaNodeValidator.validate(List.of(leaf, middle, outer)))
-                .hasMessageContaining("only one level of");
+        SchemaNodeValidator.validate(List.of(leaf, middle, outer));
+    }
+
+    @Test
+    void rejectsCyclicStructuredDataTypes() {
+        SchemaNode first = dataTypeNode("first", "First", List.of(new DataTypeMember("second", null, "second")));
+        SchemaNode second = dataTypeNode("second", "Second", List.of(new DataTypeMember("first", null, "first")));
+
+        assertThatThrownBy(() -> SchemaNodeValidator.validate(List.of(first, second)))
+                .hasMessageContaining("cyclic DATA_TYPE member reference");
     }
 
     private static SchemaNode node(String id, String parentId, NodeKind kind) {

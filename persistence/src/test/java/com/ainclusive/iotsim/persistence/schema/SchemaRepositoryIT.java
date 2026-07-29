@@ -6,6 +6,7 @@ import com.ainclusive.iotsim.persistence.datasource.JooqDataSourceRepository;
 import com.ainclusive.iotsim.persistence.project.JooqProjectRepository;
 import com.ainclusive.iotsim.protocolmodel.Access;
 import com.ainclusive.iotsim.protocolmodel.DataType;
+import com.ainclusive.iotsim.protocolmodel.DataTypeMember;
 import com.ainclusive.iotsim.protocolmodel.NodeKind;
 import com.ainclusive.iotsim.protocolmodel.ReferenceType;
 import com.ainclusive.iotsim.protocolmodel.SchemaNode;
@@ -100,6 +101,33 @@ class SchemaRepositoryIT {
 
         assertExtendedNodeValues(schemas.findCurrent(sourceId).orElseThrow(), saved.version());
         assertExtendedNodeValues(schemas.findByVersion(sourceId, saved.version()).orElseThrow(), saved.version());
+    }
+
+    @Test
+    void preservesNativeDataTypeDeclarationAndStructuredMembers() {
+        String sourceId = dataSources
+                .insert(projectId, "Typed source", "OPC_UA", "MANUAL", 4840, null, null, null, "it")
+                .id();
+        SchemaNode range = new SchemaNode("ns=0;i=884", null, "Range", "Range", NodeKind.DATA_TYPE,
+                null, null, null, null, "OPC UA Range", List.of(), null, List.of(), null,
+                List.of(new DataTypeMember("low", DataType.FLOAT64, null),
+                        new DataTypeMember("high", DataType.FLOAT64, null)),
+                null, null, null, null);
+        SchemaNode value = new SchemaNode("range-value", null, "RangeValue", "RangeValue",
+                NodeKind.VARIABLE, null, ValueRank.SCALAR, Access.READ, null, null,
+                List.of(), null, List.of(), "ns=0;i=884", List.of(), null, null, null, null);
+
+        schemas.saveNewVersion(sourceId, List.of(range, value));
+
+        SchemaWithNodes restored = schemas.findCurrent(sourceId).orElseThrow();
+        SchemaNode restoredRange = restored.nodes().stream()
+                .filter(node -> node.nodeId().equals("ns=0;i=884")).findFirst().orElseThrow();
+        SchemaNode restoredValue = restored.nodes().stream()
+                .filter(node -> node.nodeId().equals("range-value")).findFirst().orElseThrow();
+        assertThat(restoredValue.dataTypeNodeId()).isEqualTo("ns=0;i=884");
+        assertThat(restoredRange.members()).containsExactly(
+                new DataTypeMember("low", DataType.FLOAT64, null),
+                new DataTypeMember("high", DataType.FLOAT64, null));
     }
 
     private static void assertExtendedNodeValues(SchemaWithNodes schema, int expectedVersion) {
