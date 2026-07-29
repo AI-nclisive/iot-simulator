@@ -126,6 +126,9 @@ message DataTypeMemberMsg {
   string name = 1;
   string data_type = 2;
   string data_type_node_id = 3;
+  string value_rank = 4;               // SCALAR | ARRAY
+  repeated uint32 array_dimensions = 5;
+  bool optional = 6;                   // StructureField.isOptional
 }
 
 // Exact literals of a native OPC UA enum or option-set declaration.

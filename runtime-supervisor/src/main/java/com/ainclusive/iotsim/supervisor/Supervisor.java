@@ -32,6 +32,7 @@ import com.ainclusive.iotsim.protocolmodel.NeutralValue;
 import com.ainclusive.iotsim.protocolmodel.NodeKind;
 import com.ainclusive.iotsim.protocolmodel.SchemaNode;
 import com.ainclusive.iotsim.protocolmodel.ValueCodec;
+import com.ainclusive.iotsim.protocolmodel.ValueRank;
 import com.ainclusive.iotsim.workercontract.v1.CaptureRequest;
 import com.ainclusive.iotsim.workercontract.v1.ClientEvent;
 import com.ainclusive.iotsim.workercontract.v1.ConnectionConfigMsg;
@@ -652,7 +653,9 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
                 emptyToNull(n.getUnit()), emptyToNull(n.getDescription()), emptyToNull(n.getDataTypeNodeId()),
                 n.getDataTypeMembersList().stream().map(member -> new DataTypeMember(
                         member.getName(), member.getDataType().isBlank() ? null : DataType.valueOf(member.getDataType()),
-                        emptyToNull(member.getDataTypeNodeId()))).toList(),
+                        emptyToNull(member.getDataTypeNodeId()),
+                        member.getValueRank().isBlank() ? ValueRank.SCALAR : ValueRank.valueOf(member.getValueRank()),
+                        member.getArrayDimensionsList(), member.getOptional())).toList(),
                 n.getDataTypeEnumValuesList().stream().map(value -> new DataTypeEnumValue(
                         value.getName(), value.getValue(), emptyToNull(value.getDescription()))).toList(),
                 emptyToNull(n.getDataTypeDefaultEncodingId()));
@@ -711,6 +714,9 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
                                     .setName(member.name())
                                     .setDataType(member.dataType() == null ? "" : member.dataType().name())
                                     .setDataTypeNodeId(orEmpty(member.dataTypeNodeId()))
+                                    .setValueRank(member.valueRank().name())
+                                    .addAllArrayDimensions(member.arrayDimensions())
+                                    .setOptional(member.optional())
                                     .build())
                             .toList())
                     .addAllDataTypeEnumValues(n.enumValues().stream()

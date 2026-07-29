@@ -4,6 +4,7 @@ import com.ainclusive.iotsim.protocolmodel.DataType;
 import com.ainclusive.iotsim.protocolmodel.DataTypeMember;
 import com.ainclusive.iotsim.protocolmodel.ReferenceType;
 import com.ainclusive.iotsim.protocolmodel.SchemaReference;
+import com.ainclusive.iotsim.protocolmodel.ValueRank;
 import java.util.List;
 
 /** Shared mapping for the identical schema-node reference/member fields exposed by all schema endpoints. */
@@ -24,7 +25,9 @@ public final class SchemaReferenceMapper {
             return List.of();
         }
         return dtos.stream().map(d -> new DataTypeMember(d.name(),
-                d.dataType() == null ? null : parseDataType(d.dataType()), d.dataTypeNodeId())).toList();
+                d.dataType() == null ? null : parseDataType(d.dataType()), d.dataTypeNodeId(),
+                d.valueRank() == null ? ValueRank.SCALAR : ValueRank.valueOf(d.valueRank()),
+                d.arrayDimensions(), Boolean.TRUE.equals(d.optional()))).toList();
     }
 
     private static DataType parseDataType(String value) {

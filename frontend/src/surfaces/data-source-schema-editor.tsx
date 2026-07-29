@@ -29,7 +29,14 @@ export type NodeDto = {
   typeDefinition?: string | null;
   references?: ReferenceDto[];
   dataTypeNodeId?: string | null;
-  members?: Array<{ name: string; dataType: string | null; dataTypeNodeId: string | null }>;
+  members?: Array<{
+    name: string;
+    dataType: string | null;
+    dataTypeNodeId: string | null;
+    valueRank?: string | null;
+    arrayDimensions?: number[];
+    optional?: boolean | null;
+  }>;
   enumValues?: Array<{ name: string; value: number; description: string | null }>;
   accessLevelFull?: number | null;
   minimumSamplingInterval?: number | null;

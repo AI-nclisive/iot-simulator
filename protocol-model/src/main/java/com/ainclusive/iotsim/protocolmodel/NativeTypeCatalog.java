@@ -29,7 +29,7 @@ public final class NativeTypeCatalog {
                 : node.members().isEmpty() ? NativeTypeKind.OPAQUE : NativeTypeKind.STRUCTURE;
         List<NativeTypeField> fields = node.members().stream()
                 .map(member -> new NativeTypeField(member.name(), member.dataType(), member.dataTypeNodeId(),
-                        ValueRank.SCALAR, List.of(), false, null))
+                        member.valueRank(), member.arrayDimensions(), member.optional(), null))
                 .toList();
         NativeTypeCapability capability = kind == NativeTypeKind.OPAQUE
                 ? NativeTypeCapability.unsupported("the source did not supply a native type definition")

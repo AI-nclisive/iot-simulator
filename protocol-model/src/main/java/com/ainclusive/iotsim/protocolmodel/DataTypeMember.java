@@ -1,5 +1,6 @@
 package com.ainclusive.iotsim.protocolmodel;
 
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -11,7 +12,13 @@ import java.util.Objects;
  * Structured declarations may nest to any finite depth; {@link SchemaNodeValidator} rejects only
  * cycles, because a cycle has no materializable value shape.
  */
-public record DataTypeMember(String name, DataType dataType, String dataTypeNodeId) {
+public record DataTypeMember(
+        String name,
+        DataType dataType,
+        String dataTypeNodeId,
+        ValueRank valueRank,
+        List<Integer> arrayDimensions,
+        boolean optional) {
     public DataTypeMember {
         Objects.requireNonNull(name, "name");
         if (name.isBlank()) {
@@ -21,5 +28,18 @@ public record DataTypeMember(String name, DataType dataType, String dataTypeNode
             throw new IllegalArgumentException(
                     "member '" + name + "' requires exactly one of dataType or dataTypeNodeId");
         }
+        valueRank = valueRank == null ? ValueRank.SCALAR : valueRank;
+        arrayDimensions = arrayDimensions == null ? List.of() : List.copyOf(arrayDimensions);
+        if (valueRank == ValueRank.SCALAR && !arrayDimensions.isEmpty()) {
+            throw new IllegalArgumentException("arrayDimensions require ARRAY member valueRank");
+        }
+        if (arrayDimensions.stream().anyMatch(dimension -> dimension < 0)) {
+            throw new IllegalArgumentException("member arrayDimensions must be non-negative");
+        }
+    }
+
+    /** Compatibility constructor for scalar, required fields authored before IS-194. */
+    public DataTypeMember(String name, DataType dataType, String dataTypeNodeId) {
+        this(name, dataType, dataTypeNodeId, ValueRank.SCALAR, List.of(), false);
     }
 }

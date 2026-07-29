@@ -372,6 +372,16 @@ final class OpcUaDiscovery {
             } else {
                 continue;
             }
+            int fieldValueRank = field.getValueRank() == null ? -1 : field.getValueRank();
+            member.setValueRank(fieldValueRank >= 1 ? "ARRAY" : "SCALAR")
+                    .setOptional(Boolean.TRUE.equals(field.getIsOptional()));
+            if (field.getArrayDimensions() != null) {
+                for (var dimension : field.getArrayDimensions()) {
+                    if (dimension != null) {
+                        member.addArrayDimensions(dimension.intValue());
+                    }
+                }
+            }
             members.add(member.build());
         }
         NodeId encodingId = structure.getDefaultEncodingId();

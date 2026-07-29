@@ -3,6 +3,7 @@ package com.ainclusive.iotsim.protocolmodel;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class DataTypeMemberTest {
@@ -19,6 +20,16 @@ class DataTypeMemberTest {
         var member = new DataTypeMember("nested", null, "dt2");
         assertThat(member.dataTypeNodeId()).isEqualTo("dt2");
         assertThat(member.dataType()).isNull();
+    }
+
+    @Test
+    void preservesArrayAndOptionalFieldMetadata() {
+        var member = new DataTypeMember("samples", DataType.FLOAT64, null,
+                ValueRank.ARRAY, List.of(3), true);
+
+        assertThat(member.valueRank()).isEqualTo(ValueRank.ARRAY);
+        assertThat(member.arrayDimensions()).containsExactly(3);
+        assertThat(member.optional()).isTrue();
     }
 
     @Test
