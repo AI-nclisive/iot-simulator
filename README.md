@@ -238,10 +238,11 @@ Postgres:
   ```bash
   ./gradlew :workers:worker-opcua:installDist :workers:worker-opcua:compileTestJava
   java -cp "workers/worker-opcua/build/classes/java/test:workers/worker-opcua/build/install/worker-opcua/lib/*" \
-    com.ainclusive.iotsim.worker.opcua.OpcUaScanTool "opc.tcp://host:4840/path"
+    com.ainclusive.iotsim.worker.opcua.OpcUaScanTool "opc.tcp://host:4840/path" 50
   ```
 
-  Omit the endpoint argument to default to the public Prosys demo server
+  The optional second argument caps the number of browsed nodes (default: 5000);
+  use a small cap when testing a shared public server. Omit the endpoint argument to default to the public Prosys demo server
   (`opc.tcp://uademo.prosysopc.com:53530/OPCUA/SimulationServer`).
 
 ## Notes

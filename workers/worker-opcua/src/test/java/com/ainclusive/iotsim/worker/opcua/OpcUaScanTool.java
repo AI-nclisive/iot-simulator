@@ -21,6 +21,7 @@ final class OpcUaScanTool {
     public static void main(String[] args) throws Exception {
         String endpoint = args.length > 0 ? args[0]
                 : "opc.tcp://uademo.prosysopc.com:53530/OPCUA/SimulationServer";
+        int maxNodes = args.length > 1 ? Integer.parseInt(args[1]) : 5000;
 
         OpcUaDiscovery.Credentials anon = new OpcUaDiscovery.Credentials("ANONYMOUS", null, null);
 
@@ -32,7 +33,8 @@ final class OpcUaScanTool {
         }
 
         System.out.println("Scanning " + endpoint + " ...");
-        OpcUaDiscovery.ScanOutcome outcome = OpcUaDiscovery.scan(endpoint, anon, 5000, () -> System.out.println("connected"), soFar -> System.out.println("discovered " + soFar));
+        OpcUaDiscovery.ScanOutcome outcome = OpcUaDiscovery.scan(endpoint, anon, maxNodes,
+                () -> System.out.println("connected"), soFar -> System.out.println("discovered " + soFar));
         System.out.println("  status=" + outcome.status() + " message=" + outcome.message());
         System.out.println("  truncated=" + outcome.truncated() + " unknownCount=" + outcome.unknownCount());
         System.out.println("  discovered " + outcome.nodes().size() + " nodes");
