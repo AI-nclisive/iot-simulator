@@ -22,6 +22,7 @@ import com.ainclusive.iotsim.protocolmodel.Access;
 import com.ainclusive.iotsim.protocolmodel.DataType;
 import com.ainclusive.iotsim.protocolmodel.DataTypeEnumValue;
 import com.ainclusive.iotsim.protocolmodel.DataTypeMember;
+import com.ainclusive.iotsim.protocolmodel.NativeTypeKind;
 import com.ainclusive.iotsim.protocolmodel.NodeKind;
 import com.ainclusive.iotsim.protocolmodel.SchemaNode;
 import com.ainclusive.iotsim.protocolmodel.ValueRank;
@@ -382,10 +383,10 @@ public class ScanService implements DisposableBean {
     /** Adds one top-level schema type for a scanned structured native declaration. */
     private static void addImportedType(List<SchemaNode> nodes, Set<String> importedTypeIds, DiscoveredNode node) {
         addImportedType(nodes, importedTypeIds, node.dataTypeNodeId(), node.name(), node.dataTypeMembers(),
-                node.dataTypeEnumValues(), node.dataTypeDefaultEncodingId());
+                node.dataTypeEnumValues(), node.dataTypeDefaultEncodingId(), node.dataTypeKind());
         for (DiscoveredTypeDefinition dependency : node.dataTypeDependencies()) {
             addImportedType(nodes, importedTypeIds, dependency.nodeId(), dependency.name(), dependency.members(),
-                    dependency.enumValues(), dependency.defaultEncodingId());
+                    dependency.enumValues(), dependency.defaultEncodingId(), dependency.nativeTypeKind());
         }
     }
 
@@ -396,14 +397,15 @@ public class ScanService implements DisposableBean {
             String typeName,
             List<DataTypeMember> members,
             List<DataTypeEnumValue> enumValues,
-            String defaultEncodingId) {
+            String defaultEncodingId,
+            NativeTypeKind nativeTypeKind) {
         if (typeId == null || (members.isEmpty() && enumValues.isEmpty())) {
             return;
         }
         String description = members.isEmpty() ? "Imported OPC UA enum DataType" : "Imported OPC UA structured DataType";
         SchemaNode imported = new SchemaNode(typeId, null, "Types/" + typeId, typeName, NodeKind.DATA_TYPE,
                 null, null, null, null, description, List.of(), null,
-                List.of(), null, members, enumValues, defaultEncodingId, null, null, null, null);
+                List.of(), null, members, enumValues, defaultEncodingId, nativeTypeKind, null, null, null, null);
         int existingIndex = indexOfImportedType(nodes, typeId);
         if (existingIndex >= 0) {
             SchemaNode existing = nodes.get(existingIndex);

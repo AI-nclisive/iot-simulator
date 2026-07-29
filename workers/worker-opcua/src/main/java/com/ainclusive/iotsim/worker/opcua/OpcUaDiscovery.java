@@ -28,6 +28,7 @@ import org.eclipse.milo.opcua.stack.core.types.builtin.QualifiedName;
 import org.eclipse.milo.opcua.stack.core.types.enumerated.BrowseDirection;
 import org.eclipse.milo.opcua.stack.core.types.enumerated.BrowseResultMask;
 import org.eclipse.milo.opcua.stack.core.types.enumerated.NodeClass;
+import org.eclipse.milo.opcua.stack.core.types.enumerated.StructureType;
 import org.eclipse.milo.opcua.stack.core.types.enumerated.TimestampsToReturn;
 import org.eclipse.milo.opcua.stack.core.types.structured.BrowseDescription;
 import org.eclipse.milo.opcua.stack.core.types.structured.BrowseResult;
@@ -312,11 +313,12 @@ final class OpcUaDiscovery {
     /** The neutral mapping plus the original DataType attribute, when it needs preserving. */
     private record DataTypeDeclaration(String neutralType, String dataTypeNodeId,
             List<DataTypeMemberMsg> members, List<DataTypeEnumValueMsg> enumValues,
-            String defaultEncodingId, List<NativeDataTypeDefinitionMsg> dependencies) {}
+            String defaultEncodingId, String nativeTypeKind, List<NativeDataTypeDefinitionMsg> dependencies) {}
 
     /** The fields and binary encoding supplied by a native StructureDefinition. */
-    private record StructureDeclaration(List<DataTypeMemberMsg> members, String defaultEncodingId) {
-        private static final StructureDeclaration EMPTY = new StructureDeclaration(List.of(), null);
+    private record StructureDeclaration(List<DataTypeMemberMsg> members, String defaultEncodingId,
+            String nativeTypeKind) {
+        private static final StructureDeclaration EMPTY = new StructureDeclaration(List.of(), null, null);
     }
 
     /** Reads a variable's DataType attribute and reverse-maps it; counts non-neutral declarations. */
@@ -340,7 +342,9 @@ final class OpcUaDiscovery {
                 : readStructureDeclaration(client, dataTypeId);
         List<DataTypeEnumValueMsg> enumValues = nativeTypeId == null ? List.of() : readEnumValues(client, dataTypeId);
         return new DataTypeDeclaration(neutral, nativeTypeId,
-                structure.members(), enumValues, structure.defaultEncodingId(),
+                structure.members(), enumValues, structure.defaultEncodingId(), nativeTypeId == null ? null
+                        : !enumValues.isEmpty() ? "ENUM"
+                        : structure.nativeTypeKind() == null ? "OPAQUE" : structure.nativeTypeKind(),
                 nativeTypeId == null ? List.of() : readDependentTypeDefinitions(client, structure.members()));
     }
 
@@ -374,6 +378,8 @@ final class OpcUaDiscovery {
                     .addAllMembers(structure.members())
                     .addAllEnumValues(enumValues)
                     .setDefaultEncodingId(structure.defaultEncodingId() == null ? "" : structure.defaultEncodingId())
+                    .setNativeTypeKind(!enumValues.isEmpty() ? "ENUM"
+                            : structure.nativeTypeKind() == null ? "OPAQUE" : structure.nativeTypeKind())
                     .build();
             definitions.put(typeId, definition);
             for (DataTypeMemberMsg member : structure.members()) {
@@ -436,7 +442,8 @@ final class OpcUaDiscovery {
         }
         NodeId encodingId = structure.getDefaultEncodingId();
         return new StructureDeclaration(List.copyOf(members),
-                encodingId == null ? null : encodingId.toParseableString());
+                encodingId == null ? null : encodingId.toParseableString(),
+                structure.getStructureType() == StructureType.Union ? "UNION" : "STRUCTURE");
     }
 
     /** Imports numeric enum/option-set literals when the server exposes EnumValues. */
@@ -490,6 +497,8 @@ final class OpcUaDiscovery {
                     .addAllDataTypeEnumValues(declaration == null ? List.of() : declaration.enumValues())
                     .setDataTypeDefaultEncodingId(declaration == null || declaration.defaultEncodingId() == null
                             ? "" : declaration.defaultEncodingId())
+                    .setNativeTypeKind(declaration == null || declaration.nativeTypeKind() == null
+                            ? "" : declaration.nativeTypeKind())
                     .addAllDataTypeDependencies(declaration == null ? List.of() : declaration.dependencies())
                     .setValueRank(attrs != null && attrs.valueRank() != null && attrs.valueRank() >= 0
                             ? "ARRAY" : "SCALAR")

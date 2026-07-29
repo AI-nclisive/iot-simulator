@@ -118,6 +118,7 @@ message SchemaNodeMsg {
   // deliberately kept separate from the DataType NodeId.
   string data_type_default_encoding_id = 19;
   repeated NativeDataTypeDefinitionMsg data_type_dependencies = 20;
+  string native_type_kind = 21;        // ENUM | OPTION_SET | STRUCTURE | UNION | OPAQUE
 }
 
 // The declared fields of a native OPC UA structured DataType. Exactly one of
@@ -146,6 +147,7 @@ message NativeDataTypeDefinitionMsg {
   repeated DataTypeMemberMsg members = 3;
   repeated DataTypeEnumValueMsg enum_values = 4;
   string default_encoding_id = 5;
+  string native_type_kind = 6;
 }
 
 message StartRequest {}

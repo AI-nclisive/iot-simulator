@@ -29,6 +29,7 @@ import com.ainclusive.iotsim.platform.secret.ConnectionCredentials;
 import com.ainclusive.iotsim.protocolmodel.DataType;
 import com.ainclusive.iotsim.protocolmodel.DataTypeEnumValue;
 import com.ainclusive.iotsim.protocolmodel.DataTypeMember;
+import com.ainclusive.iotsim.protocolmodel.NativeTypeKind;
 import com.ainclusive.iotsim.protocolmodel.NeutralValue;
 import com.ainclusive.iotsim.protocolmodel.NodeKind;
 import com.ainclusive.iotsim.protocolmodel.SchemaNode;
@@ -661,6 +662,7 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
                 n.getDataTypeEnumValuesList().stream().map(value -> new DataTypeEnumValue(
                         value.getName(), value.getValue(), emptyToNull(value.getDescription()))).toList(),
                 emptyToNull(n.getDataTypeDefaultEncodingId()),
+                n.getNativeTypeKind().isBlank() ? null : NativeTypeKind.valueOf(n.getNativeTypeKind()),
                 n.getDataTypeDependenciesList().stream().map(Supervisor::toDiscoveredTypeDefinition).toList());
     }
 
@@ -673,7 +675,8 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
                         member.getArrayDimensionsList(), member.getOptional())).toList(),
                 definition.getEnumValuesList().stream().map(value -> new DataTypeEnumValue(
                         value.getName(), value.getValue(), emptyToNull(value.getDescription()))).toList(),
-                emptyToNull(definition.getDefaultEncodingId()));
+                emptyToNull(definition.getDefaultEncodingId()),
+                definition.getNativeTypeKind().isBlank() ? null : NativeTypeKind.valueOf(definition.getNativeTypeKind()));
     }
 
     private static ScanStatus toStatus(String wire) {

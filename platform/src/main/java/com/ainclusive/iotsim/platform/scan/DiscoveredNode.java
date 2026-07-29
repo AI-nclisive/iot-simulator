@@ -2,6 +2,7 @@ package com.ainclusive.iotsim.platform.scan;
 
 import com.ainclusive.iotsim.protocolmodel.DataTypeEnumValue;
 import com.ainclusive.iotsim.protocolmodel.DataTypeMember;
+import com.ainclusive.iotsim.protocolmodel.NativeTypeKind;
 import java.util.List;
 
 /**
@@ -21,6 +22,7 @@ public record DiscoveredNode(String nodeId, String parentId, String path, String
         String kind, String dataType, String valueRank, String access,
         String unit, String description, String dataTypeNodeId, List<DataTypeMember> dataTypeMembers,
         List<DataTypeEnumValue> dataTypeEnumValues, String dataTypeDefaultEncodingId,
+        NativeTypeKind dataTypeKind,
         List<DiscoveredTypeDefinition> dataTypeDependencies) {
 
     public DiscoveredNode {
@@ -34,7 +36,7 @@ public record DiscoveredNode(String nodeId, String parentId, String path, String
             String kind, String dataType, String valueRank, String access,
             String unit, String description) {
         this(nodeId, parentId, path, name, kind, dataType, valueRank, access,
-                unit, description, null, List.of(), List.of(), null, List.of());
+                unit, description, null, List.of(), List.of(), null, null, List.of());
     }
 
     /** Compatibility constructor for a native DataType declaration without its definition. */
@@ -42,7 +44,7 @@ public record DiscoveredNode(String nodeId, String parentId, String path, String
             String kind, String dataType, String valueRank, String access,
             String unit, String description, String dataTypeNodeId) {
         this(nodeId, parentId, path, name, kind, dataType, valueRank, access,
-                unit, description, dataTypeNodeId, List.of(), List.of(), null, List.of());
+                unit, description, dataTypeNodeId, List.of(), List.of(), null, null, List.of());
     }
 
     /** Compatibility constructor for a native structured declaration without enum literals. */
@@ -50,7 +52,7 @@ public record DiscoveredNode(String nodeId, String parentId, String path, String
             String kind, String dataType, String valueRank, String access,
             String unit, String description, String dataTypeNodeId, List<DataTypeMember> dataTypeMembers) {
         this(nodeId, parentId, path, name, kind, dataType, valueRank, access,
-                unit, description, dataTypeNodeId, dataTypeMembers, List.of(), null, List.of());
+                unit, description, dataTypeNodeId, dataTypeMembers, List.of(), null, null, List.of());
     }
 
     /** Compatibility constructor for a native declaration without structure encoding metadata. */
@@ -59,7 +61,7 @@ public record DiscoveredNode(String nodeId, String parentId, String path, String
             String unit, String description, String dataTypeNodeId, List<DataTypeMember> dataTypeMembers,
             List<DataTypeEnumValue> dataTypeEnumValues) {
         this(nodeId, parentId, path, name, kind, dataType, valueRank, access, unit, description,
-                dataTypeNodeId, dataTypeMembers, dataTypeEnumValues, null, List.of());
+                dataTypeNodeId, dataTypeMembers, dataTypeEnumValues, null, null, List.of());
     }
 
     /** Compatibility constructor for scan results without a transitive type catalog. */
@@ -68,7 +70,18 @@ public record DiscoveredNode(String nodeId, String parentId, String path, String
             String unit, String description, String dataTypeNodeId, List<DataTypeMember> dataTypeMembers,
             List<DataTypeEnumValue> dataTypeEnumValues, String dataTypeDefaultEncodingId) {
         this(nodeId, parentId, path, name, kind, dataType, valueRank, access, unit, description,
-                dataTypeNodeId, dataTypeMembers, dataTypeEnumValues, dataTypeDefaultEncodingId, List.of());
+                dataTypeNodeId, dataTypeMembers, dataTypeEnumValues, dataTypeDefaultEncodingId, null, List.of());
+    }
+
+    /** Compatibility constructor for scan results with dependencies but no explicit kind. */
+    public DiscoveredNode(String nodeId, String parentId, String path, String name,
+            String kind, String dataType, String valueRank, String access,
+            String unit, String description, String dataTypeNodeId, List<DataTypeMember> dataTypeMembers,
+            List<DataTypeEnumValue> dataTypeEnumValues, String dataTypeDefaultEncodingId,
+            List<DiscoveredTypeDefinition> dataTypeDependencies) {
+        this(nodeId, parentId, path, name, kind, dataType, valueRank, access, unit, description,
+                dataTypeNodeId, dataTypeMembers, dataTypeEnumValues, dataTypeDefaultEncodingId, null,
+                dataTypeDependencies);
     }
 
     /** True for a VARIABLE whose type could not be mapped to the neutral set. */

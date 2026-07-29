@@ -2,6 +2,7 @@ package com.ainclusive.iotsim.platform.scan;
 
 import com.ainclusive.iotsim.protocolmodel.DataTypeEnumValue;
 import com.ainclusive.iotsim.protocolmodel.DataTypeMember;
+import com.ainclusive.iotsim.protocolmodel.NativeTypeKind;
 import java.util.List;
 import java.util.Objects;
 
@@ -16,12 +17,18 @@ public record DiscoveredTypeDefinition(
         String name,
         List<DataTypeMember> members,
         List<DataTypeEnumValue> enumValues,
-        String defaultEncodingId) {
+        String defaultEncodingId,
+        NativeTypeKind nativeTypeKind) {
 
     public DiscoveredTypeDefinition {
         Objects.requireNonNull(nodeId, "nodeId");
         name = name == null || name.isBlank() ? nodeId : name;
         members = members == null ? List.of() : List.copyOf(members);
         enumValues = enumValues == null ? List.of() : List.copyOf(enumValues);
+    }
+
+    public DiscoveredTypeDefinition(String nodeId, String name, List<DataTypeMember> members,
+            List<DataTypeEnumValue> enumValues, String defaultEncodingId) {
+        this(nodeId, name, members, enumValues, defaultEncodingId, null);
     }
 }
