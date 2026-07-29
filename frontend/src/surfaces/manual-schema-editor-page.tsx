@@ -452,7 +452,7 @@ export function ManualSchemaEditorPage() {
       types.set(type.nodeId, {
         id: type.nodeId,
         name: type.name,
-        kind: (type.enumValues ?? []).length > 0 ? "ENUM" : "STRUCTURE",
+        kind: type.nativeTypeKind ?? ((type.enumValues ?? []).length > 0 ? "ENUM" : "STRUCTURE"),
       });
     }
     return [...types.values()];

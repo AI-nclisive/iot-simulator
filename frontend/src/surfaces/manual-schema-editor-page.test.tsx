@@ -206,6 +206,24 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
     ));
   });
 
+  it("labels a native UNION by its preserved kind in the variable type picker", async () => {
+    mockLoadManualSchemaById.mockResolvedValueOnce({
+      ...schema,
+      nodes: [
+        ...schema.nodes,
+        { nodeId: "selection-type", parentId: null, path: "Types/Selection", name: "Selection", kind: "DATA_TYPE" as const,
+          dataType: null, dataTypeNodeId: null, valueRank: null, access: null, unit: null, description: null,
+          members: [{ name: "integer", dataType: "INT32", dataTypeNodeId: null }], enumValues: [], nativeTypeKind: "UNION" },
+      ],
+    });
+    renderPage();
+    await waitFor(() => screen.getByText("Selection"));
+
+    fireEvent.click(screen.getByText("Level"));
+
+    expect(screen.getByRole("option", { name: "Selection (union)" })).not.toBeNull();
+  });
+
   it("edits structure members and enum literals before saving", async () => {
     mockLoadManualSchemaById.mockResolvedValueOnce({
       ...schema,
