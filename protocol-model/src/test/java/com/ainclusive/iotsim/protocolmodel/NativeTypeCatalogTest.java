@@ -52,4 +52,18 @@ class NativeTypeCatalogTest {
         assertThat(entry.capability().materializable()).isFalse();
         assertThat(entry.capability().unavailableReason()).contains("discriminator");
     }
+
+    @Test
+    void retainsOptionSetButDoesNotClaimItCanBeReplayed() {
+        SchemaNode optionSet = new SchemaNode("flags", null, "Types/Flags", "Flags", NodeKind.DATA_TYPE,
+                null, null, null, null, null, List.of(), null, List.of(), null, List.of(),
+                List.of(new DataTypeEnumValue("Readable", 1, "")), null,
+                NativeTypeKind.OPTION_SET, null, null, null, null);
+
+        NativeTypeDefinition entry = NativeTypeCatalog.fromSchemaNodes(List.of(optionSet)).getFirst();
+
+        assertThat(entry.kind()).isEqualTo(NativeTypeKind.OPTION_SET);
+        assertThat(entry.capability().materializable()).isFalse();
+        assertThat(entry.capability().unavailableReason()).contains("bit metadata");
+    }
 }

@@ -32,6 +32,9 @@ public final class NativeTypeCatalog {
         NativeTypeCapability capability = kind == NativeTypeKind.UNION
                 ? NativeTypeCapability.unsupported(
                         "the OPC UA stack did not expose the union discriminator metadata required for replay")
+                : kind == NativeTypeKind.OPTION_SET
+                ? NativeTypeCapability.unsupported(
+                        "option-set bit metadata cannot yet be materialized by the OPC UA runtime")
                 : kind == NativeTypeKind.OPAQUE
                 ? NativeTypeCapability.unsupported("the source did not supply a native type definition")
                 : kind == NativeTypeKind.STRUCTURE
