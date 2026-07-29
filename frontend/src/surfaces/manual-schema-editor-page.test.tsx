@@ -183,6 +183,29 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
     expect(screen.getByDisplayValue("2")).not.toBeNull();
   });
 
+  it("creates a manual UNION while preserving its native kind", async () => {
+    mockLoadManualSchemaById.mockResolvedValueOnce(schema);
+    mockUpdateManualSchema.mockResolvedValueOnce(schema);
+    renderPage();
+    await waitFor(() => screen.getByText("Level"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Add folder" }));
+    fireEvent.click(screen.getByRole("radio", { name: /Data type/ }));
+    fireEvent.change(screen.getAllByLabelText("Name")[1], { target: { value: "Selection" } });
+    fireEvent.click(screen.getByRole("radio", { name: "Union" }));
+    fireEvent.change(screen.getByLabelText("First member name"), { target: { value: "integer" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByLabelText(/Save in this schema/));
+    fireEvent.click(screen.getAllByRole("button", { name: "Save" })[1]);
+
+    await waitFor(() => expect(mockUpdateManualSchema).toHaveBeenCalledWith(
+      "proj-1", "ms-1", expect.objectContaining({ nodes: expect.arrayContaining([
+        expect.objectContaining({ name: "Selection", nativeTypeKind: "UNION" }),
+      ]) }),
+    ));
+  });
+
   it("edits structure members and enum literals before saving", async () => {
     mockLoadManualSchemaById.mockResolvedValueOnce({
       ...schema,

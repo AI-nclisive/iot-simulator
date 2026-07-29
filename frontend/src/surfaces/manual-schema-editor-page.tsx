@@ -382,7 +382,7 @@ export function ManualSchemaEditorPage() {
   const [addAccess, setAddAccess] = useState<string>("READ");
   const [addUnit, setAddUnit] = useState("");
   const [addDescription, setAddDescription] = useState("");
-  const [addDataTypeKind, setAddDataTypeKind] = useState<"STRUCTURE" | "ENUM">("STRUCTURE");
+  const [addDataTypeKind, setAddDataTypeKind] = useState<"STRUCTURE" | "UNION" | "ENUM">("STRUCTURE");
   const [addMemberName, setAddMemberName] = useState("value");
   const [addMemberType, setAddMemberType] = useState<string>("FLOAT64");
   const [addEnumValues, setAddEnumValues] = useState<EnumValueDraft[]>([
@@ -732,7 +732,7 @@ export function ManualSchemaEditorPage() {
       access: addKind === "VARIABLE" ? addAccess : null,
       unit: addKind === "VARIABLE" ? addUnit || null : null,
       description: addDescription || null,
-      members: addKind === "DATA_TYPE" && addDataTypeKind === "STRUCTURE"
+      members: addKind === "DATA_TYPE" && addDataTypeKind !== "ENUM"
         ? [{ name: addMemberName.trim() || "value", dataType: addMemberType, dataTypeNodeId: null }]
         : [],
       enumValues: addKind === "DATA_TYPE" && addDataTypeKind === "ENUM"
@@ -744,6 +744,7 @@ export function ManualSchemaEditorPage() {
             description: value.description.trim() || null,
           }))
         : [],
+      nativeTypeKind: addKind === "DATA_TYPE" ? addDataTypeKind : null,
       accessLevelFull: null,
       minimumSamplingInterval: null,
       writeMask: null,
@@ -1140,10 +1141,11 @@ export function ManualSchemaEditorPage() {
                   <legend className="text-sm font-medium text-shell-ink">Data type kind</legend>
                   <div className="mt-2 flex gap-4 text-sm text-shell-muted">
                     <label><input checked={addDataTypeKind === "STRUCTURE"} name="data-type-kind" type="radio" value="STRUCTURE" onChange={() => setAddDataTypeKind("STRUCTURE")} /> Structure</label>
+                    <label><input checked={addDataTypeKind === "UNION"} name="data-type-kind" type="radio" value="UNION" onChange={() => setAddDataTypeKind("UNION")} /> Union</label>
                     <label><input checked={addDataTypeKind === "ENUM"} name="data-type-kind" type="radio" value="ENUM" onChange={() => setAddDataTypeKind("ENUM")} /> Enum</label>
                   </div>
                 </fieldset>
-                {addDataTypeKind === "STRUCTURE" ? (
+                {addDataTypeKind !== "ENUM" ? (
                   <div className="grid gap-3 sm:grid-cols-2">
                     <label className="flex flex-col gap-1.5 text-sm text-shell-muted">
                       First member name
