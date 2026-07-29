@@ -1282,6 +1282,13 @@ Parallel execution:
   Depends: IS-189 (VARIABLE as parent + typed references).
   Done when: right-click on any tree node shows context menu with working actions; all actions update the schema correctly; typecheck + vitest + build green.
 
+- [x] `UI-507` ✅ Data source schema — inspect scanned schemas without editing
+  Goal: selecting a VARIABLE node must always open its details, including a
+  VARIABLE with child nodes. SCAN-basis data-source schemas are a preserved
+  discovery of the real device, so they are inspection-only; their details stay
+  visible, while add/edit/save/discard actions are unavailable. Refresh them
+  through the rescan flow instead.
+
 ## Recommended Sequence
 
 1. Complete the P0 shell and shared-pattern tasks first.
