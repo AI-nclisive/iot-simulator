@@ -341,11 +341,11 @@ final class OpcUaDiscovery {
                 ? StructureDeclaration.EMPTY
                 : readStructureDeclaration(client, dataTypeId);
         List<DataTypeEnumValueMsg> enumValues = nativeTypeId == null ? List.of() : readEnumValues(client, dataTypeId);
+        String nativeTypeKind = nativeTypeId == null ? null : resolveNativeTypeKind(structure, enumValues);
+        List<DataTypeMemberMsg> members = "OPTION_SET".equals(nativeTypeKind) ? List.of() : structure.members();
         return new DataTypeDeclaration(neutral, nativeTypeId,
-                structure.members(), enumValues, structure.defaultEncodingId(), nativeTypeId == null ? null
-                        : !enumValues.isEmpty() ? "ENUM"
-                        : structure.nativeTypeKind() == null ? "OPAQUE" : structure.nativeTypeKind(),
-                nativeTypeId == null ? List.of() : readDependentTypeDefinitions(client, structure.members()));
+                members, enumValues, "OPTION_SET".equals(nativeTypeKind) ? null : structure.defaultEncodingId(), nativeTypeKind,
+                nativeTypeId == null ? List.of() : readDependentTypeDefinitions(client, members));
     }
 
     /** Reads the closure of custom field types, retaining opaque entries when no definition is exposed. */
@@ -372,17 +372,19 @@ final class OpcUaDiscovery {
             NodeId nodeId = NodeId.parse(typeId);
             StructureDeclaration structure = readStructureDeclaration(client, nodeId);
             List<DataTypeEnumValueMsg> enumValues = readEnumValues(client, nodeId);
+            String nativeTypeKind = resolveNativeTypeKind(structure, enumValues);
+            List<DataTypeMemberMsg> members = "OPTION_SET".equals(nativeTypeKind) ? List.of() : structure.members();
             NativeDataTypeDefinitionMsg definition = NativeDataTypeDefinitionMsg.newBuilder()
                     .setNodeId(typeId)
                     .setName(typeId)
-                    .addAllMembers(structure.members())
+                    .addAllMembers(members)
                     .addAllEnumValues(enumValues)
-                    .setDefaultEncodingId(structure.defaultEncodingId() == null ? "" : structure.defaultEncodingId())
-                    .setNativeTypeKind(!enumValues.isEmpty() ? "ENUM"
-                            : structure.nativeTypeKind() == null ? "OPAQUE" : structure.nativeTypeKind())
+                    .setDefaultEncodingId("OPTION_SET".equals(nativeTypeKind) || structure.defaultEncodingId() == null
+                            ? "" : structure.defaultEncodingId())
+                    .setNativeTypeKind(nativeTypeKind)
                     .build();
             definitions.put(typeId, definition);
-            for (DataTypeMemberMsg member : structure.members()) {
+            for (DataTypeMemberMsg member : members) {
                 if (!member.getDataTypeNodeId().isBlank()) {
                     readDependentTypeDefinition(client, member.getDataTypeNodeId(), definitions, visiting);
                 }
@@ -443,7 +445,25 @@ final class OpcUaDiscovery {
         NodeId encodingId = structure.getDefaultEncodingId();
         return new StructureDeclaration(List.copyOf(members),
                 encodingId == null ? null : encodingId.toParseableString(),
-                structure.getStructureType() == StructureType.Union ? "UNION" : "STRUCTURE");
+                structure.getBaseDataType() != null && structure.getBaseDataType().equals(Identifiers.OptionSet)
+                        ? "OPTION_SET"
+                        : structure.getStructureType() == StructureType.Union ? "UNION" : "STRUCTURE");
+    }
+
+    /**
+     * Classifies a native declaration only when its representation can be retained by the schema model.
+     * An OptionSet without its named bits is opaque: calling it an OptionSet would create an invalid,
+     * uneditable catalog entry and would invent metadata that the server did not provide.
+     */
+    private static String resolveNativeTypeKind(StructureDeclaration structure,
+            List<DataTypeEnumValueMsg> enumValues) {
+        if ("OPTION_SET".equals(structure.nativeTypeKind())) {
+            return enumValues.isEmpty() ? "OPAQUE" : "OPTION_SET";
+        }
+        if (!enumValues.isEmpty()) {
+            return "ENUM";
+        }
+        return structure.nativeTypeKind() == null ? "OPAQUE" : structure.nativeTypeKind();
     }
 
     /** Imports numeric enum/option-set literals when the server exposes EnumValues. */
