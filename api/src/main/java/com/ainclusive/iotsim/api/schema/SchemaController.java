@@ -5,6 +5,7 @@ import com.ainclusive.iotsim.domain.schema.Schema;
 import com.ainclusive.iotsim.domain.schema.SchemaService;
 import com.ainclusive.iotsim.protocolmodel.Access;
 import com.ainclusive.iotsim.protocolmodel.DataType;
+import com.ainclusive.iotsim.protocolmodel.NativeTypeDefinition;
 import com.ainclusive.iotsim.protocolmodel.NodeKind;
 import com.ainclusive.iotsim.protocolmodel.SchemaNode;
 import com.ainclusive.iotsim.protocolmodel.ValueRank;
@@ -149,11 +150,12 @@ public class SchemaController {
     public record SaveSchemaRequest(List<NodeDto> nodes) {}
 
     public record SchemaResponse(
-            String id, String dataSourceId, int version, List<NodeDto> nodes) {
+            String id, String dataSourceId, int version, List<NodeDto> nodes,
+            List<NativeTypeDefinition> typeDefinitions) {
 
         static SchemaResponse from(Schema s) {
             return new SchemaResponse(s.id(), s.dataSourceId(), s.version(),
-                    s.nodes().stream().map(NodeDto::from).toList());
+                    s.nodes().stream().map(NodeDto::from).toList(), s.typeDefinitions());
         }
     }
 }
