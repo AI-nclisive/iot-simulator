@@ -63,6 +63,7 @@ class OpcUaDiscoveryIT {
             assertThat(byName.get("Id").getDataType()).isEqualTo("GUID");
             assertThat(byName.get("Quality").getDataType()).isEqualTo("STATUS_CODE");
             assertThat(byName.get("QName").getDataType()).isEqualTo("QUALIFIED_NAME");
+            assertThat(byName.get("QName").getDataTypeNodeId()).isEqualTo("ns=0;i=20");
             assertThat(byName.get("Target").getDataType()).isEqualTo("NODE_ID");
             assertThat(byName.get("XTarget").getDataType()).isEqualTo("EXPANDED_NODE_ID");
             assertThat(byName.get("Xml").getDataType()).isEqualTo("XML_ELEMENT");
