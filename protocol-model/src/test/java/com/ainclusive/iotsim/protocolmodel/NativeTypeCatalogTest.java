@@ -46,7 +46,10 @@ class NativeTypeCatalogTest {
                 List.of(new DataTypeMember("integer", DataType.INT32, null)), List.of(), "ns=2;i=5002",
                 NativeTypeKind.UNION, null, null, null, null);
 
-        assertThat(NativeTypeCatalog.fromSchemaNodes(List.of(union)).getFirst().kind())
-                .isEqualTo(NativeTypeKind.UNION);
+        NativeTypeDefinition entry = NativeTypeCatalog.fromSchemaNodes(List.of(union)).getFirst();
+
+        assertThat(entry.kind()).isEqualTo(NativeTypeKind.UNION);
+        assertThat(entry.capability().materializable()).isFalse();
+        assertThat(entry.capability().unavailableReason()).contains("discriminator");
     }
 }
