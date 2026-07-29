@@ -74,6 +74,17 @@ type StructureTemplate = {
 
 type StructureMemberDraft = { id: string; name: string; dataType: string };
 type EnumValueDraft = { id: string; name: string; value: string; description: string };
+type CatalogNativeType = {
+  id: string;
+  name: string;
+  kind: NativeTypeDefinitionDto["kind"];
+  unavailableReason: string | null;
+};
+
+function catalogTypeLabel(type: CatalogNativeType): string {
+  const kind = type.kind.toLowerCase().replace("_", " ");
+  return `${type.name} (${kind})${type.unavailableReason ? " — not executable" : ""}`;
+}
 
 const STRUCTURE_TEMPLATES = [
   {
@@ -443,16 +454,20 @@ export function ManualSchemaEditorPage() {
   const containers = nodes.filter((n) => canHaveChildren(n.kind));
   const nativeTypes = nodes.filter((n) => n.kind === "DATA_TYPE");
   const catalogNativeTypes = useMemo(() => {
-    const types = new Map(typeDefinitions.map((type) => [type.typeId, {
+    const types = new Map<string, CatalogNativeType>(typeDefinitions.map((type) => [type.typeId, {
       id: type.typeId,
       name: type.displayName || type.browseName,
       kind: type.kind,
+      unavailableReason: type.capability.materializable ? null : type.capability.unavailableReason || "not executable",
     }]));
     for (const type of nativeTypes) {
+      const existing = types.get(type.nodeId);
       types.set(type.nodeId, {
         id: type.nodeId,
         name: type.name,
         kind: type.nativeTypeKind ?? ((type.enumValues ?? []).length > 0 ? "ENUM" : "STRUCTURE"),
+        unavailableReason: existing?.unavailableReason
+          ?? (type.nativeTypeKind === "OPAQUE" ? "source definition was not supplied" : null),
       });
     }
     return [...types.values()];
@@ -1440,7 +1455,7 @@ export function ManualSchemaEditorPage() {
                         ))}
                         {catalogNativeTypes.map((type) => (
                           <option key={type.id} value={`native:${type.id}`}>
-                            {type.name} ({type.kind.toLowerCase().replace("_", " ")})
+                            {catalogTypeLabel(type)}
                           </option>
                         ))}
                       </select>
@@ -1505,7 +1520,7 @@ export function ManualSchemaEditorPage() {
                                 {DATA_TYPES.map((type) => <option key={type} value={type}>{formatDataType(type)}</option>)}
                                 {catalogNativeTypes.filter((type) => type.id !== selectedNode.nodeId).map((type) => (
                                   <option key={type.id} value={`native:${type.id}`}>
-                                    {type.name} ({type.kind.toLowerCase().replace("_", " ")})
+                                    {catalogTypeLabel(type)}
                                   </option>
                                 ))}
                               </select>

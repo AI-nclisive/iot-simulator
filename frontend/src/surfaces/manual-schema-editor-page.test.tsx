@@ -232,7 +232,7 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
         displayName: null, description: null, kind: "ENUM", baseTypeId: null,
         defaultBinaryEncodingId: null, defaultXmlEncodingId: null, fields: [],
         enumValues: [{ name: "Ready", value: 0, description: null }],
-        capability: { materializable: true, captureDecodable: true, replayEncodable: true, unavailableReason: null },
+        capability: { materializable: false, captureDecodable: false, replayEncodable: false, unavailableReason: "source did not provide an encoding" },
       }],
       nodes: [
         ...schema.nodes,
@@ -246,7 +246,7 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
 
     fireEvent.click(screen.getByText("Envelope"));
 
-    expect(screen.getByRole("option", { name: "ServerStatus (enum)" })).not.toBeNull();
+    expect(screen.getByRole("option", { name: "ServerStatus (enum) — not executable" })).not.toBeNull();
   });
 
   it("edits structure members and enum literals before saving", async () => {
