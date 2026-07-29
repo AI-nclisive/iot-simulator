@@ -580,6 +580,8 @@ describe("CreateDataSourceWizardPage — scan step (UI-458)", () => {
 
     const btn = screen.getAllByRole("button", { name: "Next" })[0] as HTMLButtonElement;
     expect(btn.disabled).toBe(false);
+    expect(screen.getByRole("button", { name: "Scan endpoint again" }).className).toContain("shell-action");
+    screen.getByText(/This replaces the discovery result above/i);
   });
 
   it("does not re-scan when navigating Next then Back to the scan step (UI-471)", async () => {
