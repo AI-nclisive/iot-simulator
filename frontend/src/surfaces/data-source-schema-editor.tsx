@@ -253,6 +253,9 @@ export function DataSourceSchemaEditor({
   const isReadOnly = source.basis === "SCAN";
 
   const rawNodesRef = useRef<NodeDto[]>([]);
+  const selectedRawNode = selectedParam
+    ? rawNodesRef.current.find((node) => node.nodeId === selectedParam.id)
+    : null;
 
   useEffect(() => {
     if (!projectId || !source.id) return;
@@ -728,6 +731,13 @@ export function DataSourceSchemaEditor({
                     </div>
                   </div>
                 </div>
+
+                {selectedRawNode?.declaredDataTypeNodeId ? (
+                  <div className="rounded-md border border-shell-line bg-shell-base/30 px-3 py-2 text-sm text-shell-muted">
+                    <span className="font-medium text-shell-ink">Declared OPC UA DataType: </span>
+                    <code>{selectedRawNode.declaredDataTypeNodeId}</code>
+                  </div>
+                ) : null}
 
                 {dependencyWarnings.length > 0 ? (
                   <section className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3">
