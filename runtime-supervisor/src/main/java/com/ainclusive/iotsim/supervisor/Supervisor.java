@@ -728,6 +728,7 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
                     .setKind(n.kind().name())
                     .setDataType(n.dataType() == null ? "" : n.dataType().name())
                     .setDataTypeNodeId(orEmpty(n.dataTypeNodeId()))
+                    .setDeclaredDataTypeNodeId(orEmpty(n.declaredDataTypeNodeId()))
                     .addAllDataTypeMembers(n.members().stream()
                             .map(member -> DataTypeMemberMsg.newBuilder()
                                     .setName(member.name())

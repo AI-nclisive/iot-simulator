@@ -10,8 +10,8 @@ import java.util.Objects;
  * scenarios, faults, evidence). {@code path} is unique within a schema. See
  * {@code backend-specs/01_PROTOCOL_NEUTRAL_MODEL.md} §1.
  *
- * @param dataType  required for {@link NodeKind#VARIABLE} unless {@code dataTypeNodeId} is set
- *                  instead, otherwise {@code null}
+ * @param dataType  executable protocol-neutral value type; may be accompanied by
+ *                  {@code declaredDataTypeNodeId} when a scan must preserve its original OPC UA declaration
  * @param parentId  {@code null} for a root child; always {@code null} for {@link NodeKind#DATA_TYPE}
  *                  (IS-183) — a DATA_TYPE is a top-level type definition, not part of the
  *                  FOLDER/OBJECT parent-child hierarchy
@@ -35,6 +35,9 @@ import java.util.Objects;
  *                   {@code null} = not specified
  * @param historizing  whether server actively collects historical values (nullable);
  *                     {@code null} = not specified, false = no history collection
+ * @param declaredDataTypeNodeId  original OPC UA DataType NodeId declared by the source variable.
+ *                                This is descriptive fidelity metadata and may accompany {@code dataType};
+ *                                it is distinct from {@code dataTypeNodeId}, which selects a schema-native type.
  */
 public record SchemaNode(
         String nodeId,
@@ -58,7 +61,8 @@ public record SchemaNode(
         Integer accessLevelFull,
         Integer minimumSamplingInterval,
         Integer writeMask,
-        Boolean historizing) {
+        Boolean historizing,
+        String declaredDataTypeNodeId) {
 
     public SchemaNode {
         Objects.requireNonNull(nodeId, "nodeId");
@@ -138,7 +142,7 @@ public record SchemaNode(
             Integer writeMask, Boolean historizing) {
         this(nodeId, parentId, path, name, kind, dataType, valueRank, access, unit, description,
                 arrayDimensions, typeDefinition, references, dataTypeNodeId, members, enumValues,
-                defaultEncodingId, null, accessLevelFull, minimumSamplingInterval, writeMask, historizing);
+                defaultEncodingId, null, accessLevelFull, minimumSamplingInterval, writeMask, historizing, null);
     }
 
     /** Backward-compatible constructor for OPC-UA address-space nodes authored before IS-189 (critical attributes). */
@@ -147,7 +151,7 @@ public record SchemaNode(
             List<Integer> arrayDimensions, String typeDefinition, List<SchemaReference> references) {
         this(nodeId, parentId, path, name, kind, dataType, valueRank, access, unit, description,
                 arrayDimensions, typeDefinition, references, null, List.of(),
-                List.of(), null, null, null, null, null);  // IS-189 fields = null
+                List.of(), null, null, null, null, null, null, null);  // IS-189 fields = null
     }
 
     /** Compatibility constructor for callers that do not declare enum values. */
@@ -158,7 +162,7 @@ public record SchemaNode(
             Integer minimumSamplingInterval, Integer writeMask, Boolean historizing) {
         this(nodeId, parentId, path, name, kind, dataType, valueRank, access, unit, description,
                 arrayDimensions, typeDefinition, references, dataTypeNodeId, members, List.of(),
-                null, accessLevelFull, minimumSamplingInterval, writeMask, historizing);
+                null, null, accessLevelFull, minimumSamplingInterval, writeMask, historizing, null);
     }
 
     /** Compatibility constructor for callers that do not declare a structure encoding. */
@@ -169,7 +173,7 @@ public record SchemaNode(
             Integer accessLevelFull, Integer minimumSamplingInterval, Integer writeMask, Boolean historizing) {
         this(nodeId, parentId, path, name, kind, dataType, valueRank, access, unit, description,
                 arrayDimensions, typeDefinition, references, dataTypeNodeId, members, enumValues,
-                null, accessLevelFull, minimumSamplingInterval, writeMask, historizing);
+                null, null, accessLevelFull, minimumSamplingInterval, writeMask, historizing, null);
     }
 
     /** Backward-compatible constructor for folders and scalar/array variables authored before IS-176. */
@@ -177,6 +181,6 @@ public record SchemaNode(
             DataType dataType, ValueRank valueRank, Access access, String unit, String description) {
         this(nodeId, parentId, path, name, kind, dataType, valueRank, access, unit, description,
                 List.of(), null, List.of(), null, List.of(),
-                List.of(), null, null, null, null, null);  // IS-183 + IS-189 fields = null
+                List.of(), null, null, null, null, null, null, null);  // IS-183 + IS-189 fields = null
     }
 }

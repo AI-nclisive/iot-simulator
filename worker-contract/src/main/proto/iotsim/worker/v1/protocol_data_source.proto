@@ -121,6 +121,9 @@ message SchemaNodeMsg {
   string native_type_kind = 21;        // ENUM | OPTION_SET | STRUCTURE | UNION | OPAQUE
   // Browse name of data_type_node_id. It is distinct from the Variable's name.
   string data_type_name = 22;
+  // Original source DataType attribute. Unlike data_type_node_id this may be set
+  // together with a neutral data_type, retaining exact OPC UA type fidelity.
+  string declared_data_type_node_id = 23;
 }
 
 // The declared fields of a native OPC UA structured DataType. Exactly one of

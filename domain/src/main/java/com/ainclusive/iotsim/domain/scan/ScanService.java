@@ -370,7 +370,7 @@ public class ScanService implements DisposableBean {
                 // Known-typed variable with valid dataType from server
                 if (n.dataType() != null && !n.dataType().isBlank()) {
                     nodes.add(variableNode(n, DataType.valueOf(n.dataType()),
-                            valueRank(n.valueRank()), access(n.access()), null));
+                            valueRank(n.valueRank()), access(n.access()), null, n.dataTypeNodeId()));
                 }
             } else {
                 nodes.add(new SchemaNode(n.nodeId(), n.parentId(), n.path(), n.name(),
@@ -406,7 +406,7 @@ public class ScanService implements DisposableBean {
         String description = members.isEmpty() ? "Imported OPC UA enum DataType" : "Imported OPC UA structured DataType";
         SchemaNode imported = new SchemaNode(typeId, null, "Types/" + typeId, typeName, NodeKind.DATA_TYPE,
                 null, null, null, null, description, List.of(), null,
-                List.of(), null, members, enumValues, defaultEncodingId, nativeTypeKind, null, null, null, null);
+                List.of(), null, members, enumValues, defaultEncodingId, nativeTypeKind, null, null, null, null, null);
         int existingIndex = indexOfImportedType(nodes, typeId);
         if (existingIndex >= 0) {
             SchemaNode existing = nodes.get(existingIndex);
@@ -480,9 +480,16 @@ public class ScanService implements DisposableBean {
 
     private static SchemaNode variableNode(
             DiscoveredNode n, DataType dataType, ValueRank valueRank, Access access, String dataTypeNodeId) {
+        return variableNode(n, dataType, valueRank, access, dataTypeNodeId, null);
+    }
+
+    private static SchemaNode variableNode(
+            DiscoveredNode n, DataType dataType, ValueRank valueRank, Access access, String dataTypeNodeId,
+            String declaredDataTypeNodeId) {
         return new SchemaNode(n.nodeId(), n.parentId(), n.path(), n.name(),
                 NodeKind.VARIABLE, dataType, valueRank, access, n.unit(), n.description(),
-                List.of(), null, List.of(), dataTypeNodeId, List.of(), null, null, null, null);
+                List.of(), null, List.of(), dataTypeNodeId, List.of(), List.of(), null, null,
+                null, null, null, null, declaredDataTypeNodeId);
     }
 
     private static ValueRank valueRank(String raw) {

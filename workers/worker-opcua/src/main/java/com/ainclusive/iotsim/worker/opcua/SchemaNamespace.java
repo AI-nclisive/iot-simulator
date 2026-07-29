@@ -162,6 +162,9 @@ final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
     }
 
     private org.eclipse.milo.opcua.stack.core.types.builtin.NodeId declaredDataType(VarDef def) {
+        if (isStandardOpcUaDataType(def.declaredDataTypeNodeId())) {
+            return org.eclipse.milo.opcua.stack.core.types.builtin.NodeId.parse(def.declaredDataTypeNodeId());
+        }
         if (isStandardOpcUaDataType(def.dataTypeNodeId())) {
             return org.eclipse.milo.opcua.stack.core.types.builtin.NodeId.parse(def.dataTypeNodeId());
         }

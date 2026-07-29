@@ -337,7 +337,11 @@ final class OpcUaDiscovery {
         if (neutral == null) {
             unknown[0]++;
         }
-        String nativeTypeId = neutral == null && dataTypeId != null ? dataTypeId.toParseableString() : null;
+        // Retain the source declaration even when its value can be executed by a
+        // neutral codec. `nativeTypeId` remains limited to definitions that must
+        // be imported into the schema-local catalog.
+        String declaredTypeId = dataTypeId == null ? null : dataTypeId.toParseableString();
+        String nativeTypeId = neutral == null ? declaredTypeId : null;
         StructureDeclaration structure = nativeTypeId == null
                 ? StructureDeclaration.EMPTY
                 : readStructureDeclaration(client, dataTypeId);
@@ -347,7 +351,7 @@ final class OpcUaDiscovery {
         List<DataTypeEnumValueMsg> enumValues = nativeTypeId == null ? List.of() : readEnumValues(client, dataTypeId);
         String nativeTypeKind = nativeTypeId == null ? null : resolveNativeTypeKind(structure, enumValues);
         List<DataTypeMemberMsg> members = "OPTION_SET".equals(nativeTypeKind) ? List.of() : structure.members();
-        return new DataTypeDeclaration(neutral, nativeTypeId,
+        return new DataTypeDeclaration(neutral, declaredTypeId,
                 members, enumValues, "OPTION_SET".equals(nativeTypeKind) ? null : structure.defaultEncodingId(), nativeTypeKind,
                 nativeTypeId == null ? List.of() : readDependentTypeDefinitions(client, members),
                 nativeTypeId == null ? null : readDataTypeName(client, dataTypeId));

@@ -122,7 +122,8 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
             if ("VARIABLE".equals(node.getKind()) || "FOLDER".equals(node.getKind())
                     || "OBJECT".equals(node.getKind())) {
                 variables.add(new VarDef(node.getNodeId(), node.getParentId().isBlank() ? null : node.getParentId(),
-                        node.getName(), node.getKind(), node.getDataType(), node.getDataTypeNodeId(), null,
+                        node.getName(), node.getKind(), node.getDataType(), node.getDataTypeNodeId(),
+                        node.getDeclaredDataTypeNodeId(), null,
                         null, null, null, null));
             }
             if ("DATA_TYPE".equals(node.getKind())) {

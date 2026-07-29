@@ -100,7 +100,8 @@ public class SchemaController {
                     d.typeDefinition(), SchemaReferenceMapper.toModel(d.references()), d.dataTypeNodeId(),
                     SchemaReferenceMapper.toMembers(d.members()), toEnumValues(d.enumValues()),
                     d.defaultEncodingId(), d.nativeTypeKind() == null ? null : parseEnum(
-                            NativeTypeKind.class, d.nativeTypeKind(), "nativeTypeKind"), null, null, null, null));
+                            NativeTypeKind.class, d.nativeTypeKind(), "nativeTypeKind"), null, null, null, null,
+                    d.declaredDataTypeNodeId()));
         }
         return nodes;
     }
@@ -129,12 +130,12 @@ public class SchemaController {
             String dataType, String valueRank, String access, String unit, String description,
             List<Integer> arrayDimensions, String typeDefinition, List<ReferenceDto> references,
             String dataTypeNodeId, List<MemberDto> members, List<EnumValueDto> enumValues,
-            String defaultEncodingId, String nativeTypeKind) {
+            String defaultEncodingId, String nativeTypeKind, String declaredDataTypeNodeId) {
 
         public NodeDto(String nodeId, String parentId, String path, String name, String kind,
                 String dataType, String valueRank, String access, String unit, String description) {
             this(nodeId, parentId, path, name, kind, dataType, valueRank, access, unit, description,
-                    List.of(), null, List.of(), null, List.of(), List.of(), null, null);
+                    List.of(), null, List.of(), null, List.of(), List.of(), null, null, null);
         }
 
         static NodeDto from(SchemaNode n) {
@@ -147,7 +148,7 @@ public class SchemaController {
                     n.references().stream().map(ReferenceDto::from).toList(),
                     n.dataTypeNodeId(), n.members().stream().map(MemberDto::from).toList(),
                     n.enumValues().stream().map(EnumValueDto::from).toList(), n.defaultEncodingId(),
-                    n.nativeTypeKind() == null ? null : n.nativeTypeKind().name());
+                    n.nativeTypeKind() == null ? null : n.nativeTypeKind().name(), n.declaredDataTypeNodeId());
         }
     }
 

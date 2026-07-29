@@ -170,6 +170,25 @@ class ScanServiceTest {
     }
 
     @Test
+    void createFromScanPreservesDeclaredBuiltinNodeIdAlongsideExecutableType() {
+        scanner.scanResult = new ScanResult(ScanStatus.OK, List.of(
+                new DiscoveredNode("ns=2;s=qname", null, "QName", "QName", "VARIABLE",
+                        "QUALIFIED_NAME", "SCALAR", "READ", null, null, "ns=0;i=20")),
+                false, 1, "discovered QualifiedName");
+        ScanJob job = service.startScan(
+                PROJECT, "OPC_UA", "opc.tcp://h", ConnectionCredentials.anonymous(), 0);
+
+        DataSource created = service.createFromScan(PROJECT, job.jobId(), "Scanned", "{}", List.of(), "alice");
+
+        Schema schema = new SchemaService(schemaRepo, dataSourceRepo, new ObjectMapper()).get(PROJECT, created.id());
+        assertThat(schema.nodes()).singleElement().satisfies(node -> {
+            assertThat(node.dataType()).isEqualTo(DataType.QUALIFIED_NAME);
+            assertThat(node.dataTypeNodeId()).isNull();
+            assertThat(node.declaredDataTypeNodeId()).isEqualTo("ns=0;i=20");
+        });
+    }
+
+    @Test
     void createFromScanPreservesNonNeutralOpcUaDataTypeWithoutResolution() {
         scanner.scanResult = nonNeutralTypeResult();
         ScanJob job = service.startScan(

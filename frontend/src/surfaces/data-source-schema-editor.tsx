@@ -29,6 +29,8 @@ export type NodeDto = {
   typeDefinition?: string | null;
   references?: ReferenceDto[];
   dataTypeNodeId?: string | null;
+  /** Original OPC UA DataType NodeId retained alongside an executable neutral type. */
+  declaredDataTypeNodeId?: string | null;
   members?: Array<{
     name: string;
     dataType: string | null;
