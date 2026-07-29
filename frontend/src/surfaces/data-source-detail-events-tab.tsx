@@ -34,7 +34,6 @@ interface RuntimeEventsResponse {
 
 interface RunEvidenceDto {
   id: string;
-  runId: string;
   manifest: {
     kind?: string;
     startedAt?: string;
@@ -43,8 +42,18 @@ interface RunEvidenceDto {
   };
 }
 
-interface RunEvidenceResponse {
-  items: RunEvidenceDto[];
+interface RunDto {
+  kind: string;
+  startedAt: string | null;
+  endedAt: string | null;
+  evidenceId: string | null;
+}
+
+interface RunSummary {
+  kind: string;
+  startedAt: string | null;
+  endedAt: string | null;
+  evidence?: RunEvidenceDto;
 }
 
 function humanize(type: string): string {
@@ -145,7 +154,8 @@ export function DataSourceDetailEventsTab({ source }: { source: DataSourceRow })
 
   // Historical events from REST API
   const [apiEvents, setApiEvents] = useState<RuntimeEvent[]>([]);
-  const [evidenceByRunId, setEvidenceByRunId] = useState<Record<string, RunEvidenceDto>>({});
+  const [runSummaries, setRunSummaries] = useState<Record<string, RunSummary>>({});
+  const [loadingRunId, setLoadingRunId] = useState<string | null>(null);
   // Live events from SSE, prepended in front
   const [liveEventsList, setLiveEventsList] = useState<RuntimeEvent[]>([]);
 
@@ -164,6 +174,7 @@ export function DataSourceDetailEventsTab({ source }: { source: DataSourceRow })
     let cancelled = false;
     setIsLoading(true);
     setFetchError(null);
+    setRunSummaries({});
 
     apiFetch<RuntimeEventsResponse>(
       `/api/v1/projects/${projectId}/runtime-events?source=${encodeURIComponent(source.id)}&limit=100`,
@@ -180,21 +191,36 @@ export function DataSourceDetailEventsTab({ source }: { source: DataSourceRow })
         if (!cancelled) setIsLoading(false);
       });
 
-    apiFetch<RunEvidenceResponse>(
-      `/api/v1/projects/${projectId}/evidence?limit=100`,
-    )
-      .then((res) => {
-        if (cancelled) return;
-        setEvidenceByRunId(Object.fromEntries((res.items ?? []).map((item) => [item.runId, item])));
-      })
-      .catch(() => {
-        // Runtime events remain useful even if the optional evidence summary is unavailable.
-      });
-
     return () => {
       cancelled = true;
     };
   }, [projectId, source.id]);
+
+  async function loadRunSummary(runId: string) {
+    if (!projectId || runSummaries[runId] || loadingRunId === runId) return;
+    setLoadingRunId(runId);
+    try {
+      const run = await apiFetch<RunDto>(`/api/v1/projects/${projectId}/runs/${runId}`);
+      let evidence: RunEvidenceDto | undefined;
+      if (run.evidenceId) {
+        try {
+          evidence = await apiFetch<RunEvidenceDto>(
+            `/api/v1/projects/${projectId}/evidence/${run.evidenceId}`,
+          );
+        } catch {
+          // The run details still provide useful terminal-event context.
+        }
+      }
+      setRunSummaries((previous) => ({
+        ...previous,
+        [runId]: { kind: run.kind, startedAt: run.startedAt, endedAt: run.endedAt, evidence },
+      }));
+    } catch {
+      // Runtime events remain useful even if optional run details are unavailable.
+    } finally {
+      setLoadingRunId((current) => (current === runId ? null : current));
+    }
+  }
 
   // Subscribe to live SSE events and prepend matching ones (no duplicates)
   const { events: liveEvents } = useLiveRuntime(projectId, !!projectId);
@@ -324,8 +350,10 @@ export function DataSourceDetailEventsTab({ source }: { source: DataSourceRow })
             {visibleEvents.map((event) => {
               const isExpanded = expandedId === event.id;
               const detailId = `event-detail-${event.id}`;
-              const evidence = event.runId ? evidenceByRunId[event.runId] : undefined;
+              const runSummary = event.runId ? runSummaries[event.runId] : undefined;
+              const evidence = runSummary?.evidence;
               const showRunSummary = isTerminalRunEvent(event);
+              const isLoadingRunSummary = loadingRunId === event.runId;
               return (
                 <li key={event.id}>
                   <button
@@ -333,7 +361,12 @@ export function DataSourceDetailEventsTab({ source }: { source: DataSourceRow })
                     type="button"
                     aria-expanded={isExpanded}
                     aria-controls={detailId}
-                    onClick={() => setExpandedId(isExpanded ? null : event.id)}
+                    onClick={() => {
+                      setExpandedId(isExpanded ? null : event.id);
+                      if (!isExpanded && showRunSummary && event.runId) {
+                        void loadRunSummary(event.runId);
+                      }
+                    }}
                   >
                     <span
                       className={`mt-0.5 shrink-0 font-mono text-base leading-none ${levelClass(event.level)}`}
@@ -378,12 +411,16 @@ export function DataSourceDetailEventsTab({ source }: { source: DataSourceRow })
                         <div className="col-span-2 grid gap-2 border-t border-shell-line pt-2 sm:grid-cols-2">
                           <div>
                             <dt className="font-semibold uppercase tracking-wide text-shell-muted">Run type</dt>
-                            <dd className="mt-0.5 text-shell-ink">{evidence?.manifest.kind ?? "Not available"}</dd>
+                            <dd className="mt-0.5 text-shell-ink">
+                              {isLoadingRunSummary ? "Loading…" : runSummary?.kind ?? "Not available"}
+                            </dd>
                           </div>
                           <div>
                             <dt className="font-semibold uppercase tracking-wide text-shell-muted">Duration</dt>
                             <dd className="mt-0.5 text-shell-ink">
-                              {formatDuration(evidence?.manifest.startedAt, evidence?.manifest.endedAt)}
+                              {isLoadingRunSummary
+                                ? "Loading…"
+                                : formatDuration(runSummary?.startedAt, runSummary?.endedAt)}
                             </dd>
                           </div>
                           <div>
@@ -397,7 +434,9 @@ export function DataSourceDetailEventsTab({ source }: { source: DataSourceRow })
                           <div>
                             <dt className="font-semibold uppercase tracking-wide text-shell-muted">Sent values</dt>
                             <dd className="mt-0.5 text-shell-ink">
-                              {typeof evidence?.manifest.valueCount === "number"
+                              {isLoadingRunSummary
+                                ? "Loading…"
+                                : typeof evidence?.manifest.valueCount === "number"
                                 ? evidence.manifest.valueCount.toLocaleString()
                                 : "Not available"}
                             </dd>

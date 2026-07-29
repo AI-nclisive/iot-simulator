@@ -192,18 +192,18 @@ describe("DataSourceDetailEventsTab — terminal run summary", () => {
   it("shows linked evidence metadata for a stopped run", async () => {
     setupDefaults();
     mockApiFetch.mockImplementation((url: string) => {
-      if (url.includes("/evidence")) {
+      if (url.includes("/runs/run-1")) {
         return Promise.resolve({
-          items: [{
-            id: "evidence-1",
-            runId: "run-1",
-            manifest: {
-              kind: "SYNTHETIC",
-              startedAt: "2026-01-01T10:00:00Z",
-              endedAt: "2026-01-01T10:02:34Z",
-              valueCount: 2142,
-            },
-          }],
+          kind: "SYNTHETIC",
+          startedAt: "2026-01-01T10:00:00Z",
+          endedAt: "2026-01-01T10:02:34Z",
+          evidenceId: "evidence-1",
+        });
+      }
+      if (url.includes("/evidence/evidence-1")) {
+        return Promise.resolve({
+          id: "evidence-1",
+          manifest: { valueCount: 2142 },
         });
       }
       return Promise.resolve({
@@ -215,13 +215,15 @@ describe("DataSourceDetailEventsTab — terminal run summary", () => {
     render(<DataSourceDetailEventsTab source={mockSource} />);
     await userEvent.click(await screen.findByRole("button", { name: /Run stopped/i }));
 
-    expect(screen.getByText("SYNTHETIC")).toBeTruthy();
+    expect(await screen.findByText("SYNTHETIC")).toBeTruthy();
     expect(screen.getByText("2m 34s")).toBeTruthy();
     expect(screen.getByText("2,142")).toBeTruthy();
     expect((screen.getByRole("link", { name: "10 in schema" }) as HTMLAnchorElement).getAttribute("href"))
       .toBe("/data-sources/src-test?tab=schema");
     expect((screen.getByRole("link", { name: "Open run evidence" }) as HTMLAnchorElement).getAttribute("href"))
       .toBe("/evidence/evidence-1");
+    expect(mockApiFetch).toHaveBeenCalledWith(`/api/v1/projects/${PROJECT_ID}/runs/run-1`);
+    expect(mockApiFetch).toHaveBeenCalledWith(`/api/v1/projects/${PROJECT_ID}/evidence/evidence-1`);
   });
 });
 
