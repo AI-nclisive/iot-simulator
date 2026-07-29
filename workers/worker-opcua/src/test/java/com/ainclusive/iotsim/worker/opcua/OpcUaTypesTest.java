@@ -6,29 +6,26 @@ import org.eclipse.milo.opcua.stack.core.Identifiers;
 import org.junit.jupiter.api.Test;
 
 /**
- * Unit coverage for {@link OpcUaTypes#neutralTypeOf}, specifically the
- * well-known standard subtype aliases (e.g. {@code UtcTime}) that a live scan
- * against an embedded {@link OpcUaServerRuntime} can't exercise — that harness
- * only ever builds nodes typed with a built-in {@link com.ainclusive.iotsim.protocolmodel.DataType}
- * via {@link OpcUaTypes#dataTypeId}, never a subtype's distinct NodeId.
+ * Unit coverage for {@link OpcUaTypes#neutralTypeOf}, including named standard
+ * subtypes with a distinct NodeId that must survive scan unchanged.
  */
 class OpcUaTypesTest {
 
     @Test
-    void mapsWellKnownStandardSubtypesToTheirParentBuiltinType() {
-        assertThat(OpcUaTypes.neutralTypeOf(Identifiers.UtcTime)).isEqualTo("DATETIME");
-        assertThat(OpcUaTypes.neutralTypeOf(Identifiers.Date)).isEqualTo("DATETIME");
-        assertThat(OpcUaTypes.neutralTypeOf(Identifiers.Duration)).isEqualTo("FLOAT64");
-        assertThat(OpcUaTypes.neutralTypeOf(Identifiers.IntegerId)).isEqualTo("UINT32");
-        assertThat(OpcUaTypes.neutralTypeOf(Identifiers.Counter)).isEqualTo("UINT32");
-        assertThat(OpcUaTypes.neutralTypeOf(Identifiers.NumericRange)).isEqualTo("STRING");
-        assertThat(OpcUaTypes.neutralTypeOf(Identifiers.Time)).isEqualTo("STRING");
-        assertThat(OpcUaTypes.neutralTypeOf(Identifiers.LocaleId)).isEqualTo("STRING");
-        assertThat(OpcUaTypes.neutralTypeOf(Identifiers.NormalizedString)).isEqualTo("STRING");
-        assertThat(OpcUaTypes.neutralTypeOf(Identifiers.DecimalString)).isEqualTo("STRING");
-        assertThat(OpcUaTypes.neutralTypeOf(Identifiers.DurationString)).isEqualTo("STRING");
-        assertThat(OpcUaTypes.neutralTypeOf(Identifiers.TimeString)).isEqualTo("STRING");
-        assertThat(OpcUaTypes.neutralTypeOf(Identifiers.DateString)).isEqualTo("STRING");
+    void preservesNamedStandardSubtypeNodeIdsInsteadOfCollapsingToTheirParents() {
+        assertThat(OpcUaTypes.neutralTypeOf(Identifiers.UtcTime)).isNull();
+        assertThat(OpcUaTypes.neutralTypeOf(Identifiers.Date)).isNull();
+        assertThat(OpcUaTypes.neutralTypeOf(Identifiers.Duration)).isNull();
+        assertThat(OpcUaTypes.neutralTypeOf(Identifiers.IntegerId)).isNull();
+        assertThat(OpcUaTypes.neutralTypeOf(Identifiers.Counter)).isNull();
+        assertThat(OpcUaTypes.neutralTypeOf(Identifiers.NumericRange)).isNull();
+        assertThat(OpcUaTypes.neutralTypeOf(Identifiers.Time)).isNull();
+        assertThat(OpcUaTypes.neutralTypeOf(Identifiers.LocaleId)).isNull();
+        assertThat(OpcUaTypes.neutralTypeOf(Identifiers.NormalizedString)).isNull();
+        assertThat(OpcUaTypes.neutralTypeOf(Identifiers.DecimalString)).isNull();
+        assertThat(OpcUaTypes.neutralTypeOf(Identifiers.DurationString)).isNull();
+        assertThat(OpcUaTypes.neutralTypeOf(Identifiers.TimeString)).isNull();
+        assertThat(OpcUaTypes.neutralTypeOf(Identifiers.DateString)).isNull();
     }
 
     @Test
