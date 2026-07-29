@@ -1488,16 +1488,25 @@ export function ManualSchemaEditorPage() {
                       ) : (
                         <div className="space-y-2">
                           {(selectedNode.members ?? []).map((member, index) => (
-                            <div className="grid gap-2 sm:grid-cols-[minmax(8rem,1fr)_minmax(8rem,1fr)_auto]" key={`${member.name}-${index}`}>
+                            <div className="grid gap-2 sm:grid-cols-[minmax(8rem,1fr)_minmax(8rem,1fr)_7rem_minmax(7rem,1fr)_auto]" key={`${member.name}-${index}`}>
                               <input aria-label={`Structure member ${index + 1} name`} className="shell-field" disabled={!access.isAdmin} value={member.name} onChange={(e) => updateDataTypeMembers((selectedNode.members ?? []).map((candidate, candidateIndex) => candidateIndex === index ? { ...candidate, name: e.target.value } : candidate))} />
                               <select aria-label={`Structure member ${index + 1} type`} className="shell-field" disabled={!access.isAdmin} value={member.dataTypeNodeId ? `native:${member.dataTypeNodeId}` : member.dataType ?? "FLOAT64"} onChange={(e) => updateDataTypeMembers((selectedNode.members ?? []).map((candidate, candidateIndex) => candidateIndex === index ? (e.target.value.startsWith("native:") ? { ...candidate, dataType: null, dataTypeNodeId: e.target.value.slice("native:".length) } : { ...candidate, dataType: e.target.value, dataTypeNodeId: null }) : candidate))}>
                                 {DATA_TYPES.map((type) => <option key={type} value={type}>{formatDataType(type)}</option>)}
                                 {nativeTypes.filter((type) => type.nodeId !== selectedNode.nodeId).map((type) => <option key={type.nodeId} value={`native:${type.nodeId}`}>{type.name}</option>)}
                               </select>
+                              <select aria-label={`Structure member ${index + 1} value shape`} className="shell-field" disabled={!access.isAdmin} value={member.valueRank ?? "SCALAR"} onChange={(e) => updateDataTypeMembers((selectedNode.members ?? []).map((candidate, candidateIndex) => candidateIndex === index ? { ...candidate, valueRank: e.target.value, arrayDimensions: e.target.value === "ARRAY" ? candidate.arrayDimensions ?? [] : [] } : candidate))}>
+                                <option value="SCALAR">Scalar</option>
+                                <option value="ARRAY">Array</option>
+                              </select>
+                              <input aria-label={`Structure member ${index + 1} array dimensions`} className="shell-field" disabled={!access.isAdmin || (member.valueRank ?? "SCALAR") !== "ARRAY"} placeholder="e.g. 3, 2" value={(member.arrayDimensions ?? []).join(", ")} onChange={(e) => {
+                                const values = e.target.value.trim() === "" ? [] : e.target.value.split(",").map((value) => Number(value.trim()));
+                                if (values.every((value) => Number.isInteger(value) && value >= 0)) updateDataTypeMembers((selectedNode.members ?? []).map((candidate, candidateIndex) => candidateIndex === index ? { ...candidate, arrayDimensions: values } : candidate));
+                              }} />
+                              <label className="flex items-center gap-1 text-xs"><input aria-label={`Structure member ${index + 1} optional`} checked={member.optional ?? false} disabled={!access.isAdmin} type="checkbox" onChange={(e) => updateDataTypeMembers((selectedNode.members ?? []).map((candidate, candidateIndex) => candidateIndex === index ? { ...candidate, optional: e.target.checked } : candidate))} />Optional</label>
                               {access.isAdmin ? <button aria-label={`Remove structure member ${index + 1}`} className="shell-text-action" disabled={(selectedNode.members ?? []).length === 1} type="button" onClick={() => updateDataTypeMembers((selectedNode.members ?? []).filter((_, candidateIndex) => candidateIndex !== index))}>Remove</button> : null}
                             </div>
                           ))}
-                          {access.isAdmin ? <button className="shell-text-action" type="button" onClick={() => updateDataTypeMembers([...(selectedNode.members ?? []), { name: "member", dataType: "FLOAT64", dataTypeNodeId: null }])}>+ Add member</button> : null}
+                          {access.isAdmin ? <button className="shell-text-action" type="button" onClick={() => updateDataTypeMembers([...(selectedNode.members ?? []), { name: "member", dataType: "FLOAT64", dataTypeNodeId: null, valueRank: "SCALAR", arrayDimensions: [], optional: false }])}>+ Add member</button> : null}
                         </div>
                       )}
                     </div>

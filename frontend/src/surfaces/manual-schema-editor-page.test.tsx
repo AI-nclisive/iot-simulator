@@ -193,6 +193,9 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
     fireEvent.click(screen.getByRole("button", { name: "+ Add member" }));
     fireEvent.change(screen.getByLabelText("Structure member 2 name"), { target: { value: "message" } });
     fireEvent.change(screen.getByLabelText("Structure member 2 type"), { target: { value: "LOCALIZED_TEXT" } });
+    fireEvent.change(screen.getByLabelText("Structure member 2 value shape"), { target: { value: "ARRAY" } });
+    fireEvent.change(screen.getByLabelText("Structure member 2 array dimensions"), { target: { value: "3" } });
+    fireEvent.click(screen.getByLabelText("Structure member 2 optional"));
 
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     fireEvent.click(screen.getByLabelText(/Save in this schema/));
@@ -202,7 +205,7 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
       "proj-1", "ms-1", expect.objectContaining({ nodes: expect.arrayContaining([
         expect.objectContaining({ nodeId: "type-1", members: [
           { name: "statusCode", dataType: "INT32", dataTypeNodeId: null },
-          { name: "message", dataType: "LOCALIZED_TEXT", dataTypeNodeId: null },
+          { name: "message", dataType: "LOCALIZED_TEXT", dataTypeNodeId: null, valueRank: "ARRAY", arrayDimensions: [3], optional: true },
         ] }),
       ]) }),
     ));
