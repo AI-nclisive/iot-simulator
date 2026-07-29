@@ -24,9 +24,7 @@ public final class NativeTypeCatalog {
     }
 
     private static NativeTypeDefinition fromSchemaNode(SchemaNode node) {
-        NativeTypeKind kind = !node.enumValues().isEmpty()
-                ? NativeTypeKind.ENUM
-                : node.members().isEmpty() ? NativeTypeKind.OPAQUE : NativeTypeKind.STRUCTURE;
+        NativeTypeKind kind = node.nativeTypeKind();
         List<NativeTypeField> fields = node.members().stream()
                 .map(member -> new NativeTypeField(member.name(), member.dataType(), member.dataTypeNodeId(),
                         member.valueRank(), member.arrayDimensions(), member.optional(), null))

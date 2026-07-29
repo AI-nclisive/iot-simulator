@@ -6,6 +6,7 @@ import com.ainclusive.iotsim.domain.schema.SchemaService;
 import com.ainclusive.iotsim.protocolmodel.Access;
 import com.ainclusive.iotsim.protocolmodel.DataType;
 import com.ainclusive.iotsim.protocolmodel.NativeTypeDefinition;
+import com.ainclusive.iotsim.protocolmodel.NativeTypeKind;
 import com.ainclusive.iotsim.protocolmodel.NodeKind;
 import com.ainclusive.iotsim.protocolmodel.SchemaNode;
 import com.ainclusive.iotsim.protocolmodel.ValueRank;
@@ -98,7 +99,8 @@ public class SchemaController {
                     kind, dataType, valueRank, access, d.unit(), d.description(), d.arrayDimensions(),
                     d.typeDefinition(), SchemaReferenceMapper.toModel(d.references()), d.dataTypeNodeId(),
                     SchemaReferenceMapper.toMembers(d.members()), toEnumValues(d.enumValues()),
-                    d.defaultEncodingId(), null, null, null, null));
+                    d.defaultEncodingId(), d.nativeTypeKind() == null ? null : parseEnum(
+                            NativeTypeKind.class, d.nativeTypeKind(), "nativeTypeKind"), null, null, null, null));
         }
         return nodes;
     }
@@ -127,12 +129,12 @@ public class SchemaController {
             String dataType, String valueRank, String access, String unit, String description,
             List<Integer> arrayDimensions, String typeDefinition, List<ReferenceDto> references,
             String dataTypeNodeId, List<MemberDto> members, List<EnumValueDto> enumValues,
-            String defaultEncodingId) {
+            String defaultEncodingId, String nativeTypeKind) {
 
         public NodeDto(String nodeId, String parentId, String path, String name, String kind,
                 String dataType, String valueRank, String access, String unit, String description) {
             this(nodeId, parentId, path, name, kind, dataType, valueRank, access, unit, description,
-                    List.of(), null, List.of(), null, List.of(), List.of(), null);
+                    List.of(), null, List.of(), null, List.of(), List.of(), null, null);
         }
 
         static NodeDto from(SchemaNode n) {
@@ -144,7 +146,8 @@ public class SchemaController {
                     n.unit(), n.description(), n.arrayDimensions(), n.typeDefinition(),
                     n.references().stream().map(ReferenceDto::from).toList(),
                     n.dataTypeNodeId(), n.members().stream().map(MemberDto::from).toList(),
-                    n.enumValues().stream().map(EnumValueDto::from).toList(), n.defaultEncodingId());
+                    n.enumValues().stream().map(EnumValueDto::from).toList(), n.defaultEncodingId(),
+                    n.nativeTypeKind() == null ? null : n.nativeTypeKind().name());
         }
     }
 

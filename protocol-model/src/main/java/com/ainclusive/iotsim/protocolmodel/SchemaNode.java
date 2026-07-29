@@ -54,6 +54,7 @@ public record SchemaNode(
         List<DataTypeMember> members,
         List<DataTypeEnumValue> enumValues,
         String defaultEncodingId,
+        NativeTypeKind nativeTypeKind,
         Integer accessLevelFull,
         Integer minimumSamplingInterval,
         Integer writeMask,
@@ -95,6 +96,10 @@ public record SchemaNode(
             throw new IllegalArgumentException(kind + " nodes cannot have a dataTypeNodeId");
         }
         if (kind == NodeKind.DATA_TYPE) {
+            nativeTypeKind = nativeTypeKind == null
+                    ? !enumValues.isEmpty() ? NativeTypeKind.ENUM
+                    : members.isEmpty() ? NativeTypeKind.OPAQUE : NativeTypeKind.STRUCTURE
+                    : nativeTypeKind;
             if (parentId != null) {
                 throw new IllegalArgumentException("DATA_TYPE nodes must be top-level (parentId must be null)");
             }
@@ -109,9 +114,31 @@ public record SchemaNode(
                 throw new IllegalArgumentException(
                         "DATA_TYPE node '" + nodeId + "' may have a default encoding only for a structure");
             }
+            if ((nativeTypeKind == NativeTypeKind.STRUCTURE || nativeTypeKind == NativeTypeKind.UNION)
+                    && members.isEmpty()) {
+                throw new IllegalArgumentException(nativeTypeKind + " DATA_TYPE node '" + nodeId + " requires members");
+            }
+            if ((nativeTypeKind == NativeTypeKind.ENUM || nativeTypeKind == NativeTypeKind.OPTION_SET)
+                    && enumValues.isEmpty()) {
+                throw new IllegalArgumentException(nativeTypeKind + " DATA_TYPE node '" + nodeId + " requires enum values");
+            }
         } else if (!members.isEmpty() || !enumValues.isEmpty() || defaultEncodingId != null) {
             throw new IllegalArgumentException(kind + " nodes cannot have members, enum values, or a default encoding");
+        } else if (nativeTypeKind != null) {
+            throw new IllegalArgumentException(kind + " nodes cannot have a nativeTypeKind");
         }
+    }
+
+    /** Compatibility constructor for schemas stored before the native type-kind catalog metadata. */
+    public SchemaNode(String nodeId, String parentId, String path, String name, NodeKind kind,
+            DataType dataType, ValueRank valueRank, Access access, String unit, String description,
+            List<Integer> arrayDimensions, String typeDefinition, List<SchemaReference> references,
+            String dataTypeNodeId, List<DataTypeMember> members, List<DataTypeEnumValue> enumValues,
+            String defaultEncodingId, Integer accessLevelFull, Integer minimumSamplingInterval,
+            Integer writeMask, Boolean historizing) {
+        this(nodeId, parentId, path, name, kind, dataType, valueRank, access, unit, description,
+                arrayDimensions, typeDefinition, references, dataTypeNodeId, members, enumValues,
+                defaultEncodingId, null, accessLevelFull, minimumSamplingInterval, writeMask, historizing);
     }
 
     /** Backward-compatible constructor for OPC-UA address-space nodes authored before IS-189 (critical attributes). */

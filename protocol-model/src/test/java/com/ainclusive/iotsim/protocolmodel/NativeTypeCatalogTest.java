@@ -38,4 +38,15 @@ class NativeTypeCatalogTest {
         assertThat(entry.kind()).isEqualTo(NativeTypeKind.OPAQUE);
         assertThat(entry.capability().materializable()).isFalse();
     }
+
+    @Test
+    void retainsExplicitUnionTypeKind() {
+        SchemaNode union = new SchemaNode("choice", null, "Types/Choice", "Choice", NodeKind.DATA_TYPE,
+                null, null, null, null, null, List.of(), null, List.of(), null,
+                List.of(new DataTypeMember("integer", DataType.INT32, null)), List.of(), "ns=2;i=5002",
+                NativeTypeKind.UNION, null, null, null, null);
+
+        assertThat(NativeTypeCatalog.fromSchemaNodes(List.of(union)).getFirst().kind())
+                .isEqualTo(NativeTypeKind.UNION);
+    }
 }

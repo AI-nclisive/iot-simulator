@@ -39,6 +39,7 @@ export type NodeDto = {
   }>;
   enumValues?: Array<{ name: string; value: number; description: string | null }>;
   defaultEncodingId?: string | null;
+  nativeTypeKind?: "ENUM" | "OPTION_SET" | "STRUCTURE" | "UNION" | "OPAQUE" | null;
   accessLevelFull?: number | null;
   minimumSamplingInterval?: number | null;
   writeMask?: number | null;
