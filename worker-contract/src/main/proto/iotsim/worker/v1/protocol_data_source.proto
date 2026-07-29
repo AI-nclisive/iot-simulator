@@ -117,6 +117,7 @@ message SchemaNodeMsg {
   // This is required to transport an opaque ExtensionObject losslessly; it is
   // deliberately kept separate from the DataType NodeId.
   string data_type_default_encoding_id = 19;
+  repeated NativeDataTypeDefinitionMsg data_type_dependencies = 20;
 }
 
 // The declared fields of a native OPC UA structured DataType. Exactly one of
@@ -136,6 +137,15 @@ message DataTypeEnumValueMsg {
   string name = 1;
   int64 value = 2;
   string description = 3;
+}
+
+// A transitive native declaration referenced by an imported structured type.
+message NativeDataTypeDefinitionMsg {
+  string node_id = 1;
+  string name = 2;
+  repeated DataTypeMemberMsg members = 3;
+  repeated DataTypeEnumValueMsg enum_values = 4;
+  string default_encoding_id = 5;
 }
 
 message StartRequest {}

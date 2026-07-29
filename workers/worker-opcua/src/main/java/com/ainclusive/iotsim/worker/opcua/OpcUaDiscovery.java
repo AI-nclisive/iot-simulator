@@ -4,12 +4,15 @@ import static org.eclipse.milo.opcua.stack.core.types.builtin.unsigned.Unsigned.
 
 import com.ainclusive.iotsim.workercontract.v1.DataTypeEnumValueMsg;
 import com.ainclusive.iotsim.workercontract.v1.DataTypeMemberMsg;
+import com.ainclusive.iotsim.workercontract.v1.NativeDataTypeDefinitionMsg;
 import com.ainclusive.iotsim.workercontract.v1.SchemaNodeMsg;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.eclipse.milo.opcua.sdk.client.OpcUaClient;
@@ -309,7 +312,7 @@ final class OpcUaDiscovery {
     /** The neutral mapping plus the original DataType attribute, when it needs preserving. */
     private record DataTypeDeclaration(String neutralType, String dataTypeNodeId,
             List<DataTypeMemberMsg> members, List<DataTypeEnumValueMsg> enumValues,
-            String defaultEncodingId) {}
+            String defaultEncodingId, List<NativeDataTypeDefinitionMsg> dependencies) {}
 
     /** The fields and binary encoding supplied by a native StructureDefinition. */
     private record StructureDeclaration(List<DataTypeMemberMsg> members, String defaultEncodingId) {
@@ -335,9 +338,56 @@ final class OpcUaDiscovery {
         StructureDeclaration structure = nativeTypeId == null
                 ? StructureDeclaration.EMPTY
                 : readStructureDeclaration(client, dataTypeId);
+        List<DataTypeEnumValueMsg> enumValues = nativeTypeId == null ? List.of() : readEnumValues(client, dataTypeId);
         return new DataTypeDeclaration(neutral, nativeTypeId,
-                structure.members(), nativeTypeId == null ? List.of() : readEnumValues(client, dataTypeId),
-                structure.defaultEncodingId());
+                structure.members(), enumValues, structure.defaultEncodingId(),
+                nativeTypeId == null ? List.of() : readDependentTypeDefinitions(client, structure.members()));
+    }
+
+    /** Reads the closure of custom field types, retaining opaque entries when no definition is exposed. */
+    private static List<NativeDataTypeDefinitionMsg> readDependentTypeDefinitions(
+            OpcUaClient client, List<DataTypeMemberMsg> members) {
+        Map<String, NativeDataTypeDefinitionMsg> definitions = new LinkedHashMap<>();
+        for (DataTypeMemberMsg member : members) {
+            if (!member.getDataTypeNodeId().isBlank()) {
+                readDependentTypeDefinition(client, member.getDataTypeNodeId(), definitions, new HashSet<>());
+            }
+        }
+        return List.copyOf(definitions.values());
+    }
+
+    private static void readDependentTypeDefinition(
+            OpcUaClient client,
+            String typeId,
+            Map<String, NativeDataTypeDefinitionMsg> definitions,
+            Set<String> visiting) {
+        if (definitions.containsKey(typeId) || !visiting.add(typeId)) {
+            return;
+        }
+        try {
+            NodeId nodeId = NodeId.parse(typeId);
+            StructureDeclaration structure = readStructureDeclaration(client, nodeId);
+            List<DataTypeEnumValueMsg> enumValues = readEnumValues(client, nodeId);
+            NativeDataTypeDefinitionMsg definition = NativeDataTypeDefinitionMsg.newBuilder()
+                    .setNodeId(typeId)
+                    .setName(typeId)
+                    .addAllMembers(structure.members())
+                    .addAllEnumValues(enumValues)
+                    .setDefaultEncodingId(structure.defaultEncodingId() == null ? "" : structure.defaultEncodingId())
+                    .build();
+            definitions.put(typeId, definition);
+            for (DataTypeMemberMsg member : structure.members()) {
+                if (!member.getDataTypeNodeId().isBlank()) {
+                    readDependentTypeDefinition(client, member.getDataTypeNodeId(), definitions, visiting);
+                }
+            }
+        } catch (Exception ignored) {
+            // The caller still preserves the field's native NodeId as an opaque dependency.
+            definitions.putIfAbsent(typeId, NativeDataTypeDefinitionMsg.newBuilder()
+                    .setNodeId(typeId).setName(typeId).build());
+        } finally {
+            visiting.remove(typeId);
+        }
     }
 
     /** Imports fields and the binary encoding required for lossless structure replay. */
@@ -440,6 +490,7 @@ final class OpcUaDiscovery {
                     .addAllDataTypeEnumValues(declaration == null ? List.of() : declaration.enumValues())
                     .setDataTypeDefaultEncodingId(declaration == null || declaration.defaultEncodingId() == null
                             ? "" : declaration.defaultEncodingId())
+                    .addAllDataTypeDependencies(declaration == null ? List.of() : declaration.dependencies())
                     .setValueRank(attrs != null && attrs.valueRank() != null && attrs.valueRank() >= 0
                             ? "ARRAY" : "SCALAR")
                     .setAccess("READ");

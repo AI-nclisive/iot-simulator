@@ -12,6 +12,7 @@ import com.ainclusive.iotsim.persistence.project.ProjectRepository;
 import com.ainclusive.iotsim.platform.Ids;
 import com.ainclusive.iotsim.platform.scan.ConnectionTestResult;
 import com.ainclusive.iotsim.platform.scan.DiscoveredNode;
+import com.ainclusive.iotsim.platform.scan.DiscoveredTypeDefinition;
 import com.ainclusive.iotsim.platform.scan.ScanResult;
 import com.ainclusive.iotsim.platform.scan.ScanSpec;
 import com.ainclusive.iotsim.platform.scan.SourceScanner;
@@ -19,6 +20,7 @@ import com.ainclusive.iotsim.platform.secret.ConnectionCredentials;
 import com.ainclusive.iotsim.platform.secret.CredentialStore;
 import com.ainclusive.iotsim.protocolmodel.Access;
 import com.ainclusive.iotsim.protocolmodel.DataType;
+import com.ainclusive.iotsim.protocolmodel.DataTypeEnumValue;
 import com.ainclusive.iotsim.protocolmodel.DataTypeMember;
 import com.ainclusive.iotsim.protocolmodel.NodeKind;
 import com.ainclusive.iotsim.protocolmodel.SchemaNode;
@@ -379,16 +381,29 @@ public class ScanService implements DisposableBean {
 
     /** Adds one top-level schema type for a scanned structured native declaration. */
     private static void addImportedType(List<SchemaNode> nodes, Set<String> importedTypeIds, DiscoveredNode node) {
-        String typeId = node.dataTypeNodeId();
-        List<DataTypeMember> members = node.dataTypeMembers();
-        var enumValues = node.dataTypeEnumValues();
+        addImportedType(nodes, importedTypeIds, node.dataTypeNodeId(), node.name(), node.dataTypeMembers(),
+                node.dataTypeEnumValues(), node.dataTypeDefaultEncodingId());
+        for (DiscoveredTypeDefinition dependency : node.dataTypeDependencies()) {
+            addImportedType(nodes, importedTypeIds, dependency.nodeId(), dependency.name(), dependency.members(),
+                    dependency.enumValues(), dependency.defaultEncodingId());
+        }
+    }
+
+    private static void addImportedType(
+            List<SchemaNode> nodes,
+            Set<String> importedTypeIds,
+            String typeId,
+            String typeName,
+            List<DataTypeMember> members,
+            List<DataTypeEnumValue> enumValues,
+            String defaultEncodingId) {
         if (typeId == null || (members.isEmpty() && enumValues.isEmpty())) {
             return;
         }
         String description = members.isEmpty() ? "Imported OPC UA enum DataType" : "Imported OPC UA structured DataType";
-        SchemaNode imported = new SchemaNode(typeId, null, "Types/" + typeId, node.name(), NodeKind.DATA_TYPE,
+        SchemaNode imported = new SchemaNode(typeId, null, "Types/" + typeId, typeName, NodeKind.DATA_TYPE,
                 null, null, null, null, description, List.of(), null,
-                List.of(), null, members, enumValues, node.dataTypeDefaultEncodingId(), null, null, null, null);
+                List.of(), null, members, enumValues, defaultEncodingId, null, null, null, null);
         int existingIndex = indexOfImportedType(nodes, typeId);
         if (existingIndex >= 0) {
             SchemaNode existing = nodes.get(existingIndex);

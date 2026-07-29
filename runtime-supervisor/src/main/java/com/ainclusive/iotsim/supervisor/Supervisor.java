@@ -18,6 +18,7 @@ import com.ainclusive.iotsim.platform.runtime.SourceError;
 import com.ainclusive.iotsim.platform.runtime.SourceHealth;
 import com.ainclusive.iotsim.platform.scan.ConnectionTestResult;
 import com.ainclusive.iotsim.platform.scan.DiscoveredNode;
+import com.ainclusive.iotsim.platform.scan.DiscoveredTypeDefinition;
 import com.ainclusive.iotsim.platform.scan.ScanPhase;
 import com.ainclusive.iotsim.platform.scan.ScanProgressListener;
 import com.ainclusive.iotsim.platform.scan.ScanResult;
@@ -38,6 +39,7 @@ import com.ainclusive.iotsim.workercontract.v1.ClientEvent;
 import com.ainclusive.iotsim.workercontract.v1.ConnectionConfigMsg;
 import com.ainclusive.iotsim.workercontract.v1.DataTypeEnumValueMsg;
 import com.ainclusive.iotsim.workercontract.v1.DataTypeMemberMsg;
+import com.ainclusive.iotsim.workercontract.v1.NativeDataTypeDefinitionMsg;
 import com.ainclusive.iotsim.workercontract.v1.Quality;
 import com.ainclusive.iotsim.workercontract.v1.RuntimeEvent;
 import com.ainclusive.iotsim.workercontract.v1.ScanProgress;
@@ -658,7 +660,20 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
                         member.getArrayDimensionsList(), member.getOptional())).toList(),
                 n.getDataTypeEnumValuesList().stream().map(value -> new DataTypeEnumValue(
                         value.getName(), value.getValue(), emptyToNull(value.getDescription()))).toList(),
-                emptyToNull(n.getDataTypeDefaultEncodingId()));
+                emptyToNull(n.getDataTypeDefaultEncodingId()),
+                n.getDataTypeDependenciesList().stream().map(Supervisor::toDiscoveredTypeDefinition).toList());
+    }
+
+    private static DiscoveredTypeDefinition toDiscoveredTypeDefinition(NativeDataTypeDefinitionMsg definition) {
+        return new DiscoveredTypeDefinition(definition.getNodeId(), definition.getName(),
+                definition.getMembersList().stream().map(member -> new DataTypeMember(
+                        member.getName(), member.getDataType().isBlank() ? null : DataType.valueOf(member.getDataType()),
+                        emptyToNull(member.getDataTypeNodeId()),
+                        member.getValueRank().isBlank() ? ValueRank.SCALAR : ValueRank.valueOf(member.getValueRank()),
+                        member.getArrayDimensionsList(), member.getOptional())).toList(),
+                definition.getEnumValuesList().stream().map(value -> new DataTypeEnumValue(
+                        value.getName(), value.getValue(), emptyToNull(value.getDescription()))).toList(),
+                emptyToNull(definition.getDefaultEncodingId()));
     }
 
     private static ScanStatus toStatus(String wire) {
