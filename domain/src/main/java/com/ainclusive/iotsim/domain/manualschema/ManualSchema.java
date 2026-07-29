@@ -1,5 +1,7 @@
 package com.ainclusive.iotsim.domain.manualschema;
 
+import com.ainclusive.iotsim.protocolmodel.NativeTypeCatalog;
+import com.ainclusive.iotsim.protocolmodel.NativeTypeDefinition;
 import com.ainclusive.iotsim.protocolmodel.SchemaNode;
 import java.time.Instant;
 import java.util.List;
@@ -23,4 +25,9 @@ public record ManualSchema(
         Instant updatedAt,
         String createdBy,
         long version) {
+
+    /** Additive catalog view of the declarations stored with this manual schema. */
+    public List<NativeTypeDefinition> typeDefinitions() {
+        return NativeTypeCatalog.fromSchemaNodes(nodes);
+    }
 }

@@ -10,7 +10,24 @@ export type ManualSchemaResponse = {
   name: string;
   description: string | null;
   nodes: NodeDto[];
+  typeDefinitions?: NativeTypeDefinitionDto[];
   version: number;
+};
+
+export type NativeTypeDefinitionDto = {
+  typeId: string;
+  namespaceUri: string | null;
+  nativeNodeId: string;
+  browseName: string;
+  displayName: string | null;
+  description: string | null;
+  kind: "ENUM" | "OPTION_SET" | "STRUCTURE" | "UNION" | "OPAQUE";
+  baseTypeId: string | null;
+  defaultBinaryEncodingId: string | null;
+  defaultXmlEncodingId: string | null;
+  fields: Array<{ name: string; dataType: string | null; dataTypeId: string | null; valueRank: string; arrayDimensions: number[]; optional: boolean; unionSwitchValue: number | null }>;
+  enumValues: Array<{ name: string; value: number; description: string | null }>;
+  capability: { materializable: boolean; captureDecodable: boolean; replayEncodable: boolean; unavailableReason: string | null };
 };
 
 export type CreateManualSchemaInput = {

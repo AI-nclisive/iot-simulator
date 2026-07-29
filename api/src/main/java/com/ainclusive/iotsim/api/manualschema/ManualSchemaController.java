@@ -12,6 +12,7 @@ import com.ainclusive.iotsim.domain.manualschema.OpcUaNodeSetImporter;
 import com.ainclusive.iotsim.domain.support.Page;
 import com.ainclusive.iotsim.protocolmodel.Access;
 import com.ainclusive.iotsim.protocolmodel.DataType;
+import com.ainclusive.iotsim.protocolmodel.NativeTypeDefinition;
 import com.ainclusive.iotsim.protocolmodel.NodeKind;
 import com.ainclusive.iotsim.protocolmodel.SchemaNode;
 import com.ainclusive.iotsim.protocolmodel.ValueRank;
@@ -290,11 +291,11 @@ public class ManualSchemaController {
 
     public record ManualSchemaResponse(
             String id, String projectId, String protocol, String name, String description,
-            List<NodeDto> nodes, long version) {
+            List<NodeDto> nodes, List<NativeTypeDefinition> typeDefinitions, long version) {
 
         static ManualSchemaResponse from(ManualSchema s) {
             return new ManualSchemaResponse(s.id(), s.projectId(), s.protocol(), s.name(), s.description(),
-                    s.nodes().stream().map(NodeDto::from).toList(), s.version());
+                    s.nodes().stream().map(NodeDto::from).toList(), s.typeDefinitions(), s.version());
         }
     }
 }
