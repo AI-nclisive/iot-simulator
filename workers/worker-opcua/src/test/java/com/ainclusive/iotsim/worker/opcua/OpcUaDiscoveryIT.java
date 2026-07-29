@@ -103,6 +103,36 @@ class OpcUaDiscoveryIT {
     }
 
     @Test
+    void scanPreservesStandardAbstractDataTypeNodeIdWithoutPrimitiveFallback() throws Exception {
+        int port = freePort();
+        OpcUaServerRuntime runtime = new OpcUaServerRuntime(
+                port,
+                "127.0.0.1",
+                "127.0.0.1",
+                List.of(new VarDef("unsigned", null, "Unsigned", "VARIABLE", "", "ns=0;i=28", null,
+                        null, null, null, null)),
+                List.of(),
+                AuthConfig.anonymous(),
+                event -> { },
+                event -> { });
+        runtime.start();
+        try {
+            OpcUaDiscovery.ScanOutcome outcome = OpcUaDiscovery.scan(
+                    runtime.endpointUrl(), ANON, 0, () -> { }, soFar -> { });
+
+            SchemaNodeMsg unsigned = outcome.nodes().stream()
+                    .filter(node -> "Unsigned".equals(node.getName()))
+                    .findFirst()
+                    .orElseThrow();
+            assertThat(unsigned.getDataType()).isEmpty();
+            assertThat(unsigned.getDataTypeNodeId()).isEqualTo("ns=0;i=28");
+            assertThat(unsigned.getDataTypeName()).isEqualTo("UInteger");
+        } finally {
+            runtime.stop();
+        }
+    }
+
+    @Test
     void scanStopsAtNodeCapAndReportsPartial() throws Exception {
         int port = freePort();
         OpcUaServerRuntime runtime = new OpcUaServerRuntime(port, List.of(
