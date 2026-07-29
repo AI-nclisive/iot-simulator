@@ -1,5 +1,6 @@
 package com.ainclusive.iotsim.platform.scan;
 
+import com.ainclusive.iotsim.protocolmodel.DataTypeEnumValue;
 import com.ainclusive.iotsim.protocolmodel.DataTypeMember;
 import java.util.List;
 
@@ -18,10 +19,12 @@ import java.util.List;
  */
 public record DiscoveredNode(String nodeId, String parentId, String path, String name,
         String kind, String dataType, String valueRank, String access,
-        String unit, String description, String dataTypeNodeId, List<DataTypeMember> dataTypeMembers) {
+        String unit, String description, String dataTypeNodeId, List<DataTypeMember> dataTypeMembers,
+        List<DataTypeEnumValue> dataTypeEnumValues) {
 
     public DiscoveredNode {
         dataTypeMembers = dataTypeMembers == null ? List.of() : List.copyOf(dataTypeMembers);
+        dataTypeEnumValues = dataTypeEnumValues == null ? List.of() : List.copyOf(dataTypeEnumValues);
     }
 
     /** Compatibility constructor for callers that have no native type declaration. */
@@ -29,7 +32,7 @@ public record DiscoveredNode(String nodeId, String parentId, String path, String
             String kind, String dataType, String valueRank, String access,
             String unit, String description) {
         this(nodeId, parentId, path, name, kind, dataType, valueRank, access,
-                unit, description, null, List.of());
+                unit, description, null, List.of(), List.of());
     }
 
     /** Compatibility constructor for a native DataType declaration without its definition. */
@@ -37,7 +40,15 @@ public record DiscoveredNode(String nodeId, String parentId, String path, String
             String kind, String dataType, String valueRank, String access,
             String unit, String description, String dataTypeNodeId) {
         this(nodeId, parentId, path, name, kind, dataType, valueRank, access,
-                unit, description, dataTypeNodeId, List.of());
+                unit, description, dataTypeNodeId, List.of(), List.of());
+    }
+
+    /** Compatibility constructor for a native structured declaration without enum literals. */
+    public DiscoveredNode(String nodeId, String parentId, String path, String name,
+            String kind, String dataType, String valueRank, String access,
+            String unit, String description, String dataTypeNodeId, List<DataTypeMember> dataTypeMembers) {
+        this(nodeId, parentId, path, name, kind, dataType, valueRank, access,
+                unit, description, dataTypeNodeId, dataTypeMembers, List.of());
     }
 
     /** True for a VARIABLE whose type could not be mapped to the neutral set. */

@@ -381,12 +381,14 @@ public class ScanService implements DisposableBean {
     private static void addImportedType(List<SchemaNode> nodes, Set<String> importedTypeIds, DiscoveredNode node) {
         String typeId = node.dataTypeNodeId();
         List<DataTypeMember> members = node.dataTypeMembers();
-        if (typeId == null || members.isEmpty() || !importedTypeIds.add(typeId)) {
+        var enumValues = node.dataTypeEnumValues();
+        if (typeId == null || (members.isEmpty() && enumValues.isEmpty()) || !importedTypeIds.add(typeId)) {
             return;
         }
+        String description = members.isEmpty() ? "Imported OPC UA enum DataType" : "Imported OPC UA structured DataType";
         nodes.add(new SchemaNode(typeId, null, "Types/" + typeId, node.name(), NodeKind.DATA_TYPE,
-                null, null, null, null, "Imported OPC UA structured DataType", List.of(), null,
-                List.of(), null, members, null, null, null, null));
+                null, null, null, null, description, List.of(), null,
+                List.of(), null, members, enumValues, null, null, null, null));
     }
 
     /** Indexes resolutions by nodeId, rejecting duplicates and non-unknown targets. */

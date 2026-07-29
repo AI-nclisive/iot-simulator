@@ -27,6 +27,7 @@ import com.ainclusive.iotsim.platform.secret.ConnectionCredentials;
 import com.ainclusive.iotsim.platform.secret.InMemoryCredentialStore;
 import com.ainclusive.iotsim.protocolmodel.Access;
 import com.ainclusive.iotsim.protocolmodel.DataType;
+import com.ainclusive.iotsim.protocolmodel.DataTypeEnumValue;
 import com.ainclusive.iotsim.protocolmodel.DataTypeMember;
 import com.ainclusive.iotsim.protocolmodel.NodeKind;
 import com.ainclusive.iotsim.protocolmodel.SchemaNode;
@@ -204,6 +205,28 @@ class ScanServiceTest {
             assertThat(node.members()).containsExactly(
                     new DataTypeMember("low", DataType.FLOAT64, null),
                     new DataTypeMember("high", DataType.FLOAT64, null));
+        });
+    }
+
+    @Test
+    void createFromScanImportsNativeEnumDefinition() {
+        scanner.scanResult = new ScanResult(ScanStatus.OK, List.of(
+                new DiscoveredNode("ns=2;s=state", null, "State", "State", "VARIABLE",
+                        null, "SCALAR", "READ", null, null, "ns=2;i=1001", List.of(),
+                        List.of(new DataTypeEnumValue("Stopped", 0, "Not running"),
+                                new DataTypeEnumValue("Running", 1, "Running")))),
+                false, 1, "discovered enum type");
+        ScanJob job = service.startScan(PROJECT, "OPC_UA", "opc.tcp://h", ConnectionCredentials.anonymous(), 0);
+
+        DataSource created = service.createFromScan(PROJECT, job.jobId(), "State source", null, List.of(), "a");
+
+        Schema schema = new SchemaService(schemaRepo, dataSourceRepo, new ObjectMapper()).get(PROJECT, created.id());
+        assertThat(schema.nodes()).anySatisfy(node -> {
+            assertThat(node.kind()).isEqualTo(NodeKind.DATA_TYPE);
+            assertThat(node.nodeId()).isEqualTo("ns=2;i=1001");
+            assertThat(node.enumValues()).containsExactly(
+                    new DataTypeEnumValue("Stopped", 0, "Not running"),
+                    new DataTypeEnumValue("Running", 1, "Running"));
         });
     }
 

@@ -2,6 +2,7 @@ package com.ainclusive.iotsim.worker.opcua;
 
 import static org.eclipse.milo.opcua.stack.core.types.builtin.unsigned.Unsigned.uint;
 
+import com.ainclusive.iotsim.workercontract.v1.DataTypeEnumValueMsg;
 import com.ainclusive.iotsim.workercontract.v1.DataTypeMemberMsg;
 import com.ainclusive.iotsim.workercontract.v1.SchemaNodeMsg;
 import java.util.ArrayDeque;
@@ -12,6 +13,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.eclipse.milo.opcua.sdk.client.OpcUaClient;
+import org.eclipse.milo.opcua.sdk.client.nodes.UaDataTypeNode;
 import org.eclipse.milo.opcua.stack.core.AttributeId;
 import org.eclipse.milo.opcua.stack.core.Identifiers;
 import org.eclipse.milo.opcua.stack.core.NamespaceTable;
@@ -26,6 +28,7 @@ import org.eclipse.milo.opcua.stack.core.types.enumerated.NodeClass;
 import org.eclipse.milo.opcua.stack.core.types.enumerated.TimestampsToReturn;
 import org.eclipse.milo.opcua.stack.core.types.structured.BrowseDescription;
 import org.eclipse.milo.opcua.stack.core.types.structured.BrowseResult;
+import org.eclipse.milo.opcua.stack.core.types.structured.EnumValueType;
 import org.eclipse.milo.opcua.stack.core.types.structured.ReadResponse;
 import org.eclipse.milo.opcua.stack.core.types.structured.ReadValueId;
 import org.eclipse.milo.opcua.stack.core.types.structured.ReferenceDescription;
@@ -305,7 +308,7 @@ final class OpcUaDiscovery {
 
     /** The neutral mapping plus the original DataType attribute, when it needs preserving. */
     private record DataTypeDeclaration(String neutralType, String dataTypeNodeId,
-            List<DataTypeMemberMsg> members) {}
+            List<DataTypeMemberMsg> members, List<DataTypeEnumValueMsg> enumValues) {}
 
     /** Reads a variable's DataType attribute and reverse-maps it; counts non-neutral declarations. */
     private static DataTypeDeclaration dataTypeOf(OpcUaClient client, NodeId nodeId, int[] unknown)
@@ -323,7 +326,8 @@ final class OpcUaDiscovery {
         }
         String nativeTypeId = neutral == null && dataTypeId != null ? dataTypeId.toParseableString() : null;
         return new DataTypeDeclaration(neutral, nativeTypeId,
-                nativeTypeId == null ? List.of() : readStructureFields(client, dataTypeId));
+                nativeTypeId == null ? List.of() : readStructureFields(client, dataTypeId),
+                nativeTypeId == null ? List.of() : readEnumValues(client, dataTypeId));
     }
 
     /** Imports the server-provided field definitions when this native type is a structure. */
@@ -363,6 +367,35 @@ final class OpcUaDiscovery {
         return List.copyOf(members);
     }
 
+    /** Imports numeric enum/option-set literals when the server exposes EnumValues. */
+    private static List<DataTypeEnumValueMsg> readEnumValues(OpcUaClient client, NodeId dataTypeId) {
+        try {
+            var node = client.getAddressSpace().getNode(dataTypeId);
+            if (!(node instanceof UaDataTypeNode dataTypeNode)) {
+                return List.of();
+            }
+            EnumValueType[] values = dataTypeNode.readEnumValuesAsync()
+                    .get(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            if (values == null) {
+                return List.of();
+            }
+            List<DataTypeEnumValueMsg> literals = new ArrayList<>();
+            for (EnumValueType value : values) {
+                if (value == null || value.getValue() == null || value.getDisplayName() == null) {
+                    continue;
+                }
+                literals.add(DataTypeEnumValueMsg.newBuilder()
+                        .setName(value.getDisplayName().getText())
+                        .setValue(value.getValue())
+                        .setDescription(value.getDescription() == null ? "" : value.getDescription().getText())
+                        .build());
+            }
+            return List.copyOf(literals);
+        } catch (Exception ignored) {
+            return List.of();
+        }
+    }
+
     private static SchemaNodeMsg toNode(String nodeId, String parentId, String path, String name,
             boolean variable, DataTypeDeclaration declaration, String referenceType, VariableAttributes attrs) {
         SchemaNodeMsg.Builder b = SchemaNodeMsg.newBuilder()
@@ -377,6 +410,7 @@ final class OpcUaDiscovery {
                     .setDataTypeNodeId(declaration == null || declaration.dataTypeNodeId() == null
                             ? "" : declaration.dataTypeNodeId())
                     .addAllDataTypeMembers(declaration == null ? List.of() : declaration.members())
+                    .addAllDataTypeEnumValues(declaration == null ? List.of() : declaration.enumValues())
                     .setValueRank(attrs != null && attrs.valueRank() != null && attrs.valueRank() >= 0
                             ? "ARRAY" : "SCALAR")
                     .setAccess("READ");
