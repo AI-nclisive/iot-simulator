@@ -147,6 +147,34 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
     ));
   });
 
+  it("adds built-in OPC UA types and aliases with their exact NodeIds as opaque declarations", async () => {
+    mockLoadManualSchemaById.mockResolvedValueOnce(schema);
+    mockUpdateManualSchema.mockResolvedValueOnce(schema);
+    renderPage();
+    await waitFor(() => screen.getByText("Level"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Add folder" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add QualifiedName" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add Duration" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByLabelText(/Save in this schema/));
+    fireEvent.click(screen.getAllByRole("button", { name: "Save" })[1]);
+
+    await waitFor(() => expect(mockUpdateManualSchema).toHaveBeenCalledWith(
+      "proj-1", "ms-1", expect.objectContaining({ nodes: expect.arrayContaining([
+        expect.objectContaining({
+          nodeId: "ns=0;i=20", name: "QualifiedName", nativeTypeKind: "OPAQUE",
+          defaultEncodingId: null, members: [], enumValues: [],
+        }),
+        expect.objectContaining({
+          nodeId: "ns=0;i=290", name: "Duration", nativeTypeKind: "OPAQUE",
+          defaultEncodingId: null, members: [], enumValues: [],
+        }),
+      ]) }),
+    ));
+  });
+
   it("creates a manual structured DATA_TYPE with its first member", async () => {
     mockLoadManualSchemaById.mockResolvedValueOnce(schema);
     renderPage();

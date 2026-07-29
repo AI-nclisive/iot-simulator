@@ -214,6 +214,51 @@ class ScanServiceTest {
     }
 
     @Test
+    void createFromScanPersistsCompleteNativeStructureMetadata() {
+        DataTypeMember samples = new DataTypeMember(
+                "samples", DataType.UINT16, null, ValueRank.ARRAY, List.of(4), true);
+        DataTypeMember engineeringUnit = new DataTypeMember(
+                "engineeringUnit", null, "ns=2;i=4101", ValueRank.SCALAR, List.of(), false);
+        scanner.scanResult = new ScanResult(ScanStatus.OK, List.of(
+                new DiscoveredNode("ns=2;s=measurement", null, "Measurement", "Measurement", "VARIABLE",
+                        null, "SCALAR", "READ", null, null, "ns=2;i=4001",
+                        List.of(samples, engineeringUnit), List.of(), "ns=2;i=5001",
+                        NativeTypeKind.STRUCTURE,
+                        List.of(new DiscoveredTypeDefinition("ns=2;i=4101", "EngineeringUnit",
+                                List.of(new DataTypeMember("code", DataType.INT32, null)), List.of(),
+                                "ns=2;i=5101", NativeTypeKind.STRUCTURE)),
+                        "MeasurementData")),
+                false, 1, "discovered native structure metadata");
+        ScanJob job = service.startScan(PROJECT, "OPC_UA", "opc.tcp://h", ConnectionCredentials.anonymous(), 0);
+
+        DataSource created = service.createFromScan(PROJECT, job.jobId(), "Measurement source", null, List.of(), "a");
+
+        Schema schema = new SchemaService(schemaRepo, dataSourceRepo, new ObjectMapper()).get(PROJECT, created.id());
+        assertThat(schema.nodes())
+                .filteredOn(node -> "ns=2;i=4001".equals(node.nodeId()))
+                .singleElement()
+                .satisfies(node -> {
+                    assertThat(node.name()).isEqualTo("MeasurementData");
+                    assertThat(node.nativeTypeKind()).isEqualTo(NativeTypeKind.STRUCTURE);
+                    assertThat(node.defaultEncodingId()).isEqualTo("ns=2;i=5001");
+                    assertThat(node.members()).containsExactly(samples, engineeringUnit);
+                });
+        assertThat(schema.nodes())
+                .filteredOn(node -> "ns=2;i=4101".equals(node.nodeId()))
+                .singleElement()
+                .satisfies(node -> {
+                    assertThat(node.name()).isEqualTo("EngineeringUnit");
+                    assertThat(node.nativeTypeKind()).isEqualTo(NativeTypeKind.STRUCTURE);
+                    assertThat(node.defaultEncodingId()).isEqualTo("ns=2;i=5101");
+                    assertThat(node.members()).containsExactly(new DataTypeMember("code", DataType.INT32, null));
+                });
+        assertThat(schema.nodes())
+                .filteredOn(node -> "Measurement".equals(node.name()))
+                .singleElement()
+                .satisfies(node -> assertThat(node.dataTypeNodeId()).isEqualTo("ns=2;i=4001"));
+    }
+
+    @Test
     void createFromScanPreservesUnresolvedStructuredMemberTypeAsOpaqueDefinition() {
         scanner.scanResult = new ScanResult(ScanStatus.OK, List.of(
                 new DiscoveredNode("ns=2;s=value", null, "Value", "Value", "VARIABLE",
