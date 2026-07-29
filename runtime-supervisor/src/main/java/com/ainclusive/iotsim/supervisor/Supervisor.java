@@ -663,7 +663,8 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
                         value.getName(), value.getValue(), emptyToNull(value.getDescription()))).toList(),
                 emptyToNull(n.getDataTypeDefaultEncodingId()),
                 n.getNativeTypeKind().isBlank() ? null : NativeTypeKind.valueOf(n.getNativeTypeKind()),
-                n.getDataTypeDependenciesList().stream().map(Supervisor::toDiscoveredTypeDefinition).toList());
+                n.getDataTypeDependenciesList().stream().map(Supervisor::toDiscoveredTypeDefinition).toList(),
+                emptyToNull(n.getDataTypeName()));
     }
 
     private static DiscoveredTypeDefinition toDiscoveredTypeDefinition(NativeDataTypeDefinitionMsg definition) {

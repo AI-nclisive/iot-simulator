@@ -382,7 +382,8 @@ public class ScanService implements DisposableBean {
 
     /** Adds one top-level schema type for a scanned structured native declaration. */
     private static void addImportedType(List<SchemaNode> nodes, Set<String> importedTypeIds, DiscoveredNode node) {
-        addImportedType(nodes, importedTypeIds, node.dataTypeNodeId(), node.name(), node.dataTypeMembers(),
+        addImportedType(nodes, importedTypeIds, node.dataTypeNodeId(),
+                node.dataTypeName() == null ? node.name() : node.dataTypeName(), node.dataTypeMembers(),
                 node.dataTypeEnumValues(), node.dataTypeDefaultEncodingId(), node.dataTypeKind());
         for (DiscoveredTypeDefinition dependency : node.dataTypeDependencies()) {
             addImportedType(nodes, importedTypeIds, dependency.nodeId(), dependency.name(), dependency.members(),

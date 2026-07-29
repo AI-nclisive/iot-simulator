@@ -313,7 +313,8 @@ final class OpcUaDiscovery {
     /** The neutral mapping plus the original DataType attribute, when it needs preserving. */
     private record DataTypeDeclaration(String neutralType, String dataTypeNodeId,
             List<DataTypeMemberMsg> members, List<DataTypeEnumValueMsg> enumValues,
-            String defaultEncodingId, String nativeTypeKind, List<NativeDataTypeDefinitionMsg> dependencies) {}
+            String defaultEncodingId, String nativeTypeKind, List<NativeDataTypeDefinitionMsg> dependencies,
+            String typeName) {}
 
     /** The fields and binary encoding supplied by a native StructureDefinition. */
     private record StructureDeclaration(List<DataTypeMemberMsg> members, String defaultEncodingId,
@@ -345,7 +346,8 @@ final class OpcUaDiscovery {
         List<DataTypeMemberMsg> members = "OPTION_SET".equals(nativeTypeKind) ? List.of() : structure.members();
         return new DataTypeDeclaration(neutral, nativeTypeId,
                 members, enumValues, "OPTION_SET".equals(nativeTypeKind) ? null : structure.defaultEncodingId(), nativeTypeKind,
-                nativeTypeId == null ? List.of() : readDependentTypeDefinitions(client, members));
+                nativeTypeId == null ? List.of() : readDependentTypeDefinitions(client, members),
+                nativeTypeId == null ? null : readDataTypeName(client, dataTypeId));
     }
 
     /** Reads the closure of custom field types, retaining opaque entries when no definition is exposed. */
@@ -376,7 +378,7 @@ final class OpcUaDiscovery {
             List<DataTypeMemberMsg> members = "OPTION_SET".equals(nativeTypeKind) ? List.of() : structure.members();
             NativeDataTypeDefinitionMsg definition = NativeDataTypeDefinitionMsg.newBuilder()
                     .setNodeId(typeId)
-                    .setName(typeId)
+                    .setName(readDataTypeName(client, nodeId))
                     .addAllMembers(members)
                     .addAllEnumValues(enumValues)
                     .setDefaultEncodingId("OPTION_SET".equals(nativeTypeKind) || structure.defaultEncodingId() == null
@@ -466,6 +468,26 @@ final class OpcUaDiscovery {
         return structure.nativeTypeKind() == null ? "OPAQUE" : structure.nativeTypeKind();
     }
 
+    /** Reads the DataType browse name separately from the Variable that uses it. */
+    private static String readDataTypeName(OpcUaClient client, NodeId dataTypeId) {
+        try {
+            ReadValueId request = new ReadValueId(
+                    dataTypeId, AttributeId.BrowseName.uid(), null, QualifiedName.NULL_VALUE);
+            ReadResponse response = client.read(0.0, TimestampsToReturn.Neither, List.of(request))
+                    .get(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            DataValue[] results = response.getResults();
+            Object value = results != null && results.length > 0 && results[0].getValue() != null
+                    ? results[0].getValue().getValue() : null;
+            if (value instanceof QualifiedName browseName
+                    && browseName.getName() != null && !browseName.getName().isBlank()) {
+                return browseName.getName();
+            }
+        } catch (Exception ignored) {
+            // Preserve the identity even if the optional human-readable name cannot be read.
+        }
+        return dataTypeId.toParseableString();
+    }
+
     /** Imports numeric enum/option-set literals when the server exposes EnumValues. */
     private static List<DataTypeEnumValueMsg> readEnumValues(OpcUaClient client, NodeId dataTypeId) {
         try {
@@ -520,6 +542,8 @@ final class OpcUaDiscovery {
                     .setNativeTypeKind(declaration == null || declaration.nativeTypeKind() == null
                             ? "" : declaration.nativeTypeKind())
                     .addAllDataTypeDependencies(declaration == null ? List.of() : declaration.dependencies())
+                    .setDataTypeName(declaration == null || declaration.typeName() == null
+                            ? "" : declaration.typeName())
                     .setValueRank(attrs != null && attrs.valueRank() != null && attrs.valueRank() >= 0
                             ? "ARRAY" : "SCALAR")
                     .setAccess("READ");

@@ -30,6 +30,7 @@ import com.ainclusive.iotsim.protocolmodel.Access;
 import com.ainclusive.iotsim.protocolmodel.DataType;
 import com.ainclusive.iotsim.protocolmodel.DataTypeEnumValue;
 import com.ainclusive.iotsim.protocolmodel.DataTypeMember;
+import com.ainclusive.iotsim.protocolmodel.NativeTypeKind;
 import com.ainclusive.iotsim.protocolmodel.NodeKind;
 import com.ainclusive.iotsim.protocolmodel.SchemaNode;
 import com.ainclusive.iotsim.protocolmodel.ValueRank;
@@ -193,7 +194,8 @@ class ScanServiceTest {
                 new DiscoveredNode("ns=2;s=range", null, "Range", "Range", "VARIABLE",
                         null, "SCALAR", "READ", null, null, "ns=0;i=884",
                         List.of(new DataTypeMember("low", DataType.FLOAT64, null),
-                                new DataTypeMember("high", DataType.FLOAT64, null)), List.of(), "ns=2;i=5002")),
+                                new DataTypeMember("high", DataType.FLOAT64, null)), List.of(), "ns=2;i=5002",
+                        NativeTypeKind.STRUCTURE, List.of(), "ServerRange")),
                 false, 1, "discovered structured type");
         ScanJob job = service.startScan(PROJECT, "OPC_UA", "opc.tcp://h", ConnectionCredentials.anonymous(), 0);
 
@@ -203,6 +205,7 @@ class ScanServiceTest {
         assertThat(schema.nodes()).anySatisfy(node -> {
             assertThat(node.kind()).isEqualTo(NodeKind.DATA_TYPE);
             assertThat(node.nodeId()).isEqualTo("ns=0;i=884");
+            assertThat(node.name()).isEqualTo("ServerRange");
             assertThat(node.members()).containsExactly(
                     new DataTypeMember("low", DataType.FLOAT64, null),
                     new DataTypeMember("high", DataType.FLOAT64, null));
