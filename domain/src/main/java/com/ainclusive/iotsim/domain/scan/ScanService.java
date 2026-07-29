@@ -382,14 +382,37 @@ public class ScanService implements DisposableBean {
         String typeId = node.dataTypeNodeId();
         List<DataTypeMember> members = node.dataTypeMembers();
         var enumValues = node.dataTypeEnumValues();
-        if (typeId == null || (members.isEmpty() && enumValues.isEmpty()) || !importedTypeIds.add(typeId)) {
+        if (typeId == null || (members.isEmpty() && enumValues.isEmpty())) {
             return;
         }
         String description = members.isEmpty() ? "Imported OPC UA enum DataType" : "Imported OPC UA structured DataType";
-        nodes.add(new SchemaNode(typeId, null, "Types/" + typeId, node.name(), NodeKind.DATA_TYPE,
+        SchemaNode imported = new SchemaNode(typeId, null, "Types/" + typeId, node.name(), NodeKind.DATA_TYPE,
                 null, null, null, null, description, List.of(), null,
-                List.of(), null, members, enumValues, node.dataTypeDefaultEncodingId(), null, null, null, null));
+                List.of(), null, members, enumValues, node.dataTypeDefaultEncodingId(), null, null, null, null);
+        int existingIndex = indexOfImportedType(nodes, typeId);
+        if (existingIndex >= 0) {
+            SchemaNode existing = nodes.get(existingIndex);
+            // A prior structure may have introduced this identity as opaque. If a
+            // later variable supplies the actual declaration, upgrade in place.
+            if (existing.members().isEmpty() && existing.enumValues().isEmpty()) {
+                nodes.set(existingIndex, imported);
+                addOpaqueMemberTypes(nodes, importedTypeIds, members);
+            }
+            return;
+        }
+        importedTypeIds.add(typeId);
+        nodes.add(imported);
         addOpaqueMemberTypes(nodes, importedTypeIds, members);
+    }
+
+    private static int indexOfImportedType(List<SchemaNode> nodes, String typeId) {
+        for (int index = 0; index < nodes.size(); index++) {
+            SchemaNode candidate = nodes.get(index);
+            if (candidate.kind() == NodeKind.DATA_TYPE && candidate.nodeId().equals(typeId)) {
+                return index;
+            }
+        }
+        return -1;
     }
 
     /**

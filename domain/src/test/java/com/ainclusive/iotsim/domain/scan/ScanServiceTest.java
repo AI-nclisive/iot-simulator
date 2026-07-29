@@ -230,6 +230,30 @@ class ScanServiceTest {
     }
 
     @Test
+    void createFromScanUpgradesOpaqueMemberTypeWhenItsDeclarationAppearsLater() {
+        scanner.scanResult = new ScanResult(ScanStatus.OK, List.of(
+                new DiscoveredNode("ns=2;s=outer", null, "Outer", "Outer", "VARIABLE",
+                        null, "SCALAR", "READ", null, null, "ns=2;i=1001",
+                        List.of(new DataTypeMember("nested", null, "ns=2;i=2002")), List.of(), "ns=2;i=5001"),
+                new DiscoveredNode("ns=2;s=nested", null, "Nested", "Nested", "VARIABLE",
+                        null, "SCALAR", "READ", null, null, "ns=2;i=2002",
+                        List.of(new DataTypeMember("value", DataType.INT32, null)), List.of(), "ns=2;i=5002")),
+                false, 2, "discovered nested structures");
+        ScanJob job = service.startScan(PROJECT, "OPC_UA", "opc.tcp://h", ConnectionCredentials.anonymous(), 0);
+
+        DataSource created = service.createFromScan(PROJECT, job.jobId(), "Nested source", null, List.of(), "a");
+
+        Schema schema = new SchemaService(schemaRepo, dataSourceRepo, new ObjectMapper()).get(PROJECT, created.id());
+        assertThat(schema.nodes())
+                .filteredOn(node -> "ns=2;i=2002".equals(node.nodeId()))
+                .singleElement()
+                .satisfies(node -> {
+                    assertThat(node.members()).containsExactly(new DataTypeMember("value", DataType.INT32, null));
+                    assertThat(node.defaultEncodingId()).isEqualTo("ns=2;i=5002");
+                });
+    }
+
+    @Test
     void createFromScanImportsNativeEnumDefinition() {
         scanner.scanResult = new ScanResult(ScanStatus.OK, List.of(
                 new DiscoveredNode("ns=2;s=state", null, "State", "State", "VARIABLE",
