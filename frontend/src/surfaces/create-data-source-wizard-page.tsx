@@ -1647,9 +1647,17 @@ export function CreateDataSourceWizardPage() {
           </div>
         ) : null}
 
-        <button className="shell-action-secondary" type="button" onClick={retryScan}>
-          Scan again
-        </button>
+        <section className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-shell-accent/30 bg-shell-accent/5 px-4 py-3">
+          <div>
+            <p className="text-sm font-medium text-shell-ink">Need a fresh result?</p>
+            <p className="mt-1 text-sm text-shell-muted">
+              Scan the configured endpoint again. This replaces the discovery result above.
+            </p>
+          </div>
+          <button className="shell-action border-shell-accent bg-white text-shell-accent shadow-sm" type="button" onClick={retryScan}>
+            Scan endpoint again
+          </button>
+        </section>
       </div>
     );
   }

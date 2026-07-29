@@ -1289,6 +1289,10 @@ Parallel execution:
   visible, while add/edit/save/discard actions are unavailable. Refresh them
   through the rescan flow instead.
 
+- [x] `UI-509` Data source wizard — make repeat scan action prominent
+  Goal: after a completed scan, clearly distinguish the action that starts a
+  fresh endpoint scan and explain that it replaces the current discovery result.
+
 ## Recommended Sequence
 
 1. Complete the P0 shell and shared-pattern tasks first.
