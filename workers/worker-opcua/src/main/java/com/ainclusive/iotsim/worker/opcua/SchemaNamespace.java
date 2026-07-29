@@ -9,6 +9,7 @@ import org.eclipse.milo.opcua.sdk.server.OpcUaServer;
 import org.eclipse.milo.opcua.sdk.server.api.DataItem;
 import org.eclipse.milo.opcua.sdk.server.api.ManagedNamespaceWithLifecycle;
 import org.eclipse.milo.opcua.sdk.server.api.MonitoredItem;
+import org.eclipse.milo.opcua.sdk.server.nodes.UaDataTypeNode;
 import org.eclipse.milo.opcua.sdk.server.nodes.UaObjectNode;
 import org.eclipse.milo.opcua.sdk.server.nodes.UaVariableNode;
 import org.eclipse.milo.opcua.sdk.server.util.SubscriptionModel;
@@ -16,6 +17,7 @@ import org.eclipse.milo.opcua.stack.core.Identifiers;
 import org.eclipse.milo.opcua.stack.core.types.builtin.DataValue;
 import org.eclipse.milo.opcua.stack.core.types.builtin.LocalizedText;
 import org.eclipse.milo.opcua.stack.core.types.builtin.Variant;
+import org.eclipse.milo.opcua.stack.core.types.structured.EnumValueType;
 
 /**
  * Builds the OPC UA address space from the protocol-neutral schema: each VARIABLE
@@ -27,13 +29,21 @@ final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
     static final String URI = "urn:iotsim:opcua";
 
     private final List<VarDef> variables;
+    private final List<NativeDataTypeDef> typeDefinitions;
     private final Map<String, UaVariableNode> nodes = new ConcurrentHashMap<>();
     private final Map<String, org.eclipse.milo.opcua.stack.core.types.builtin.NodeId> hierarchy = new ConcurrentHashMap<>();
+    private final Map<String, org.eclipse.milo.opcua.stack.core.types.builtin.NodeId> nativeDataTypes =
+            new ConcurrentHashMap<>();
     private final SubscriptionModel subscriptionModel;
 
     SchemaNamespace(OpcUaServer server, List<VarDef> variables) {
+        this(server, variables, List.of());
+    }
+
+    SchemaNamespace(OpcUaServer server, List<VarDef> variables, List<NativeDataTypeDef> typeDefinitions) {
         super(server, URI);
         this.variables = List.copyOf(variables);
+        this.typeDefinitions = List.copyOf(typeDefinitions);
         this.subscriptionModel = new SubscriptionModel(server, this);
         getLifecycleManager().addLifecycle(subscriptionModel);
         getLifecycleManager().addStartupTask(this::createNodes);
@@ -60,6 +70,7 @@ final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
     }
 
     private void createNodes() {
+        createNativeDataTypes();
         // Folders are built first, repeatedly, so an out-of-order schema still
         // materializes correctly. A missing parent is rejected rather than flattened.
         int remaining = (int) variables.stream()
@@ -110,7 +121,7 @@ final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
                     .setDataType(declaredDataType(def))
                     .setTypeDefinition(Identifiers.BaseDataVariableType)
                     .build();
-            if (!isStandardOpcUaDataType(def.dataTypeNodeId())) {
+            if (!isStandardOpcUaDataType(def.dataTypeNodeId()) && def.dataType() != null && !def.dataType().isBlank()) {
                 node.setValue(new DataValue(new Variant(OpcUaTypes.defaultValue(def.dataType()))));
             }
             getNodeManager().addNode(node);
@@ -122,13 +133,44 @@ final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
         }
     }
 
-    private static org.eclipse.milo.opcua.stack.core.types.builtin.NodeId declaredDataType(VarDef def) {
+    private void createNativeDataTypes() {
+        for (NativeDataTypeDef definition : typeDefinitions) {
+            var nodeId = newNodeId("types/" + definition.nodeId());
+            UaDataTypeNode node = new UaDataTypeNode(
+                    getNodeContext(),
+                    nodeId,
+                    newQualifiedName(definition.name()),
+                    LocalizedText.english(definition.name()),
+                    LocalizedText.english(definition.name()),
+                    null,
+                    null,
+                    false);
+            if (definition.isEnum()) {
+                node.setEnumValues(definition.enumValues().stream()
+                        .map(value -> new EnumValueType(
+                                value.getValue(),
+                                LocalizedText.english(value.getName()),
+                                value.getDescription().isBlank() ? null : LocalizedText.english(value.getDescription())))
+                        .toArray(EnumValueType[]::new));
+            }
+            getNodeManager().addNode(node);
+            var baseType = definition.isEnum() ? Identifiers.Enumeration : Identifiers.Structure;
+            node.addReference(new Reference(nodeId, Identifiers.HasSubtype, baseType.expanded(), false));
+            nativeDataTypes.put(definition.nodeId(), nodeId);
+        }
+    }
+
+    private org.eclipse.milo.opcua.stack.core.types.builtin.NodeId declaredDataType(VarDef def) {
         if (isStandardOpcUaDataType(def.dataTypeNodeId())) {
             return org.eclipse.milo.opcua.stack.core.types.builtin.NodeId.parse(def.dataTypeNodeId());
         }
         if (def.dataTypeNodeId() != null && !def.dataTypeNodeId().isBlank()) {
+            var nativeType = nativeDataTypes.get(def.dataTypeNodeId());
+            if (nativeType != null) {
+                return nativeType;
+            }
             throw new IllegalArgumentException(
-                    "cannot simulate non-standard OPC UA DataType without its type definition: "
+                    "cannot simulate non-standard OPC UA DataType because its declaration was not supplied: "
                             + def.dataTypeNodeId());
         }
         return OpcUaTypes.dataTypeId(def.dataType());

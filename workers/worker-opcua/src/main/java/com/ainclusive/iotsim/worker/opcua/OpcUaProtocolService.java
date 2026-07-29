@@ -35,8 +35,10 @@ import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -57,6 +59,7 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
     private final AtomicInteger configuredNodes = new AtomicInteger();
     private final AtomicReference<OpcUaServerRuntime> serverRuntime = new AtomicReference<>();
     private final Map<String, String> nodeDataTypes = new ConcurrentHashMap<>();
+    private final Map<String, String> unsupportedNativeTypes = new ConcurrentHashMap<>();
     private final ClientEventHub clientEventHub = new ClientEventHub();
     private final RuntimeEventHub runtimeEventHub = new RuntimeEventHub();
     /**
@@ -106,7 +109,9 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
     @Override
     public void configure(ConfigureRequest request, StreamObserver<Ack> obs) {
         List<VarDef> variables = new ArrayList<>();
+        List<NativeDataTypeDef> typeDefinitions = new ArrayList<>();
         nodeDataTypes.clear();
+        unsupportedNativeTypes.clear();
         for (SchemaNodeMsg node : request.getSchema().getNodesList()) {
             if ("VARIABLE".equals(node.getKind()) || "FOLDER".equals(node.getKind())
                     || "OBJECT".equals(node.getKind())) {
@@ -114,17 +119,37 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
                         node.getName(), node.getKind(), node.getDataType(), node.getDataTypeNodeId(), null,
                         null, null, null, null));
             }
-            if ("VARIABLE".equals(node.getKind())) {
-                if (!node.getDataType().isBlank()) {
-                    nodeDataTypes.put(node.getNodeId(), node.getDataType());
-                }
+            if ("DATA_TYPE".equals(node.getKind())) {
+                typeDefinitions.add(new NativeDataTypeDef(
+                        node.getNodeId(),
+                        node.getName(),
+                        node.getDataTypeMembersList(),
+                        node.getDataTypeEnumValuesList()));
+            }
+        }
+        Set<String> enumTypeIds = new HashSet<>();
+        for (NativeDataTypeDef definition : typeDefinitions) {
+            if (definition.isEnum()) {
+                enumTypeIds.add(definition.nodeId());
+            }
+        }
+        for (SchemaNodeMsg node : request.getSchema().getNodesList()) {
+            if (!"VARIABLE".equals(node.getKind())) {
+                continue;
+            }
+            if (!node.getDataType().isBlank()) {
+                nodeDataTypes.put(node.getNodeId(), node.getDataType());
+            } else if (enumTypeIds.contains(node.getDataTypeNodeId())) {
+                nodeDataTypes.put(node.getNodeId(), "INT32");
+            } else if (!node.getDataTypeNodeId().isBlank()) {
+                unsupportedNativeTypes.put(node.getNodeId(), node.getDataTypeNodeId());
             }
         }
         String bindAddress = request.getOptions().getOrDefault("bindAddress", "127.0.0.1");
         String advertisedHost = request.getOptions().getOrDefault("advertisedHost", "127.0.0.1");
         AuthConfig auth = toAuthConfig(request.getSecurityConfig());
         serverRuntime.set(new OpcUaServerRuntime(
-                request.getListenPort(), bindAddress, advertisedHost, variables, auth,
+                request.getListenPort(), bindAddress, advertisedHost, variables, typeDefinitions, auth,
                 clientEventHub::emit, runtimeEventHub::emit));
         configuredNodes.set(request.getSchema().getNodesCount());
         state.set("CONFIGURED");
@@ -469,6 +494,13 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
                                     + ": " + e.getMessage())
                             .build());
                 }
+            } else if (unsupportedNativeTypes.containsKey(value.getNodeId())) {
+                runtimeEventHub.emit(RuntimeEvent.newBuilder()
+                        .setType("ERROR")
+                        .setAtMicros(System.currentTimeMillis() * 1_000L)
+                        .setDetail("cannot apply value for native DataType without an executable encoding: "
+                                + unsupportedNativeTypes.get(value.getNodeId()))
+                        .build());
             }
         }
     }

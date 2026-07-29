@@ -35,6 +35,8 @@ import com.ainclusive.iotsim.protocolmodel.ValueCodec;
 import com.ainclusive.iotsim.workercontract.v1.CaptureRequest;
 import com.ainclusive.iotsim.workercontract.v1.ClientEvent;
 import com.ainclusive.iotsim.workercontract.v1.ConnectionConfigMsg;
+import com.ainclusive.iotsim.workercontract.v1.DataTypeEnumValueMsg;
+import com.ainclusive.iotsim.workercontract.v1.DataTypeMemberMsg;
 import com.ainclusive.iotsim.workercontract.v1.Quality;
 import com.ainclusive.iotsim.workercontract.v1.RuntimeEvent;
 import com.ainclusive.iotsim.workercontract.v1.ScanProgress;
@@ -678,6 +680,20 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
                     .setKind(n.kind().name())
                     .setDataType(n.dataType() == null ? "" : n.dataType().name())
                     .setDataTypeNodeId(orEmpty(n.dataTypeNodeId()))
+                    .addAllDataTypeMembers(n.members().stream()
+                            .map(member -> DataTypeMemberMsg.newBuilder()
+                                    .setName(member.name())
+                                    .setDataType(member.dataType() == null ? "" : member.dataType().name())
+                                    .setDataTypeNodeId(orEmpty(member.dataTypeNodeId()))
+                                    .build())
+                            .toList())
+                    .addAllDataTypeEnumValues(n.enumValues().stream()
+                            .map(value -> DataTypeEnumValueMsg.newBuilder()
+                                    .setName(value.name())
+                                    .setValue(value.value())
+                                    .setDescription(orEmpty(value.description()))
+                                    .build())
+                            .toList())
                     .setValueRank(n.valueRank() == null ? "" : n.valueRank().name())
                     .setAccess(n.access() == null ? "" : n.access().name())
                     .setUnit(orEmpty(n.unit()))
