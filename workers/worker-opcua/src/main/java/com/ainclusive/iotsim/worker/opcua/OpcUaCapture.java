@@ -107,7 +107,8 @@ final class OpcUaCapture {
     /** Visible to package tests so non-neutral capture encoding remains covered. */
     static Value toProtoValue(NodeSpec spec, DataValue dv) {
         if (spec.isNativeStructure()) {
-            Object raw = dv.getValue().getValue();
+            var variant = dv.getValue();
+            Object raw = variant == null ? null : variant.getValue();
             if (!(raw instanceof ExtensionObject extension)
                     || !(extension.getBody() instanceof org.eclipse.milo.opcua.stack.core.types.builtin.ByteString body)) {
                 throw new IllegalArgumentException(
