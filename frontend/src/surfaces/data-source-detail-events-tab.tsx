@@ -9,10 +9,12 @@ export type RuntimeEventLevel = "info" | "warning" | "error";
 
 export type RuntimeEvent = {
   id: string;
+  type: string;
   level: RuntimeEventLevel;
   timestamp: string;
   message: string;
   category: "connection" | "runtime" | "recording" | "replay";
+  runId: string | null;
 };
 
 /** DTO shape returned by GET /api/v1/projects/{pid}/runtime-events */
@@ -28,6 +30,30 @@ interface RuntimeEventDto {
 interface RuntimeEventsResponse {
   events: RuntimeEventDto[];
   nextCursor: string | null;
+}
+
+interface RunEvidenceDto {
+  id: string;
+  manifest: {
+    kind?: string;
+    startedAt?: string;
+    endedAt?: string | null;
+    valueCount?: number;
+  };
+}
+
+interface RunDto {
+  kind: string;
+  startedAt: string | null;
+  endedAt: string | null;
+  evidenceId: string | null;
+}
+
+interface RunSummary {
+  kind: string;
+  startedAt: string | null;
+  endedAt: string | null;
+  evidence?: RunEvidenceDto;
 }
 
 function humanize(type: string): string {
@@ -74,11 +100,27 @@ function mapDtoToEvent(dto: RuntimeEventDto): RuntimeEvent {
     humanize(dto.type);
   return {
     id: String(dto.id),
+    type: dto.type,
     level: typeToLevel(dto.type),
     timestamp: dto.at,
     message,
     category: typeToCategory(dto.type),
+    runId: dto.runId,
   };
+}
+
+function isTerminalRunEvent(event: RuntimeEvent): boolean {
+  return event.runId !== null && ["RUN_COMPLETED", "RUN_STOPPED", "RUN_FAILED"].includes(event.type);
+}
+
+function formatDuration(startedAt?: string | null, endedAt?: string | null): string {
+  if (!startedAt || !endedAt) return "Not available";
+  const start = new Date(startedAt).getTime();
+  const end = new Date(endedAt).getTime();
+  if (Number.isNaN(start) || Number.isNaN(end) || end < start) return "Not available";
+  const seconds = Math.round((end - start) / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
 }
 
 function levelIcon(level: RuntimeEventLevel) {
@@ -113,6 +155,8 @@ export function DataSourceDetailEventsTab({ source }: { source: DataSourceRow })
 
   // Historical events from REST API
   const [apiEvents, setApiEvents] = useState<RuntimeEvent[]>([]);
+  const [runSummaries, setRunSummaries] = useState<Record<string, RunSummary>>({});
+  const [loadingRunId, setLoadingRunId] = useState<string | null>(null);
   // Live events from SSE, prepended in front
   const [liveEventsList, setLiveEventsList] = useState<RuntimeEvent[]>([]);
 
@@ -131,6 +175,7 @@ export function DataSourceDetailEventsTab({ source }: { source: DataSourceRow })
     let cancelled = false;
     setIsLoading(true);
     setFetchError(null);
+    setRunSummaries({});
 
     apiFetch<RuntimeEventsResponse>(
       `/api/v1/projects/${projectId}/runtime-events?source=${encodeURIComponent(source.id)}&limit=100`,
@@ -152,6 +197,32 @@ export function DataSourceDetailEventsTab({ source }: { source: DataSourceRow })
     };
   }, [projectId, source.id]);
 
+  async function loadRunSummary(runId: string) {
+    if (!projectId || runSummaries[runId] || loadingRunId === runId) return;
+    setLoadingRunId(runId);
+    try {
+      const run = await apiFetch<RunDto>(`/api/v1/projects/${projectId}/runs/${runId}`);
+      let evidence: RunEvidenceDto | undefined;
+      if (run.evidenceId) {
+        try {
+          evidence = await apiFetch<RunEvidenceDto>(
+            `/api/v1/projects/${projectId}/evidence/${run.evidenceId}`,
+          );
+        } catch {
+          // The run details still provide useful terminal-event context.
+        }
+      }
+      setRunSummaries((previous) => ({
+        ...previous,
+        [runId]: { kind: run.kind, startedAt: run.startedAt, endedAt: run.endedAt, evidence },
+      }));
+    } catch {
+      // Runtime events remain useful even if optional run details are unavailable.
+    } finally {
+      setLoadingRunId((current) => (current === runId ? null : current));
+    }
+  }
+
   // Subscribe to live SSE events and prepend matching ones (no duplicates)
   const { events: liveEvents } = useLiveRuntime(projectId, !!projectId);
 
@@ -164,10 +235,12 @@ export function DataSourceDetailEventsTab({ source }: { source: DataSourceRow })
     const mappedId = `live-${latest.at}-${latest.type}`;
     const mapped: RuntimeEvent = {
       id: mappedId,
+      type: latest.type,
       level: typeToLevel(latest.type),
       timestamp: latest.at,
       message: latest.detail ?? humanize(latest.type),
       category: typeToCategory(latest.type),
+      runId: null,
     };
 
     setLiveEventsList((prev) => {
@@ -278,6 +351,10 @@ export function DataSourceDetailEventsTab({ source }: { source: DataSourceRow })
             {visibleEvents.map((event) => {
               const isExpanded = expandedId === event.id;
               const detailId = `event-detail-${event.id}`;
+              const runSummary = event.runId ? runSummaries[event.runId] : undefined;
+              const evidence = runSummary?.evidence;
+              const showRunSummary = isTerminalRunEvent(event);
+              const isLoadingRunSummary = loadingRunId === event.runId;
               return (
                 <li key={event.id}>
                   <button
@@ -285,7 +362,12 @@ export function DataSourceDetailEventsTab({ source }: { source: DataSourceRow })
                     type="button"
                     aria-expanded={isExpanded}
                     aria-controls={detailId}
-                    onClick={() => setExpandedId(isExpanded ? null : event.id)}
+                    onClick={() => {
+                      setExpandedId(isExpanded ? null : event.id);
+                      if (!isExpanded && showRunSummary && event.runId) {
+                        void loadRunSummary(event.runId);
+                      }
+                    }}
                   >
                     <span
                       className={`mt-0.5 shrink-0 font-mono text-base leading-none ${levelClass(event.level)}`}
@@ -326,6 +408,49 @@ export function DataSourceDetailEventsTab({ source }: { source: DataSourceRow })
                         <dt className="font-semibold uppercase tracking-wide text-shell-muted">Event ID</dt>
                         <dd className="mt-0.5 font-mono text-shell-muted">{event.id}</dd>
                       </div>
+                      {showRunSummary ? (
+                        <div className="col-span-2 grid gap-2 border-t border-shell-line pt-2 sm:grid-cols-2">
+                          <div>
+                            <dt className="font-semibold uppercase tracking-wide text-shell-muted">Run type</dt>
+                            <dd className="mt-0.5 text-shell-ink">
+                              {isLoadingRunSummary ? "Loading…" : runSummary?.kind ?? "Not available"}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="font-semibold uppercase tracking-wide text-shell-muted">Duration</dt>
+                            <dd className="mt-0.5 text-shell-ink">
+                              {isLoadingRunSummary
+                                ? "Loading…"
+                                : formatDuration(runSummary?.startedAt, runSummary?.endedAt)}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="font-semibold uppercase tracking-wide text-shell-muted">Parameters</dt>
+                            <dd className="mt-0.5">
+                              <a className="shell-text-action" href={`/data-sources/${source.id}?tab=schema`}>
+                                {source.parameterCount.toLocaleString()} in schema
+                              </a>
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="font-semibold uppercase tracking-wide text-shell-muted">Sent values</dt>
+                            <dd className="mt-0.5 text-shell-ink">
+                              {isLoadingRunSummary
+                                ? "Loading…"
+                                : typeof evidence?.manifest.valueCount === "number"
+                                ? evidence.manifest.valueCount.toLocaleString()
+                                : "Not available"}
+                            </dd>
+                          </div>
+                          {evidence ? (
+                            <div className="col-span-2">
+                              <a className="shell-text-action" href={`/evidence/${evidence.id}`}>
+                                Open run evidence
+                              </a>
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
                     </dl>
                   ) : null}
                 </li>

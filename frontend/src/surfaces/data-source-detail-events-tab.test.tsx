@@ -98,6 +98,7 @@ type DtoOverride = {
   type?: string;
   at?: string;
   dataSourceId?: string | null;
+  runId?: string | null;
   payload?: Record<string, unknown>;
 };
 
@@ -184,6 +185,45 @@ describe("DataSourceDetailEventsTab — API fetch", () => {
       expect(screen.getByText("Source is up")).toBeTruthy();
       expect(screen.getByText("Connection refused")).toBeTruthy();
     });
+  });
+});
+
+describe("DataSourceDetailEventsTab — terminal run summary", () => {
+  it("shows linked evidence metadata for a stopped run", async () => {
+    setupDefaults();
+    mockApiFetch.mockImplementation((url: string) => {
+      if (url.includes("/runs/run-1")) {
+        return Promise.resolve({
+          kind: "SYNTHETIC",
+          startedAt: "2026-01-01T10:00:00Z",
+          endedAt: "2026-01-01T10:02:34Z",
+          evidenceId: "evidence-1",
+        });
+      }
+      if (url.includes("/evidence/evidence-1")) {
+        return Promise.resolve({
+          id: "evidence-1",
+          manifest: { valueCount: 2142 },
+        });
+      }
+      return Promise.resolve({
+        events: [makeDto({ type: "RUN_STOPPED", runId: "run-1" })],
+        nextCursor: null,
+      });
+    });
+
+    render(<DataSourceDetailEventsTab source={mockSource} />);
+    await userEvent.click(await screen.findByRole("button", { name: /Run stopped/i }));
+
+    expect(await screen.findByText("SYNTHETIC")).toBeTruthy();
+    expect(screen.getByText("2m 34s")).toBeTruthy();
+    expect(screen.getByText("2,142")).toBeTruthy();
+    expect((screen.getByRole("link", { name: "10 in schema" }) as HTMLAnchorElement).getAttribute("href"))
+      .toBe("/data-sources/src-test?tab=schema");
+    expect((screen.getByRole("link", { name: "Open run evidence" }) as HTMLAnchorElement).getAttribute("href"))
+      .toBe("/evidence/evidence-1");
+    expect(mockApiFetch).toHaveBeenCalledWith(`/api/v1/projects/${PROJECT_ID}/runs/run-1`);
+    expect(mockApiFetch).toHaveBeenCalledWith(`/api/v1/projects/${PROJECT_ID}/evidence/evidence-1`);
   });
 });
 

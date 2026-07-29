@@ -1289,6 +1289,11 @@ Parallel execution:
   visible, while add/edit/save/discard actions are unavailable. Refresh them
   through the rescan flow instead.
 
+- [x] `UI-508` Data source Events — show terminal run summary
+  Goal: a terminal runtime event must answer what ran, for how long, which
+  source schema was used, and how many values were sent. Link to the schema
+  and the run's evidence when available.
+
 - [x] `UI-509` Data source wizard — make repeat scan action prominent
   Goal: after a completed scan, clearly distinguish the action that starts a
   fresh endpoint scan and explain that it replaces the current discovery result.
