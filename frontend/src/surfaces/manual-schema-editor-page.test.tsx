@@ -115,6 +115,29 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
     expect(mockPushNotification).toHaveBeenCalledWith(expect.objectContaining({ title: "Type already added" }));
   });
 
+  it("offers abstract OPC UA types without inventing a concrete encoding", async () => {
+    mockLoadManualSchemaById.mockResolvedValueOnce(schema);
+    mockUpdateManualSchema.mockResolvedValueOnce(schema);
+    renderPage();
+    await waitFor(() => screen.getByText("Level"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Add folder" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add UInteger" }));
+
+    await waitFor(() => expect(screen.getAllByText("UInteger").length).toBeGreaterThan(0));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByLabelText(/Save in this schema/));
+    fireEvent.click(screen.getAllByRole("button", { name: "Save" })[1]);
+
+    await waitFor(() => expect(mockUpdateManualSchema).toHaveBeenCalledWith(
+      "proj-1", "ms-1", expect.objectContaining({ nodes: expect.arrayContaining([
+        expect.objectContaining({
+          nodeId: "ns=0;i=28", kind: "DATA_TYPE", members: [], enumValues: [],
+        }),
+      ]) }),
+    ));
+  });
+
   it("creates a manual structured DATA_TYPE with its first member", async () => {
     mockLoadManualSchemaById.mockResolvedValueOnce(schema);
     renderPage();

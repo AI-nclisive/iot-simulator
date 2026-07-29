@@ -198,6 +198,15 @@ const REFERENCE_TYPES = ["ORGANIZES", "HAS_COMPONENT", "HAS_PROPERTY", "HAS_TYPE
 // whose field shapes are stable in the specification. A real-device scan adds
 // vendor declarations to the same schema-local catalog.
 const STANDARD_OPC_UA_TYPE_TEMPLATES = [
+  // Abstract standard DataTypes intentionally have no fields or default binary
+  // encoding. They are preserved as opaque declarations: selectable by their
+  // real NodeId, but clearly non-executable until a concrete declaration is
+  // supplied by a source.
+  { nodeId: "ns=0;i=24", name: "BaseDataType", description: "OPC UA abstract root data type (opaque; no concrete value encoding)." },
+  { nodeId: "ns=0;i=26", name: "Number", description: "OPC UA abstract numeric base type (opaque; no concrete value encoding)." },
+  { nodeId: "ns=0;i=27", name: "Integer", description: "OPC UA abstract signed-integer base type (opaque; no concrete value encoding)." },
+  { nodeId: "ns=0;i=28", name: "UInteger", description: "OPC UA abstract unsigned-integer base type (opaque; no concrete value encoding)." },
+  { nodeId: "ns=0;i=29", name: "Enumeration", description: "OPC UA abstract enumeration base type (opaque; add a concrete enum when values are known)." },
   { nodeId: "ns=0;i=884", name: "Range", description: "OPC UA numeric engineering range.", members: [
     { name: "low", dataType: "FLOAT64", dataTypeNodeId: null },
     { name: "high", dataType: "FLOAT64", dataTypeNodeId: null },
