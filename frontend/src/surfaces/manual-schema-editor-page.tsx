@@ -382,7 +382,7 @@ export function ManualSchemaEditorPage() {
   const [addAccess, setAddAccess] = useState<string>("READ");
   const [addUnit, setAddUnit] = useState("");
   const [addDescription, setAddDescription] = useState("");
-  const [addDataTypeKind, setAddDataTypeKind] = useState<"STRUCTURE" | "UNION" | "ENUM">("STRUCTURE");
+  const [addDataTypeKind, setAddDataTypeKind] = useState<"STRUCTURE" | "UNION" | "ENUM" | "OPTION_SET">("STRUCTURE");
   const [addMemberName, setAddMemberName] = useState("value");
   const [addMemberType, setAddMemberType] = useState<string>("FLOAT64");
   const [addEnumValues, setAddEnumValues] = useState<EnumValueDraft[]>([
@@ -735,7 +735,7 @@ export function ManualSchemaEditorPage() {
       members: addKind === "DATA_TYPE" && addDataTypeKind !== "ENUM"
         ? [{ name: addMemberName.trim() || "value", dataType: addMemberType, dataTypeNodeId: null }]
         : [],
-      enumValues: addKind === "DATA_TYPE" && addDataTypeKind === "ENUM"
+      enumValues: addKind === "DATA_TYPE" && (addDataTypeKind === "ENUM" || addDataTypeKind === "OPTION_SET")
         ? addEnumValues
           .filter((value) => value.name.trim() && Number.isInteger(Number(value.value)))
           .map((value) => ({
@@ -1143,9 +1143,10 @@ export function ManualSchemaEditorPage() {
                     <label><input checked={addDataTypeKind === "STRUCTURE"} name="data-type-kind" type="radio" value="STRUCTURE" onChange={() => setAddDataTypeKind("STRUCTURE")} /> Structure</label>
                     <label><input checked={addDataTypeKind === "UNION"} name="data-type-kind" type="radio" value="UNION" onChange={() => setAddDataTypeKind("UNION")} /> Union</label>
                     <label><input checked={addDataTypeKind === "ENUM"} name="data-type-kind" type="radio" value="ENUM" onChange={() => setAddDataTypeKind("ENUM")} /> Enum</label>
+                    <label><input checked={addDataTypeKind === "OPTION_SET"} name="data-type-kind" type="radio" value="OPTION_SET" onChange={() => setAddDataTypeKind("OPTION_SET")} /> Option set</label>
                   </div>
                 </fieldset>
-                {addDataTypeKind !== "ENUM" ? (
+                {addDataTypeKind !== "ENUM" && addDataTypeKind !== "OPTION_SET" ? (
                   <div className="grid gap-3 sm:grid-cols-2">
                     <label className="flex flex-col gap-1.5 text-sm text-shell-muted">
                       First member name

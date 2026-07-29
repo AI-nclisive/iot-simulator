@@ -154,7 +154,8 @@ final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
                         .toArray(EnumValueType[]::new));
             }
             getNodeManager().addNode(node);
-            var baseType = definition.isEnum() ? Identifiers.Enumeration : Identifiers.Structure;
+            var baseType = definition.isEnum() ? Identifiers.Enumeration
+                    : definition.isOptionSet() ? Identifiers.OptionSet : Identifiers.Structure;
             node.addReference(new Reference(nodeId, Identifiers.HasSubtype, baseType.expanded(), false));
             nativeDataTypes.put(definition.nodeId(), nodeId);
         }

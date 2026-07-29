@@ -46,6 +46,27 @@ class OpcUaCaptureSchemaTest {
     }
 
     @Test
+    void rejectsOptionSetInsteadOfTreatingItsBitsAsAnEnum() {
+        CaptureRequest request = CaptureRequest.newBuilder().setSchema(Schema.newBuilder()
+                .addNodes(SchemaNodeMsg.newBuilder()
+                        .setNodeId("ns=2;i=7001")
+                        .setKind("DATA_TYPE")
+                        .setNativeTypeKind("OPTION_SET")
+                        .addDataTypeEnumValues(DataTypeEnumValueMsg.newBuilder()
+                                .setName("Enabled")
+                                .setValue(1)))
+                .addNodes(SchemaNodeMsg.newBuilder()
+                        .setNodeId("ns=2;s=options")
+                        .setKind("VARIABLE")
+                        .setDataTypeNodeId("ns=2;i=7001")))
+                .build();
+
+        assertThatIllegalArgumentException().isThrownBy(() -> OpcUaProtocolService.captureNodes(request))
+                .withMessageContaining("without an executable encoding")
+                .withMessageContaining("ns=2;i=7001");
+    }
+
+    @Test
     void resolvesStructureWithDefaultEncodingToRawBinaryCapture() {
         CaptureRequest request = CaptureRequest.newBuilder().setSchema(Schema.newBuilder()
                 .addNodes(SchemaNodeMsg.newBuilder()

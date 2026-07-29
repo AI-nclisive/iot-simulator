@@ -131,7 +131,7 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
                         node.getName(),
                         node.getDataTypeMembersList(),
                         node.getDataTypeEnumValuesList(),
-                        node.getDataTypeDefaultEncodingId()));
+                        node.getDataTypeDefaultEncodingId(), node.getNativeTypeKind()));
             }
         }
         Set<String> enumTypeIds = new HashSet<>();
@@ -321,7 +321,9 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
             String defaultEncodingId = "";
             if (dataType.isEmpty() && !node.getDataTypeNodeId().isEmpty()) {
                 SchemaNodeMsg declaration = declarations.get(node.getDataTypeNodeId());
-                if (declaration != null && declaration.getDataTypeEnumValuesCount() > 0) {
+                if (declaration != null && declaration.getDataTypeEnumValuesCount() > 0
+                        && (declaration.getNativeTypeKind().isBlank()
+                                || "ENUM".equals(declaration.getNativeTypeKind()))) {
                     dataType = "INT32";
                 } else if (declaration != null && declaration.getDataTypeMembersCount() > 0
                         && !declaration.getDataTypeDefaultEncodingId().isEmpty()) {
