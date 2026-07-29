@@ -69,11 +69,6 @@ public class JooqSchemaRepository implements SchemaRepository {
     private final DSLContext dsl;
     private final ObjectMapper json;
 
-    /** Kept for repository integration tests and standalone wiring. */
-    public JooqSchemaRepository(DSLContext dsl) {
-        this(dsl, new ObjectMapper());
-    }
-
     public JooqSchemaRepository(DSLContext dsl, ObjectMapper json) {
         this.dsl = dsl;
         this.json = json;

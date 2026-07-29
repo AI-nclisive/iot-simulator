@@ -23,6 +23,7 @@ import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import tools.jackson.databind.ObjectMapper;
 
 /** Schema versioning + node round-trip against real Postgres. */
 @Testcontainers(disabledWithoutDocker = true)
@@ -47,7 +48,7 @@ class SchemaRepositoryIT {
         projectId = new JooqProjectRepository(dsl).insert("Plant", null, "it").id();
         dataSources = new JooqDataSourceRepository(dsl);
         dataSourceId = dataSources.insert(projectId, "Pump", "OPC_UA", "MANUAL", 4840, null, null, null, "it").id();
-        schemas = new JooqSchemaRepository(dsl);
+        schemas = new JooqSchemaRepository(dsl, new ObjectMapper());
     }
 
     private static List<SchemaNode> sampleNodes() {

@@ -100,6 +100,15 @@ class SchemaNodeValidatorTest {
     }
 
     @Test
+    void acceptsStandardDataTypeNodeIdInShortForm() {
+        SchemaNode variable = new SchemaNode("v1", null, "v1", "V1", NodeKind.VARIABLE,
+                null, ValueRank.SCALAR, Access.READ, null, null, List.of(), null, List.of(), "i=884", List.of(),
+                null, null, null, null);
+
+        SchemaNodeValidator.validate(List.of(variable));
+    }
+
+    @Test
     void rejectsDuplicateMemberNames() {
         SchemaNode dataType = dataTypeNode("dt1", "Vector3D",
                 List.of(new DataTypeMember("x", DataType.FLOAT64, null),

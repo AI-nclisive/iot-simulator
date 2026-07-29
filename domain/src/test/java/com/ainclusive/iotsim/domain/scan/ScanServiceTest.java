@@ -27,6 +27,7 @@ import com.ainclusive.iotsim.platform.secret.ConnectionCredentials;
 import com.ainclusive.iotsim.platform.secret.InMemoryCredentialStore;
 import com.ainclusive.iotsim.protocolmodel.Access;
 import com.ainclusive.iotsim.protocolmodel.DataType;
+import com.ainclusive.iotsim.protocolmodel.DataTypeMember;
 import com.ainclusive.iotsim.protocolmodel.NodeKind;
 import com.ainclusive.iotsim.protocolmodel.SchemaNode;
 import com.ainclusive.iotsim.protocolmodel.ValueRank;
@@ -182,6 +183,28 @@ class ScanServiceTest {
                     assertThat(n.dataTypeNodeId()).isEqualTo("ns=0;i=28");
                     assertThat(n.valueRank()).isEqualTo(ValueRank.ARRAY);
                 });
+    }
+
+    @Test
+    void createFromScanImportsStructuredNativeDataTypeDefinition() {
+        scanner.scanResult = new ScanResult(ScanStatus.OK, List.of(
+                new DiscoveredNode("ns=2;s=range", null, "Range", "Range", "VARIABLE",
+                        null, "SCALAR", "READ", null, null, "ns=0;i=884",
+                        List.of(new DataTypeMember("low", DataType.FLOAT64, null),
+                                new DataTypeMember("high", DataType.FLOAT64, null)))),
+                false, 1, "discovered structured type");
+        ScanJob job = service.startScan(PROJECT, "OPC_UA", "opc.tcp://h", ConnectionCredentials.anonymous(), 0);
+
+        DataSource created = service.createFromScan(PROJECT, job.jobId(), "Range source", null, List.of(), "a");
+
+        Schema schema = new SchemaService(schemaRepo, dataSourceRepo, new ObjectMapper()).get(PROJECT, created.id());
+        assertThat(schema.nodes()).anySatisfy(node -> {
+            assertThat(node.kind()).isEqualTo(NodeKind.DATA_TYPE);
+            assertThat(node.nodeId()).isEqualTo("ns=0;i=884");
+            assertThat(node.members()).containsExactly(
+                    new DataTypeMember("low", DataType.FLOAT64, null),
+                    new DataTypeMember("high", DataType.FLOAT64, null));
+        });
     }
 
     @Test

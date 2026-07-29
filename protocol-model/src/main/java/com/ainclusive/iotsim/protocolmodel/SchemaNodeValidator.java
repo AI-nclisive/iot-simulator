@@ -47,7 +47,7 @@ public final class SchemaNodeValidator {
         }
         SchemaNode target = byId.get(node.dataTypeNodeId());
         if (target == null) {
-            if (node.dataTypeNodeId().matches("ns=\\d+;[isgb]=.+")) {
+            if (node.dataTypeNodeId().matches("(?:ns=\\d+;)?[isgb]=.+")) {
                 return;
             }
             throw new IllegalArgumentException("dataTypeNodeId target does not exist: " + node.dataTypeNodeId());
@@ -79,7 +79,7 @@ public final class SchemaNodeValidator {
             }
             SchemaNode target = byId.get(member.dataTypeNodeId());
             if (target == null) {
-                if (member.dataTypeNodeId().matches("ns=\\d+;[isgb]=.+")) {
+                if (member.dataTypeNodeId().matches("(?:ns=\\d+;)?[isgb]=.+")) {
                     continue; // a standard or vendor-native declaration, preserved verbatim
                 }
                 throw new IllegalArgumentException(

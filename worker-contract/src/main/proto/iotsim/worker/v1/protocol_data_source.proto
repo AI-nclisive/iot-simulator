@@ -111,6 +111,16 @@ message SchemaNodeMsg {
   // neutral primitive set (for example ns=0;i=28, UInteger). It is preserved
   // verbatim rather than being coerced to a different primitive type.
   string data_type_node_id = 16;
+  repeated DataTypeMemberMsg data_type_members = 17;
+}
+
+// The declared fields of a native OPC UA structured DataType. Exactly one of
+// data_type and data_type_node_id is present, mirroring protocol-model's
+// DataTypeMember. The list is empty for scalar, enum, or opaque declarations.
+message DataTypeMemberMsg {
+  string name = 1;
+  string data_type = 2;
+  string data_type_node_id = 3;
 }
 
 message StartRequest {}

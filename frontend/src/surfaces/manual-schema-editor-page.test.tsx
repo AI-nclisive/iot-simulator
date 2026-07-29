@@ -265,7 +265,7 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add variable" }));
 
     expect(screen.getByText("Coming soon:")).toBeTruthy();
-    expect(screen.getByText(/For now, create folders, objects, and variables/i)).toBeTruthy();
+    expect(screen.getByText(/Data types can be defined here and selected by variables/i)).toBeTruthy();
     expect(screen.queryByText(/address-space model/i)).toBeNull();
   });
 

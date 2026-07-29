@@ -19,7 +19,7 @@ export type NodeDto = {
   parentId: string | null;
   path: string;
   name: string;
-  kind: "FOLDER" | "OBJECT" | "VARIABLE";
+  kind: "FOLDER" | "OBJECT" | "VARIABLE" | "DATA_TYPE";
   dataType: string | null;
   valueRank: string | null;
   access: string | null;
@@ -28,6 +28,8 @@ export type NodeDto = {
   arrayDimensions?: number[];
   typeDefinition?: string | null;
   references?: ReferenceDto[];
+  dataTypeNodeId?: string | null;
+  members?: Array<{ name: string; dataType: string | null; dataTypeNodeId: string | null }>;
   accessLevelFull?: number | null;
   minimumSamplingInterval?: number | null;
   writeMask?: number | null;

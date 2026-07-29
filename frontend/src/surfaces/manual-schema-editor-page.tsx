@@ -188,8 +188,30 @@ const STRUCTURE_TEMPLATES = [
 
 const VALUE_RANKS = ["SCALAR", "ARRAY"] as const;
 const ACCESS_LEVELS = ["READ", "READ_WRITE"] as const;
-const UPCOMING_NODE_CLASSES = ["Method", "DataType"] as const;
+const UPCOMING_NODE_CLASSES = ["Method"] as const;
 const REFERENCE_TYPES = ["ORGANIZES", "HAS_COMPONENT", "HAS_PROPERTY", "HAS_TYPE_DEFINITION", "GENERIC"] as const;
+
+// Available without scanning: these are standard OPC UA structured declarations
+// whose field shapes are stable in the specification. A real-device scan adds
+// vendor declarations to the same schema-local catalog.
+const STANDARD_OPC_UA_TYPE_TEMPLATES = [
+  { nodeId: "ns=0;i=884", name: "Range", description: "OPC UA numeric engineering range.", members: [
+    { name: "low", dataType: "FLOAT64", dataTypeNodeId: null },
+    { name: "high", dataType: "FLOAT64", dataTypeNodeId: null },
+  ] },
+  { nodeId: "ns=0;i=889", name: "TimeZoneDataType", description: "UTC offset and daylight-saving flag.", members: [
+    { name: "offset", dataType: "INT16", dataTypeNodeId: null },
+    { name: "daylightSavingInOffset", dataType: "BOOL", dataTypeNodeId: null },
+  ] },
+  { nodeId: "ns=0;i=340", name: "BuildInfo", description: "Standard OPC UA server build identity.", members: [
+    { name: "productUri", dataType: "STRING", dataTypeNodeId: null },
+    { name: "manufacturerName", dataType: "STRING", dataTypeNodeId: null },
+    { name: "productName", dataType: "STRING", dataTypeNodeId: null },
+    { name: "softwareVersion", dataType: "STRING", dataTypeNodeId: null },
+    { name: "buildNumber", dataType: "STRING", dataTypeNodeId: null },
+    { name: "buildDate", dataType: "DATETIME", dataTypeNodeId: null },
+  ] },
+] as const;
 
 function referenceTypeLabel(type: ReferenceDto["type"]): string {
   switch (type) {
@@ -296,13 +318,15 @@ export function ManualSchemaEditorPage() {
   });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
-  const [addKind, setAddKind] = useState<"FOLDER" | "OBJECT" | "VARIABLE" | null>(null);
+  const [addKind, setAddKind] = useState<"FOLDER" | "OBJECT" | "VARIABLE" | "DATA_TYPE" | null>(null);
   const [addName, setAddName] = useState("");
   const [addType, setAddType] = useState<string>("FLOAT64");
   const [addValueRank, setAddValueRank] = useState<string>("SCALAR");
   const [addAccess, setAddAccess] = useState<string>("READ");
   const [addUnit, setAddUnit] = useState("");
   const [addDescription, setAddDescription] = useState("");
+  const [addMemberName, setAddMemberName] = useState("value");
+  const [addMemberType, setAddMemberType] = useState<string>("FLOAT64");
   const [selectedSuggestion, setSelectedSuggestion] = useState("");
   const [addParentId, setAddParentId] = useState<string | null>(null);
   const [addRefTargetId, setAddRefTargetId] = useState<string>("");
@@ -355,6 +379,7 @@ export function ManualSchemaEditorPage() {
   const selectedNode = nodes.find((n) => n.nodeId === selectedId) ?? null;
   const variableCount = nodes.filter((n) => n.kind === "VARIABLE").length;
   const containers = nodes.filter((n) => canHaveChildren(n.kind));
+  const nativeTypes = nodes.filter((n) => n.kind === "DATA_TYPE");
   const isEmpty = nodes.length === 0;
   const catalogParentId = selectedNode && canHaveChildren(selectedNode.kind) ? selectedNode.nodeId : null;
   const validationIssues = useMemo(() => validateManualSchemaNodes(nodes), [nodes]);
@@ -608,11 +633,16 @@ export function ManualSchemaEditorPage() {
       path: pathFor(parentId, trimmed),
       name: trimmed,
       kind: addKind,
-      dataType: addKind === "VARIABLE" ? addType : null,
+      dataType: addKind === "VARIABLE" && !addType.startsWith("native:") ? addType : null,
+      dataTypeNodeId: addKind === "VARIABLE" && addType.startsWith("native:")
+        ? addType.slice("native:".length) : null,
       valueRank: addKind === "VARIABLE" ? addValueRank : null,
       access: addKind === "VARIABLE" ? addAccess : null,
       unit: addKind === "VARIABLE" ? addUnit || null : null,
       description: addDescription || null,
+      members: addKind === "DATA_TYPE"
+        ? [{ name: addMemberName.trim() || "value", dataType: addMemberType, dataTypeNodeId: null }]
+        : [],
       accessLevelFull: null,
       minimumSamplingInterval: null,
       writeMask: null,
@@ -620,11 +650,34 @@ export function ManualSchemaEditorPage() {
     };
     setNodes((prev) => [...prev, node]);
     if (parentId) setExpandedIds((prev) => new Set(prev).add(parentId));
-    if (addKind === "FOLDER") setSelectedId(node.nodeId);
+    if (addKind === "FOLDER" || addKind === "DATA_TYPE") setSelectedId(node.nodeId);
     setAddName("");
     setAddUnit("");
     setAddDescription("");
     setAddKind(null);
+  }
+
+  function addStandardTypeTemplate(template: typeof STANDARD_OPC_UA_TYPE_TEMPLATES[number]) {
+    if (nodes.some((node) => node.nodeId === template.nodeId)) {
+      push({ tone: "success", title: "Type already added", message: `${template.name} is already in this schema.` });
+      return;
+    }
+    const type: NodeDto = {
+      nodeId: template.nodeId,
+      parentId: null,
+      path: `Types/${template.name}`,
+      name: template.name,
+      kind: "DATA_TYPE",
+      dataType: null,
+      dataTypeNodeId: null,
+      valueRank: null,
+      access: null,
+      unit: null,
+      description: template.description,
+      members: template.members.map((member) => ({ ...member })),
+    };
+    setNodes((previous) => [...previous, type]);
+    setSelectedId(type.nodeId);
   }
 
   function applySuggestedVariable(name: string) {
@@ -875,17 +928,28 @@ export function ManualSchemaEditorPage() {
               <legend className="text-sm font-medium text-shell-ink">Choose a node class</legend>
               <p className="mt-1 text-xs text-shell-muted">Folders and objects organize the server tree. Variables hold values clients can read or write.</p>
               <div className="mt-3 flex flex-wrap gap-2" role="radiogroup" aria-label="Node class">
-                {(["FOLDER", "OBJECT", "VARIABLE"] as const).map((kind) => (
+                {(["FOLDER", "OBJECT", "VARIABLE", "DATA_TYPE"] as const).map((kind) => (
                   <label key={kind} className={`cursor-pointer rounded-md border px-3 py-2 text-sm ${addKind === kind ? "border-shell-accent bg-shell-accent/5 text-shell-ink" : "border-shell-line text-shell-muted"}`}>
                     <input checked={addKind === kind} className="sr-only" name="node-class" type="radio" value={kind} onChange={() => setAddKind(kind)} />
-                    <span className="font-medium">{kind === "FOLDER" ? "Folder" : kind === "OBJECT" ? "Object" : "Variable"}</span>
-                    <span className="block text-xs">{kind === "FOLDER" ? "Contains nodes" : kind === "OBJECT" ? "Groups related nodes" : "Stores a value"}</span>
+                    <span className="font-medium">{kind === "FOLDER" ? "Folder" : kind === "OBJECT" ? "Object" : kind === "VARIABLE" ? "Variable" : "Data type"}</span>
+                    <span className="block text-xs">{kind === "FOLDER" ? "Contains nodes" : kind === "OBJECT" ? "Groups related nodes" : kind === "VARIABLE" ? "Stores a value" : "Reusable structured value shape"}</span>
                   </label>
                 ))}
               </div>
             </fieldset>
             <div className="rounded-md bg-shell-base/60 px-3 py-2 text-xs text-shell-muted">
-              <span className="font-medium text-shell-ink">Coming soon: </span>{UPCOMING_NODE_CLASSES.join(", ")}. For now, create folders, objects, and variables to build your server structure.
+              <span className="font-medium text-shell-ink">Coming soon: </span>{UPCOMING_NODE_CLASSES.join(", ")}. Data types can be defined here and selected by variables in this schema.
+            </div>
+            <div className="rounded-md border border-shell-line bg-shell-base/30 px-3 py-3">
+              <p className="text-sm font-medium text-shell-ink">Standard OPC UA type catalog</p>
+              <p className="mt-1 text-xs text-shell-muted">Available without a scan. Adding one makes its exact type and fields selectable by variables in this schema.</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {STANDARD_OPC_UA_TYPE_TEMPLATES.map((template) => (
+                  <button className="shell-action" key={template.nodeId} type="button" onClick={() => addStandardTypeTemplate(template)}>
+                    Add {template.name}
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
               <label className="flex flex-col gap-1.5 text-sm text-shell-muted">
@@ -939,6 +1003,7 @@ export function ManualSchemaEditorPage() {
                     Data type
                     <select className="shell-field" value={addType} onChange={(e) => setAddType(e.target.value)}>
                       {DATA_TYPES.map((t) => <option key={t} value={t}>{formatDataType(t)}</option>)}
+                      {nativeTypes.map((type) => <option key={type.nodeId} value={`native:${type.nodeId}`}>{type.name} (structured type)</option>)}
                     </select>
                   </label>
                   <label className="flex flex-col gap-1.5 text-sm text-shell-muted">
@@ -956,7 +1021,20 @@ export function ManualSchemaEditorPage() {
                 </>
               ) : null}
             </div>
-            {addKind === "VARIABLE" ? (
+            {addKind === "DATA_TYPE" ? (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="flex flex-col gap-1.5 text-sm text-shell-muted">
+                  First member name
+                  <input className="shell-field" value={addMemberName} onChange={(e) => setAddMemberName(e.target.value)} />
+                </label>
+                <label className="flex flex-col gap-1.5 text-sm text-shell-muted">
+                  First member type
+                  <select className="shell-field" value={addMemberType} onChange={(e) => setAddMemberType(e.target.value)}>
+                    {DATA_TYPES.map((type) => <option key={type} value={type}>{formatDataType(type)}</option>)}
+                  </select>
+                </label>
+              </div>
+            ) : addKind === "VARIABLE" ? (
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="flex flex-col gap-1.5 text-sm text-shell-muted">
                   Unit (optional)

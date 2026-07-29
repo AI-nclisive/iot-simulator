@@ -123,6 +123,21 @@ export function pasteNodeOperation(
   } else {
     const idMap = new Map<string, string>();
     const cloned = cloneSubtree(nodes, clipboard.nodeId, parentId, newParentPath, idMap);
+    // A copied root would otherwise retain the same sibling browse name and
+    // immediately make the schema invalid. Keep its descendants' names but
+    // make the new root explicitly distinct, as duplicateNodeOperation does.
+    if (cloned.length > 0) {
+      const root = cloned[0];
+      const copyName = `${root.name} (copy)`;
+      const copyPath = newParentPath ? `${newParentPath}/${copyName}` : `/${copyName}`;
+      const originalRootPath = root.path;
+      cloned[0] = { ...root, name: copyName, path: copyPath };
+      for (let i = 1; i < cloned.length; i++) {
+        if (cloned[i].path.startsWith(`${originalRootPath}/`)) {
+          cloned[i] = { ...cloned[i], path: copyPath + cloned[i].path.slice(originalRootPath.length) };
+        }
+      }
+    }
     return [...nodes, ...cloned];
   }
 }

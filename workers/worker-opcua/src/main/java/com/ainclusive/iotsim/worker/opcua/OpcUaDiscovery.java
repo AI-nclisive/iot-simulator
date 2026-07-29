@@ -2,6 +2,7 @@ package com.ainclusive.iotsim.worker.opcua;
 
 import static org.eclipse.milo.opcua.stack.core.types.builtin.unsigned.Unsigned.uint;
 
+import com.ainclusive.iotsim.workercontract.v1.DataTypeMemberMsg;
 import com.ainclusive.iotsim.workercontract.v1.SchemaNodeMsg;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -28,6 +29,8 @@ import org.eclipse.milo.opcua.stack.core.types.structured.BrowseResult;
 import org.eclipse.milo.opcua.stack.core.types.structured.ReadResponse;
 import org.eclipse.milo.opcua.stack.core.types.structured.ReadValueId;
 import org.eclipse.milo.opcua.stack.core.types.structured.ReferenceDescription;
+import org.eclipse.milo.opcua.stack.core.types.structured.StructureDefinition;
+import org.eclipse.milo.opcua.stack.core.types.structured.StructureField;
 
 /**
  * OPC UA <em>client-mode</em> discovery for create-from-scan (IS-043). Connects to
@@ -301,7 +304,8 @@ final class OpcUaDiscovery {
     }
 
     /** The neutral mapping plus the original DataType attribute, when it needs preserving. */
-    private record DataTypeDeclaration(String neutralType, String dataTypeNodeId) {}
+    private record DataTypeDeclaration(String neutralType, String dataTypeNodeId,
+            List<DataTypeMemberMsg> members) {}
 
     /** Reads a variable's DataType attribute and reverse-maps it; counts non-neutral declarations. */
     private static DataTypeDeclaration dataTypeOf(OpcUaClient client, NodeId nodeId, int[] unknown)
@@ -317,8 +321,39 @@ final class OpcUaDiscovery {
         if (neutral == null) {
             unknown[0]++;
         }
-        return new DataTypeDeclaration(neutral,
-                neutral == null && dataTypeId != null ? dataTypeId.toParseableString() : null);
+        String nativeTypeId = neutral == null && dataTypeId != null ? dataTypeId.toParseableString() : null;
+        return new DataTypeDeclaration(neutral, nativeTypeId,
+                nativeTypeId == null ? List.of() : readStructureFields(client, dataTypeId));
+    }
+
+    /** Imports the server-provided field definitions when this native type is a structure. */
+    private static List<DataTypeMemberMsg> readStructureFields(OpcUaClient client, NodeId dataTypeId)
+            throws Exception {
+        // DataTypeDefinition is AttributeId 23 in OPC UA 1.04. Milo 0.6 predates
+        // that enum constant, but accepts the standard numeric id on the wire.
+        ReadValueId request = new ReadValueId(dataTypeId, uint(23), null, QualifiedName.NULL_VALUE);
+        ReadResponse response = client.read(0.0, TimestampsToReturn.Neither, List.of(request))
+                .get(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        DataValue[] results = response.getResults();
+        Object definition = results != null && results.length > 0 ? results[0].getValue().getValue() : null;
+        if (!(definition instanceof StructureDefinition structure) || structure.getFields() == null) {
+            return List.of();
+        }
+        List<DataTypeMemberMsg> members = new ArrayList<>();
+        for (StructureField field : structure.getFields()) {
+            NodeId fieldType = field.getDataType();
+            String neutral = OpcUaTypes.neutralTypeOf(fieldType);
+            DataTypeMemberMsg.Builder member = DataTypeMemberMsg.newBuilder().setName(field.getName());
+            if (neutral != null) {
+                member.setDataType(neutral);
+            } else if (fieldType != null) {
+                member.setDataTypeNodeId(fieldType.toParseableString());
+            } else {
+                continue;
+            }
+            members.add(member.build());
+        }
+        return List.copyOf(members);
     }
 
     private static SchemaNodeMsg toNode(String nodeId, String parentId, String path, String name,
@@ -334,6 +369,7 @@ final class OpcUaDiscovery {
                             ? "" : declaration.neutralType())
                     .setDataTypeNodeId(declaration == null || declaration.dataTypeNodeId() == null
                             ? "" : declaration.dataTypeNodeId())
+                    .addAllDataTypeMembers(declaration == null ? List.of() : declaration.members())
                     .setValueRank(attrs != null && attrs.valueRank() != null && attrs.valueRank() >= 0
                             ? "ARRAY" : "SCALAR")
                     .setAccess("READ");
