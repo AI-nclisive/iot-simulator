@@ -156,6 +156,7 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add folder" }));
     fireEvent.click(screen.getByRole("button", { name: "Add QualifiedName" }));
     fireEvent.click(screen.getByRole("button", { name: "Add Duration" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add NormalizedString" }));
 
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     fireEvent.click(screen.getByLabelText(/Save in this schema/));
@@ -169,6 +170,10 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
         }),
         expect.objectContaining({
           nodeId: "ns=0;i=290", name: "Duration", nativeTypeKind: "OPAQUE",
+          defaultEncodingId: null, members: [], enumValues: [],
+        }),
+        expect.objectContaining({
+          nodeId: "ns=0;i=12877", name: "NormalizedString", nativeTypeKind: "OPAQUE",
           defaultEncodingId: null, members: [], enumValues: [],
         }),
       ]) }),

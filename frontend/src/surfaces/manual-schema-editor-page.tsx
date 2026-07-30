@@ -253,6 +253,11 @@ const STANDARD_OPC_UA_TYPE_TEMPLATES = [
   { nodeId: "ns=0;i=293", name: "Date", nativeTypeKind: "OPAQUE", description: "Standard OPC UA DateTime date alias with its exact NodeId." },
   { nodeId: "ns=0;i=294", name: "UtcTime", nativeTypeKind: "OPAQUE", description: "Standard OPC UA DateTime UTC alias with its exact NodeId." },
   { nodeId: "ns=0;i=295", name: "LocaleId", nativeTypeKind: "OPAQUE", description: "Standard OPC UA String locale alias with its exact NodeId." },
+  { nodeId: "ns=0;i=12877", name: "NormalizedString", nativeTypeKind: "OPAQUE", description: "Standard OPC UA normalized string alias with its exact NodeId." },
+  { nodeId: "ns=0;i=12878", name: "DecimalString", nativeTypeKind: "OPAQUE", description: "Standard OPC UA decimal string alias with its exact NodeId." },
+  { nodeId: "ns=0;i=12879", name: "DurationString", nativeTypeKind: "OPAQUE", description: "Standard OPC UA duration string alias with its exact NodeId." },
+  { nodeId: "ns=0;i=12880", name: "TimeString", nativeTypeKind: "OPAQUE", description: "Standard OPC UA time string alias with its exact NodeId." },
+  { nodeId: "ns=0;i=12881", name: "DateString", nativeTypeKind: "OPAQUE", description: "Standard OPC UA date string alias with its exact NodeId." },
   { nodeId: "ns=0;i=884", name: "Range", nativeTypeKind: "STRUCTURE", description: "OPC UA numeric engineering range.", defaultEncodingId: "ns=0;i=886", members: [
     { name: "low", dataType: "FLOAT64", dataTypeNodeId: null },
     { name: "high", dataType: "FLOAT64", dataTypeNodeId: null },
