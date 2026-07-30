@@ -190,6 +190,14 @@ final class OpcUaServerRuntime {
         return namespace.structureValue(sourceTypeId, members);
     }
 
+    Object unionValue(String sourceTypeId, String fieldName, Object fieldValue) {
+        return namespace.unionValue(sourceTypeId, fieldName, fieldValue);
+    }
+
+    Object optionSetValue(String sourceTypeId, byte[] value, byte[] validBits) {
+        return namespace.optionSetValue(sourceTypeId, value, validBits);
+    }
+
     String endpointUrl() {
         return endpointUrl;
     }

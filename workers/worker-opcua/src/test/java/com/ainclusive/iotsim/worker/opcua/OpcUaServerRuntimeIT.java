@@ -9,7 +9,9 @@ import java.net.ServerSocket;
 import java.util.List;
 import java.util.Map;
 import org.eclipse.milo.opcua.sdk.client.OpcUaClient;
+import org.eclipse.milo.opcua.sdk.core.types.DynamicOptionSetType;
 import org.eclipse.milo.opcua.sdk.core.types.DynamicStructType;
+import org.eclipse.milo.opcua.sdk.core.types.DynamicUnionType;
 import org.eclipse.milo.opcua.stack.core.types.builtin.DataValue;
 import org.eclipse.milo.opcua.stack.core.types.builtin.ExtensionObject;
 import org.eclipse.milo.opcua.stack.core.types.builtin.NodeId;
@@ -186,6 +188,85 @@ class OpcUaServerRuntimeIT {
                 DynamicStructType[] decodedStates = (DynamicStructType[]) decoded.getMembers().get("states");
                 assertThat(decodedStates).extracting(state -> state.getMembers().get("running"))
                         .containsExactly(true, false);
+            } finally {
+                client.disconnect();
+            }
+        } finally {
+            runtime.stop();
+        }
+    }
+
+    @Test
+    void clientReadsRuntimeMaterializedUnionValue() throws Exception {
+        int port = freePort();
+        String unionTypeId = "ns=4;s=SwitchValue";
+        NativeDataTypeDef union = new NativeDataTypeDef(
+                unionTypeId,
+                "SwitchValue",
+                List.of(
+                        DataTypeMemberMsg.newBuilder().setName("enabled").setDataType("BOOL")
+                                .setValueRank("SCALAR").build(),
+                        DataTypeMemberMsg.newBuilder().setName("count").setDataType("INT32")
+                                .setValueRank("SCALAR").build()),
+                List.of(), "ns=4;s=SwitchValue.DefaultBinary", "UNION");
+        OpcUaServerRuntime runtime = new OpcUaServerRuntime(
+                port, "127.0.0.1", "127.0.0.1",
+                List.of(new VarDef("switch", null, "Switch", "VARIABLE", "", unionTypeId,
+                        null, null, null, null, null)),
+                List.of(union), AuthConfig.anonymous(), event -> { }, event -> { });
+        runtime.start();
+        try {
+            runtime.updateValue("switch", runtime.unionValue(unionTypeId, "count", 7));
+            OpcUaClient client = OpcUaClient.create(runtime.endpointUrl());
+            client.connect();
+            try {
+                DataValue value = client.readValue(0.0, TimestampsToReturn.Neither, runtime.variableNodeId("switch"));
+                DynamicUnionType decoded = (DynamicUnionType) ((ExtensionObject) value.getValue().getValue())
+                        .decode(client.getDynamicEncodingContext());
+                assertThat(decoded.getValue()).hasValueSatisfying(selected -> {
+                    assertThat(selected.fieldName()).isEqualTo("count");
+                    assertThat(selected.fieldValue()).isEqualTo(7);
+                });
+            } finally {
+                client.disconnect();
+            }
+        } finally {
+            runtime.stop();
+        }
+    }
+
+    @Test
+    void clientReadsRuntimeMaterializedOptionSetValue() throws Exception {
+        int port = freePort();
+        String typeId = "ns=4;s=AccessFlags";
+        NativeDataTypeDef optionSet = new NativeDataTypeDef(
+                typeId,
+                "AccessFlags",
+                List.of(),
+                List.of(
+                        com.ainclusive.iotsim.workercontract.v1.DataTypeEnumValueMsg.newBuilder()
+                                .setName("Read").setValue(0).build(),
+                        com.ainclusive.iotsim.workercontract.v1.DataTypeEnumValueMsg.newBuilder()
+                                .setName("Write").setValue(1).build()),
+                null, "OPTION_SET");
+        OpcUaServerRuntime runtime = new OpcUaServerRuntime(
+                port, "127.0.0.1", "127.0.0.1",
+                List.of(new VarDef("flags", null, "Flags", "VARIABLE", "", typeId,
+                        null, null, null, null, null)),
+                List.of(optionSet), AuthConfig.anonymous(), event -> { }, event -> { });
+        runtime.start();
+        try {
+            runtime.updateValue("flags", runtime.optionSetValue(typeId, new byte[] {3}, new byte[] {3}));
+            OpcUaClient client = OpcUaClient.create(runtime.endpointUrl());
+            client.connect();
+            try {
+                DataValue value = client.readValue(0.0, TimestampsToReturn.Neither, runtime.variableNodeId("flags"));
+                DynamicOptionSetType decoded = (DynamicOptionSetType) ((ExtensionObject) value.getValue().getValue())
+                        .decode(client.getDynamicEncodingContext());
+                assertThat(decoded.getValue().bytes()).containsExactly(3);
+                assertThat(decoded.getValidBits().bytes()).containsExactly(3);
+                assertThat(decoded.getName(0)).contains("Read");
+                assertThat(decoded.getName(1)).contains("Write");
             } finally {
                 client.disconnect();
             }

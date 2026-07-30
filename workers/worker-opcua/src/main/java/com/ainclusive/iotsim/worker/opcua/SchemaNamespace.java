@@ -7,7 +7,9 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.eclipse.milo.opcua.sdk.core.AccessLevel;
 import org.eclipse.milo.opcua.sdk.core.Reference;
+import org.eclipse.milo.opcua.sdk.core.types.DynamicOptionSetType;
 import org.eclipse.milo.opcua.sdk.core.types.DynamicStructType;
+import org.eclipse.milo.opcua.sdk.core.types.DynamicUnionType;
 import org.eclipse.milo.opcua.sdk.core.types.codec.DynamicCodecFactory;
 import org.eclipse.milo.opcua.sdk.core.typetree.DataType;
 import org.eclipse.milo.opcua.sdk.server.ManagedNamespaceWithLifecycle;
@@ -20,6 +22,7 @@ import org.eclipse.milo.opcua.sdk.server.nodes.UaVariableNode;
 import org.eclipse.milo.opcua.sdk.server.util.SubscriptionModel;
 import org.eclipse.milo.opcua.stack.core.Identifiers;
 import org.eclipse.milo.opcua.stack.core.types.UaStructuredType;
+import org.eclipse.milo.opcua.stack.core.types.builtin.ByteString;
 import org.eclipse.milo.opcua.stack.core.types.builtin.DataValue;
 import org.eclipse.milo.opcua.stack.core.types.builtin.ExtensionObject;
 import org.eclipse.milo.opcua.stack.core.types.builtin.LocalizedText;
@@ -28,6 +31,8 @@ import org.eclipse.milo.opcua.stack.core.types.builtin.Variant;
 import org.eclipse.milo.opcua.stack.core.types.builtin.unsigned.UInteger;
 import org.eclipse.milo.opcua.stack.core.types.enumerated.StructureType;
 import org.eclipse.milo.opcua.stack.core.types.structured.DataTypeDefinition;
+import org.eclipse.milo.opcua.stack.core.types.structured.EnumDefinition;
+import org.eclipse.milo.opcua.stack.core.types.structured.EnumField;
 import org.eclipse.milo.opcua.stack.core.types.structured.EnumValueType;
 import org.eclipse.milo.opcua.stack.core.types.structured.StructureDefinition;
 import org.eclipse.milo.opcua.stack.core.types.structured.StructureField;
@@ -49,6 +54,8 @@ final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
             new ConcurrentHashMap<>();
     private final Map<String, UaDataTypeNode> nativeDataTypeNodes = new ConcurrentHashMap<>();
     private final Map<String, DataType> executableStructures = new ConcurrentHashMap<>();
+    private final Map<String, DataType> executableUnions = new ConcurrentHashMap<>();
+    private final Map<String, DataType> executableOptionSets = new ConcurrentHashMap<>();
     /** Local encoding identities used only by this server's address space. */
     private final Map<String, org.eclipse.milo.opcua.stack.core.types.builtin.NodeId> nativeDataTypeEncodings =
             new ConcurrentHashMap<>();
@@ -171,6 +178,19 @@ final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
                                 value.getDescription().isBlank() ? null : LocalizedText.english(value.getDescription())))
                         .toArray(EnumValueType[]::new));
             }
+            if (definition.isOptionSet()) {
+                node.setOptionSetValues(definition.enumValues().stream()
+                        .map(value -> LocalizedText.english(value.getName()))
+                        .toArray(LocalizedText[]::new));
+                node.setDataTypeDefinition(new EnumDefinition(definition.enumValues().stream()
+                        .map(value -> new EnumField(
+                                value.getValue(),
+                                LocalizedText.english(value.getName()),
+                                value.getDescription().isBlank()
+                                        ? null : LocalizedText.english(value.getDescription()),
+                                value.getName()))
+                        .toArray(EnumField[]::new)));
+            }
             getNodeManager().addNode(node);
             var baseType = definition.isEnum() ? Identifiers.Enumeration
                     : definition.isOptionSet() ? Identifiers.OptionSet : Identifiers.Structure;
@@ -180,7 +200,9 @@ final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
         }
         for (NativeDataTypeDef definition : typeDefinitions) {
             UaDataTypeNode node = nativeDataTypeNodes.get(definition.nodeId());
-            if (definition.isStructure() && definition.hasDefaultEncoding()) {
+            boolean needsEncoding = (definition.isStructure() && definition.hasDefaultEncoding())
+                    || (definition.isOptionSet() && !definition.enumValues().isEmpty());
+            if (needsEncoding) {
                 var encodingId = newNodeId("encodings/" + definition.nodeId() + "/DefaultBinary");
                 UaObjectNode encoding = UaObjectNode.builder(getNodeContext())
                         .setNodeId(encodingId)
@@ -192,11 +214,13 @@ final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
                 node.addReference(new Reference(
                         node.getNodeId(), Identifiers.HasEncoding, encodingId.expanded(), true));
                 nativeDataTypeEncodings.put(definition.nodeId(), encodingId);
-                node.setDataTypeDefinition(new StructureDefinition(
-                        encodingId,
-                        Identifiers.Structure,
-                        structureType(definition),
-                        definition.members().stream().map(this::structureField).toArray(StructureField[]::new)));
+                if (definition.isStructure()) {
+                    node.setDataTypeDefinition(new StructureDefinition(
+                            encodingId,
+                            Identifiers.Structure,
+                            structureType(definition),
+                            definition.members().stream().map(this::structureField).toArray(StructureField[]::new)));
+                }
             }
         }
     }
@@ -247,8 +271,8 @@ final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
     void materializeStructureCodecs(OpcUaServer server) {
         var typeTree = server.updateDataTypeTree();
         for (NativeDataTypeDef definition : typeDefinitions) {
-            if (!definition.isStructure() || "UNION".equals(definition.nativeTypeKind())
-                    || !definition.hasDefaultEncoding()) {
+            if ((!definition.isStructure() || !definition.hasDefaultEncoding())
+                    && (!definition.isOptionSet() || definition.enumValues().isEmpty())) {
                 continue;
             }
             var typeId = nativeDataTypes.get(definition.nodeId());
@@ -260,7 +284,13 @@ final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
             DataType executableType = new ExecutableStructureType(dataType, encodingId);
             server.getDynamicDataTypeManager().registerType(
                     typeId, DynamicCodecFactory.create(executableType, typeTree), encodingId, null, null);
-            executableStructures.put(definition.nodeId(), executableType);
+            if ("UNION".equals(definition.nativeTypeKind())) {
+                executableUnions.put(definition.nodeId(), executableType);
+            } else if (definition.isOptionSet()) {
+                executableOptionSets.put(definition.nodeId(), executableType);
+            } else {
+                executableStructures.put(definition.nodeId(), executableType);
+            }
         }
     }
 
@@ -270,6 +300,22 @@ final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
             throw new IllegalArgumentException("native structure has no executable runtime codec: " + sourceTypeId);
         }
         return new DynamicStructType(dataType, new java.util.LinkedHashMap<>(members));
+    }
+
+    DynamicUnionType unionValue(String sourceTypeId, String fieldName, Object fieldValue) {
+        DataType dataType = executableUnions.get(sourceTypeId);
+        if (dataType == null) {
+            throw new IllegalArgumentException("native union has no executable runtime codec: " + sourceTypeId);
+        }
+        return new DynamicUnionType(dataType, new DynamicUnionType.UnionValue(fieldName, fieldValue));
+    }
+
+    DynamicOptionSetType optionSetValue(String sourceTypeId, byte[] value, byte[] validBits) {
+        DataType dataType = executableOptionSets.get(sourceTypeId);
+        if (dataType == null) {
+            throw new IllegalArgumentException("native option set has no executable runtime codec: " + sourceTypeId);
+        }
+        return new DynamicOptionSetType(dataType, ByteString.of(value), ByteString.of(validBits));
     }
 
     /** Supplies the schema-local Default Binary encoding even when Milo's type tree has not indexed it yet. */
