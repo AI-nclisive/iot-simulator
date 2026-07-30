@@ -3,9 +3,6 @@ package com.ainclusive.iotsim.worker.opcua;
 import com.ainclusive.iotsim.protocolmodel.PasswordHash;
 import com.ainclusive.iotsim.workercontract.v1.ClientEvent;
 import com.ainclusive.iotsim.workercontract.v1.RuntimeEvent;
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -75,10 +72,7 @@ final class OpcUaServerRuntime {
             Consumer<RuntimeEvent> runtimeEventSink) {
         this.runtimeEventSink = runtimeEventSink;
         this.port = port;
-        try {
-            Files.createTempDirectory("iotsim-pki");
-
-            // USERNAME policy with SecurityPolicy.None: passwords travel in the clear over the
+        // USERNAME policy with SecurityPolicy.None: passwords travel in the clear over the
             // SecurityPolicy.None channel (consistent with None channel security). The built-in
             // USER_TOKEN_POLICY_USERNAME uses Basic256 which requires a server certificate the
             // worker does not provision — causing Bad_ConfigurationError on the client side.
@@ -141,10 +135,7 @@ final class OpcUaServerRuntime {
                 }
             });
             this.namespace = new SchemaNamespace(server, variables, typeDefinitions);
-            this.endpointUrl = "opc.tcp://" + advertisedHost + ":" + port + "/iotsim";
-        } catch (IOException e) {
-            throw new UncheckedIOException("failed to prepare OPC UA server", e);
-        }
+        this.endpointUrl = "opc.tcp://" + advertisedHost + ":" + port + "/iotsim";
     }
 
     void start() {
