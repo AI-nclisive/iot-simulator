@@ -133,6 +133,19 @@ public record SchemaNode(
         }
     }
 
+    /** Compatibility constructor for schemas stored before declared OPC UA type metadata. */
+    public SchemaNode(String nodeId, String parentId, String path, String name, NodeKind kind,
+            DataType dataType, ValueRank valueRank, Access access, String unit, String description,
+            List<Integer> arrayDimensions, String typeDefinition, List<SchemaReference> references,
+            String dataTypeNodeId, List<DataTypeMember> members, List<DataTypeEnumValue> enumValues,
+            String defaultEncodingId, NativeTypeKind nativeTypeKind, Integer accessLevelFull,
+            Integer minimumSamplingInterval, Integer writeMask, Boolean historizing) {
+        this(nodeId, parentId, path, name, kind, dataType, valueRank, access, unit, description,
+                arrayDimensions, typeDefinition, references, dataTypeNodeId, members, enumValues,
+                defaultEncodingId, nativeTypeKind, accessLevelFull, minimumSamplingInterval, writeMask,
+                historizing, null);
+    }
+
     /** Compatibility constructor for schemas stored before the native type-kind catalog metadata. */
     public SchemaNode(String nodeId, String parentId, String path, String name, NodeKind kind,
             DataType dataType, ValueRank valueRank, Access access, String unit, String description,
