@@ -31,7 +31,7 @@ public final class NativeTypeCatalog {
                 .toList();
         NativeTypeCapability capability = kind == NativeTypeKind.OPAQUE
                 ? NativeTypeCapability.unsupported("the source did not supply a native type definition")
-                : kind == NativeTypeKind.STRUCTURE
+                : (kind == NativeTypeKind.STRUCTURE || kind == NativeTypeKind.UNION)
                         && (node.defaultEncodingId() == null || node.defaultEncodingId().isBlank())
                 ? NativeTypeCapability.unsupported("no default binary encoding was supplied")
                 : NativeTypeCapability.supported();

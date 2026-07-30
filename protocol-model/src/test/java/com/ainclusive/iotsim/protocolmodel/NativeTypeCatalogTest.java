@@ -53,6 +53,18 @@ class NativeTypeCatalogTest {
     }
 
     @Test
+    void marksUnionWithoutDefaultEncodingAsNotMaterializable() {
+        SchemaNode union = new SchemaNode("choice", null, "Types/Choice", "Choice", NodeKind.DATA_TYPE,
+                null, null, null, null, null, List.of(), null, List.of(), null,
+                List.of(new DataTypeMember("integer", DataType.INT32, null)), List.of(), null,
+                NativeTypeKind.UNION, null, null, null, null);
+
+        NativeTypeDefinition entry = NativeTypeCatalog.fromSchemaNodes(List.of(union)).getFirst();
+
+        assertThat(entry.capability().materializable()).isFalse();
+    }
+
+    @Test
     void retainsExecutableOptionSet() {
         SchemaNode optionSet = new SchemaNode("flags", null, "Types/Flags", "Flags", NodeKind.DATA_TYPE,
                 null, null, null, null, null, List.of(), null, List.of(), null, List.of(),
