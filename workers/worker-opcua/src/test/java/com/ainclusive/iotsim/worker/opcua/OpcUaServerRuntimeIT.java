@@ -106,6 +106,95 @@ class OpcUaServerRuntimeIT {
     }
 
     @Test
+    void clientReadsNestedRuntimeMaterializedNativeStructureValue() throws Exception {
+        int port = freePort();
+        String innerTypeId = "ns=4;s=InnerState";
+        String outerTypeId = "ns=4;s=OuterState";
+        NativeDataTypeDef inner = new NativeDataTypeDef(
+                innerTypeId,
+                "InnerState",
+                List.of(DataTypeMemberMsg.newBuilder().setName("running").setDataType("BOOL")
+                        .setValueRank("SCALAR").build()),
+                List.of(), "ns=4;s=InnerState.DefaultBinary", "STRUCTURE");
+        NativeDataTypeDef outer = new NativeDataTypeDef(
+                outerTypeId,
+                "OuterState",
+                List.of(DataTypeMemberMsg.newBuilder().setName("state").setDataTypeNodeId(innerTypeId)
+                        .setValueRank("SCALAR").build()),
+                List.of(), "ns=4;s=OuterState.DefaultBinary", "STRUCTURE");
+        OpcUaServerRuntime runtime = new OpcUaServerRuntime(
+                port, "127.0.0.1", "127.0.0.1",
+                List.of(new VarDef("outer", null, "Outer", "VARIABLE", "", outerTypeId,
+                        null, null, null, null, null)),
+                List.of(inner, outer), AuthConfig.anonymous(), event -> { }, event -> { });
+        runtime.start();
+        try {
+            runtime.updateValue("outer", runtime.structureValue(outerTypeId, Map.of(
+                    "state", runtime.structureValue(innerTypeId, Map.of("running", true)))));
+            OpcUaClient client = OpcUaClient.create(runtime.endpointUrl());
+            client.connect();
+            try {
+                DataValue value = client.readValue(0.0, TimestampsToReturn.Neither, runtime.variableNodeId("outer"));
+                DynamicStructType decoded = (DynamicStructType) ((ExtensionObject) value.getValue().getValue())
+                        .decode(client.getDynamicEncodingContext());
+                assertThat(decoded.getMembers().get("state")).isInstanceOf(DynamicStructType.class);
+                DynamicStructType nested = (DynamicStructType) decoded.getMembers().get("state");
+                assertThat(nested.getMembers()).containsEntry("running", true);
+            } finally {
+                client.disconnect();
+            }
+        } finally {
+            runtime.stop();
+        }
+    }
+
+    @Test
+    void clientReadsArrayOfNestedRuntimeMaterializedStructures() throws Exception {
+        int port = freePort();
+        String innerTypeId = "ns=4;s=InnerState";
+        String outerTypeId = "ns=4;s=OuterState";
+        NativeDataTypeDef inner = new NativeDataTypeDef(
+                innerTypeId,
+                "InnerState",
+                List.of(DataTypeMemberMsg.newBuilder().setName("running").setDataType("BOOL")
+                        .setValueRank("SCALAR").build()),
+                List.of(), "ns=4;s=InnerState.DefaultBinary", "STRUCTURE");
+        NativeDataTypeDef outer = new NativeDataTypeDef(
+                outerTypeId,
+                "OuterState",
+                List.of(DataTypeMemberMsg.newBuilder().setName("states").setDataTypeNodeId(innerTypeId)
+                        .setValueRank("ARRAY").addArrayDimensions(2).build()),
+                List.of(), "ns=4;s=OuterState.DefaultBinary", "STRUCTURE");
+        OpcUaServerRuntime runtime = new OpcUaServerRuntime(
+                port, "127.0.0.1", "127.0.0.1",
+                List.of(new VarDef("outer", null, "Outer", "VARIABLE", "", outerTypeId,
+                        null, null, null, null, null)),
+                List.of(inner, outer), AuthConfig.anonymous(), event -> { }, event -> { });
+        runtime.start();
+        try {
+            DynamicStructType[] states = {
+                    (DynamicStructType) runtime.structureValue(innerTypeId, Map.of("running", true)),
+                    (DynamicStructType) runtime.structureValue(innerTypeId, Map.of("running", false))};
+            runtime.updateValue("outer", runtime.structureValue(outerTypeId, Map.of("states", states)));
+            OpcUaClient client = OpcUaClient.create(runtime.endpointUrl());
+            client.connect();
+            try {
+                DataValue value = client.readValue(0.0, TimestampsToReturn.Neither, runtime.variableNodeId("outer"));
+                DynamicStructType decoded = (DynamicStructType) ((ExtensionObject) value.getValue().getValue())
+                        .decode(client.getDynamicEncodingContext());
+                assertThat(decoded.getMembers().get("states")).isInstanceOf(DynamicStructType[].class);
+                DynamicStructType[] decodedStates = (DynamicStructType[]) decoded.getMembers().get("states");
+                assertThat(decodedStates).extracting(state -> state.getMembers().get("running"))
+                        .containsExactly(true, false);
+            } finally {
+                client.disconnect();
+            }
+        } finally {
+            runtime.stop();
+        }
+    }
+
+    @Test
     void clientReadsProjectedVariableValue() throws Exception {
         int port = freePort();
         OpcUaServerRuntime runtime = new OpcUaServerRuntime(
