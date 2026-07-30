@@ -598,7 +598,7 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
         if (defaultEncodingId == null || binaryBody == null) {
             throw new IllegalArgumentException("native structure requires a binary body and default encoding id");
         }
-        return new ExtensionObject(ByteString.of(binaryBody), defaultEncodingId);
+        return ExtensionObject.of(ByteString.of(binaryBody), defaultEncodingId);
     }
 
     @Override

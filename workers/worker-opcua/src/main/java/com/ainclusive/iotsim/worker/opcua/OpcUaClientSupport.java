@@ -2,11 +2,10 @@ package com.ainclusive.iotsim.worker.opcua;
 
 import static org.eclipse.milo.opcua.stack.core.types.builtin.unsigned.Unsigned.uint;
 
-import java.util.concurrent.TimeUnit;
 import org.eclipse.milo.opcua.sdk.client.OpcUaClient;
-import org.eclipse.milo.opcua.sdk.client.api.identity.AnonymousProvider;
-import org.eclipse.milo.opcua.sdk.client.api.identity.IdentityProvider;
-import org.eclipse.milo.opcua.sdk.client.api.identity.UsernameProvider;
+import org.eclipse.milo.opcua.sdk.client.identity.AnonymousProvider;
+import org.eclipse.milo.opcua.sdk.client.identity.IdentityProvider;
+import org.eclipse.milo.opcua.sdk.client.identity.UsernameProvider;
 import org.eclipse.milo.opcua.stack.core.StatusCodes;
 import org.eclipse.milo.opcua.stack.core.UaException;
 import org.eclipse.milo.opcua.stack.core.security.SecurityPolicy;
@@ -26,8 +25,6 @@ final class OpcUaClientSupport {
     static final String UNREACHABLE = "UNREACHABLE";
     static final String AUTH_FAILURE = "AUTH_FAILURE";
 
-    private static final long CONNECT_TIMEOUT_SECONDS = 15;
-    private static final long DISCONNECT_TIMEOUT_SECONDS = 10;
     private static final int REQUEST_TIMEOUT_MILLIS = 10_000;
 
     private OpcUaClientSupport() {}
@@ -46,13 +43,13 @@ final class OpcUaClientSupport {
                         .filter(e -> SecurityPolicy.None.getUri().equals(e.getSecurityPolicyUri()))
                         .findFirst()
                         .or(() -> endpoints.stream().findFirst()),
+                transport -> {},
                 cfg -> cfg
                         .setApplicationName(LocalizedText.english("IoT Simulator Client"))
                         .setApplicationUri("urn:iotsim:opcua:client")
                         .setIdentityProvider(identityProvider(mode, username, secret))
-                        .setRequestTimeout(uint(REQUEST_TIMEOUT_MILLIS))
-                        .build());
-        client.connect().get(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                        .setRequestTimeout(uint(REQUEST_TIMEOUT_MILLIS)));
+        client.connect();
         return client;
     }
 
@@ -67,7 +64,7 @@ final class OpcUaClientSupport {
     static void disconnectQuietly(OpcUaClient client) {
         if (client != null) {
             try {
-                client.disconnect().get(DISCONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                client.disconnect();
             } catch (Exception ignored) {
                 // best effort; we are tearing down a client-mode session
             }

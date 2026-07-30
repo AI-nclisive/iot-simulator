@@ -3,7 +3,6 @@ package com.ainclusive.iotsim.worker.opcua;
 import com.ainclusive.iotsim.protocolmodel.PasswordHash;
 import com.ainclusive.iotsim.workercontract.v1.ClientEvent;
 import com.ainclusive.iotsim.workercontract.v1.RuntimeEvent;
-import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -12,13 +11,16 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
+import org.eclipse.milo.opcua.sdk.server.EndpointConfig;
 import org.eclipse.milo.opcua.sdk.server.OpcUaServer;
+import org.eclipse.milo.opcua.sdk.server.OpcUaServerConfig;
 import org.eclipse.milo.opcua.sdk.server.Session;
 import org.eclipse.milo.opcua.sdk.server.SessionListener;
-import org.eclipse.milo.opcua.sdk.server.api.config.OpcUaServerConfig;
+import org.eclipse.milo.opcua.sdk.server.identity.AnonymousIdentityValidator;
+import org.eclipse.milo.opcua.sdk.server.identity.CompositeValidator;
 import org.eclipse.milo.opcua.sdk.server.identity.UsernameIdentityValidator;
 import org.eclipse.milo.opcua.stack.core.security.DefaultCertificateManager;
-import org.eclipse.milo.opcua.stack.core.security.DefaultTrustListManager;
+import org.eclipse.milo.opcua.stack.core.security.MemoryCertificateQuarantine;
 import org.eclipse.milo.opcua.stack.core.security.SecurityPolicy;
 import org.eclipse.milo.opcua.stack.core.transport.TransportProfile;
 import org.eclipse.milo.opcua.stack.core.types.builtin.LocalizedText;
@@ -26,8 +28,8 @@ import org.eclipse.milo.opcua.stack.core.types.builtin.NodeId;
 import org.eclipse.milo.opcua.stack.core.types.enumerated.MessageSecurityMode;
 import org.eclipse.milo.opcua.stack.core.types.enumerated.UserTokenType;
 import org.eclipse.milo.opcua.stack.core.types.structured.UserTokenPolicy;
-import org.eclipse.milo.opcua.stack.server.EndpointConfiguration;
-import org.eclipse.milo.opcua.stack.server.security.DefaultServerCertificateValidator;
+import org.eclipse.milo.opcua.stack.transport.server.tcp.OpcTcpServerTransport;
+import org.eclipse.milo.opcua.stack.transport.server.tcp.OpcTcpServerTransportConfigBuilder;
 
 /**
  * A real OPC UA server (Eclipse Milo) with an address space built from the
@@ -74,8 +76,7 @@ final class OpcUaServerRuntime {
         this.runtimeEventSink = runtimeEventSink;
         this.port = port;
         try {
-            File pki = Files.createTempDirectory("iotsim-pki").toFile();
-            DefaultTrustListManager trustList = new DefaultTrustListManager(pki);
+            Files.createTempDirectory("iotsim-pki");
 
             // USERNAME policy with SecurityPolicy.None: passwords travel in the clear over the
             // SecurityPolicy.None channel (consistent with None channel security). The built-in
@@ -90,16 +91,16 @@ final class OpcUaServerRuntime {
 
             List<UserTokenPolicy> tokenPolicies = new ArrayList<>();
             if (auth.anonymousAllowed()) {
-                tokenPolicies.add(OpcUaServerConfig.USER_TOKEN_POLICY_ANONYMOUS);
+                tokenPolicies.add(anonymousPolicy());
             }
             if (auth.usernameEnabled()) {
                 tokenPolicies.add(usernamePolicy);
             }
             if (tokenPolicies.isEmpty()) {
-                tokenPolicies.add(OpcUaServerConfig.USER_TOKEN_POLICY_ANONYMOUS);
+                tokenPolicies.add(anonymousPolicy());
             }
 
-            EndpointConfiguration endpoint = EndpointConfiguration.newBuilder()
+            EndpointConfig endpoint = EndpointConfig.newBuilder()
                     .setTransportProfile(TransportProfile.TCP_UASC_UABINARY)
                     .setBindAddress(bindAddress)
                     .setHostname(advertisedHost)
@@ -114,15 +115,17 @@ final class OpcUaServerRuntime {
                     .setApplicationUri("urn:iotsim:opcua:worker")
                     .setApplicationName(LocalizedText.english("IoT Simulator OPC UA Worker"))
                     .setProductUri("urn:iotsim:opcua")
-                    .setIdentityValidator(new UsernameIdentityValidator(
-                            auth.anonymousAllowed(), challenge -> authenticate(auth, challenge)))
+                    .setIdentityValidator(identityValidator(auth))
                     .setEndpoints(Set.of(endpoint))
-                    .setCertificateManager(new DefaultCertificateManager())
-                    .setTrustListManager(trustList)
-                    .setCertificateValidator(new DefaultServerCertificateValidator(trustList))
+                    .setCertificateManager(new DefaultCertificateManager(new MemoryCertificateQuarantine()))
                     .build();
 
-            this.server = new OpcUaServer(config);
+            this.server = new OpcUaServer(config, profile -> {
+                if (!TransportProfile.TCP_UASC_UABINARY.equals(profile)) {
+                    throw new IllegalArgumentException("unsupported transport profile: " + profile);
+                }
+                return new OpcTcpServerTransport(new OpcTcpServerTransportConfigBuilder().build());
+            });
             // Surface protocol-client connect/disconnect as ClientEvents (IS-047). Milo
             // fires session created/closed on the server's session manager; map each to a
             // neutral event for the supervisor stream.
@@ -146,10 +149,15 @@ final class OpcUaServerRuntime {
 
     void start() {
         namespace.startup();
-        await(server.startup());
+        try {
+            await(server.startup());
+        } catch (RuntimeException e) {
+            runtimeEventSink.accept(runtimeEvent("ERROR", "port " + port + " bind failed"));
+            throw new BindFailedException("port " + port + " bind failed", e);
+        }
         // Milo swallows bind failures silently (exceptionally → Unit.VALUE); detect them
         // by checking that the endpoint was actually registered after startup.
-        if (server.getStackServer().getBoundEndpoints().isEmpty()) {
+        if (server.getBoundEndpoints().isEmpty()) {
             runtimeEventSink.accept(runtimeEvent("ERROR", "port " + port + " bind failed"));
             throw new BindFailedException("port " + port + " bind failed", null);
         }
@@ -173,6 +181,10 @@ final class OpcUaServerRuntime {
         return namespace.localEncodingId(sourceTypeId);
     }
 
+    NodeId localDataTypeId(String sourceTypeId) {
+        return namespace.localDataTypeId(sourceTypeId);
+    }
+
     String endpointUrl() {
         return endpointUrl;
     }
@@ -190,6 +202,17 @@ final class OpcUaServerRuntime {
         }
         String hash = auth.userPasswordHashes().get(challenge.getUsername());
         return hash != null && PasswordHash.matches(challenge.getPassword(), hash);
+    }
+
+    private static org.eclipse.milo.opcua.sdk.server.identity.IdentityValidator identityValidator(AuthConfig auth) {
+        var username = new UsernameIdentityValidator(challenge -> authenticate(auth, challenge));
+        return auth.anonymousAllowed()
+                ? new CompositeValidator(AnonymousIdentityValidator.INSTANCE, username)
+                : username;
+    }
+
+    private static UserTokenPolicy anonymousPolicy() {
+        return new UserTokenPolicy("anonymous", UserTokenType.Anonymous, null, null, SecurityPolicy.None.getUri());
     }
 
     /** Builds a neutral runtime event with the current wall-clock time in micros. */

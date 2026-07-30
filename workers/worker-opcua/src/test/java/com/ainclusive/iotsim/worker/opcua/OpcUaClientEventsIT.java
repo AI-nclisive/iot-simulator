@@ -60,7 +60,7 @@ class OpcUaClientEventsIT {
 
             String endpointUrl = "opc.tcp://127.0.0.1:" + opcPort + "/iotsim";
             opcClient = OpcUaClient.create(endpointUrl);
-            opcClient.connect().get(15, TimeUnit.SECONDS);
+            opcClient.connect();
 
             ClientEvent connected = events.poll(10, TimeUnit.SECONDS);
             assertThat(connected).isNotNull();
@@ -68,7 +68,7 @@ class OpcUaClientEventsIT {
             assertThat(connected.getClientId()).isNotEmpty();
             assertThat(connected.getAtMicros()).isPositive();
 
-            opcClient.disconnect().get(10, TimeUnit.SECONDS);
+            opcClient.disconnect();
             opcClient = null;
 
             ClientEvent disconnected = events.poll(10, TimeUnit.SECONDS);
@@ -76,7 +76,7 @@ class OpcUaClientEventsIT {
             assertThat(disconnected.getKind()).isEqualTo(ClientEvent.Kind.DISCONNECTED);
         } finally {
             if (opcClient != null) {
-                opcClient.disconnect().get(10, TimeUnit.SECONDS);
+                opcClient.disconnect();
             }
             ProtocolDataSourceGrpc.newBlockingStub(channel).stop(StopRequest.getDefaultInstance());
             channel.shutdownNow().awaitTermination(5, TimeUnit.SECONDS);

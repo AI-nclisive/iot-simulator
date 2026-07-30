@@ -1,6 +1,5 @@
 package com.ainclusive.iotsim.worker.opcua;
 
-import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -26,7 +25,7 @@ class OpcUaServerAuthIT {
         runtime.start();
         try {
             OpcUaClient ok = OpcUaClientSupport.connect(runtime.endpointUrl(), "PASSWORD", "operator", "s3cret");
-            ok.disconnect().get(10, SECONDS);
+            ok.disconnect();
 
             assertThatThrownBy(() ->
                     OpcUaClientSupport.connect(runtime.endpointUrl(), "PASSWORD", "operator", "wrong"));
@@ -47,7 +46,7 @@ class OpcUaServerAuthIT {
         try {
             OpcUaClient client = OpcUaClientSupport.connect(runtime.endpointUrl(), "ANONYMOUS", null, null);
             assertThat(client).isNotNull();
-            client.disconnect().get(10, SECONDS);
+            client.disconnect();
         } finally {
             runtime.stop();
         }

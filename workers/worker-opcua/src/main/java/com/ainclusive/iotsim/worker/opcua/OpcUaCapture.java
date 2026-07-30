@@ -10,7 +10,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 import org.eclipse.milo.opcua.sdk.client.OpcUaClient;
-import org.eclipse.milo.opcua.sdk.client.subscriptions.ManagedSubscription;
+import org.eclipse.milo.opcua.sdk.client.subscriptions.OpcUaMonitoredItem;
+import org.eclipse.milo.opcua.sdk.client.subscriptions.OpcUaSubscription;
 import org.eclipse.milo.opcua.stack.core.types.builtin.DataValue;
 import org.eclipse.milo.opcua.stack.core.types.builtin.DateTime;
 import org.eclipse.milo.opcua.stack.core.types.builtin.ExtensionObject;
@@ -33,9 +34,9 @@ final class OpcUaCapture {
     private static final double PUBLISHING_INTERVAL_MILLIS = 200.0;
 
     private final OpcUaClient client;
-    private final ManagedSubscription subscription;
+    private final OpcUaSubscription subscription;
 
-    private OpcUaCapture(OpcUaClient client, ManagedSubscription subscription) {
+    private OpcUaCapture(OpcUaClient client, OpcUaSubscription subscription) {
         this.client = client;
         this.subscription = subscription;
     }
@@ -70,22 +71,20 @@ final class OpcUaCapture {
                 byNodeId.put(id, node);
                 nodeIds.add(id);
             }
-            ManagedSubscription subscription =
-                    ManagedSubscription.create(client, PUBLISHING_INTERVAL_MILLIS);
-            subscription.addDataChangeListener((items, values) -> {
-                List<Value> batch = new ArrayList<>(items.size());
-                for (int i = 0; i < items.size(); i++) {
-                    NodeSpec spec = byNodeId.get(items.get(i).getNodeId());
+            OpcUaSubscription subscription = new OpcUaSubscription(client, PUBLISHING_INTERVAL_MILLIS);
+            subscription.create();
+            for (NodeId nodeId : nodeIds) {
+                OpcUaMonitoredItem item = OpcUaMonitoredItem.newDataItem(nodeId);
+                item.setDataValueListener((monitoredItem, value) -> {
+                    NodeSpec spec = byNodeId.get(monitoredItem.getReadValueId().getNodeId());
                     if (spec != null) {
-                        batch.add(toProtoValue(spec, values.get(i)));
+                        sink.accept(List.of(toProtoValue(spec, value)));
                     }
-                }
-                if (!batch.isEmpty()) {
-                    sink.accept(batch);
-                }
-            });
+                });
+                subscription.addMonitoredItem(item);
+            }
             if (!nodeIds.isEmpty()) {
-                subscription.createDataItems(nodeIds);
+                subscription.createMonitoredItems();
             }
             return new OpcUaCapture(client, subscription);
         } catch (Exception e) {
@@ -115,9 +114,9 @@ final class OpcUaCapture {
                         "capture expected a binary ExtensionObject for native structure node " + spec.nodeId());
             }
             NodeId expectedEncoding = NodeId.parse(spec.defaultEncodingId());
-            if (!expectedEncoding.equals(extension.getEncodingId())) {
+            if (!expectedEncoding.equals(extension.getEncodingOrTypeId())) {
                 throw new IllegalArgumentException(
-                        "capture received ExtensionObject with encoding " + extension.getEncodingId()
+                        "capture received ExtensionObject with encoding " + extension.getEncodingOrTypeId()
                                 + " but schema declares " + expectedEncoding + " for native structure node "
                                 + spec.nodeId());
             }

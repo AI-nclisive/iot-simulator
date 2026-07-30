@@ -17,7 +17,7 @@ class NativeStructureReplayTest {
 
         ExtensionObject value = OpcUaProtocolService.structureValue(encodingId, new byte[] {1, 2, 3});
 
-        assertThat(value.getEncodingId()).isEqualTo(encodingId);
+        assertThat(value.getEncodingOrTypeId()).isEqualTo(encodingId);
         assertThat(value.getBody()).isEqualTo(ByteString.of(new byte[] {1, 2, 3}));
     }
 
@@ -36,7 +36,7 @@ class NativeStructureReplayTest {
         var captured = OpcUaCapture.toProtoValue(
                 new OpcUaCapture.NodeSpec("ns=2;s=structure", null, encodingId.toParseableString()),
                 new DataValue(new org.eclipse.milo.opcua.stack.core.types.builtin.Variant(
-                        new ExtensionObject(ByteString.of(body), encodingId))));
+                        ExtensionObject.of(ByteString.of(body), encodingId))));
 
         assertThat(captured.getValueEnc().toByteArray()).containsExactly(body);
     }
@@ -46,7 +46,7 @@ class NativeStructureReplayTest {
         assertThatThrownBy(() -> OpcUaCapture.toProtoValue(
                 new OpcUaCapture.NodeSpec("ns=2;s=structure", null, "ns=2;i=6001"),
                 new DataValue(new org.eclipse.milo.opcua.stack.core.types.builtin.Variant(
-                        new ExtensionObject(ByteString.of(new byte[] {1}), NodeId.parse("ns=2;i=6002"))))))
+                        ExtensionObject.of(ByteString.of(new byte[] {1}), NodeId.parse("ns=2;i=6002"))))))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("schema declares");
     }

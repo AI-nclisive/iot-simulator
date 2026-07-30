@@ -1,14 +1,16 @@
 package com.ainclusive.iotsim.worker.opcua;
 
+import static org.eclipse.milo.opcua.stack.core.types.builtin.unsigned.Unsigned.uint;
+
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.eclipse.milo.opcua.sdk.core.AccessLevel;
 import org.eclipse.milo.opcua.sdk.core.Reference;
+import org.eclipse.milo.opcua.sdk.server.ManagedNamespaceWithLifecycle;
 import org.eclipse.milo.opcua.sdk.server.OpcUaServer;
-import org.eclipse.milo.opcua.sdk.server.api.DataItem;
-import org.eclipse.milo.opcua.sdk.server.api.ManagedNamespaceWithLifecycle;
-import org.eclipse.milo.opcua.sdk.server.api.MonitoredItem;
+import org.eclipse.milo.opcua.sdk.server.items.DataItem;
+import org.eclipse.milo.opcua.sdk.server.items.MonitoredItem;
 import org.eclipse.milo.opcua.sdk.server.nodes.UaDataTypeNode;
 import org.eclipse.milo.opcua.sdk.server.nodes.UaObjectNode;
 import org.eclipse.milo.opcua.sdk.server.nodes.UaVariableNode;
@@ -17,7 +19,11 @@ import org.eclipse.milo.opcua.stack.core.Identifiers;
 import org.eclipse.milo.opcua.stack.core.types.builtin.DataValue;
 import org.eclipse.milo.opcua.stack.core.types.builtin.LocalizedText;
 import org.eclipse.milo.opcua.stack.core.types.builtin.Variant;
+import org.eclipse.milo.opcua.stack.core.types.builtin.unsigned.UInteger;
+import org.eclipse.milo.opcua.stack.core.types.enumerated.StructureType;
 import org.eclipse.milo.opcua.stack.core.types.structured.EnumValueType;
+import org.eclipse.milo.opcua.stack.core.types.structured.StructureDefinition;
+import org.eclipse.milo.opcua.stack.core.types.structured.StructureField;
 
 /**
  * Builds the OPC UA address space from the protocol-neutral schema: each VARIABLE
@@ -34,6 +40,7 @@ final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
     private final Map<String, org.eclipse.milo.opcua.stack.core.types.builtin.NodeId> hierarchy = new ConcurrentHashMap<>();
     private final Map<String, org.eclipse.milo.opcua.stack.core.types.builtin.NodeId> nativeDataTypes =
             new ConcurrentHashMap<>();
+    private final Map<String, UaDataTypeNode> nativeDataTypeNodes = new ConcurrentHashMap<>();
     /** Local encoding identities used only by this server's address space. */
     private final Map<String, org.eclipse.milo.opcua.stack.core.types.builtin.NodeId> nativeDataTypeEncodings =
             new ConcurrentHashMap<>();
@@ -161,6 +168,10 @@ final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
                     : definition.isOptionSet() ? Identifiers.OptionSet : Identifiers.Structure;
             node.addReference(new Reference(nodeId, Identifiers.HasSubtype, baseType.expanded(), false));
             nativeDataTypes.put(definition.nodeId(), nodeId);
+            nativeDataTypeNodes.put(definition.nodeId(), node);
+        }
+        for (NativeDataTypeDef definition : typeDefinitions) {
+            UaDataTypeNode node = nativeDataTypeNodes.get(definition.nodeId());
             if (definition.isStructure() && definition.hasDefaultEncoding()) {
                 var encodingId = newNodeId("encodings/" + definition.nodeId() + "/DefaultBinary");
                 UaObjectNode encoding = UaObjectNode.builder(getNodeContext())
@@ -170,14 +181,58 @@ final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
                         .setTypeDefinition(Identifiers.DataTypeEncodingType)
                         .build();
                 getNodeManager().addNode(encoding);
-                encoding.addReference(new Reference(encodingId, Identifiers.HasEncoding, nodeId.expanded(), false));
+                encoding.addReference(new Reference(
+                        encodingId, Identifiers.HasEncoding, node.getNodeId().expanded(), false));
                 nativeDataTypeEncodings.put(definition.nodeId(), encodingId);
+                node.setDataTypeDefinition(new StructureDefinition(
+                        encodingId,
+                        Identifiers.Structure,
+                        structureType(definition),
+                        definition.members().stream().map(this::structureField).toArray(StructureField[]::new)));
             }
         }
     }
 
+    private StructureField structureField(com.ainclusive.iotsim.workercontract.v1.DataTypeMemberMsg member) {
+        UInteger[] dimensions = member.getArrayDimensionsList().stream()
+                .map(value -> uint(value.longValue()))
+                .toArray(UInteger[]::new);
+        return new StructureField(
+                member.getName(),
+                null,
+                memberDataType(member),
+                "ARRAY".equals(member.getValueRank()) ? 1 : -1,
+                dimensions.length == 0 ? null : dimensions,
+                null,
+                member.getOptional());
+    }
+
+    private org.eclipse.milo.opcua.stack.core.types.builtin.NodeId memberDataType(
+            com.ainclusive.iotsim.workercontract.v1.DataTypeMemberMsg member) {
+        if (!member.getDataTypeNodeId().isBlank()) {
+            var local = nativeDataTypes.get(member.getDataTypeNodeId());
+            return local != null
+                    ? local
+                    : org.eclipse.milo.opcua.stack.core.types.builtin.NodeId.parse(member.getDataTypeNodeId());
+        }
+        return OpcUaTypes.dataTypeId(member.getDataType());
+    }
+
+    private static StructureType structureType(NativeDataTypeDef definition) {
+        if ("UNION".equals(definition.nativeTypeKind())) {
+            return StructureType.Union;
+        }
+        return definition.members().stream().anyMatch(member -> member.getOptional())
+                ? StructureType.StructureWithOptionalFields
+                : StructureType.Structure;
+    }
+
     org.eclipse.milo.opcua.stack.core.types.builtin.NodeId localEncodingId(String sourceTypeId) {
         return nativeDataTypeEncodings.get(sourceTypeId);
+    }
+
+    org.eclipse.milo.opcua.stack.core.types.builtin.NodeId localDataTypeId(String sourceTypeId) {
+        return nativeDataTypes.get(sourceTypeId);
     }
 
     private org.eclipse.milo.opcua.stack.core.types.builtin.NodeId declaredDataType(VarDef def) {

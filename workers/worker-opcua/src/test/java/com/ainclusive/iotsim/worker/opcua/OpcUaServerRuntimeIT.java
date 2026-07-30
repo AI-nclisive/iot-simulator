@@ -1,16 +1,20 @@
 package com.ainclusive.iotsim.worker.opcua;
 
-import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.ainclusive.iotsim.workercontract.v1.DataTypeMemberMsg;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.util.List;
 import org.eclipse.milo.opcua.sdk.client.OpcUaClient;
 import org.eclipse.milo.opcua.stack.core.types.builtin.DataValue;
+import org.eclipse.milo.opcua.stack.core.types.builtin.ExtensionObject;
 import org.eclipse.milo.opcua.stack.core.types.builtin.NodeId;
+import org.eclipse.milo.opcua.stack.core.types.builtin.QualifiedName;
 import org.eclipse.milo.opcua.stack.core.types.enumerated.TimestampsToReturn;
+import org.eclipse.milo.opcua.stack.core.types.structured.ReadValueId;
+import org.eclipse.milo.opcua.stack.core.types.structured.StructureDefinition;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -20,6 +24,46 @@ import org.junit.jupiter.api.Test;
 class OpcUaServerRuntimeIT {
 
     @Test
+    void clientReadsPublishedNativeStructureDefinition() throws Exception {
+        int port = freePort();
+        String sourceTypeId = "ns=4;s=PumpState";
+        NativeDataTypeDef type = new NativeDataTypeDef(
+                sourceTypeId,
+                "PumpState",
+                List.of(DataTypeMemberMsg.newBuilder().setName("running").setDataType("BOOL")
+                        .setValueRank("SCALAR").build()),
+                List.of(),
+                "ns=4;s=PumpState.DefaultBinary",
+                "STRUCTURE");
+        OpcUaServerRuntime runtime = new OpcUaServerRuntime(
+                port, "127.0.0.1", "127.0.0.1",
+                List.of(new VarDef("pump", null, "Pump", "VARIABLE", "", sourceTypeId,
+                        null, null, null, null, null)),
+                List.of(type), AuthConfig.anonymous(), event -> { }, event -> { });
+        runtime.start();
+        try {
+            OpcUaClient client = OpcUaClient.create(runtime.endpointUrl());
+            client.connect();
+            try {
+                DataValue value = client.read(0.0, TimestampsToReturn.Neither, List.of(new ReadValueId(
+                        runtime.localDataTypeId(sourceTypeId),
+                        org.eclipse.milo.opcua.stack.core.types.builtin.unsigned.Unsigned.uint(23),
+                        null,
+                        QualifiedName.NULL_VALUE))).getResults()[0];
+                assertThat(value.getValue().getValue()).isInstanceOf(ExtensionObject.class);
+                StructureDefinition definition = (StructureDefinition) ((ExtensionObject) value.getValue().getValue())
+                        .decode(client.getStaticEncodingContext());
+                assertThat(definition.getFields()).extracting(field -> field.getName()).containsExactly("running");
+                assertThat(definition.getDefaultEncodingId()).isEqualTo(runtime.localEncodingId(sourceTypeId));
+            } finally {
+                client.disconnect();
+            }
+        } finally {
+            runtime.stop();
+        }
+    }
+
+    @Test
     void clientReadsProjectedVariableValue() throws Exception {
         int port = freePort();
         OpcUaServerRuntime runtime = new OpcUaServerRuntime(
@@ -27,19 +71,19 @@ class OpcUaServerRuntimeIT {
         runtime.start();
         try {
             OpcUaClient client = OpcUaClient.create(runtime.endpointUrl());
-            client.connect().get(15, SECONDS);
+            client.connect();
             try {
                 NodeId nodeId = runtime.variableNodeId("temp");
 
-                DataValue initial = client.readValue(0.0, TimestampsToReturn.Both, nodeId).get(10, SECONDS);
+                DataValue initial = client.readValue(0.0, TimestampsToReturn.Both, nodeId);
                 assertThat(((Number) initial.getValue().getValue()).doubleValue()).isEqualTo(0.0);
 
                 runtime.updateValue("temp", 42.5);
 
-                DataValue updated = client.readValue(0.0, TimestampsToReturn.Both, nodeId).get(10, SECONDS);
+                DataValue updated = client.readValue(0.0, TimestampsToReturn.Both, nodeId);
                 assertThat(((Number) updated.getValue().getValue()).doubleValue()).isEqualTo(42.5);
             } finally {
-                client.disconnect().get(10, SECONDS);
+                client.disconnect();
             }
         } finally {
             runtime.stop();

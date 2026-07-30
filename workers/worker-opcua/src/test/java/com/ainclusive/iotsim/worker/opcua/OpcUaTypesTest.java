@@ -14,12 +14,12 @@ class OpcUaTypesTest {
     @Test
     void preservesNamedStandardSubtypeNodeIdsInsteadOfCollapsingToTheirParents() {
         assertThat(OpcUaTypes.neutralTypeOf(Identifiers.UtcTime)).isNull();
-        assertThat(OpcUaTypes.neutralTypeOf(Identifiers.Date)).isNull();
+        assertThat(OpcUaTypes.neutralTypeOf(org.eclipse.milo.opcua.stack.core.types.builtin.NodeId.parse("ns=0;i=293"))).isNull();
         assertThat(OpcUaTypes.neutralTypeOf(Identifiers.Duration)).isNull();
         assertThat(OpcUaTypes.neutralTypeOf(Identifiers.IntegerId)).isNull();
         assertThat(OpcUaTypes.neutralTypeOf(Identifiers.Counter)).isNull();
         assertThat(OpcUaTypes.neutralTypeOf(Identifiers.NumericRange)).isNull();
-        assertThat(OpcUaTypes.neutralTypeOf(Identifiers.Time)).isNull();
+        assertThat(OpcUaTypes.neutralTypeOf(org.eclipse.milo.opcua.stack.core.types.builtin.NodeId.parse("ns=0;i=292"))).isNull();
         assertThat(OpcUaTypes.neutralTypeOf(Identifiers.LocaleId)).isNull();
         assertThat(OpcUaTypes.neutralTypeOf(Identifiers.NormalizedString)).isNull();
         assertThat(OpcUaTypes.neutralTypeOf(Identifiers.DecimalString)).isNull();
