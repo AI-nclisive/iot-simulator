@@ -235,6 +235,11 @@ const unknownNode: DiscoveredNodeResponse = {
   unknownType: true,
 };
 
+const preservedNativeNode: DiscoveredNodeResponse = {
+  ...unknownNode,
+  dataTypeNodeId: "ns=2;i=884",
+};
+
 describe("scanStepValidationMessage (UI-458)", () => {
   it("returns scanning message while scanning", () => {
     expect(scanStepValidationMessage("scanning", [], null)).toBe("Scanning in progress…");
@@ -260,7 +265,7 @@ describe("scanStepValidationMessage (UI-458)", () => {
     ).toBeNull();
   });
 
-  it("returns null when a non-neutral node has no replacement type", () => {
+  it("requires a mapping only when an unresolved node has no original type id", () => {
     const resolutions: TypeResolutionEntry[] = [
       { nodeId: unknownNode.nodeId, dataType: "", valueRank: 1, access: "READ", exclude: false },
     ];
@@ -271,7 +276,7 @@ describe("scanStepValidationMessage (UI-458)", () => {
         unknownCount: 1,
         truncated: false,
       }),
-    ).toBeNull();
+    ).toBe("Choose a scalar type or exclude every unresolved node.");
   });
 
   it("returns null when all unknown nodes are excluded", () => {
@@ -684,19 +689,20 @@ describe("CreateDataSourceWizardPage — scan step (UI-458)", () => {
           message: null,
         }),
       )
-      .mockImplementationOnce(() => makeNodesPage([unknownNode]));
+      .mockImplementationOnce(() => makeNodesPage([preservedNativeNode]));
 
     await navigateToScanStep();
     await advanceIntervalAndFlush(2000);
 
-    expect(screen.getByText(/native OPC UA type declarations preserved/i)).toBeTruthy();
-    // The original DataType NodeId is enough to preserve the declaration; a
-    // scalar mapping is optional and must not block creation.
+    expect(screen.getByText("Native OPC UA types preserved")).toBeTruthy();
+    expect(screen.getByText("OPC UA DataType: ns=2;i=884")).toBeTruthy();
+    expect(screen.queryByLabelText(/Data type for/i)).toBeNull();
+    // The original DataType NodeId is enough to preserve the declaration.
     const btn = screen.getAllByRole("button", { name: "Next" })[0] as HTMLButtonElement;
     expect(btn.disabled).toBe(false);
   });
 
-  it("optionally maps a preserved native type to a neutral scalar", async () => {
+  it("requires a scalar mapping for a genuinely unresolved node", async () => {
     mockApiFetch
       .mockImplementationOnce(() => Promise.resolve({ jobId: "job-1", status: "RUNNING" }))
       .mockImplementationOnce(() =>
@@ -715,13 +721,12 @@ describe("CreateDataSourceWizardPage — scan step (UI-458)", () => {
     await advanceIntervalAndFlush(2000);
 
     expect(screen.getByLabelText(/Data type for/i)).toBeTruthy();
-
-    expect((screen.getAllByRole("button", { name: "Next" })[0] as HTMLButtonElement).disabled).toBe(false);
+    expect((screen.getAllByRole("button", { name: "Next" })[0] as HTMLButtonElement).disabled).toBe(true);
 
     // Resolve the unknown type
     await userEvent.selectOptions(screen.getByLabelText(/Data type for/i), "FLOAT64");
 
-    // Mapping remains optional and keeps Next enabled.
+    // A deliberate mapping enables the next step.
     expect((screen.getAllByRole("button", { name: "Next" })[0] as HTMLButtonElement).disabled).toBe(false);
   });
 

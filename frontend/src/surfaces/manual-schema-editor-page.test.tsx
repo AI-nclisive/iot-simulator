@@ -282,6 +282,25 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
     expect(screen.getByRole("option", { name: "ServerStatus (enum) — not executable" })).not.toBeNull();
   });
 
+  it("offers imported catalog types when adding a new variable", async () => {
+    mockLoadManualSchemaById.mockResolvedValueOnce({
+      ...schemaWithFolder,
+      typeDefinitions: [{
+        typeId: "ns=2;i=884", namespaceUri: null, nativeNodeId: "ns=2;i=884", browseName: "Range",
+        displayName: "Range", description: null, kind: "STRUCTURE", baseTypeId: null,
+        defaultBinaryEncodingId: "ns=2;i=886", defaultXmlEncodingId: null,
+        fields: [], enumValues: [],
+        capability: { materializable: true, captureDecodable: true, replayEncodable: true, unavailableReason: null },
+      }],
+    });
+    renderPage();
+    await waitFor(() => screen.getByText("Reactor"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Add variable" }));
+
+    expect(screen.getByRole("option", { name: "Range (structure)" })).not.toBeNull();
+  });
+
   it("edits structure members and enum literals before saving", async () => {
     mockLoadManualSchemaById.mockResolvedValueOnce({
       ...schema,
