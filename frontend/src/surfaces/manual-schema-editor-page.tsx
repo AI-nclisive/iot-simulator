@@ -1173,7 +1173,11 @@ export function ManualSchemaEditorPage() {
                     Data type
                     <select className="shell-field" value={addType} onChange={(e) => setAddType(e.target.value)}>
                       {DATA_TYPES.map((t) => <option key={t} value={t}>{formatDataType(t)}</option>)}
-                      {nativeTypes.map((type) => <option key={type.nodeId} value={`native:${type.nodeId}`}>{type.name} (structured type)</option>)}
+                      {catalogNativeTypes.map((type) => (
+                        <option key={type.id} value={`native:${type.id}`}>
+                          {catalogTypeLabel(type)}
+                        </option>
+                      ))}
                     </select>
                   </label>
                   <label className="flex flex-col gap-1.5 text-sm text-shell-muted">

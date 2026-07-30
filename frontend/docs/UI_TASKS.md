@@ -1298,6 +1298,22 @@ Parallel execution:
   Goal: after a completed scan, clearly distinguish the action that starts a
   fresh endpoint scan and explain that it replaces the current discovery result.
 
+- [x] `UI-510` Preserve native OPC UA types in scan and authoring
+  Goal: ensure native OPC UA DataType NodeIds discovered by a scan are kept
+  unchanged by default, rather than being presented as scalar mappings; make
+  the available native type catalog selectable while manually authoring a
+  schema.
+  Surface: `Create Data Source Wizard`, `Rescan tags`, `Manual Schema Editor`.
+  Work includes: separate native declarations with an original NodeId from
+  truly unresolved nodes; show preserved types without a scalar selector;
+  require an explicit scalar mapping or exclusion only when the server did not
+  supply a type identity; offer the complete loaded native catalog when adding
+  a manual variable or a structure member.
+  Depends: IS-194.
+  Done when: scan/rescan preserves known native types without user mapping;
+  unresolved choices include the complete neutral type set; manual authoring
+  can select catalog native types; typecheck, vitest, and build are green.
+
 ## Recommended Sequence
 
 1. Complete the P0 shell and shared-pattern tasks first.
