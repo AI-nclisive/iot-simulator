@@ -3,6 +3,7 @@ package com.ainclusive.iotsim.worker.opcua;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.ainclusive.iotsim.workercontract.v1.DataTypeEnumValueMsg;
+import com.ainclusive.iotsim.workercontract.v1.DataTypeMemberMsg;
 import com.ainclusive.iotsim.workercontract.v1.SchemaNodeMsg;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -63,6 +64,7 @@ class OpcUaDiscoveryIT {
             assertThat(byName.get("Id").getDataType()).isEqualTo("GUID");
             assertThat(byName.get("Quality").getDataType()).isEqualTo("STATUS_CODE");
             assertThat(byName.get("QName").getDataType()).isEqualTo("QUALIFIED_NAME");
+            assertThat(byName.get("QName").getDataTypeNodeId()).isEqualTo("ns=0;i=20");
             assertThat(byName.get("Target").getDataType()).isEqualTo("NODE_ID");
             assertThat(byName.get("XTarget").getDataType()).isEqualTo("EXPANDED_NODE_ID");
             assertThat(byName.get("Xml").getDataType()).isEqualTo("XML_ELEMENT");
@@ -97,6 +99,99 @@ class OpcUaDiscoveryIT {
         try {
             assertThat(OpcUaDiscovery.testConnection(runtime.endpointUrl(), ANON).status())
                     .isEqualTo(OpcUaDiscovery.OK);
+        } finally {
+            runtime.stop();
+        }
+    }
+
+    @Test
+    void createsLocalEncodingForSchemaOwnedStructure() throws Exception {
+        int port = freePort();
+        NativeDataTypeDef reading = new NativeDataTypeDef(
+                "ns=2;i=7001",
+                "Reading",
+                List.of(DataTypeMemberMsg.newBuilder().setName("value").setDataType("INT32").build()),
+                List.of(),
+                "ns=2;i=7002",
+                "STRUCTURE");
+        OpcUaServerRuntime runtime = new OpcUaServerRuntime(
+                port,
+                "127.0.0.1",
+                "127.0.0.1",
+                List.of(new VarDef("reading", null, "Reading", "VARIABLE", "", "ns=2;i=7001", null,
+                        null, null, null, null)),
+                List.of(reading),
+                AuthConfig.anonymous(),
+                event -> { },
+                event -> { });
+        runtime.start();
+        try {
+            var localEncoding = runtime.localEncodingId("ns=2;i=7001");
+            assertThat(localEncoding).isNotNull();
+            assertThat(localEncoding.toParseableString()).isNotEqualTo("ns=2;i=7002");
+            assertThat(localEncoding.getNamespaceIndex().intValue()).isGreaterThan(0);
+        } finally {
+            runtime.stop();
+        }
+    }
+
+    @Test
+    void scanPreservesStandardAbstractDataTypeNodeIdWithoutPrimitiveFallback() throws Exception {
+        int port = freePort();
+        OpcUaServerRuntime runtime = new OpcUaServerRuntime(
+                port,
+                "127.0.0.1",
+                "127.0.0.1",
+                List.of(new VarDef("unsigned", null, "Unsigned", "VARIABLE", "", "ns=0;i=28", null,
+                        null, null, null, null)),
+                List.of(),
+                AuthConfig.anonymous(),
+                event -> { },
+                event -> { });
+        runtime.start();
+        try {
+            OpcUaDiscovery.ScanOutcome outcome = OpcUaDiscovery.scan(
+                    runtime.endpointUrl(), ANON, 0, () -> { }, soFar -> { });
+
+            SchemaNodeMsg unsigned = outcome.nodes().stream()
+                    .filter(node -> "Unsigned".equals(node.getName()))
+                    .findFirst()
+                    .orElseThrow();
+            assertThat(unsigned.getDataType()).isEmpty();
+            assertThat(unsigned.getDataTypeNodeId()).isEqualTo("ns=0;i=28");
+            assertThat(unsigned.getDataTypeName()).isEqualTo("UInteger");
+        } finally {
+            runtime.stop();
+        }
+    }
+
+    @Test
+    void scanMaterializesStandardRangeWhenServerOmitsItsDefinition() throws Exception {
+        int port = freePort();
+        OpcUaServerRuntime runtime = new OpcUaServerRuntime(
+                port,
+                "127.0.0.1",
+                "127.0.0.1",
+                List.of(new VarDef("range", null, "Range", "VARIABLE", "", "ns=0;i=884", null,
+                        null, null, null, null)),
+                List.of(),
+                AuthConfig.anonymous(),
+                event -> { },
+                event -> { });
+        runtime.start();
+        try {
+            OpcUaDiscovery.ScanOutcome outcome = OpcUaDiscovery.scan(
+                    runtime.endpointUrl(), ANON, 0, () -> { }, soFar -> { });
+
+            SchemaNodeMsg range = outcome.nodes().stream()
+                    .filter(node -> "Range".equals(node.getName()))
+                    .findFirst()
+                    .orElseThrow();
+            assertThat(range.getDataTypeNodeId()).isEqualTo("ns=0;i=884");
+            assertThat(range.getNativeTypeKind()).isEqualTo("STRUCTURE");
+            assertThat(range.getDataTypeDefaultEncodingId()).isEqualTo("ns=0;i=886");
+            assertThat(range.getDataTypeMembersList()).extracting(member -> member.getName())
+                    .containsExactly("low", "high");
         } finally {
             runtime.stop();
         }

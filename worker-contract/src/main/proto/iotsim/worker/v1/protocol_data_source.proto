@@ -117,6 +117,13 @@ message SchemaNodeMsg {
   // This is required to transport an opaque ExtensionObject losslessly; it is
   // deliberately kept separate from the DataType NodeId.
   string data_type_default_encoding_id = 19;
+  repeated NativeDataTypeDefinitionMsg data_type_dependencies = 20;
+  string native_type_kind = 21;        // ENUM | OPTION_SET | STRUCTURE | UNION | OPAQUE
+  // Browse name of data_type_node_id. It is distinct from the Variable's name.
+  string data_type_name = 22;
+  // Original source DataType attribute. Unlike data_type_node_id this may be set
+  // together with a neutral data_type, retaining exact OPC UA type fidelity.
+  string declared_data_type_node_id = 23;
 }
 
 // The declared fields of a native OPC UA structured DataType. Exactly one of
@@ -126,6 +133,9 @@ message DataTypeMemberMsg {
   string name = 1;
   string data_type = 2;
   string data_type_node_id = 3;
+  string value_rank = 4;               // SCALAR | ARRAY
+  repeated uint32 array_dimensions = 5;
+  bool optional = 6;                   // StructureField.isOptional
 }
 
 // Exact literals of a native OPC UA enum or option-set declaration.
@@ -133,6 +143,16 @@ message DataTypeEnumValueMsg {
   string name = 1;
   int64 value = 2;
   string description = 3;
+}
+
+// A transitive native declaration referenced by an imported structured type.
+message NativeDataTypeDefinitionMsg {
+  string node_id = 1;
+  string name = 2;
+  repeated DataTypeMemberMsg members = 3;
+  repeated DataTypeEnumValueMsg enum_values = 4;
+  string default_encoding_id = 5;
+  string native_type_kind = 6;
 }
 
 message StartRequest {}
@@ -228,6 +248,9 @@ message Value {
   bytes value_enc = 3;          // encoded per the node's data type
   Quality quality = 4;
   string quality_reason = 5;
+  // The ValueCodec kind used for value_enc. Empty is the legacy form, decoded
+  // from the schema's neutral type. TREE carries a canonical native value tree.
+  string value_kind = 6;
 }
 
 message ValueBatch {

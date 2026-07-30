@@ -69,9 +69,16 @@ final class OpcUaScanTool {
             return;
         }
         for (SchemaNodeMsg n : children) {
-            String typeInfo = "VARIABLE".equals(n.getKind())
-                    ? " : " + (n.getDataType().isEmpty() ? "unknown" : n.getDataType())
-                    : "/";
+            String typeInfo;
+            if (!"VARIABLE".equals(n.getKind())) {
+                typeInfo = "/";
+            } else if (!n.getDataType().isEmpty()) {
+                typeInfo = " : " + n.getDataType();
+            } else {
+                String nativeName = n.getDataTypeName().isEmpty() ? "unknown" : n.getDataTypeName();
+                typeInfo = " : " + nativeName + " [" + n.getDataTypeNodeId() + "]"
+                        + (n.getNativeTypeKind().isEmpty() ? "" : " (" + n.getNativeTypeKind() + ")");
+            }
             System.out.println(indent + n.getName() + typeInfo + "  [" + n.getNodeId() + "]");
             printChildren(n.getNodeId(), byParent, indent + "  ");
         }

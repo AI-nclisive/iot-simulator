@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ApiError, mapDataType } from "../api";
 import { resolveAccess } from "../shell/access-policy";
-import { useManualSchemasStore } from "../shell/manual-schemas-store";
+import { type NativeTypeDefinitionDto, useManualSchemasStore } from "../shell/manual-schemas-store";
 import { useNotificationStore } from "../shell/notification-store";
 import { useShellStore } from "../shell/shell-store";
 import { SharedStatePanel } from "../ui/shared-state-panel";
@@ -74,6 +74,17 @@ type StructureTemplate = {
 
 type StructureMemberDraft = { id: string; name: string; dataType: string };
 type EnumValueDraft = { id: string; name: string; value: string; description: string };
+type CatalogNativeType = {
+  id: string;
+  name: string;
+  kind: NativeTypeDefinitionDto["kind"];
+  unavailableReason: string | null;
+};
+
+function catalogTypeLabel(type: CatalogNativeType): string {
+  const kind = type.kind.toLowerCase().replace("_", " ");
+  return `${type.name} (${kind})${type.unavailableReason ? " — not executable" : ""}`;
+}
 
 const STRUCTURE_TEMPLATES = [
   {
@@ -194,25 +205,74 @@ const ACCESS_LEVELS = ["READ", "READ_WRITE"] as const;
 const UPCOMING_NODE_CLASSES = ["Method"] as const;
 const REFERENCE_TYPES = ["ORGANIZES", "HAS_COMPONENT", "HAS_PROPERTY", "HAS_TYPE_DEFINITION", "GENERIC"] as const;
 
-// Available without scanning: these are standard OPC UA structured declarations
-// whose field shapes are stable in the specification. A real-device scan adds
-// vendor declarations to the same schema-local catalog.
+// Available without scanning: these are standard OPC UA declarations whose
+// NodeIds and field shapes are stable in the specification. A real-device scan
+// adds vendor declarations to the same schema-local catalog. Built-in scalar
+// types and aliases are deliberately OPAQUE here: their exact NodeId can be
+// retained and selected, but this catalog does not invent a custom encoding.
 const STANDARD_OPC_UA_TYPE_TEMPLATES = [
-  { nodeId: "ns=0;i=884", name: "Range", description: "OPC UA numeric engineering range.", members: [
+  // Abstract standard DataTypes intentionally have no fields or default binary
+  // encoding. They are preserved as opaque declarations: selectable by their
+  // real NodeId, but clearly non-executable until a concrete declaration is
+  // supplied by a source.
+  { nodeId: "ns=0;i=24", name: "BaseDataType", nativeTypeKind: "OPAQUE", description: "OPC UA abstract root data type (no concrete value encoding)." },
+  { nodeId: "ns=0;i=26", name: "Number", nativeTypeKind: "OPAQUE", description: "OPC UA abstract numeric base type (no concrete value encoding)." },
+  { nodeId: "ns=0;i=27", name: "Integer", nativeTypeKind: "OPAQUE", description: "OPC UA abstract signed-integer base type (no concrete value encoding)." },
+  { nodeId: "ns=0;i=28", name: "UInteger", nativeTypeKind: "OPAQUE", description: "OPC UA abstract unsigned-integer base type (no concrete value encoding)." },
+  { nodeId: "ns=0;i=29", name: "Enumeration", nativeTypeKind: "OPAQUE", description: "OPC UA abstract enumeration base type (add a concrete enum when values are known)." },
+  { nodeId: "ns=0;i=1", name: "Boolean", nativeTypeKind: "OPAQUE", description: "Standard OPC UA built-in Boolean with its exact NodeId." },
+  { nodeId: "ns=0;i=2", name: "SByte", nativeTypeKind: "OPAQUE", description: "Standard OPC UA built-in signed 8-bit integer with its exact NodeId." },
+  { nodeId: "ns=0;i=3", name: "Byte", nativeTypeKind: "OPAQUE", description: "Standard OPC UA built-in unsigned 8-bit integer with its exact NodeId." },
+  { nodeId: "ns=0;i=4", name: "Int16", nativeTypeKind: "OPAQUE", description: "Standard OPC UA built-in signed 16-bit integer with its exact NodeId." },
+  { nodeId: "ns=0;i=5", name: "UInt16", nativeTypeKind: "OPAQUE", description: "Standard OPC UA built-in unsigned 16-bit integer with its exact NodeId." },
+  { nodeId: "ns=0;i=6", name: "Int32", nativeTypeKind: "OPAQUE", description: "Standard OPC UA built-in signed 32-bit integer with its exact NodeId." },
+  { nodeId: "ns=0;i=7", name: "UInt32", nativeTypeKind: "OPAQUE", description: "Standard OPC UA built-in unsigned 32-bit integer with its exact NodeId." },
+  { nodeId: "ns=0;i=8", name: "Int64", nativeTypeKind: "OPAQUE", description: "Standard OPC UA built-in signed 64-bit integer with its exact NodeId." },
+  { nodeId: "ns=0;i=9", name: "UInt64", nativeTypeKind: "OPAQUE", description: "Standard OPC UA built-in unsigned 64-bit integer with its exact NodeId." },
+  { nodeId: "ns=0;i=10", name: "Float", nativeTypeKind: "OPAQUE", description: "Standard OPC UA built-in single-precision floating point type with its exact NodeId." },
+  { nodeId: "ns=0;i=11", name: "Double", nativeTypeKind: "OPAQUE", description: "Standard OPC UA built-in double-precision floating point type with its exact NodeId." },
+  { nodeId: "ns=0;i=12", name: "String", nativeTypeKind: "OPAQUE", description: "Standard OPC UA built-in String with its exact NodeId." },
+  { nodeId: "ns=0;i=13", name: "DateTime", nativeTypeKind: "OPAQUE", description: "Standard OPC UA built-in DateTime with its exact NodeId." },
+  { nodeId: "ns=0;i=14", name: "Guid", nativeTypeKind: "OPAQUE", description: "Standard OPC UA built-in Guid with its exact NodeId." },
+  { nodeId: "ns=0;i=15", name: "ByteString", nativeTypeKind: "OPAQUE", description: "Standard OPC UA built-in ByteString with its exact NodeId." },
+  { nodeId: "ns=0;i=16", name: "XmlElement", nativeTypeKind: "OPAQUE", description: "Standard OPC UA built-in XmlElement with its exact NodeId." },
+  { nodeId: "ns=0;i=17", name: "NodeId", nativeTypeKind: "OPAQUE", description: "Standard OPC UA built-in NodeId with its exact NodeId." },
+  { nodeId: "ns=0;i=18", name: "ExpandedNodeId", nativeTypeKind: "OPAQUE", description: "Standard OPC UA built-in ExpandedNodeId with its exact NodeId." },
+  { nodeId: "ns=0;i=19", name: "StatusCode", nativeTypeKind: "OPAQUE", description: "Standard OPC UA built-in StatusCode with its exact NodeId." },
+  { nodeId: "ns=0;i=20", name: "QualifiedName", nativeTypeKind: "OPAQUE", description: "Standard OPC UA built-in QualifiedName with its exact NodeId." },
+  { nodeId: "ns=0;i=21", name: "LocalizedText", nativeTypeKind: "OPAQUE", description: "Standard OPC UA built-in LocalizedText with its exact NodeId." },
+  { nodeId: "ns=0;i=22", name: "Structure", nativeTypeKind: "OPAQUE", description: "OPC UA abstract structured-value base type (no concrete declaration or encoding)." },
+  { nodeId: "ns=0;i=23", name: "DataValue", nativeTypeKind: "OPAQUE", description: "Standard OPC UA built-in DataValue with its exact NodeId." },
+  { nodeId: "ns=0;i=25", name: "DiagnosticInfo", nativeTypeKind: "OPAQUE", description: "Standard OPC UA built-in DiagnosticInfo with its exact NodeId." },
+  { nodeId: "ns=0;i=30", name: "Image", nativeTypeKind: "OPAQUE", description: "OPC UA abstract image base type (no concrete declaration or encoding)." },
+  { nodeId: "ns=0;i=288", name: "IntegerId", nativeTypeKind: "OPAQUE", description: "Standard OPC UA UInt32 alias with its exact NodeId." },
+  { nodeId: "ns=0;i=289", name: "Counter", nativeTypeKind: "OPAQUE", description: "Standard OPC UA UInt32 counter alias with its exact NodeId." },
+  { nodeId: "ns=0;i=290", name: "Duration", nativeTypeKind: "OPAQUE", description: "Standard OPC UA Double duration alias with its exact NodeId." },
+  { nodeId: "ns=0;i=291", name: "NumericRange", nativeTypeKind: "OPAQUE", description: "Standard OPC UA String numeric-range alias with its exact NodeId." },
+  { nodeId: "ns=0;i=292", name: "Time", nativeTypeKind: "OPAQUE", description: "Standard OPC UA DateTime time-of-day alias with its exact NodeId." },
+  { nodeId: "ns=0;i=293", name: "Date", nativeTypeKind: "OPAQUE", description: "Standard OPC UA DateTime date alias with its exact NodeId." },
+  { nodeId: "ns=0;i=294", name: "UtcTime", nativeTypeKind: "OPAQUE", description: "Standard OPC UA DateTime UTC alias with its exact NodeId." },
+  { nodeId: "ns=0;i=295", name: "LocaleId", nativeTypeKind: "OPAQUE", description: "Standard OPC UA String locale alias with its exact NodeId." },
+  { nodeId: "ns=0;i=12877", name: "NormalizedString", nativeTypeKind: "OPAQUE", description: "Standard OPC UA normalized string alias with its exact NodeId." },
+  { nodeId: "ns=0;i=12878", name: "DecimalString", nativeTypeKind: "OPAQUE", description: "Standard OPC UA decimal string alias with its exact NodeId." },
+  { nodeId: "ns=0;i=12879", name: "DurationString", nativeTypeKind: "OPAQUE", description: "Standard OPC UA duration string alias with its exact NodeId." },
+  { nodeId: "ns=0;i=12880", name: "TimeString", nativeTypeKind: "OPAQUE", description: "Standard OPC UA time string alias with its exact NodeId." },
+  { nodeId: "ns=0;i=12881", name: "DateString", nativeTypeKind: "OPAQUE", description: "Standard OPC UA date string alias with its exact NodeId." },
+  { nodeId: "ns=0;i=884", name: "Range", nativeTypeKind: "STRUCTURE", description: "OPC UA numeric engineering range.", defaultEncodingId: "ns=0;i=886", members: [
     { name: "low", dataType: "FLOAT64", dataTypeNodeId: null },
     { name: "high", dataType: "FLOAT64", dataTypeNodeId: null },
   ] },
-  { nodeId: "ns=0;i=889", name: "TimeZoneDataType", description: "UTC offset and daylight-saving flag.", members: [
+  { nodeId: "ns=0;i=8912", name: "TimeZoneDataType", nativeTypeKind: "STRUCTURE", description: "UTC offset and daylight-saving flag.", defaultEncodingId: "ns=0;i=8917", members: [
     { name: "offset", dataType: "INT16", dataTypeNodeId: null },
     { name: "daylightSavingInOffset", dataType: "BOOL", dataTypeNodeId: null },
   ] },
-  { nodeId: "ns=0;i=887", name: "EUInformation", description: "Standard OPC UA engineering-unit metadata.", members: [
+  { nodeId: "ns=0;i=887", name: "EUInformation", nativeTypeKind: "STRUCTURE", description: "Standard OPC UA engineering-unit metadata.", defaultEncodingId: "ns=0;i=889", members: [
     { name: "namespaceUri", dataType: "STRING", dataTypeNodeId: null },
     { name: "unitId", dataType: "INT32", dataTypeNodeId: null },
     { name: "displayName", dataType: "LOCALIZED_TEXT", dataTypeNodeId: null },
     { name: "description", dataType: "LOCALIZED_TEXT", dataTypeNodeId: null },
   ] },
-  { nodeId: "ns=0;i=340", name: "BuildInfo", description: "Standard OPC UA server build identity.", members: [
+  { nodeId: "ns=0;i=338", name: "BuildInfo", nativeTypeKind: "STRUCTURE", description: "Standard OPC UA server build identity.", defaultEncodingId: "ns=0;i=340", members: [
     { name: "productUri", dataType: "STRING", dataTypeNodeId: null },
     { name: "manufacturerName", dataType: "STRING", dataTypeNodeId: null },
     { name: "productName", dataType: "STRING", dataTypeNodeId: null },
@@ -220,20 +280,20 @@ const STANDARD_OPC_UA_TYPE_TEMPLATES = [
     { name: "buildNumber", dataType: "STRING", dataTypeNodeId: null },
     { name: "buildDate", dataType: "DATETIME", dataTypeNodeId: null },
   ] },
-  { nodeId: "ns=0;i=296", name: "Argument", description: "Standard OPC UA method argument declaration.", members: [
+  { nodeId: "ns=0;i=296", name: "Argument", nativeTypeKind: "STRUCTURE", description: "Standard OPC UA method argument declaration.", defaultEncodingId: "ns=0;i=298", members: [
     { name: "name", dataType: "STRING", dataTypeNodeId: null },
     { name: "dataType", dataType: "NODE_ID", dataTypeNodeId: null },
     { name: "valueRank", dataType: "INT32", dataTypeNodeId: null },
     { name: "arrayDimensions", dataType: "UINT32", dataTypeNodeId: null },
     { name: "description", dataType: "LOCALIZED_TEXT", dataTypeNodeId: null },
   ] },
-  { nodeId: "ns=0;i=302", name: "MessageSecurityMode", description: "OPC UA message security mode enum.", enumValues: [
+  { nodeId: "ns=0;i=302", name: "MessageSecurityMode", nativeTypeKind: "ENUM", description: "OPC UA message security mode enum.", enumValues: [
     { name: "Invalid", value: 0, description: "Invalid or unspecified mode." },
     { name: "None", value: 1, description: "No message security." },
     { name: "Sign", value: 2, description: "Messages are signed." },
     { name: "SignAndEncrypt", value: 3, description: "Messages are signed and encrypted." },
   ] },
-  { nodeId: "ns=0;i=307", name: "ApplicationType", description: "OPC UA application role enum.", enumValues: [
+  { nodeId: "ns=0;i=307", name: "ApplicationType", nativeTypeKind: "ENUM", description: "OPC UA application role enum.", enumValues: [
     { name: "Server", value: 0, description: "Server application." },
     { name: "Client", value: 1, description: "Client application." },
     { name: "ClientAndServer", value: 2, description: "Combined client and server." },
@@ -358,6 +418,7 @@ export function ManualSchemaEditorPage() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [nodes, setNodes] = useState<NodeDto[]>([]);
+  const [typeDefinitions, setTypeDefinitions] = useState<NativeTypeDefinitionDto[]>([]);
   const [savedSnapshot, setSavedSnapshot] = useState<{ name: string; description: string; nodes: NodeDto[] }>({
     name: "",
     description: "",
@@ -372,7 +433,7 @@ export function ManualSchemaEditorPage() {
   const [addAccess, setAddAccess] = useState<string>("READ");
   const [addUnit, setAddUnit] = useState("");
   const [addDescription, setAddDescription] = useState("");
-  const [addDataTypeKind, setAddDataTypeKind] = useState<"STRUCTURE" | "ENUM">("STRUCTURE");
+  const [addDataTypeKind, setAddDataTypeKind] = useState<"STRUCTURE" | "UNION" | "ENUM" | "OPTION_SET">("STRUCTURE");
   const [addMemberName, setAddMemberName] = useState("value");
   const [addMemberType, setAddMemberType] = useState<string>("FLOAT64");
   const [addEnumValues, setAddEnumValues] = useState<EnumValueDraft[]>([
@@ -405,6 +466,7 @@ export function ManualSchemaEditorPage() {
         setName(schema.name);
         setDescription(schema.description ?? "");
         setNodes(schema.nodes);
+        setTypeDefinitions(schema.typeDefinitions ?? []);
         setSavedSnapshot({
           name: schema.name,
           description: schema.description ?? "",
@@ -431,6 +493,25 @@ export function ManualSchemaEditorPage() {
   const variableCount = nodes.filter((n) => n.kind === "VARIABLE").length;
   const containers = nodes.filter((n) => canHaveChildren(n.kind));
   const nativeTypes = nodes.filter((n) => n.kind === "DATA_TYPE");
+  const catalogNativeTypes = useMemo(() => {
+    const types = new Map<string, CatalogNativeType>(typeDefinitions.map((type) => [type.typeId, {
+      id: type.typeId,
+      name: type.displayName || type.browseName,
+      kind: type.kind,
+      unavailableReason: type.capability.materializable ? null : type.capability.unavailableReason || "not executable",
+    }]));
+    for (const type of nativeTypes) {
+      const existing = types.get(type.nodeId);
+      types.set(type.nodeId, {
+        id: type.nodeId,
+        name: type.name,
+        kind: type.nativeTypeKind ?? ((type.enumValues ?? []).length > 0 ? "ENUM" : "STRUCTURE"),
+        unavailableReason: existing?.unavailableReason
+          ?? (type.nativeTypeKind === "OPAQUE" ? "source definition was not supplied" : null),
+      });
+    }
+    return [...types.values()];
+  }, [nativeTypes, typeDefinitions]);
   const isEmpty = nodes.length === 0;
   const catalogParentId = selectedNode && canHaveChildren(selectedNode.kind) ? selectedNode.nodeId : null;
   const validationIssues = useMemo(() => validateManualSchemaNodes(nodes), [nodes]);
@@ -706,10 +787,10 @@ export function ManualSchemaEditorPage() {
       access: addKind === "VARIABLE" ? addAccess : null,
       unit: addKind === "VARIABLE" ? addUnit || null : null,
       description: addDescription || null,
-      members: addKind === "DATA_TYPE" && addDataTypeKind === "STRUCTURE"
+      members: addKind === "DATA_TYPE" && addDataTypeKind !== "ENUM"
         ? [{ name: addMemberName.trim() || "value", dataType: addMemberType, dataTypeNodeId: null }]
         : [],
-      enumValues: addKind === "DATA_TYPE" && addDataTypeKind === "ENUM"
+      enumValues: addKind === "DATA_TYPE" && (addDataTypeKind === "ENUM" || addDataTypeKind === "OPTION_SET")
         ? addEnumValues
           .filter((value) => value.name.trim() && Number.isInteger(Number(value.value)))
           .map((value) => ({
@@ -718,6 +799,7 @@ export function ManualSchemaEditorPage() {
             description: value.description.trim() || null,
           }))
         : [],
+      nativeTypeKind: addKind === "DATA_TYPE" ? addDataTypeKind : null,
       accessLevelFull: null,
       minimumSamplingInterval: null,
       writeMask: null,
@@ -751,8 +833,10 @@ export function ManualSchemaEditorPage() {
       access: null,
       unit: null,
       description: template.description,
+      defaultEncodingId: "defaultEncodingId" in template ? template.defaultEncodingId : null,
       members: "members" in template ? template.members.map((member) => ({ ...member })) : [],
       enumValues: "enumValues" in template ? template.enumValues.map((value) => ({ ...value })) : [],
+      nativeTypeKind: template.nativeTypeKind,
     };
     setNodes((previous) => [...previous, type]);
     setSelectedId(type.nodeId);
@@ -1113,10 +1197,12 @@ export function ManualSchemaEditorPage() {
                   <legend className="text-sm font-medium text-shell-ink">Data type kind</legend>
                   <div className="mt-2 flex gap-4 text-sm text-shell-muted">
                     <label><input checked={addDataTypeKind === "STRUCTURE"} name="data-type-kind" type="radio" value="STRUCTURE" onChange={() => setAddDataTypeKind("STRUCTURE")} /> Structure</label>
+                    <label><input checked={addDataTypeKind === "UNION"} name="data-type-kind" type="radio" value="UNION" onChange={() => setAddDataTypeKind("UNION")} /> Union</label>
                     <label><input checked={addDataTypeKind === "ENUM"} name="data-type-kind" type="radio" value="ENUM" onChange={() => setAddDataTypeKind("ENUM")} /> Enum</label>
+                    <label><input checked={addDataTypeKind === "OPTION_SET"} name="data-type-kind" type="radio" value="OPTION_SET" onChange={() => setAddDataTypeKind("OPTION_SET")} /> Option set</label>
                   </div>
                 </fieldset>
-                {addDataTypeKind === "STRUCTURE" ? (
+                {addDataTypeKind !== "ENUM" && addDataTypeKind !== "OPTION_SET" ? (
                   <div className="grid gap-3 sm:grid-cols-2">
                     <label className="flex flex-col gap-1.5 text-sm text-shell-muted">
                       First member name
@@ -1408,9 +1494,9 @@ export function ManualSchemaEditorPage() {
                             {typeLabel(t)}
                           </option>
                         ))}
-                        {nativeTypes.map((type) => (
-                          <option key={type.nodeId} value={`native:${type.nodeId}`}>
-                            {type.name} ({(type.enumValues ?? []).length > 0 ? "enum" : "structured type"})
+                        {catalogNativeTypes.map((type) => (
+                          <option key={type.id} value={`native:${type.id}`}>
+                            {catalogTypeLabel(type)}
                           </option>
                         ))}
                       </select>
@@ -1444,6 +1530,13 @@ export function ManualSchemaEditorPage() {
                   return (
                     <div className="flex flex-col gap-2 text-sm text-shell-muted">
                       <span className="font-medium text-shell-ink">{isEnum ? "Enum values" : "Structure members"}</span>
+                      {!isEnum ? (
+                        <label className="flex max-w-xl flex-col gap-1 text-xs">
+                          Default binary encoding NodeId
+                          <input aria-label="Default binary encoding NodeId" className="shell-field" disabled={!access.isAdmin} placeholder="e.g. ns=2;i=5002" value={selectedNode.defaultEncodingId ?? ""} onChange={(e) => updateSelectedNode({ defaultEncodingId: e.target.value || null })} />
+                          <span>Needed for binary capture and replay. Leave empty only when the source does not expose an executable encoding.</span>
+                        </label>
+                      ) : null}
                       {isEnum ? (
                         <div className="space-y-2">
                           {(selectedNode.enumValues ?? []).map((value, index) => (
@@ -1462,16 +1555,29 @@ export function ManualSchemaEditorPage() {
                       ) : (
                         <div className="space-y-2">
                           {(selectedNode.members ?? []).map((member, index) => (
-                            <div className="grid gap-2 sm:grid-cols-[minmax(8rem,1fr)_minmax(8rem,1fr)_auto]" key={`${member.name}-${index}`}>
+                            <div className="grid gap-2 sm:grid-cols-[minmax(8rem,1fr)_minmax(8rem,1fr)_7rem_minmax(7rem,1fr)_auto]" key={`${member.name}-${index}`}>
                               <input aria-label={`Structure member ${index + 1} name`} className="shell-field" disabled={!access.isAdmin} value={member.name} onChange={(e) => updateDataTypeMembers((selectedNode.members ?? []).map((candidate, candidateIndex) => candidateIndex === index ? { ...candidate, name: e.target.value } : candidate))} />
                               <select aria-label={`Structure member ${index + 1} type`} className="shell-field" disabled={!access.isAdmin} value={member.dataTypeNodeId ? `native:${member.dataTypeNodeId}` : member.dataType ?? "FLOAT64"} onChange={(e) => updateDataTypeMembers((selectedNode.members ?? []).map((candidate, candidateIndex) => candidateIndex === index ? (e.target.value.startsWith("native:") ? { ...candidate, dataType: null, dataTypeNodeId: e.target.value.slice("native:".length) } : { ...candidate, dataType: e.target.value, dataTypeNodeId: null }) : candidate))}>
                                 {DATA_TYPES.map((type) => <option key={type} value={type}>{formatDataType(type)}</option>)}
-                                {nativeTypes.filter((type) => type.nodeId !== selectedNode.nodeId).map((type) => <option key={type.nodeId} value={`native:${type.nodeId}`}>{type.name}</option>)}
+                                {catalogNativeTypes.filter((type) => type.id !== selectedNode.nodeId).map((type) => (
+                                  <option key={type.id} value={`native:${type.id}`}>
+                                    {catalogTypeLabel(type)}
+                                  </option>
+                                ))}
                               </select>
+                              <select aria-label={`Structure member ${index + 1} value shape`} className="shell-field" disabled={!access.isAdmin} value={member.valueRank ?? "SCALAR"} onChange={(e) => updateDataTypeMembers((selectedNode.members ?? []).map((candidate, candidateIndex) => candidateIndex === index ? { ...candidate, valueRank: e.target.value, arrayDimensions: e.target.value === "ARRAY" ? candidate.arrayDimensions ?? [] : [] } : candidate))}>
+                                <option value="SCALAR">Scalar</option>
+                                <option value="ARRAY">Array</option>
+                              </select>
+                              <input aria-label={`Structure member ${index + 1} array dimensions`} className="shell-field" disabled={!access.isAdmin || (member.valueRank ?? "SCALAR") !== "ARRAY"} placeholder="e.g. 3, 2" value={(member.arrayDimensions ?? []).join(", ")} onChange={(e) => {
+                                const values = e.target.value.trim() === "" ? [] : e.target.value.split(",").map((value) => Number(value.trim()));
+                                if (values.every((value) => Number.isInteger(value) && value >= 0)) updateDataTypeMembers((selectedNode.members ?? []).map((candidate, candidateIndex) => candidateIndex === index ? { ...candidate, arrayDimensions: values } : candidate));
+                              }} />
+                              <label className="flex items-center gap-1 text-xs"><input aria-label={`Structure member ${index + 1} optional`} checked={member.optional ?? false} disabled={!access.isAdmin} type="checkbox" onChange={(e) => updateDataTypeMembers((selectedNode.members ?? []).map((candidate, candidateIndex) => candidateIndex === index ? { ...candidate, optional: e.target.checked } : candidate))} />Optional</label>
                               {access.isAdmin ? <button aria-label={`Remove structure member ${index + 1}`} className="shell-text-action" disabled={(selectedNode.members ?? []).length === 1} type="button" onClick={() => updateDataTypeMembers((selectedNode.members ?? []).filter((_, candidateIndex) => candidateIndex !== index))}>Remove</button> : null}
                             </div>
                           ))}
-                          {access.isAdmin ? <button className="shell-text-action" type="button" onClick={() => updateDataTypeMembers([...(selectedNode.members ?? []), { name: "member", dataType: "FLOAT64", dataTypeNodeId: null }])}>+ Add member</button> : null}
+                          {access.isAdmin ? <button className="shell-text-action" type="button" onClick={() => updateDataTypeMembers([...(selectedNode.members ?? []), { name: "member", dataType: "FLOAT64", dataTypeNodeId: null, valueRank: "SCALAR", arrayDimensions: [], optional: false }])}>+ Add member</button> : null}
                         </div>
                       )}
                     </div>

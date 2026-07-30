@@ -10,7 +10,8 @@ record NativeDataTypeDef(
         String name,
         List<DataTypeMemberMsg> members,
         List<DataTypeEnumValueMsg> enumValues,
-        String defaultEncodingId) {
+        String defaultEncodingId,
+        String nativeTypeKind) {
 
     NativeDataTypeDef {
         members = List.copyOf(members);
@@ -18,7 +19,11 @@ record NativeDataTypeDef(
     }
 
     boolean isEnum() {
-        return !enumValues.isEmpty();
+        return !enumValues.isEmpty() && !isOptionSet();
+    }
+
+    boolean isOptionSet() {
+        return "OPTION_SET".equals(nativeTypeKind);
     }
 
     boolean isStructure() {
@@ -32,6 +37,6 @@ record NativeDataTypeDef(
     /** Compatibility constructor for declarations received before encoding metadata existed. */
     NativeDataTypeDef(String nodeId, String name, List<DataTypeMemberMsg> members,
             List<DataTypeEnumValueMsg> enumValues) {
-        this(nodeId, name, members, enumValues, null);
+        this(nodeId, name, members, enumValues, null, null);
     }
 }

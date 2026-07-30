@@ -111,8 +111,73 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add Range" }));
     await waitFor(() => expect(screen.getAllByText("Range").length).toBeGreaterThan(0));
 
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByLabelText(/Save in this schema/));
+    fireEvent.click(screen.getAllByRole("button", { name: "Save" })[1]);
+    await waitFor(() => expect(mockUpdateManualSchema).toHaveBeenCalledWith(
+      "proj-1", "ms-1", expect.objectContaining({ nodes: expect.arrayContaining([
+        expect.objectContaining({ nodeId: "ns=0;i=884", defaultEncodingId: "ns=0;i=886" }),
+      ]) }),
+    ));
+
     fireEvent.click(screen.getByRole("button", { name: "Add Range" }));
     expect(mockPushNotification).toHaveBeenCalledWith(expect.objectContaining({ title: "Type already added" }));
+  });
+
+  it("offers abstract OPC UA types without inventing a concrete encoding", async () => {
+    mockLoadManualSchemaById.mockResolvedValueOnce(schema);
+    mockUpdateManualSchema.mockResolvedValueOnce(schema);
+    renderPage();
+    await waitFor(() => screen.getByText("Level"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Add folder" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add UInteger" }));
+
+    await waitFor(() => expect(screen.getAllByText("UInteger").length).toBeGreaterThan(0));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByLabelText(/Save in this schema/));
+    fireEvent.click(screen.getAllByRole("button", { name: "Save" })[1]);
+
+    await waitFor(() => expect(mockUpdateManualSchema).toHaveBeenCalledWith(
+      "proj-1", "ms-1", expect.objectContaining({ nodes: expect.arrayContaining([
+        expect.objectContaining({
+          nodeId: "ns=0;i=28", kind: "DATA_TYPE", members: [], enumValues: [],
+        }),
+      ]) }),
+    ));
+  });
+
+  it("adds built-in OPC UA types and aliases with their exact NodeIds as opaque declarations", async () => {
+    mockLoadManualSchemaById.mockResolvedValueOnce(schema);
+    mockUpdateManualSchema.mockResolvedValueOnce(schema);
+    renderPage();
+    await waitFor(() => screen.getByText("Level"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Add folder" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add QualifiedName" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add Duration" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add NormalizedString" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByLabelText(/Save in this schema/));
+    fireEvent.click(screen.getAllByRole("button", { name: "Save" })[1]);
+
+    await waitFor(() => expect(mockUpdateManualSchema).toHaveBeenCalledWith(
+      "proj-1", "ms-1", expect.objectContaining({ nodes: expect.arrayContaining([
+        expect.objectContaining({
+          nodeId: "ns=0;i=20", name: "QualifiedName", nativeTypeKind: "OPAQUE",
+          defaultEncodingId: null, members: [], enumValues: [],
+        }),
+        expect.objectContaining({
+          nodeId: "ns=0;i=290", name: "Duration", nativeTypeKind: "OPAQUE",
+          defaultEncodingId: null, members: [], enumValues: [],
+        }),
+        expect.objectContaining({
+          nodeId: "ns=0;i=12877", name: "NormalizedString", nativeTypeKind: "OPAQUE",
+          defaultEncodingId: null, members: [], enumValues: [],
+        }),
+      ]) }),
+    ));
   });
 
   it("creates a manual structured DATA_TYPE with its first member", async () => {
@@ -151,6 +216,72 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
     expect(screen.getByDisplayValue("2")).not.toBeNull();
   });
 
+  it("creates a manual UNION while preserving its native kind", async () => {
+    mockLoadManualSchemaById.mockResolvedValueOnce(schema);
+    mockUpdateManualSchema.mockResolvedValueOnce(schema);
+    renderPage();
+    await waitFor(() => screen.getByText("Level"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Add folder" }));
+    fireEvent.click(screen.getByRole("radio", { name: /Data type/ }));
+    fireEvent.change(screen.getAllByLabelText("Name")[1], { target: { value: "Selection" } });
+    fireEvent.click(screen.getByRole("radio", { name: "Union" }));
+    fireEvent.change(screen.getByLabelText("First member name"), { target: { value: "integer" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByLabelText(/Save in this schema/));
+    fireEvent.click(screen.getAllByRole("button", { name: "Save" })[1]);
+
+    await waitFor(() => expect(mockUpdateManualSchema).toHaveBeenCalledWith(
+      "proj-1", "ms-1", expect.objectContaining({ nodes: expect.arrayContaining([
+        expect.objectContaining({ name: "Selection", nativeTypeKind: "UNION" }),
+      ]) }),
+    ));
+  });
+
+  it("labels a native UNION by its preserved kind in the variable type picker", async () => {
+    mockLoadManualSchemaById.mockResolvedValueOnce({
+      ...schema,
+      nodes: [
+        ...schema.nodes,
+        { nodeId: "selection-type", parentId: null, path: "Types/Selection", name: "Selection", kind: "DATA_TYPE" as const,
+          dataType: null, dataTypeNodeId: null, valueRank: null, access: null, unit: null, description: null,
+          members: [{ name: "integer", dataType: "INT32", dataTypeNodeId: null }], enumValues: [], nativeTypeKind: "UNION" },
+      ],
+    });
+    renderPage();
+    await waitFor(() => screen.getByText("Selection"));
+
+    fireEvent.click(screen.getByText("Level"));
+
+    expect(screen.getByRole("option", { name: "Selection (union)" })).not.toBeNull();
+  });
+
+  it("offers catalog types for a manually authored structure member", async () => {
+    mockLoadManualSchemaById.mockResolvedValueOnce({
+      ...schema,
+      typeDefinitions: [{
+        typeId: "ns=2;i=7001", namespaceUri: null, nativeNodeId: "ns=2;i=7001", browseName: "ServerStatus",
+        displayName: null, description: null, kind: "ENUM", baseTypeId: null,
+        defaultBinaryEncodingId: null, defaultXmlEncodingId: null, fields: [],
+        enumValues: [{ name: "Ready", value: 0, description: null }],
+        capability: { materializable: false, captureDecodable: false, replayEncodable: false, unavailableReason: "source did not provide an encoding" },
+      }],
+      nodes: [
+        ...schema.nodes,
+        { nodeId: "type-1", parentId: null, path: "Types/Envelope", name: "Envelope", kind: "DATA_TYPE" as const,
+          dataType: null, dataTypeNodeId: null, valueRank: null, access: null, unit: null, description: null,
+          members: [{ name: "status", dataType: "INT32", dataTypeNodeId: null }], enumValues: [] },
+      ],
+    });
+    renderPage();
+    await waitFor(() => screen.getByText("Envelope"));
+
+    fireEvent.click(screen.getByText("Envelope"));
+
+    expect(screen.getByRole("option", { name: "ServerStatus (enum) — not executable" })).not.toBeNull();
+  });
+
   it("edits structure members and enum literals before saving", async () => {
     mockLoadManualSchemaById.mockResolvedValueOnce({
       ...schema,
@@ -166,10 +297,14 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
     await waitFor(() => screen.getByText("State"));
 
     fireEvent.click(screen.getByText("State"));
+    fireEvent.change(screen.getByLabelText("Default binary encoding NodeId"), { target: { value: "ns=2;i=5002" } });
     fireEvent.change(screen.getByLabelText("Structure member 1 name"), { target: { value: "statusCode" } });
     fireEvent.click(screen.getByRole("button", { name: "+ Add member" }));
     fireEvent.change(screen.getByLabelText("Structure member 2 name"), { target: { value: "message" } });
     fireEvent.change(screen.getByLabelText("Structure member 2 type"), { target: { value: "LOCALIZED_TEXT" } });
+    fireEvent.change(screen.getByLabelText("Structure member 2 value shape"), { target: { value: "ARRAY" } });
+    fireEvent.change(screen.getByLabelText("Structure member 2 array dimensions"), { target: { value: "3" } });
+    fireEvent.click(screen.getByLabelText("Structure member 2 optional"));
 
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     fireEvent.click(screen.getByLabelText(/Save in this schema/));
@@ -179,8 +314,8 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
       "proj-1", "ms-1", expect.objectContaining({ nodes: expect.arrayContaining([
         expect.objectContaining({ nodeId: "type-1", members: [
           { name: "statusCode", dataType: "INT32", dataTypeNodeId: null },
-          { name: "message", dataType: "LOCALIZED_TEXT", dataTypeNodeId: null },
-        ] }),
+          { name: "message", dataType: "LOCALIZED_TEXT", dataTypeNodeId: null, valueRank: "ARRAY", arrayDimensions: [3], optional: true },
+        ], defaultEncodingId: "ns=2;i=5002" }),
       ]) }),
     ));
   });

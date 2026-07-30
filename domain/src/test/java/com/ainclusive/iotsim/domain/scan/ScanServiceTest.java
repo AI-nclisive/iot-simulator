@@ -20,6 +20,7 @@ import com.ainclusive.iotsim.persistence.schema.SchemaWithNodes;
 import com.ainclusive.iotsim.platform.runtime.InMemoryRuntimeController;
 import com.ainclusive.iotsim.platform.scan.ConnectionTestResult;
 import com.ainclusive.iotsim.platform.scan.DiscoveredNode;
+import com.ainclusive.iotsim.platform.scan.DiscoveredTypeDefinition;
 import com.ainclusive.iotsim.platform.scan.ScanResult;
 import com.ainclusive.iotsim.platform.scan.ScanSpec;
 import com.ainclusive.iotsim.platform.scan.ScanStatus;
@@ -29,6 +30,7 @@ import com.ainclusive.iotsim.protocolmodel.Access;
 import com.ainclusive.iotsim.protocolmodel.DataType;
 import com.ainclusive.iotsim.protocolmodel.DataTypeEnumValue;
 import com.ainclusive.iotsim.protocolmodel.DataTypeMember;
+import com.ainclusive.iotsim.protocolmodel.NativeTypeKind;
 import com.ainclusive.iotsim.protocolmodel.NodeKind;
 import com.ainclusive.iotsim.protocolmodel.SchemaNode;
 import com.ainclusive.iotsim.protocolmodel.ValueRank;
@@ -168,6 +170,25 @@ class ScanServiceTest {
     }
 
     @Test
+    void createFromScanPreservesDeclaredBuiltinNodeIdAlongsideExecutableType() {
+        scanner.scanResult = new ScanResult(ScanStatus.OK, List.of(
+                new DiscoveredNode("ns=2;s=qname", null, "QName", "QName", "VARIABLE",
+                        "QUALIFIED_NAME", "SCALAR", "READ", null, null, "ns=0;i=20")),
+                false, 1, "discovered QualifiedName");
+        ScanJob job = service.startScan(
+                PROJECT, "OPC_UA", "opc.tcp://h", ConnectionCredentials.anonymous(), 0);
+
+        DataSource created = service.createFromScan(PROJECT, job.jobId(), "Scanned", "{}", List.of(), "alice");
+
+        Schema schema = new SchemaService(schemaRepo, dataSourceRepo, new ObjectMapper()).get(PROJECT, created.id());
+        assertThat(schema.nodes()).singleElement().satisfies(node -> {
+            assertThat(node.dataType()).isEqualTo(DataType.QUALIFIED_NAME);
+            assertThat(node.dataTypeNodeId()).isNull();
+            assertThat(node.declaredDataTypeNodeId()).isEqualTo("ns=0;i=20");
+        });
+    }
+
+    @Test
     void createFromScanPreservesNonNeutralOpcUaDataTypeWithoutResolution() {
         scanner.scanResult = nonNeutralTypeResult();
         ScanJob job = service.startScan(
@@ -192,7 +213,8 @@ class ScanServiceTest {
                 new DiscoveredNode("ns=2;s=range", null, "Range", "Range", "VARIABLE",
                         null, "SCALAR", "READ", null, null, "ns=0;i=884",
                         List.of(new DataTypeMember("low", DataType.FLOAT64, null),
-                                new DataTypeMember("high", DataType.FLOAT64, null)), List.of(), "ns=2;i=5002")),
+                                new DataTypeMember("high", DataType.FLOAT64, null)), List.of(), "ns=2;i=5002",
+                        NativeTypeKind.STRUCTURE, List.of(), "ServerRange")),
                 false, 1, "discovered structured type");
         ScanJob job = service.startScan(PROJECT, "OPC_UA", "opc.tcp://h", ConnectionCredentials.anonymous(), 0);
 
@@ -202,11 +224,125 @@ class ScanServiceTest {
         assertThat(schema.nodes()).anySatisfy(node -> {
             assertThat(node.kind()).isEqualTo(NodeKind.DATA_TYPE);
             assertThat(node.nodeId()).isEqualTo("ns=0;i=884");
+            assertThat(node.name()).isEqualTo("ServerRange");
             assertThat(node.members()).containsExactly(
                     new DataTypeMember("low", DataType.FLOAT64, null),
                     new DataTypeMember("high", DataType.FLOAT64, null));
             assertThat(node.defaultEncodingId()).isEqualTo("ns=2;i=5002");
         });
+    }
+
+    @Test
+    void createFromScanPersistsCompleteNativeStructureMetadata() {
+        DataTypeMember samples = new DataTypeMember(
+                "samples", DataType.UINT16, null, ValueRank.ARRAY, List.of(4), true);
+        DataTypeMember engineeringUnit = new DataTypeMember(
+                "engineeringUnit", null, "ns=2;i=4101", ValueRank.SCALAR, List.of(), false);
+        scanner.scanResult = new ScanResult(ScanStatus.OK, List.of(
+                new DiscoveredNode("ns=2;s=measurement", null, "Measurement", "Measurement", "VARIABLE",
+                        null, "SCALAR", "READ", null, null, "ns=2;i=4001",
+                        List.of(samples, engineeringUnit), List.of(), "ns=2;i=5001",
+                        NativeTypeKind.STRUCTURE,
+                        List.of(new DiscoveredTypeDefinition("ns=2;i=4101", "EngineeringUnit",
+                                List.of(new DataTypeMember("code", DataType.INT32, null)), List.of(),
+                                "ns=2;i=5101", NativeTypeKind.STRUCTURE)),
+                        "MeasurementData")),
+                false, 1, "discovered native structure metadata");
+        ScanJob job = service.startScan(PROJECT, "OPC_UA", "opc.tcp://h", ConnectionCredentials.anonymous(), 0);
+
+        DataSource created = service.createFromScan(PROJECT, job.jobId(), "Measurement source", null, List.of(), "a");
+
+        Schema schema = new SchemaService(schemaRepo, dataSourceRepo, new ObjectMapper()).get(PROJECT, created.id());
+        assertThat(schema.nodes())
+                .filteredOn(node -> "ns=2;i=4001".equals(node.nodeId()))
+                .singleElement()
+                .satisfies(node -> {
+                    assertThat(node.name()).isEqualTo("MeasurementData");
+                    assertThat(node.nativeTypeKind()).isEqualTo(NativeTypeKind.STRUCTURE);
+                    assertThat(node.defaultEncodingId()).isEqualTo("ns=2;i=5001");
+                    assertThat(node.members()).containsExactly(samples, engineeringUnit);
+                });
+        assertThat(schema.nodes())
+                .filteredOn(node -> "ns=2;i=4101".equals(node.nodeId()))
+                .singleElement()
+                .satisfies(node -> {
+                    assertThat(node.name()).isEqualTo("EngineeringUnit");
+                    assertThat(node.nativeTypeKind()).isEqualTo(NativeTypeKind.STRUCTURE);
+                    assertThat(node.defaultEncodingId()).isEqualTo("ns=2;i=5101");
+                    assertThat(node.members()).containsExactly(new DataTypeMember("code", DataType.INT32, null));
+                });
+        assertThat(schema.nodes())
+                .filteredOn(node -> "Measurement".equals(node.name()))
+                .singleElement()
+                .satisfies(node -> assertThat(node.dataTypeNodeId()).isEqualTo("ns=2;i=4001"));
+    }
+
+    @Test
+    void createFromScanPreservesUnresolvedStructuredMemberTypeAsOpaqueDefinition() {
+        scanner.scanResult = new ScanResult(ScanStatus.OK, List.of(
+                new DiscoveredNode("ns=2;s=value", null, "Value", "Value", "VARIABLE",
+                        null, "SCALAR", "READ", null, null, "ns=2;i=1001",
+                        List.of(new DataTypeMember("payload", null, "ns=2;i=2002")), List.of(), "ns=2;i=5002")),
+                false, 1, "discovered structured type");
+        ScanJob job = service.startScan(PROJECT, "OPC_UA", "opc.tcp://h", ConnectionCredentials.anonymous(), 0);
+
+        DataSource created = service.createFromScan(PROJECT, job.jobId(), "Nested source", null, List.of(), "a");
+
+        Schema schema = new SchemaService(schemaRepo, dataSourceRepo, new ObjectMapper()).get(PROJECT, created.id());
+        assertThat(schema.nodes()).anySatisfy(node -> {
+            assertThat(node.kind()).isEqualTo(NodeKind.DATA_TYPE);
+            assertThat(node.nodeId()).isEqualTo("ns=2;i=2002");
+            assertThat(node.members()).isEmpty();
+            assertThat(node.enumValues()).isEmpty();
+        });
+    }
+
+    @Test
+    void createFromScanUpgradesOpaqueMemberTypeWhenItsDeclarationAppearsLater() {
+        scanner.scanResult = new ScanResult(ScanStatus.OK, List.of(
+                new DiscoveredNode("ns=2;s=outer", null, "Outer", "Outer", "VARIABLE",
+                        null, "SCALAR", "READ", null, null, "ns=2;i=1001",
+                        List.of(new DataTypeMember("nested", null, "ns=2;i=2002")), List.of(), "ns=2;i=5001"),
+                new DiscoveredNode("ns=2;s=nested", null, "Nested", "Nested", "VARIABLE",
+                        null, "SCALAR", "READ", null, null, "ns=2;i=2002",
+                        List.of(new DataTypeMember("value", DataType.INT32, null)), List.of(), "ns=2;i=5002")),
+                false, 2, "discovered nested structures");
+        ScanJob job = service.startScan(PROJECT, "OPC_UA", "opc.tcp://h", ConnectionCredentials.anonymous(), 0);
+
+        DataSource created = service.createFromScan(PROJECT, job.jobId(), "Nested source", null, List.of(), "a");
+
+        Schema schema = new SchemaService(schemaRepo, dataSourceRepo, new ObjectMapper()).get(PROJECT, created.id());
+        assertThat(schema.nodes())
+                .filteredOn(node -> "ns=2;i=2002".equals(node.nodeId()))
+                .singleElement()
+                .satisfies(node -> {
+                    assertThat(node.members()).containsExactly(new DataTypeMember("value", DataType.INT32, null));
+                    assertThat(node.defaultEncodingId()).isEqualTo("ns=2;i=5002");
+                });
+    }
+
+    @Test
+    void createFromScanImportsTransitiveTypeDefinitionWithoutASecondVariable() {
+        scanner.scanResult = new ScanResult(ScanStatus.OK, List.of(
+                new DiscoveredNode("ns=2;s=outer", null, "Outer", "Outer", "VARIABLE",
+                        null, "SCALAR", "READ", null, null, "ns=2;i=1001",
+                        List.of(new DataTypeMember("nested", null, "ns=2;i=2002")), List.of(), "ns=2;i=5001",
+                        List.of(new DiscoveredTypeDefinition("ns=2;i=2002", "Nested",
+                                List.of(new DataTypeMember("value", DataType.INT32, null)), List.of(), "ns=2;i=5002")))),
+                false, 1, "discovered transitive native type");
+        ScanJob job = service.startScan(PROJECT, "OPC_UA", "opc.tcp://h", ConnectionCredentials.anonymous(), 0);
+
+        DataSource created = service.createFromScan(PROJECT, job.jobId(), "Nested source", null, List.of(), "a");
+
+        Schema schema = new SchemaService(schemaRepo, dataSourceRepo, new ObjectMapper()).get(PROJECT, created.id());
+        assertThat(schema.nodes())
+                .filteredOn(node -> "ns=2;i=2002".equals(node.nodeId()))
+                .singleElement()
+                .satisfies(node -> {
+                    assertThat(node.name()).isEqualTo("Nested");
+                    assertThat(node.members()).containsExactly(new DataTypeMember("value", DataType.INT32, null));
+                    assertThat(node.defaultEncodingId()).isEqualTo("ns=2;i=5002");
+                });
     }
 
     @Test

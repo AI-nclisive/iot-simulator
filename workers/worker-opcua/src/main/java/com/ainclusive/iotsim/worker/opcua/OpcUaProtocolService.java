@@ -33,9 +33,11 @@ import com.ainclusive.iotsim.workercontract.v1.ValueBatch;
 import io.grpc.Status;
 import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -64,6 +66,10 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
     private final Map<String, String> nodeDataTypes = new ConcurrentHashMap<>();
     /** Default binary encodings for native structures, keyed by variable node id. */
     private final Map<String, NodeId> structureEncodings = new ConcurrentHashMap<>();
+    private final Map<String, String> structureDataTypes = new ConcurrentHashMap<>();
+    /** Native declarations that can be instantiated from canonical TREE values. */
+    private final Map<String, String> treeDataTypes = new ConcurrentHashMap<>();
+    private final Map<String, NativeDataTypeDef> nativeTypeDefinitions = new ConcurrentHashMap<>();
     private final Map<String, String> unsupportedNativeTypes = new ConcurrentHashMap<>();
     private final ClientEventHub clientEventHub = new ClientEventHub();
     private final RuntimeEventHub runtimeEventHub = new RuntimeEventHub();
@@ -101,6 +107,15 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
         return runtimeEventHub.openStreamCount();
     }
 
+    /** Test-visible endpoint of the currently configured simulated OPC UA server. */
+    String opcUaEndpointUrl() {
+        OpcUaServerRuntime runtime = serverRuntime.get();
+        if (runtime == null) {
+            throw new IllegalStateException("worker is not configured");
+        }
+        return runtime.endpointUrl();
+    }
+
     @Override
     public void hello(HelloRequest request, StreamObserver<HelloResponse> obs) {
         obs.onNext(HelloResponse.newBuilder()
@@ -117,12 +132,16 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
         List<NativeDataTypeDef> typeDefinitions = new ArrayList<>();
         nodeDataTypes.clear();
         structureEncodings.clear();
+        structureDataTypes.clear();
+        treeDataTypes.clear();
+        nativeTypeDefinitions.clear();
         unsupportedNativeTypes.clear();
         for (SchemaNodeMsg node : request.getSchema().getNodesList()) {
             if ("VARIABLE".equals(node.getKind()) || "FOLDER".equals(node.getKind())
                     || "OBJECT".equals(node.getKind())) {
                 variables.add(new VarDef(node.getNodeId(), node.getParentId().isBlank() ? null : node.getParentId(),
-                        node.getName(), node.getKind(), node.getDataType(), node.getDataTypeNodeId(), null,
+                        node.getName(), node.getKind(), node.getDataType(), node.getDataTypeNodeId(),
+                        node.getDeclaredDataTypeNodeId(), null,
                         null, null, null, null));
             }
             if ("DATA_TYPE".equals(node.getKind())) {
@@ -131,9 +150,10 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
                         node.getName(),
                         node.getDataTypeMembersList(),
                         node.getDataTypeEnumValuesList(),
-                        node.getDataTypeDefaultEncodingId()));
+                        node.getDataTypeDefaultEncodingId(), node.getNativeTypeKind()));
             }
         }
+        typeDefinitions.forEach(definition -> nativeTypeDefinitions.put(definition.nodeId(), definition));
         Set<String> enumTypeIds = new HashSet<>();
         Map<String, NodeId> structureTypeEncodings = new HashMap<>();
         for (NativeDataTypeDef definition : typeDefinitions) {
@@ -158,6 +178,11 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
                 nodeDataTypes.put(node.getNodeId(), "INT32");
             } else if (structureTypeEncodings.containsKey(node.getDataTypeNodeId())) {
                 structureEncodings.put(node.getNodeId(), structureTypeEncodings.get(node.getDataTypeNodeId()));
+                structureDataTypes.put(node.getNodeId(), node.getDataTypeNodeId());
+                treeDataTypes.put(node.getNodeId(), node.getDataTypeNodeId());
+            } else if (nativeTypeDefinitions.containsKey(node.getDataTypeNodeId())
+                    && nativeTypeDefinitions.get(node.getDataTypeNodeId()).isOptionSet()) {
+                treeDataTypes.put(node.getNodeId(), node.getDataTypeNodeId());
             } else if (!node.getDataTypeNodeId().isBlank()) {
                 unsupportedNativeTypes.put(node.getNodeId(), node.getDataTypeNodeId());
             }
@@ -321,7 +346,9 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
             String defaultEncodingId = "";
             if (dataType.isEmpty() && !node.getDataTypeNodeId().isEmpty()) {
                 SchemaNodeMsg declaration = declarations.get(node.getDataTypeNodeId());
-                if (declaration != null && declaration.getDataTypeEnumValuesCount() > 0) {
+                if (declaration != null && declaration.getDataTypeEnumValuesCount() > 0
+                        && (declaration.getNativeTypeKind().isBlank()
+                                || "ENUM".equals(declaration.getNativeTypeKind()))) {
                     dataType = "INT32";
                 } else if (declaration != null && declaration.getDataTypeMembersCount() > 0
                         && !declaration.getDataTypeDefaultEncodingId().isEmpty()) {
@@ -562,11 +589,24 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
                                     + ": " + e.getMessage())
                             .build());
                 }
+            } else if ("TREE".equals(value.getValueKind()) && treeDataTypes.containsKey(value.getNodeId())) {
+                Object decoded = ValueCodec.decode(ValueCodec.Kind.TREE, value.getValueEnc().toByteArray());
+                runtime.updateValue(value.getNodeId(), treeNativeValue(
+                        runtime, treeDataTypes.get(value.getNodeId()), decoded));
             } else if (structureEncodings.containsKey(value.getNodeId())) {
                 // A native structure is replayed as its original binary body. Its
                 // encoding id is schema metadata, not inferred from the bytes.
-                runtime.updateValue(value.getNodeId(), structureValue(
-                        structureEncodings.get(value.getNodeId()), value.getValueEnc().toByteArray()));
+                NodeId localEncoding = runtime.localEncodingId(structureDataTypes.get(value.getNodeId()));
+                if (localEncoding == null) {
+                    runtimeEventHub.emit(RuntimeEvent.newBuilder()
+                            .setType("ERROR")
+                            .setAtMicros(System.currentTimeMillis() * 1_000L)
+                            .setDetail("native structure has no local runtime encoding: "
+                                    + structureDataTypes.get(value.getNodeId()))
+                            .build());
+                    continue;
+                }
+                runtime.updateValue(value.getNodeId(), structureValue(localEncoding, value.getValueEnc().toByteArray()));
             } else if (unsupportedNativeTypes.containsKey(value.getNodeId())) {
                 runtimeEventHub.emit(RuntimeEvent.newBuilder()
                         .setType("ERROR")
@@ -583,7 +623,85 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
         if (defaultEncodingId == null || binaryBody == null) {
             throw new IllegalArgumentException("native structure requires a binary body and default encoding id");
         }
-        return new ExtensionObject(ByteString.of(binaryBody), defaultEncodingId);
+        return ExtensionObject.of(ByteString.of(binaryBody), defaultEncodingId);
+    }
+
+    /** Materializes a canonical TREE payload using the schema's exact native declarations. */
+    private Object treeNativeValue(OpcUaServerRuntime runtime, String sourceTypeId, Object value) {
+        NativeDataTypeDef definition = nativeTypeDefinitions.get(sourceTypeId);
+        if (definition == null) {
+            throw new IllegalArgumentException("native type declaration is missing: " + sourceTypeId);
+        }
+        if (definition.isOptionSet()) {
+            if (!(value instanceof Map<?, ?> members)
+                    || !(members.get("value") instanceof byte[] bits)
+                    || !(members.get("validBits") instanceof byte[] validBits)) {
+                throw new IllegalArgumentException("native option set value tree requires byte fields value and validBits");
+            }
+            return runtime.optionSetValue(sourceTypeId, bits, validBits);
+        }
+        if ("UNION".equals(definition.nativeTypeKind())) {
+            if (!(value instanceof Map<?, ?> members) || members.size() != 1) {
+                throw new IllegalArgumentException("native union value tree must contain exactly one field");
+            }
+            Map.Entry<?, ?> selected = members.entrySet().iterator().next();
+            if (!(selected.getKey() instanceof String fieldName)) {
+                throw new IllegalArgumentException("native union field name must be text");
+            }
+            return runtime.unionValue(sourceTypeId, fieldName,
+                    treeMemberValue(runtime, member(definition, fieldName), selected.getValue()));
+        }
+        if (!(value instanceof Map<?, ?> members)) {
+            throw new IllegalArgumentException("native structure value tree must be an object");
+        }
+        Map<String, Object> materialized = new LinkedHashMap<>();
+        for (Map.Entry<?, ?> entry : members.entrySet()) {
+            if (!(entry.getKey() instanceof String fieldName)) {
+                throw new IllegalArgumentException("native structure field name must be text");
+            }
+            materialized.put(fieldName, treeMemberValue(runtime, member(definition, fieldName), entry.getValue()));
+        }
+        return runtime.structureValue(sourceTypeId, materialized);
+    }
+
+    private com.ainclusive.iotsim.workercontract.v1.DataTypeMemberMsg member(
+            NativeDataTypeDef definition, String fieldName) {
+        return definition.members().stream().filter(field -> field.getName().equals(fieldName)).findFirst()
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "native type " + definition.name() + " has no field " + fieldName));
+    }
+
+    private Object treeMemberValue(OpcUaServerRuntime runtime,
+            com.ainclusive.iotsim.workercontract.v1.DataTypeMemberMsg member, Object value) {
+        if (!member.getDataTypeNodeId().isBlank()) {
+            if ("ARRAY".equals(member.getValueRank())) {
+                if (!(value instanceof List<?> values)) {
+                    throw new IllegalArgumentException("native array field " + member.getName() + " must be an array");
+                }
+                return typedNativeArray(values.stream()
+                        .map(item -> treeNativeValue(runtime, member.getDataTypeNodeId(), item)).toList());
+            }
+            return treeNativeValue(runtime, member.getDataTypeNodeId(), value);
+        }
+        if ("ARRAY".equals(member.getValueRank())) {
+            if (!(value instanceof List<?> values)) {
+                throw new IllegalArgumentException("native array field " + member.getName() + " must be an array");
+            }
+            return values.stream().map(item -> OpcUaTypes.toOpcUaValue(member.getDataType(), item))
+                    .toArray(Object[]::new);
+        }
+        return OpcUaTypes.toOpcUaValue(member.getDataType(), value);
+    }
+
+    private static Object typedNativeArray(List<Object> values) {
+        if (values.isEmpty()) {
+            return new Object[0];
+        }
+        Object array = Array.newInstance(values.getFirst().getClass(), values.size());
+        for (int i = 0; i < values.size(); i++) {
+            Array.set(array, i, values.get(i));
+        }
+        return array;
     }
 
     @Override

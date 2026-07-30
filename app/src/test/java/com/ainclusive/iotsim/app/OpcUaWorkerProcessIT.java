@@ -1,6 +1,5 @@
 package com.ainclusive.iotsim.app;
 
-import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
@@ -53,11 +52,11 @@ class OpcUaWorkerProcessIT {
 
             OpcUaClient client = OpcUaClient.create("opc.tcp://127.0.0.1:" + listenPort + "/iotsim");
             try {
-                client.connect().get(15, SECONDS);
+                client.connect();
 
                 NodeId nodeId = new NodeId(schemaNamespaceIndex(client), "temp");
 
-                DataValue initial = client.readValue(0.0, TimestampsToReturn.Both, nodeId).get(10, SECONDS);
+                DataValue initial = client.readValue(0.0, TimestampsToReturn.Both, nodeId);
                 assertThat(initial.getStatusCode().isGood()).as("initial read status").isTrue();
                 assertThat(((Number) initial.getValue().getValue()).doubleValue()).isEqualTo(0.0);
 
@@ -65,7 +64,7 @@ class OpcUaWorkerProcessIT {
 
                 assertThat(awaitValue(client, nodeId)).isEqualTo(42.5);
             } finally {
-                client.disconnect().get(10, SECONDS);
+                client.disconnect();
             }
         } finally {
             assertThat(supervisor.stop("ds1")).isEqualTo("STOPPED");
@@ -79,8 +78,7 @@ class OpcUaWorkerProcessIT {
 
     /** Resolves the schema namespace index from the server's NamespaceArray. */
     private static int schemaNamespaceIndex(OpcUaClient client) throws Exception {
-        DataValue nsArray = client.readValue(0.0, TimestampsToReturn.Neither, Identifiers.Server_NamespaceArray)
-                .get(10, SECONDS);
+        DataValue nsArray = client.readValue(0.0, TimestampsToReturn.Neither, Identifiers.Server_NamespaceArray);
         String[] namespaces = (String[]) nsArray.getValue().getValue();
         int index = Arrays.asList(namespaces).indexOf(SCHEMA_NS_URI);
         assertThat(index).as("schema namespace %s registered", SCHEMA_NS_URI).isGreaterThanOrEqualTo(0);
@@ -91,7 +89,7 @@ class OpcUaWorkerProcessIT {
     private static double awaitValue(OpcUaClient client, NodeId nodeId) throws Exception {
         double last = Double.NaN;
         for (int attempt = 0; attempt < 25; attempt++) {
-            DataValue value = client.readValue(0.0, TimestampsToReturn.Both, nodeId).get(10, SECONDS);
+            DataValue value = client.readValue(0.0, TimestampsToReturn.Both, nodeId);
             if (value.getValue().getValue() instanceof Number number) {
                 last = number.doubleValue();
                 if (last == 42.5) {

@@ -18,6 +18,7 @@ import com.ainclusive.iotsim.platform.runtime.SourceError;
 import com.ainclusive.iotsim.platform.runtime.SourceHealth;
 import com.ainclusive.iotsim.platform.scan.ConnectionTestResult;
 import com.ainclusive.iotsim.platform.scan.DiscoveredNode;
+import com.ainclusive.iotsim.platform.scan.DiscoveredTypeDefinition;
 import com.ainclusive.iotsim.platform.scan.ScanPhase;
 import com.ainclusive.iotsim.platform.scan.ScanProgressListener;
 import com.ainclusive.iotsim.platform.scan.ScanResult;
@@ -28,15 +29,18 @@ import com.ainclusive.iotsim.platform.secret.ConnectionCredentials;
 import com.ainclusive.iotsim.protocolmodel.DataType;
 import com.ainclusive.iotsim.protocolmodel.DataTypeEnumValue;
 import com.ainclusive.iotsim.protocolmodel.DataTypeMember;
+import com.ainclusive.iotsim.protocolmodel.NativeTypeKind;
 import com.ainclusive.iotsim.protocolmodel.NeutralValue;
 import com.ainclusive.iotsim.protocolmodel.NodeKind;
 import com.ainclusive.iotsim.protocolmodel.SchemaNode;
 import com.ainclusive.iotsim.protocolmodel.ValueCodec;
+import com.ainclusive.iotsim.protocolmodel.ValueRank;
 import com.ainclusive.iotsim.workercontract.v1.CaptureRequest;
 import com.ainclusive.iotsim.workercontract.v1.ClientEvent;
 import com.ainclusive.iotsim.workercontract.v1.ConnectionConfigMsg;
 import com.ainclusive.iotsim.workercontract.v1.DataTypeEnumValueMsg;
 import com.ainclusive.iotsim.workercontract.v1.DataTypeMemberMsg;
+import com.ainclusive.iotsim.workercontract.v1.NativeDataTypeDefinitionMsg;
 import com.ainclusive.iotsim.workercontract.v1.Quality;
 import com.ainclusive.iotsim.workercontract.v1.RuntimeEvent;
 import com.ainclusive.iotsim.workercontract.v1.ScanProgress;
@@ -502,7 +506,9 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
             ValueBatch batch, Map<String, ValueCodec.Kind> kinds) {
         List<NeutralValue> out = new ArrayList<>(batch.getValuesCount());
         for (Value v : batch.getValuesList()) {
-            ValueCodec.Kind kind = kinds.get(v.getNodeId());
+            ValueCodec.Kind kind = v.getValueKind().isBlank()
+                    ? kinds.get(v.getNodeId())
+                    : ValueCodec.Kind.valueOf(v.getValueKind());
             if (kind == null) {
                 continue; // a value for a node not in the recording's schema; skip
             }
@@ -652,10 +658,28 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
                 emptyToNull(n.getUnit()), emptyToNull(n.getDescription()), emptyToNull(n.getDataTypeNodeId()),
                 n.getDataTypeMembersList().stream().map(member -> new DataTypeMember(
                         member.getName(), member.getDataType().isBlank() ? null : DataType.valueOf(member.getDataType()),
-                        emptyToNull(member.getDataTypeNodeId()))).toList(),
+                        emptyToNull(member.getDataTypeNodeId()),
+                        member.getValueRank().isBlank() ? ValueRank.SCALAR : ValueRank.valueOf(member.getValueRank()),
+                        member.getArrayDimensionsList(), member.getOptional())).toList(),
                 n.getDataTypeEnumValuesList().stream().map(value -> new DataTypeEnumValue(
                         value.getName(), value.getValue(), emptyToNull(value.getDescription()))).toList(),
-                emptyToNull(n.getDataTypeDefaultEncodingId()));
+                emptyToNull(n.getDataTypeDefaultEncodingId()),
+                n.getNativeTypeKind().isBlank() ? null : NativeTypeKind.valueOf(n.getNativeTypeKind()),
+                n.getDataTypeDependenciesList().stream().map(Supervisor::toDiscoveredTypeDefinition).toList(),
+                emptyToNull(n.getDataTypeName()));
+    }
+
+    private static DiscoveredTypeDefinition toDiscoveredTypeDefinition(NativeDataTypeDefinitionMsg definition) {
+        return new DiscoveredTypeDefinition(definition.getNodeId(), definition.getName(),
+                definition.getMembersList().stream().map(member -> new DataTypeMember(
+                        member.getName(), member.getDataType().isBlank() ? null : DataType.valueOf(member.getDataType()),
+                        emptyToNull(member.getDataTypeNodeId()),
+                        member.getValueRank().isBlank() ? ValueRank.SCALAR : ValueRank.valueOf(member.getValueRank()),
+                        member.getArrayDimensionsList(), member.getOptional())).toList(),
+                definition.getEnumValuesList().stream().map(value -> new DataTypeEnumValue(
+                        value.getName(), value.getValue(), emptyToNull(value.getDescription()))).toList(),
+                emptyToNull(definition.getDefaultEncodingId()),
+                definition.getNativeTypeKind().isBlank() ? null : NativeTypeKind.valueOf(definition.getNativeTypeKind()));
     }
 
     private static ScanStatus toStatus(String wire) {
@@ -690,6 +714,7 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
                 .setNodeId(nv.nodeId())
                 .setSourceTimeMicros(micros)
                 .setValueEnc(ByteString.copyFrom(enc.bytes()))
+                .setValueKind(enc.kind().name())
                 .setQuality(Quality.valueOf(nv.quality().name()))
                 .setQualityReason(nv.qualityReason() == null ? "" : nv.qualityReason())
                 .build();
@@ -706,11 +731,15 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
                     .setKind(n.kind().name())
                     .setDataType(n.dataType() == null ? "" : n.dataType().name())
                     .setDataTypeNodeId(orEmpty(n.dataTypeNodeId()))
+                    .setDeclaredDataTypeNodeId(orEmpty(n.declaredDataTypeNodeId()))
                     .addAllDataTypeMembers(n.members().stream()
                             .map(member -> DataTypeMemberMsg.newBuilder()
                                     .setName(member.name())
                                     .setDataType(member.dataType() == null ? "" : member.dataType().name())
                                     .setDataTypeNodeId(orEmpty(member.dataTypeNodeId()))
+                                    .setValueRank(member.valueRank().name())
+                                    .addAllArrayDimensions(member.arrayDimensions())
+                                    .setOptional(member.optional())
                                     .build())
                             .toList())
                     .addAllDataTypeEnumValues(n.enumValues().stream()
@@ -721,6 +750,7 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
                                     .build())
                             .toList())
                     .setDataTypeDefaultEncodingId(orEmpty(n.defaultEncodingId()))
+                    .setNativeTypeKind(n.nativeTypeKind() == null ? "" : n.nativeTypeKind().name())
                     .setValueRank(n.valueRank() == null ? "" : n.valueRank().name())
                     .setAccess(n.access() == null ? "" : n.access().name())
                     .setUnit(orEmpty(n.unit()))

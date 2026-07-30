@@ -51,45 +51,16 @@ final class OpcUaTypes {
             Map.entry(Identifiers.XmlElement, "XML_ELEMENT"));
 
     /**
-     * Standard-library named subtypes (OPC UA Part 3 §8) whose value is encoded
-     * exactly like one of the built-in types above — e.g. {@code UtcTime}/
-     * {@code Date} carry a plain {@code DateTime}, {@code Duration} a plain
-     * {@code Double}. Distinct {@link NodeId}s from their parent built-in type, so
-     * {@link #BUILTIN_TYPES}'s exact match misses them unless listed here too.
-     * Unlike vendor/custom subtypes (still left "unknown" for the user to resolve,
-     * IS-044), these are fixed, spec-defined, and safe to alias permanently.
-     */
-    private static final Map<NodeId, String> WELL_KNOWN_SUBTYPES = Map.ofEntries(
-            // Standard subtypes (OPC UA Part 3 §8)
-            Map.entry(Identifiers.Date, "DATETIME"),
-            Map.entry(Identifiers.UtcTime, "DATETIME"),
-            Map.entry(Identifiers.Duration, "FLOAT64"),
-            Map.entry(Identifiers.IntegerId, "UINT32"),
-            Map.entry(Identifiers.Counter, "UINT32"),
-            Map.entry(Identifiers.NumericRange, "STRING"),
-            Map.entry(Identifiers.Time, "STRING"),
-            Map.entry(Identifiers.LocaleId, "STRING"),
-            Map.entry(Identifiers.NormalizedString, "STRING"),
-            Map.entry(Identifiers.DecimalString, "STRING"),
-            Map.entry(Identifiers.DurationString, "STRING"),
-            Map.entry(Identifiers.TimeString, "STRING"),
-            Map.entry(Identifiers.DateString, "STRING"));
-
-    /**
      * Reverse mapping used by scan/discovery: an OPC UA DataType node id back to a
-     * protocol-neutral data type, or {@code null} when the declared type cannot
-     * be represented by a neutral primitive. The caller preserves its NodeId;
-     * it must never silently coerce it to {@code BYTES} or another default.
+     * protocol-neutral data type, or {@code null} when the declaration has a
+     * distinct native NodeId. The caller preserves that NodeId exactly; a named
+     * subtype must not be silently replaced by its primitive parent.
      */
     static String neutralTypeOf(NodeId dataTypeId) {
         if (dataTypeId == null) {
             return null;
         }
-        String builtin = BUILTIN_TYPES.get(dataTypeId);
-        if (builtin != null) {
-            return builtin;
-        }
-        return WELL_KNOWN_SUBTYPES.get(dataTypeId);
+        return BUILTIN_TYPES.get(dataTypeId);
     }
 
     static NodeId dataTypeId(String dataType) {
@@ -177,6 +148,8 @@ final class OpcUaTypes {
                     ? (bs.bytes() == null ? new byte[0] : bs.bytes())
                     : (byte[]) value;
             case TEXT -> textOf(value);
+            case TREE -> throw new IllegalArgumentException(
+                    "TREE is only valid for native structured OPC UA values");
         };
     }
 

@@ -4,12 +4,15 @@ import static org.eclipse.milo.opcua.stack.core.types.builtin.unsigned.Unsigned.
 
 import com.ainclusive.iotsim.workercontract.v1.DataTypeEnumValueMsg;
 import com.ainclusive.iotsim.workercontract.v1.DataTypeMemberMsg;
+import com.ainclusive.iotsim.workercontract.v1.NativeDataTypeDefinitionMsg;
 import com.ainclusive.iotsim.workercontract.v1.SchemaNodeMsg;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.eclipse.milo.opcua.sdk.client.OpcUaClient;
@@ -25,6 +28,7 @@ import org.eclipse.milo.opcua.stack.core.types.builtin.QualifiedName;
 import org.eclipse.milo.opcua.stack.core.types.enumerated.BrowseDirection;
 import org.eclipse.milo.opcua.stack.core.types.enumerated.BrowseResultMask;
 import org.eclipse.milo.opcua.stack.core.types.enumerated.NodeClass;
+import org.eclipse.milo.opcua.stack.core.types.enumerated.StructureType;
 import org.eclipse.milo.opcua.stack.core.types.enumerated.TimestampsToReturn;
 import org.eclipse.milo.opcua.stack.core.types.structured.BrowseDescription;
 import org.eclipse.milo.opcua.stack.core.types.structured.BrowseResult;
@@ -128,8 +132,7 @@ final class OpcUaDiscovery {
                     new ReadValueId(nodeId, AttributeId.ValueRank.uid(), null, QualifiedName.NULL_VALUE)
             );
 
-            ReadResponse response = client.read(0.0, TimestampsToReturn.Neither, toRead)
-                    .get(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            ReadResponse response = client.read(0.0, TimestampsToReturn.Neither, toRead);
             DataValue[] results = response.getResults();
 
             if (results == null || results.length < 6) {
@@ -228,6 +231,12 @@ final class OpcUaDiscovery {
                 if (childId == null || childId.equals(Identifiers.Server) || !visited.add(childId)) {
                     continue;
                 }
+                // The standard Objects folder contains server diagnostics and capability
+                // objects in namespace zero. They are infrastructure, not the source
+                // schema; do not mix them into a device schema at the scan root.
+                if (frame.parentId() == null && childId.getNamespaceIndex().intValue() == 0) {
+                    continue;
+                }
                 boolean isVariable = ref.getNodeClass() == NodeClass.Variable;
                 if (!isVariable && ref.getNodeClass() != NodeClass.Object) {
                     continue;
@@ -276,6 +285,14 @@ final class OpcUaDiscovery {
 
     private record Frame(NodeId nodeId, String parentId, String path) {}
 
+    /** Milo 1.x omits the namespace-zero prefix; schemas retain the canonical OPC UA form. */
+    private static String nodeIdText(NodeId nodeId) {
+        String parsed = nodeId.toParseableString();
+        return nodeId.getNamespaceIndex().intValue() == 0 && !parsed.startsWith("ns=0;")
+                ? "ns=0;" + parsed
+                : parsed;
+    }
+
     private static List<ReferenceDescription> browseChildren(OpcUaClient client, NodeId nodeId)
             throws Exception {
         BrowseDescription browse = new BrowseDescription(
@@ -285,15 +302,14 @@ final class OpcUaDiscovery {
                 true,
                 uint(NodeClass.Object.getValue() | NodeClass.Variable.getValue()),
                 uint(BrowseResultMask.All.getValue()));
-        BrowseResult result = client.browse(browse).get(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        BrowseResult result = client.browse(browse);
         List<ReferenceDescription> all = new ArrayList<>();
         addRefs(all, result.getReferences());
         // Servers cap references per node (maxReferencesPerNode); follow continuation
         // points so a folder with many children isn't silently truncated.
         ByteString continuation = result.getContinuationPoint();
         while (continuation != null && continuation.isNotNull()) {
-            BrowseResult next = client.browseNext(false, continuation)
-                    .get(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            BrowseResult next = client.browseNext(false, List.of(continuation)).getResults()[0];
             addRefs(all, next.getReferences());
             continuation = next.getContinuationPoint();
         }
@@ -309,11 +325,13 @@ final class OpcUaDiscovery {
     /** The neutral mapping plus the original DataType attribute, when it needs preserving. */
     private record DataTypeDeclaration(String neutralType, String dataTypeNodeId,
             List<DataTypeMemberMsg> members, List<DataTypeEnumValueMsg> enumValues,
-            String defaultEncodingId) {}
+            String defaultEncodingId, String nativeTypeKind, List<NativeDataTypeDefinitionMsg> dependencies,
+            String typeName) {}
 
     /** The fields and binary encoding supplied by a native StructureDefinition. */
-    private record StructureDeclaration(List<DataTypeMemberMsg> members, String defaultEncodingId) {
-        private static final StructureDeclaration EMPTY = new StructureDeclaration(List.of(), null);
+    private record StructureDeclaration(List<DataTypeMemberMsg> members, String defaultEncodingId,
+            String nativeTypeKind) {
+        private static final StructureDeclaration EMPTY = new StructureDeclaration(List.of(), null, null);
     }
 
     /** Reads a variable's DataType attribute and reverse-maps it; counts non-neutral declarations. */
@@ -321,8 +339,7 @@ final class OpcUaDiscovery {
             throws Exception {
         ReadValueId rv = new ReadValueId(
                 nodeId, AttributeId.DataType.uid(), null, QualifiedName.NULL_VALUE);
-        ReadResponse response = client.read(0.0, TimestampsToReturn.Neither, List.of(rv))
-                .get(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        ReadResponse response = client.read(0.0, TimestampsToReturn.Neither, List.of(rv));
         DataValue[] results = response.getResults();
         DataValue dataTypeValue = results != null && results.length > 0 ? results[0] : null;
         NodeId dataTypeId = dataTypeValue != null && dataTypeValue.getValue() != null
@@ -331,13 +348,77 @@ final class OpcUaDiscovery {
         if (neutral == null) {
             unknown[0]++;
         }
-        String nativeTypeId = neutral == null && dataTypeId != null ? dataTypeId.toParseableString() : null;
+        // Retain the source declaration even when its value can be executed by a
+        // neutral codec. `nativeTypeId` remains limited to definitions that must
+        // be imported into the schema-local catalog.
+        String declaredTypeId = dataTypeId == null ? null : nodeIdText(dataTypeId);
+        String nativeTypeId = neutral == null ? declaredTypeId : null;
         StructureDeclaration structure = nativeTypeId == null
                 ? StructureDeclaration.EMPTY
                 : readStructureDeclaration(client, dataTypeId);
-        return new DataTypeDeclaration(neutral, nativeTypeId,
-                structure.members(), nativeTypeId == null ? List.of() : readEnumValues(client, dataTypeId),
-                structure.defaultEncodingId());
+        if (nativeTypeId != null && structure.members().isEmpty()) {
+            structure = standardStructureDeclaration(dataTypeId);
+        }
+        List<DataTypeEnumValueMsg> enumValues = nativeTypeId == null ? List.of() : readEnumValues(client, dataTypeId);
+        String nativeTypeKind = nativeTypeId == null ? null : resolveNativeTypeKind(structure, enumValues);
+        List<DataTypeMemberMsg> members = "OPTION_SET".equals(nativeTypeKind) ? List.of() : structure.members();
+        return new DataTypeDeclaration(neutral, declaredTypeId,
+                members, enumValues, "OPTION_SET".equals(nativeTypeKind) ? null : structure.defaultEncodingId(), nativeTypeKind,
+                nativeTypeId == null ? List.of() : readDependentTypeDefinitions(client, members),
+                nativeTypeId == null ? null : readDataTypeName(client, dataTypeId));
+    }
+
+    /** Reads the closure of custom field types, retaining opaque entries when no definition is exposed. */
+    private static List<NativeDataTypeDefinitionMsg> readDependentTypeDefinitions(
+            OpcUaClient client, List<DataTypeMemberMsg> members) {
+        Map<String, NativeDataTypeDefinitionMsg> definitions = new LinkedHashMap<>();
+        for (DataTypeMemberMsg member : members) {
+            if (!member.getDataTypeNodeId().isBlank()) {
+                readDependentTypeDefinition(client, member.getDataTypeNodeId(), definitions, new HashSet<>());
+            }
+        }
+        return List.copyOf(definitions.values());
+    }
+
+    private static void readDependentTypeDefinition(
+            OpcUaClient client,
+            String typeId,
+            Map<String, NativeDataTypeDefinitionMsg> definitions,
+            Set<String> visiting) {
+        if (definitions.containsKey(typeId) || !visiting.add(typeId)) {
+            return;
+        }
+        try {
+            NodeId nodeId = NodeId.parse(typeId);
+            StructureDeclaration structure = readStructureDeclaration(client, nodeId);
+            if (structure.members().isEmpty()) {
+                structure = standardStructureDeclaration(nodeId);
+            }
+            List<DataTypeEnumValueMsg> enumValues = readEnumValues(client, nodeId);
+            String nativeTypeKind = resolveNativeTypeKind(structure, enumValues);
+            List<DataTypeMemberMsg> members = "OPTION_SET".equals(nativeTypeKind) ? List.of() : structure.members();
+            NativeDataTypeDefinitionMsg definition = NativeDataTypeDefinitionMsg.newBuilder()
+                    .setNodeId(typeId)
+                    .setName(readDataTypeName(client, nodeId))
+                    .addAllMembers(members)
+                    .addAllEnumValues(enumValues)
+                    .setDefaultEncodingId("OPTION_SET".equals(nativeTypeKind) || structure.defaultEncodingId() == null
+                            ? "" : structure.defaultEncodingId())
+                    .setNativeTypeKind(nativeTypeKind)
+                    .build();
+            definitions.put(typeId, definition);
+            for (DataTypeMemberMsg member : members) {
+                if (!member.getDataTypeNodeId().isBlank()) {
+                    readDependentTypeDefinition(client, member.getDataTypeNodeId(), definitions, visiting);
+                }
+            }
+        } catch (Exception ignored) {
+            // The caller still preserves the field's native NodeId as an opaque dependency.
+            definitions.putIfAbsent(typeId, NativeDataTypeDefinitionMsg.newBuilder()
+                    .setNodeId(typeId).setName(typeId).build());
+        } finally {
+            visiting.remove(typeId);
+        }
     }
 
     /** Imports fields and the binary encoding required for lossless structure replay. */
@@ -346,8 +427,7 @@ final class OpcUaDiscovery {
         // DataTypeDefinition is AttributeId 23 in OPC UA 1.04. Milo 0.6 predates
         // that enum constant, but accepts the standard numeric id on the wire.
         ReadValueId request = new ReadValueId(dataTypeId, uint(23), null, QualifiedName.NULL_VALUE);
-        ReadResponse response = client.read(0.0, TimestampsToReturn.Neither, List.of(request))
-                .get(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        ReadResponse response = client.read(0.0, TimestampsToReturn.Neither, List.of(request));
         DataValue[] results = response.getResults();
         DataValue definitionValue = results != null && results.length > 0 ? results[0] : null;
         Object definition = definitionValue != null && definitionValue.getValue() != null
@@ -368,15 +448,100 @@ final class OpcUaDiscovery {
             if (neutral != null) {
                 member.setDataType(neutral);
             } else if (fieldType != null) {
-                member.setDataTypeNodeId(fieldType.toParseableString());
+                member.setDataTypeNodeId(nodeIdText(fieldType));
             } else {
                 continue;
+            }
+            int fieldValueRank = field.getValueRank() == null ? -1 : field.getValueRank();
+            member.setValueRank(fieldValueRank >= 1 ? "ARRAY" : "SCALAR")
+                    .setOptional(Boolean.TRUE.equals(field.getIsOptional()));
+            if (field.getArrayDimensions() != null) {
+                for (var dimension : field.getArrayDimensions()) {
+                    if (dimension != null) {
+                        member.addArrayDimensions(dimension.intValue());
+                    }
+                }
             }
             members.add(member.build());
         }
         NodeId encodingId = structure.getDefaultEncodingId();
         return new StructureDeclaration(List.copyOf(members),
-                encodingId == null ? null : encodingId.toParseableString());
+                encodingId == null ? null : nodeIdText(encodingId),
+                structure.getBaseDataType() != null && structure.getBaseDataType().equals(Identifiers.OptionSet)
+                        ? "OPTION_SET"
+                        : structure.getStructureType() == StructureType.Union ? "UNION" : "STRUCTURE");
+    }
+
+    /**
+     * Standard Part 3 declarations that many servers omit from DataTypeDefinition.
+     * Their NodeIds, encodings, and fields are fixed by OPC UA, so this retains an
+     * exact standard declaration rather than applying a primitive fallback.
+     */
+    private static StructureDeclaration standardStructureDeclaration(NodeId dataTypeId) {
+        if (dataTypeId == null) {
+            return StructureDeclaration.EMPTY;
+        }
+        return switch (nodeIdText(dataTypeId)) {
+            case "ns=0;i=884" -> standardStructure("ns=0;i=886",
+                    member("low", "FLOAT64"), member("high", "FLOAT64"));
+            case "ns=0;i=8912" -> standardStructure("ns=0;i=8917",
+                    member("offset", "INT16"), member("daylightSavingInOffset", "BOOL"));
+            case "ns=0;i=887" -> standardStructure("ns=0;i=889",
+                    member("namespaceUri", "STRING"), member("unitId", "INT32"),
+                    member("displayName", "LOCALIZED_TEXT"), member("description", "LOCALIZED_TEXT"));
+            case "ns=0;i=338" -> standardStructure("ns=0;i=340",
+                    member("productUri", "STRING"), member("manufacturerName", "STRING"),
+                    member("productName", "STRING"), member("softwareVersion", "STRING"),
+                    member("buildNumber", "STRING"), member("buildDate", "DATETIME"));
+            case "ns=0;i=296" -> standardStructure("ns=0;i=298",
+                    member("name", "STRING"), member("dataType", "NODE_ID"), member("valueRank", "INT32"),
+                    member("arrayDimensions", "UINT32"), member("description", "LOCALIZED_TEXT"));
+            default -> StructureDeclaration.EMPTY;
+        };
+    }
+
+    private static StructureDeclaration standardStructure(String encodingId, DataTypeMemberMsg... members) {
+        return new StructureDeclaration(List.of(members), encodingId, "STRUCTURE");
+    }
+
+    private static DataTypeMemberMsg member(String name, String dataType) {
+        return DataTypeMemberMsg.newBuilder().setName(name).setDataType(dataType)
+                .setValueRank("SCALAR").setOptional(false).build();
+    }
+
+    /**
+     * Classifies a native declaration only when its representation can be retained by the schema model.
+     * An OptionSet without its named bits is opaque: calling it an OptionSet would create an invalid,
+     * uneditable catalog entry and would invent metadata that the server did not provide.
+     */
+    private static String resolveNativeTypeKind(StructureDeclaration structure,
+            List<DataTypeEnumValueMsg> enumValues) {
+        if ("OPTION_SET".equals(structure.nativeTypeKind())) {
+            return enumValues.isEmpty() ? "OPAQUE" : "OPTION_SET";
+        }
+        if (!enumValues.isEmpty()) {
+            return "ENUM";
+        }
+        return structure.nativeTypeKind() == null ? "OPAQUE" : structure.nativeTypeKind();
+    }
+
+    /** Reads the DataType browse name separately from the Variable that uses it. */
+    private static String readDataTypeName(OpcUaClient client, NodeId dataTypeId) {
+        try {
+            ReadValueId request = new ReadValueId(
+                    dataTypeId, AttributeId.BrowseName.uid(), null, QualifiedName.NULL_VALUE);
+            ReadResponse response = client.read(0.0, TimestampsToReturn.Neither, List.of(request));
+            DataValue[] results = response.getResults();
+            Object value = results != null && results.length > 0 && results[0].getValue() != null
+                    ? results[0].getValue().getValue() : null;
+            if (value instanceof QualifiedName browseName
+                    && browseName.getName() != null && !browseName.getName().isBlank()) {
+                return browseName.getName();
+            }
+        } catch (Exception ignored) {
+            // Preserve the identity even if the optional human-readable name cannot be read.
+        }
+        return nodeIdText(dataTypeId);
     }
 
     /** Imports numeric enum/option-set literals when the server exposes EnumValues. */
@@ -430,6 +595,11 @@ final class OpcUaDiscovery {
                     .addAllDataTypeEnumValues(declaration == null ? List.of() : declaration.enumValues())
                     .setDataTypeDefaultEncodingId(declaration == null || declaration.defaultEncodingId() == null
                             ? "" : declaration.defaultEncodingId())
+                    .setNativeTypeKind(declaration == null || declaration.nativeTypeKind() == null
+                            ? "" : declaration.nativeTypeKind())
+                    .addAllDataTypeDependencies(declaration == null ? List.of() : declaration.dependencies())
+                    .setDataTypeName(declaration == null || declaration.typeName() == null
+                            ? "" : declaration.typeName())
                     .setValueRank(attrs != null && attrs.valueRank() != null && attrs.valueRank() >= 0
                             ? "ARRAY" : "SCALAR")
                     .setAccess("READ");

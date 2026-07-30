@@ -13,23 +13,31 @@ package com.ainclusive.iotsim.worker.opcua;
  * @param writeMask IS-189: Attribute write permissions
  * @param historizing IS-189: Whether server collects historical values
  */
-record VarDef(String nodeId, String parentId, String name, String kind, String dataType, String dataTypeNodeId, String referenceType,
+record VarDef(String nodeId, String parentId, String name, String kind, String dataType, String dataTypeNodeId,
+        String declaredDataTypeNodeId, String referenceType,
         Integer accessLevelFull, Integer minimumSamplingInterval, Integer writeMask, Boolean historizing) {
+    VarDef(String nodeId, String parentId, String name, String kind, String dataType, String dataTypeNodeId,
+            String referenceType, Integer accessLevelFull, Integer minimumSamplingInterval, Integer writeMask,
+            Boolean historizing) {
+        this(nodeId, parentId, name, kind, dataType, dataTypeNodeId, null, referenceType,
+                accessLevelFull, minimumSamplingInterval, writeMask, historizing);
+    }
+
     VarDef(String nodeId, String parentId, String name, String kind, String dataType, String referenceType,
             Integer accessLevelFull, Integer minimumSamplingInterval, Integer writeMask, Boolean historizing) {
-        this(nodeId, parentId, name, kind, dataType, null, referenceType,
+        this(nodeId, parentId, name, kind, dataType, null, null, referenceType,
                 accessLevelFull, minimumSamplingInterval, writeMask, historizing);
     }
 
     VarDef(String nodeId, String parentId, String name, String kind, String dataType, String referenceType) {
-        this(nodeId, parentId, name, kind, dataType, null, referenceType, null, null, null, null);
+        this(nodeId, parentId, name, kind, dataType, null, null, referenceType, null, null, null, null);
     }
 
     VarDef(String nodeId, String parentId, String name, String kind, String dataType) {
-        this(nodeId, parentId, name, kind, dataType, null, null, null, null, null, null);
+        this(nodeId, parentId, name, kind, dataType, null, null, null, null, null, null, null);
     }
 
     VarDef(String nodeId, String name, String dataType) {
-        this(nodeId, null, name, "VARIABLE", dataType, null, null, null, null, null, null);
+        this(nodeId, null, name, "VARIABLE", dataType, null, null, null, null, null, null, null);
     }
 }

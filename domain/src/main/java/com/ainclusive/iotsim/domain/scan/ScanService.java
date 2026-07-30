@@ -12,6 +12,7 @@ import com.ainclusive.iotsim.persistence.project.ProjectRepository;
 import com.ainclusive.iotsim.platform.Ids;
 import com.ainclusive.iotsim.platform.scan.ConnectionTestResult;
 import com.ainclusive.iotsim.platform.scan.DiscoveredNode;
+import com.ainclusive.iotsim.platform.scan.DiscoveredTypeDefinition;
 import com.ainclusive.iotsim.platform.scan.ScanResult;
 import com.ainclusive.iotsim.platform.scan.ScanSpec;
 import com.ainclusive.iotsim.platform.scan.SourceScanner;
@@ -19,7 +20,9 @@ import com.ainclusive.iotsim.platform.secret.ConnectionCredentials;
 import com.ainclusive.iotsim.platform.secret.CredentialStore;
 import com.ainclusive.iotsim.protocolmodel.Access;
 import com.ainclusive.iotsim.protocolmodel.DataType;
+import com.ainclusive.iotsim.protocolmodel.DataTypeEnumValue;
 import com.ainclusive.iotsim.protocolmodel.DataTypeMember;
+import com.ainclusive.iotsim.protocolmodel.NativeTypeKind;
 import com.ainclusive.iotsim.protocolmodel.NodeKind;
 import com.ainclusive.iotsim.protocolmodel.SchemaNode;
 import com.ainclusive.iotsim.protocolmodel.ValueRank;
@@ -367,7 +370,7 @@ public class ScanService implements DisposableBean {
                 // Known-typed variable with valid dataType from server
                 if (n.dataType() != null && !n.dataType().isBlank()) {
                     nodes.add(variableNode(n, DataType.valueOf(n.dataType()),
-                            valueRank(n.valueRank()), access(n.access()), null));
+                            valueRank(n.valueRank()), access(n.access()), null, n.dataTypeNodeId()));
                 }
             } else {
                 nodes.add(new SchemaNode(n.nodeId(), n.parentId(), n.path(), n.name(),
@@ -379,16 +382,75 @@ public class ScanService implements DisposableBean {
 
     /** Adds one top-level schema type for a scanned structured native declaration. */
     private static void addImportedType(List<SchemaNode> nodes, Set<String> importedTypeIds, DiscoveredNode node) {
-        String typeId = node.dataTypeNodeId();
-        List<DataTypeMember> members = node.dataTypeMembers();
-        var enumValues = node.dataTypeEnumValues();
-        if (typeId == null || (members.isEmpty() && enumValues.isEmpty()) || !importedTypeIds.add(typeId)) {
+        addImportedType(nodes, importedTypeIds, node.dataTypeNodeId(),
+                node.dataTypeName() == null ? node.name() : node.dataTypeName(), node.dataTypeMembers(),
+                node.dataTypeEnumValues(), node.dataTypeDefaultEncodingId(), node.dataTypeKind());
+        for (DiscoveredTypeDefinition dependency : node.dataTypeDependencies()) {
+            addImportedType(nodes, importedTypeIds, dependency.nodeId(), dependency.name(), dependency.members(),
+                    dependency.enumValues(), dependency.defaultEncodingId(), dependency.nativeTypeKind());
+        }
+    }
+
+    private static void addImportedType(
+            List<SchemaNode> nodes,
+            Set<String> importedTypeIds,
+            String typeId,
+            String typeName,
+            List<DataTypeMember> members,
+            List<DataTypeEnumValue> enumValues,
+            String defaultEncodingId,
+            NativeTypeKind nativeTypeKind) {
+        if (typeId == null || (members.isEmpty() && enumValues.isEmpty())) {
             return;
         }
         String description = members.isEmpty() ? "Imported OPC UA enum DataType" : "Imported OPC UA structured DataType";
-        nodes.add(new SchemaNode(typeId, null, "Types/" + typeId, node.name(), NodeKind.DATA_TYPE,
+        SchemaNode imported = new SchemaNode(typeId, null, "Types/" + typeId, typeName, NodeKind.DATA_TYPE,
                 null, null, null, null, description, List.of(), null,
-                List.of(), null, members, enumValues, node.dataTypeDefaultEncodingId(), null, null, null, null));
+                List.of(), null, members, enumValues, defaultEncodingId, nativeTypeKind, null, null, null, null, null);
+        int existingIndex = indexOfImportedType(nodes, typeId);
+        if (existingIndex >= 0) {
+            SchemaNode existing = nodes.get(existingIndex);
+            // A prior structure may have introduced this identity as opaque. If a
+            // later variable supplies the actual declaration, upgrade in place.
+            if (existing.members().isEmpty() && existing.enumValues().isEmpty()) {
+                nodes.set(existingIndex, imported);
+                addOpaqueMemberTypes(nodes, importedTypeIds, members);
+            }
+            return;
+        }
+        importedTypeIds.add(typeId);
+        nodes.add(imported);
+        addOpaqueMemberTypes(nodes, importedTypeIds, members);
+    }
+
+    private static int indexOfImportedType(List<SchemaNode> nodes, String typeId) {
+        for (int index = 0; index < nodes.size(); index++) {
+            SchemaNode candidate = nodes.get(index);
+            if (candidate.kind() == NodeKind.DATA_TYPE && candidate.nodeId().equals(typeId)) {
+                return index;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * Preserves identities referenced by a structure even when the server did not return their
+     * declarations. Those entries remain explicitly opaque instead of being silently replaced by
+     * a primitive fallback.
+     */
+    private static void addOpaqueMemberTypes(
+            List<SchemaNode> nodes, Set<String> importedTypeIds, List<DataTypeMember> members) {
+        for (DataTypeMember member : members) {
+            String memberTypeId = member.dataTypeNodeId();
+            if (memberTypeId == null || !importedTypeIds.add(memberTypeId)) {
+                continue;
+            }
+            nodes.add(new SchemaNode(memberTypeId, null, "Types/" + memberTypeId, memberTypeId,
+                    NodeKind.DATA_TYPE, null, null, null, null,
+                    "Opaque OPC UA DataType referenced by an imported structure; its definition was not supplied by the source",
+                    List.of(), null, List.of(), null, List.of(), List.of(), null,
+                    null, null, null, null));
+        }
     }
 
     /** Indexes resolutions by nodeId, rejecting duplicates and non-unknown targets. */
@@ -418,9 +480,16 @@ public class ScanService implements DisposableBean {
 
     private static SchemaNode variableNode(
             DiscoveredNode n, DataType dataType, ValueRank valueRank, Access access, String dataTypeNodeId) {
+        return variableNode(n, dataType, valueRank, access, dataTypeNodeId, null);
+    }
+
+    private static SchemaNode variableNode(
+            DiscoveredNode n, DataType dataType, ValueRank valueRank, Access access, String dataTypeNodeId,
+            String declaredDataTypeNodeId) {
         return new SchemaNode(n.nodeId(), n.parentId(), n.path(), n.name(),
                 NodeKind.VARIABLE, dataType, valueRank, access, n.unit(), n.description(),
-                List.of(), null, List.of(), dataTypeNodeId, List.of(), null, null, null, null);
+                List.of(), null, List.of(), dataTypeNodeId, List.of(), List.of(), null, null,
+                null, null, null, null, declaredDataTypeNodeId);
     }
 
     private static ValueRank valueRank(String raw) {

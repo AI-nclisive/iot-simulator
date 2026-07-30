@@ -13,6 +13,20 @@ import org.junit.jupiter.api.Test;
 class OpcUaCaptureSchemaTest {
 
     @Test
+    void capturesKnownTypeWhenItsOriginalOpcUaDeclarationIsAlsoPresent() {
+        CaptureRequest request = CaptureRequest.newBuilder().setSchema(Schema.newBuilder()
+                .addNodes(SchemaNodeMsg.newBuilder()
+                        .setNodeId("ns=2;s=qname")
+                        .setKind("VARIABLE")
+                        .setDataType("QUALIFIED_NAME")
+                        .setDeclaredDataTypeNodeId("ns=0;i=20")))
+                .build();
+
+        assertThat(OpcUaProtocolService.captureNodes(request))
+                .containsExactly(new OpcUaCapture.NodeSpec("ns=2;s=qname", "QUALIFIED_NAME"));
+    }
+
+    @Test
     void resolvesSchemaOwnedEnumToIntegerCaptureEncoding() {
         CaptureRequest request = CaptureRequest.newBuilder().setSchema(Schema.newBuilder()
                 .addNodes(SchemaNodeMsg.newBuilder()
@@ -36,6 +50,27 @@ class OpcUaCaptureSchemaTest {
         CaptureRequest request = CaptureRequest.newBuilder().setSchema(Schema.newBuilder()
                 .addNodes(SchemaNodeMsg.newBuilder()
                         .setNodeId("ns=2;s=reading")
+                        .setKind("VARIABLE")
+                        .setDataTypeNodeId("ns=2;i=7001")))
+                .build();
+
+        assertThatIllegalArgumentException().isThrownBy(() -> OpcUaProtocolService.captureNodes(request))
+                .withMessageContaining("without an executable encoding")
+                .withMessageContaining("ns=2;i=7001");
+    }
+
+    @Test
+    void rejectsOptionSetInsteadOfTreatingItsBitsAsAnEnum() {
+        CaptureRequest request = CaptureRequest.newBuilder().setSchema(Schema.newBuilder()
+                .addNodes(SchemaNodeMsg.newBuilder()
+                        .setNodeId("ns=2;i=7001")
+                        .setKind("DATA_TYPE")
+                        .setNativeTypeKind("OPTION_SET")
+                        .addDataTypeEnumValues(DataTypeEnumValueMsg.newBuilder()
+                                .setName("Enabled")
+                                .setValue(1)))
+                .addNodes(SchemaNodeMsg.newBuilder()
+                        .setNodeId("ns=2;s=options")
                         .setKind("VARIABLE")
                         .setDataTypeNodeId("ns=2;i=7001")))
                 .build();

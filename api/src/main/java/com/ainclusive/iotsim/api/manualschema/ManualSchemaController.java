@@ -12,6 +12,8 @@ import com.ainclusive.iotsim.domain.manualschema.OpcUaNodeSetImporter;
 import com.ainclusive.iotsim.domain.support.Page;
 import com.ainclusive.iotsim.protocolmodel.Access;
 import com.ainclusive.iotsim.protocolmodel.DataType;
+import com.ainclusive.iotsim.protocolmodel.NativeTypeDefinition;
+import com.ainclusive.iotsim.protocolmodel.NativeTypeKind;
 import com.ainclusive.iotsim.protocolmodel.NodeKind;
 import com.ainclusive.iotsim.protocolmodel.SchemaNode;
 import com.ainclusive.iotsim.protocolmodel.ValueRank;
@@ -186,8 +188,9 @@ public class ManualSchemaController {
                     kind, dataType, valueRank, access, d.unit(), d.description(), d.arrayDimensions(),
                     d.typeDefinition(), SchemaReferenceMapper.toModel(d.references()), d.dataTypeNodeId(),
                     SchemaReferenceMapper.toMembers(d.members()), toEnumValues(d.enumValues()),
-                    d.accessLevelFull(), d.minimumSamplingInterval(),
-                    d.writeMask(), d.historizing()));
+                    d.defaultEncodingId(), d.nativeTypeKind() == null ? null : parseEnum(
+                            NativeTypeKind.class, d.nativeTypeKind(), "nativeTypeKind"), d.accessLevelFull(), d.minimumSamplingInterval(),
+                    d.writeMask(), d.historizing(), d.declaredDataTypeNodeId()));
         }
         return nodes;
     }
@@ -243,13 +246,14 @@ public class ManualSchemaController {
             String dataType, String valueRank, String access, String unit, String description,
             List<Integer> arrayDimensions, String typeDefinition, List<ReferenceDto> references,
             String dataTypeNodeId, List<MemberDto> members,
-            List<EnumValueDto> enumValues,
-            Integer accessLevelFull, Integer minimumSamplingInterval, Integer writeMask, Boolean historizing) {
+            List<EnumValueDto> enumValues, String defaultEncodingId, String nativeTypeKind,
+            Integer accessLevelFull, Integer minimumSamplingInterval, Integer writeMask, Boolean historizing,
+            String declaredDataTypeNodeId) {
 
         public NodeDto(String nodeId, String parentId, String path, String name, String kind,
                 String dataType, String valueRank, String access, String unit, String description) {
             this(nodeId, parentId, path, name, kind, dataType, valueRank, access, unit, description,
-                    List.of(), null, List.of(), null, List.of(), List.of(), null, null, null, null);
+                    List.of(), null, List.of(), null, List.of(), List.of(), null, null, null, null, null, null, null);
         }
 
         /** Compatibility constructor for clients written before enum literals were exposed. */
@@ -260,7 +264,7 @@ public class ManualSchemaController {
                 Integer minimumSamplingInterval, Integer writeMask, Boolean historizing) {
             this(nodeId, parentId, path, name, kind, dataType, valueRank, access, unit, description,
                     arrayDimensions, typeDefinition, references, dataTypeNodeId, members, List.of(),
-                    accessLevelFull, minimumSamplingInterval, writeMask, historizing);
+                    null, null, accessLevelFull, minimumSamplingInterval, writeMask, historizing, null);
         }
 
         static NodeDto from(SchemaNode n) {
@@ -273,7 +277,9 @@ public class ManualSchemaController {
                     n.references().stream().map(ReferenceDto::from).toList(),
                     n.dataTypeNodeId(), n.members().stream().map(MemberDto::from).toList(),
                     n.enumValues().stream().map(EnumValueDto::from).toList(),
-                    n.accessLevelFull(), n.minimumSamplingInterval(), n.writeMask(), n.historizing());
+                    n.defaultEncodingId(), n.nativeTypeKind() == null ? null : n.nativeTypeKind().name(),
+                    n.accessLevelFull(), n.minimumSamplingInterval(), n.writeMask(), n.historizing(),
+                    n.declaredDataTypeNodeId());
         }
     }
 
@@ -290,11 +296,11 @@ public class ManualSchemaController {
 
     public record ManualSchemaResponse(
             String id, String projectId, String protocol, String name, String description,
-            List<NodeDto> nodes, long version) {
+            List<NodeDto> nodes, List<NativeTypeDefinition> typeDefinitions, long version) {
 
         static ManualSchemaResponse from(ManualSchema s) {
             return new ManualSchemaResponse(s.id(), s.projectId(), s.protocol(), s.name(), s.description(),
-                    s.nodes().stream().map(NodeDto::from).toList(), s.version());
+                    s.nodes().stream().map(NodeDto::from).toList(), s.typeDefinitions(), s.version());
         }
     }
 }
