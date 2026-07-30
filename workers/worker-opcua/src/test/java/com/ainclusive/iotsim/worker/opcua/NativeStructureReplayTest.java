@@ -40,4 +40,14 @@ class NativeStructureReplayTest {
 
         assertThat(captured.getValueEnc().toByteArray()).containsExactly(body);
     }
+
+    @Test
+    void captureRejectsAnExtensionObjectWithDifferentEncoding() {
+        assertThatThrownBy(() -> OpcUaCapture.toProtoValue(
+                new OpcUaCapture.NodeSpec("ns=2;s=structure", null, "ns=2;i=6001"),
+                new DataValue(new org.eclipse.milo.opcua.stack.core.types.builtin.Variant(
+                        new ExtensionObject(ByteString.of(new byte[] {1}), NodeId.parse("ns=2;i=6002"))))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("schema declares");
+    }
 }
