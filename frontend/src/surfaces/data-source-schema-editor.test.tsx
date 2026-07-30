@@ -152,6 +152,22 @@ describe("detectDependencyWarnings — description (identifier rename)", () => {
 // ---------------------------------------------------------------------------
 
 describe("DataSourceSchemaEditor — dependency warnings in UI", () => {
+  it("shows the original OPC UA declaration alongside the executable type", async () => {
+    mockApiFetch.mockResolvedValueOnce({
+      ...mockSchemaResponse,
+      nodes: mockSchemaResponse.nodes.map((node) => node.nodeId === "p-001"
+        ? { ...node, declaredDataTypeNodeId: "ns=0;i=20" }
+        : node),
+    });
+    render(<DataSourceSchemaEditor source={mockSource} projectId={PROJECT_ID} />);
+
+    await screen.findByText("zone1.temp");
+    await userEvent.click(screen.getByText("zone1.temp"));
+
+    expect(screen.getByText("Declared OPC UA DataType:")).toBeTruthy();
+    expect(screen.getByText("ns=0;i=20")).toBeTruthy();
+  });
+
   it("shows no warnings when no changes are made", async () => {
     render(<DataSourceSchemaEditor source={mockSource} projectId={PROJECT_ID} />);
 
