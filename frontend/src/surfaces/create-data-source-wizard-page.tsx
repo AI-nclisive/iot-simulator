@@ -110,15 +110,35 @@ export function preservesNativeType(node: DiscoveredNodeResponse): boolean {
 }
 
 export function PreservedNativeNodesList({ nodes }: { nodes: DiscoveredNodeResponse[] }) {
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const virtualizer = useVirtualizer({
+    count: nodes.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => UNKNOWN_NODE_ROW_HEIGHT,
+    overscan: 8,
+  });
+
   return (
-    <div className="max-h-[28rem] overflow-y-auto" role="list">
-      {nodes.map((node) => (
-        <div key={node.nodeId} role="listitem" className="mb-2 rounded-md border border-shell-line bg-white px-4 py-3">
-          <p className="truncate text-sm font-medium text-shell-ink">{node.name || node.nodeId}</p>
-          <p className="truncate text-xs text-shell-muted">{node.path || node.nodeId}</p>
-          <p className="mt-1 truncate text-xs text-shell-muted">OPC UA DataType: {node.dataTypeNodeId}</p>
-        </div>
-      ))}
+    <div ref={scrollRef} className="max-h-[28rem] overflow-y-auto" role="list">
+      <div style={{ position: "relative", height: virtualizer.getTotalSize() }}>
+        {virtualizer.getVirtualItems().map((row) => {
+          const node = nodes[row.index];
+          return (
+            <div
+              key={node.nodeId}
+              role="listitem"
+              className="absolute left-0 top-0 w-full pb-2"
+              style={{ transform: `translateY(${row.start}px)` }}
+            >
+              <div className="rounded-md border border-shell-line bg-white px-4 py-3">
+                <p className="truncate text-sm font-medium text-shell-ink">{node.name || node.nodeId}</p>
+                <p className="truncate text-xs text-shell-muted">{node.path || node.nodeId}</p>
+                <p className="mt-1 truncate text-xs text-shell-muted">OPC UA DataType: {node.dataTypeNodeId}</p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
