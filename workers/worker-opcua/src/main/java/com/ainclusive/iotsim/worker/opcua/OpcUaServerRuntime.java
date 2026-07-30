@@ -161,6 +161,7 @@ final class OpcUaServerRuntime {
             runtimeEventSink.accept(runtimeEvent("ERROR", "port " + port + " bind failed"));
             throw new BindFailedException("port " + port + " bind failed", null);
         }
+        namespace.materializeStructureCodecs(server);
         // Server is now listening: surface SOURCE_START on the runtime stream (IS-048).
         runtimeEventSink.accept(runtimeEvent("SOURCE_START", ""));
     }
@@ -183,6 +184,10 @@ final class OpcUaServerRuntime {
 
     NodeId localDataTypeId(String sourceTypeId) {
         return namespace.localDataTypeId(sourceTypeId);
+    }
+
+    Object structureValue(String sourceTypeId, java.util.Map<String, Object> members) {
+        return namespace.structureValue(sourceTypeId, members);
     }
 
     String endpointUrl() {

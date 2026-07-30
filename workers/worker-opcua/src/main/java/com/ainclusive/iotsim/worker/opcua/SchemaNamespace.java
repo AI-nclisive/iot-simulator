@@ -7,6 +7,9 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.eclipse.milo.opcua.sdk.core.AccessLevel;
 import org.eclipse.milo.opcua.sdk.core.Reference;
+import org.eclipse.milo.opcua.sdk.core.types.DynamicStructType;
+import org.eclipse.milo.opcua.sdk.core.types.codec.DynamicCodecFactory;
+import org.eclipse.milo.opcua.sdk.core.typetree.DataType;
 import org.eclipse.milo.opcua.sdk.server.ManagedNamespaceWithLifecycle;
 import org.eclipse.milo.opcua.sdk.server.OpcUaServer;
 import org.eclipse.milo.opcua.sdk.server.items.DataItem;
@@ -16,11 +19,15 @@ import org.eclipse.milo.opcua.sdk.server.nodes.UaObjectNode;
 import org.eclipse.milo.opcua.sdk.server.nodes.UaVariableNode;
 import org.eclipse.milo.opcua.sdk.server.util.SubscriptionModel;
 import org.eclipse.milo.opcua.stack.core.Identifiers;
+import org.eclipse.milo.opcua.stack.core.types.UaStructuredType;
 import org.eclipse.milo.opcua.stack.core.types.builtin.DataValue;
+import org.eclipse.milo.opcua.stack.core.types.builtin.ExtensionObject;
 import org.eclipse.milo.opcua.stack.core.types.builtin.LocalizedText;
+import org.eclipse.milo.opcua.stack.core.types.builtin.QualifiedName;
 import org.eclipse.milo.opcua.stack.core.types.builtin.Variant;
 import org.eclipse.milo.opcua.stack.core.types.builtin.unsigned.UInteger;
 import org.eclipse.milo.opcua.stack.core.types.enumerated.StructureType;
+import org.eclipse.milo.opcua.stack.core.types.structured.DataTypeDefinition;
 import org.eclipse.milo.opcua.stack.core.types.structured.EnumValueType;
 import org.eclipse.milo.opcua.stack.core.types.structured.StructureDefinition;
 import org.eclipse.milo.opcua.stack.core.types.structured.StructureField;
@@ -41,6 +48,7 @@ final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
     private final Map<String, org.eclipse.milo.opcua.stack.core.types.builtin.NodeId> nativeDataTypes =
             new ConcurrentHashMap<>();
     private final Map<String, UaDataTypeNode> nativeDataTypeNodes = new ConcurrentHashMap<>();
+    private final Map<String, DataType> executableStructures = new ConcurrentHashMap<>();
     /** Local encoding identities used only by this server's address space. */
     private final Map<String, org.eclipse.milo.opcua.stack.core.types.builtin.NodeId> nativeDataTypeEncodings =
             new ConcurrentHashMap<>();
@@ -181,8 +189,8 @@ final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
                         .setTypeDefinition(Identifiers.DataTypeEncodingType)
                         .build();
                 getNodeManager().addNode(encoding);
-                encoding.addReference(new Reference(
-                        encodingId, Identifiers.HasEncoding, node.getNodeId().expanded(), false));
+                node.addReference(new Reference(
+                        node.getNodeId(), Identifiers.HasEncoding, encodingId.expanded(), true));
                 nativeDataTypeEncodings.put(definition.nodeId(), encodingId);
                 node.setDataTypeDefinition(new StructureDefinition(
                         encodingId,
@@ -235,6 +243,74 @@ final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
         return nativeDataTypes.get(sourceTypeId);
     }
 
+    /** Registers Milo's schema-driven binary codec after the address space is live. */
+    void materializeStructureCodecs(OpcUaServer server) {
+        var typeTree = server.updateDataTypeTree();
+        for (NativeDataTypeDef definition : typeDefinitions) {
+            if (!definition.isStructure() || "UNION".equals(definition.nativeTypeKind())
+                    || !definition.hasDefaultEncoding()) {
+                continue;
+            }
+            var typeId = nativeDataTypes.get(definition.nodeId());
+            var encodingId = nativeDataTypeEncodings.get(definition.nodeId());
+            DataType dataType = typeId == null ? null : typeTree.getDataType(typeId);
+            if (dataType == null || encodingId == null) {
+                continue;
+            }
+            DataType executableType = new ExecutableStructureType(dataType, encodingId);
+            server.getDynamicDataTypeManager().registerType(
+                    typeId, DynamicCodecFactory.create(executableType, typeTree), encodingId, null, null);
+            executableStructures.put(definition.nodeId(), executableType);
+        }
+    }
+
+    DynamicStructType structureValue(String sourceTypeId, Map<String, Object> members) {
+        DataType dataType = executableStructures.get(sourceTypeId);
+        if (dataType == null) {
+            throw new IllegalArgumentException("native structure has no executable runtime codec: " + sourceTypeId);
+        }
+        return new DynamicStructType(dataType, new java.util.LinkedHashMap<>(members));
+    }
+
+    /** Supplies the schema-local Default Binary encoding even when Milo's type tree has not indexed it yet. */
+    private record ExecutableStructureType(DataType delegate,
+            org.eclipse.milo.opcua.stack.core.types.builtin.NodeId binaryEncodingId) implements DataType {
+        @Override
+        public QualifiedName getBrowseName() {
+            return delegate.getBrowseName();
+        }
+
+        @Override
+        public org.eclipse.milo.opcua.stack.core.types.builtin.NodeId getNodeId() {
+            return delegate.getNodeId();
+        }
+
+        @Override
+        public org.eclipse.milo.opcua.stack.core.types.builtin.NodeId getBinaryEncodingId() {
+            return binaryEncodingId;
+        }
+
+        @Override
+        public org.eclipse.milo.opcua.stack.core.types.builtin.NodeId getXmlEncodingId() {
+            return delegate.getXmlEncodingId();
+        }
+
+        @Override
+        public org.eclipse.milo.opcua.stack.core.types.builtin.NodeId getJsonEncodingId() {
+            return delegate.getJsonEncodingId();
+        }
+
+        @Override
+        public DataTypeDefinition getDataTypeDefinition() {
+            return delegate.getDataTypeDefinition();
+        }
+
+        @Override
+        public Boolean isAbstract() {
+            return delegate.isAbstract();
+        }
+    }
+
     private org.eclipse.milo.opcua.stack.core.types.builtin.NodeId declaredDataType(VarDef def) {
         if (isStandardOpcUaDataType(def.declaredDataTypeNodeId())) {
             return org.eclipse.milo.opcua.stack.core.types.builtin.NodeId.parse(def.declaredDataTypeNodeId());
@@ -276,7 +352,15 @@ final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
     void updateValue(String nodeId, Object opcUaValue) {
         UaVariableNode node = nodes.get(nodeId);
         if (node != null) {
-            node.setValue(new DataValue(new Variant(opcUaValue)));
+            Object value = opcUaValue;
+            if (value instanceof UaStructuredType structure) {
+                try {
+                    value = ExtensionObject.encode(getServer().getDynamicEncodingContext(), structure);
+                } catch (Exception e) {
+                    throw new IllegalArgumentException("failed to encode native structure for " + nodeId, e);
+                }
+            }
+            node.setValue(new DataValue(new Variant(value)));
         }
     }
 }

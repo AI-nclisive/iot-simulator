@@ -7,6 +7,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.util.List;
+import java.util.Map;
 import org.eclipse.milo.opcua.sdk.client.OpcUaClient;
 import org.eclipse.milo.opcua.stack.core.types.builtin.DataValue;
 import org.eclipse.milo.opcua.stack.core.types.builtin.ExtensionObject;
@@ -55,6 +56,42 @@ class OpcUaServerRuntimeIT {
                         .decode(client.getStaticEncodingContext());
                 assertThat(definition.getFields()).extracting(field -> field.getName()).containsExactly("running");
                 assertThat(definition.getDefaultEncodingId()).isEqualTo(runtime.localEncodingId(sourceTypeId));
+            } finally {
+                client.disconnect();
+            }
+        } finally {
+            runtime.stop();
+        }
+    }
+
+    @Test
+    void clientReadsRuntimeMaterializedNativeStructureValue() throws Exception {
+        int port = freePort();
+        String sourceTypeId = "ns=4;s=PumpState";
+        NativeDataTypeDef type = new NativeDataTypeDef(
+                sourceTypeId,
+                "PumpState",
+                List.of(DataTypeMemberMsg.newBuilder().setName("running").setDataType("BOOL")
+                        .setValueRank("SCALAR").build()),
+                List.of(),
+                "ns=4;s=PumpState.DefaultBinary",
+                "STRUCTURE");
+        OpcUaServerRuntime runtime = new OpcUaServerRuntime(
+                port, "127.0.0.1", "127.0.0.1",
+                List.of(new VarDef("pump", null, "Pump", "VARIABLE", "", sourceTypeId,
+                        null, null, null, null, null)),
+                List.of(type), AuthConfig.anonymous(), event -> { }, event -> { });
+        runtime.start();
+        try {
+            runtime.updateValue("pump", runtime.structureValue(sourceTypeId, Map.of("running", true)));
+            OpcUaClient client = OpcUaClient.create(runtime.endpointUrl());
+            client.connect();
+            try {
+                DataValue value = client.readValue(0.0, TimestampsToReturn.Neither, runtime.variableNodeId("pump"));
+                assertThat(value.getValue().getValue()).isInstanceOf(ExtensionObject.class);
+                ExtensionObject extension = (ExtensionObject) value.getValue().getValue();
+                assertThat(extension.getEncodingOrTypeId()).isEqualTo(runtime.localEncodingId(sourceTypeId));
+                assertThat(extension.getBody()).isNotNull();
             } finally {
                 client.disconnect();
             }
