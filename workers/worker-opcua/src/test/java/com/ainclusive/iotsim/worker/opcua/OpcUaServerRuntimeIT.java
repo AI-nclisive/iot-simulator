@@ -9,6 +9,7 @@ import java.net.ServerSocket;
 import java.util.List;
 import java.util.Map;
 import org.eclipse.milo.opcua.sdk.client.OpcUaClient;
+import org.eclipse.milo.opcua.sdk.core.types.DynamicStructType;
 import org.eclipse.milo.opcua.stack.core.types.builtin.DataValue;
 import org.eclipse.milo.opcua.stack.core.types.builtin.ExtensionObject;
 import org.eclipse.milo.opcua.stack.core.types.builtin.NodeId;
@@ -92,6 +93,10 @@ class OpcUaServerRuntimeIT {
                 ExtensionObject extension = (ExtensionObject) value.getValue().getValue();
                 assertThat(extension.getEncodingOrTypeId()).isEqualTo(runtime.localEncodingId(sourceTypeId));
                 assertThat(extension.getBody()).isNotNull();
+                assertThat(extension.decode(client.getDynamicEncodingContext()))
+                        .isInstanceOf(DynamicStructType.class);
+                DynamicStructType decoded = (DynamicStructType) extension.decode(client.getDynamicEncodingContext());
+                assertThat(decoded.getMembers()).containsEntry("running", true);
             } finally {
                 client.disconnect();
             }
