@@ -113,7 +113,12 @@ final class OpcUaCapture {
                 throw new IllegalArgumentException(
                         "capture expected a binary ExtensionObject for native structure node " + spec.nodeId());
             }
-            NodeId expectedEncoding = NodeId.parse(spec.defaultEncodingId());
+            String encodingId = spec.defaultEncodingId();
+            if (encodingId == null) {
+                throw new IllegalArgumentException("native structure node " + spec.nodeId()
+                        + " has no declared encoding id; cannot validate capture fidelity");
+            }
+            NodeId expectedEncoding = NodeId.parse(encodingId);
             if (!expectedEncoding.equals(extension.getEncodingOrTypeId())) {
                 throw new IllegalArgumentException(
                         "capture received ExtensionObject with encoding " + extension.getEncodingOrTypeId()

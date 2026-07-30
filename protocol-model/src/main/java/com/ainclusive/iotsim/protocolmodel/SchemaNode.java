@@ -120,11 +120,13 @@ public record SchemaNode(
             }
             if ((nativeTypeKind == NativeTypeKind.STRUCTURE || nativeTypeKind == NativeTypeKind.UNION)
                     && members.isEmpty()) {
-                throw new IllegalArgumentException(nativeTypeKind + " DATA_TYPE node '" + nodeId + " requires members");
+                throw new IllegalArgumentException(nativeTypeKind + " DATA_TYPE node '" + nodeId
+                        + "' requires members");
             }
             if ((nativeTypeKind == NativeTypeKind.ENUM || nativeTypeKind == NativeTypeKind.OPTION_SET)
                     && enumValues.isEmpty()) {
-                throw new IllegalArgumentException(nativeTypeKind + " DATA_TYPE node '" + nodeId + " requires enum values");
+                throw new IllegalArgumentException(nativeTypeKind + " DATA_TYPE node '" + nodeId
+                        + "' requires enum values");
             }
         } else if (!members.isEmpty() || !enumValues.isEmpty() || defaultEncodingId != null) {
             throw new IllegalArgumentException(kind + " nodes cannot have members, enum values, or a default encoding");
