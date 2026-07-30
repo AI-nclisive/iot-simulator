@@ -29,13 +29,7 @@ public final class NativeTypeCatalog {
                 .map(member -> new NativeTypeField(member.name(), member.dataType(), member.dataTypeNodeId(),
                         member.valueRank(), member.arrayDimensions(), member.optional(), null))
                 .toList();
-        NativeTypeCapability capability = kind == NativeTypeKind.UNION
-                ? NativeTypeCapability.unsupported(
-                        "the OPC UA stack did not expose the union discriminator metadata required for replay")
-                : kind == NativeTypeKind.OPTION_SET
-                ? NativeTypeCapability.unsupported(
-                        "option-set bit metadata cannot yet be materialized by the OPC UA runtime")
-                : kind == NativeTypeKind.OPAQUE
+        NativeTypeCapability capability = kind == NativeTypeKind.OPAQUE
                 ? NativeTypeCapability.unsupported("the source did not supply a native type definition")
                 : kind == NativeTypeKind.STRUCTURE
                         && (node.defaultEncodingId() == null || node.defaultEncodingId().isBlank())

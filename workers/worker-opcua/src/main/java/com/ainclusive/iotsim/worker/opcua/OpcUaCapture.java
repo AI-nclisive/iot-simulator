@@ -125,6 +125,7 @@ final class OpcUaCapture {
                     .setNodeId(spec.nodeId())
                     .setSourceTimeMicros(sourceMicros(dv))
                     .setValueEnc(ByteString.copyFrom(enc.bytes()))
+                    .setValueKind(enc.kind().name())
                     .setQuality(quality(dv.getStatusCode()))
                     .build();
         }
@@ -139,6 +140,7 @@ final class OpcUaCapture {
                 .setNodeId(spec.nodeId())
                 .setSourceTimeMicros(sourceMicros(dv))
                 .setValueEnc(ByteString.copyFrom(enc.bytes()))
+                .setValueKind(enc.kind().name())
                 .setQuality(quality(dv.getStatusCode()))
                 .build();
     }

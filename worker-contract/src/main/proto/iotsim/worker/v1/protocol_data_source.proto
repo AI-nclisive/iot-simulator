@@ -248,6 +248,9 @@ message Value {
   bytes value_enc = 3;          // encoded per the node's data type
   Quality quality = 4;
   string quality_reason = 5;
+  // The ValueCodec kind used for value_enc. Empty is the legacy form, decoded
+  // from the schema's neutral type. TREE carries a canonical native value tree.
+  string value_kind = 6;
 }
 
 message ValueBatch {

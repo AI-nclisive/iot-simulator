@@ -506,7 +506,9 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
             ValueBatch batch, Map<String, ValueCodec.Kind> kinds) {
         List<NeutralValue> out = new ArrayList<>(batch.getValuesCount());
         for (Value v : batch.getValuesList()) {
-            ValueCodec.Kind kind = kinds.get(v.getNodeId());
+            ValueCodec.Kind kind = v.getValueKind().isBlank()
+                    ? kinds.get(v.getNodeId())
+                    : ValueCodec.Kind.valueOf(v.getValueKind());
             if (kind == null) {
                 continue; // a value for a node not in the recording's schema; skip
             }
@@ -712,6 +714,7 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
                 .setNodeId(nv.nodeId())
                 .setSourceTimeMicros(micros)
                 .setValueEnc(ByteString.copyFrom(enc.bytes()))
+                .setValueKind(enc.kind().name())
                 .setQuality(Quality.valueOf(nv.quality().name()))
                 .setQualityReason(nv.qualityReason() == null ? "" : nv.qualityReason())
                 .build();

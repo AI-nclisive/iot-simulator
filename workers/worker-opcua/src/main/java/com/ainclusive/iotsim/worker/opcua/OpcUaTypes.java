@@ -148,6 +148,8 @@ final class OpcUaTypes {
                     ? (bs.bytes() == null ? new byte[0] : bs.bytes())
                     : (byte[]) value;
             case TEXT -> textOf(value);
+            case TREE -> throw new IllegalArgumentException(
+                    "TREE is only valid for native structured OPC UA values");
         };
     }
 
