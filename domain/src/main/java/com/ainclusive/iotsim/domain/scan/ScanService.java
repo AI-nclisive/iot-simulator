@@ -434,10 +434,7 @@ public class ScanService implements DisposableBean {
         }
         String candidate = parentPath == null || parentPath.isEmpty() ? segment : parentPath + "/" + segment;
         if (!usedPaths.add(candidate)) {
-            candidate = parentPath == null || parentPath.isEmpty()
-                    ? disambiguatedSegment(segment, node.nodeId())
-                    : parentPath + "/" + disambiguatedSegment(segment, node.nodeId());
-            usedPaths.add(candidate);
+            throw new IllegalArgumentException("could not derive a unique schema path for node: " + node.nodeId());
         }
         resolved.put(node.nodeId(), candidate);
         resolving.remove(node.nodeId());
