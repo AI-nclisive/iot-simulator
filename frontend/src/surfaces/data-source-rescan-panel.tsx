@@ -10,7 +10,7 @@
  * `UnknownNodesList`/`fetchAllScanNodes` instead of duplicating them.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch, ApiError } from "../api";
 import { useDataSourcesStore } from "../shell/data-sources-store";
 import { useNotificationStore } from "../shell/notification-store";
@@ -169,8 +169,11 @@ export function DataSourceRescanPanel({
 
   const unresolvedCount = typeResolutions.filter((r) => !r.exclude && !r.dataType).length;
   const canApply = status === "resolving" && unresolvedCount === 0;
-  const preservedNativeNodes = nodes.filter(preservesNativeType);
-  const unresolvedNodes = nodes.filter((node) => node.unknownType && !preservesNativeType(node));
+  const preservedNativeNodes = useMemo(() => nodes.filter(preservesNativeType), [nodes]);
+  const unresolvedNodes = useMemo(
+    () => nodes.filter((node) => node.unknownType && !preservesNativeType(node)),
+    [nodes],
+  );
 
   async function apply() {
     if (!jobId || !canApply) return;
