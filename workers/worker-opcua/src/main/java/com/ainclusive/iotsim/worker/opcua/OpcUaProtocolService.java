@@ -64,6 +64,7 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
     private final Map<String, String> nodeDataTypes = new ConcurrentHashMap<>();
     /** Default binary encodings for native structures, keyed by variable node id. */
     private final Map<String, NodeId> structureEncodings = new ConcurrentHashMap<>();
+    private final Map<String, String> structureDataTypes = new ConcurrentHashMap<>();
     private final Map<String, String> unsupportedNativeTypes = new ConcurrentHashMap<>();
     private final ClientEventHub clientEventHub = new ClientEventHub();
     private final RuntimeEventHub runtimeEventHub = new RuntimeEventHub();
@@ -117,6 +118,7 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
         List<NativeDataTypeDef> typeDefinitions = new ArrayList<>();
         nodeDataTypes.clear();
         structureEncodings.clear();
+        structureDataTypes.clear();
         unsupportedNativeTypes.clear();
         for (SchemaNodeMsg node : request.getSchema().getNodesList()) {
             if ("VARIABLE".equals(node.getKind()) || "FOLDER".equals(node.getKind())
@@ -159,6 +161,7 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
                 nodeDataTypes.put(node.getNodeId(), "INT32");
             } else if (structureTypeEncodings.containsKey(node.getDataTypeNodeId())) {
                 structureEncodings.put(node.getNodeId(), structureTypeEncodings.get(node.getDataTypeNodeId()));
+                structureDataTypes.put(node.getNodeId(), node.getDataTypeNodeId());
             } else if (!node.getDataTypeNodeId().isBlank()) {
                 unsupportedNativeTypes.put(node.getNodeId(), node.getDataTypeNodeId());
             }
@@ -568,8 +571,17 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
             } else if (structureEncodings.containsKey(value.getNodeId())) {
                 // A native structure is replayed as its original binary body. Its
                 // encoding id is schema metadata, not inferred from the bytes.
-                runtime.updateValue(value.getNodeId(), structureValue(
-                        structureEncodings.get(value.getNodeId()), value.getValueEnc().toByteArray()));
+                NodeId localEncoding = runtime.localEncodingId(structureDataTypes.get(value.getNodeId()));
+                if (localEncoding == null) {
+                    runtimeEventHub.emit(RuntimeEvent.newBuilder()
+                            .setType("ERROR")
+                            .setAtMicros(System.currentTimeMillis() * 1_000L)
+                            .setDetail("native structure has no local runtime encoding: "
+                                    + structureDataTypes.get(value.getNodeId()))
+                            .build());
+                    continue;
+                }
+                runtime.updateValue(value.getNodeId(), structureValue(localEncoding, value.getValueEnc().toByteArray()));
             } else if (unsupportedNativeTypes.containsKey(value.getNodeId())) {
                 runtimeEventHub.emit(RuntimeEvent.newBuilder()
                         .setType("ERROR")

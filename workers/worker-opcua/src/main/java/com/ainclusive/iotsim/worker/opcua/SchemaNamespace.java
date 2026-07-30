@@ -34,6 +34,9 @@ final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
     private final Map<String, org.eclipse.milo.opcua.stack.core.types.builtin.NodeId> hierarchy = new ConcurrentHashMap<>();
     private final Map<String, org.eclipse.milo.opcua.stack.core.types.builtin.NodeId> nativeDataTypes =
             new ConcurrentHashMap<>();
+    /** Local encoding identities used only by this server's address space. */
+    private final Map<String, org.eclipse.milo.opcua.stack.core.types.builtin.NodeId> nativeDataTypeEncodings =
+            new ConcurrentHashMap<>();
     private final SubscriptionModel subscriptionModel;
 
     SchemaNamespace(OpcUaServer server, List<VarDef> variables) {
@@ -158,7 +161,23 @@ final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
                     : definition.isOptionSet() ? Identifiers.OptionSet : Identifiers.Structure;
             node.addReference(new Reference(nodeId, Identifiers.HasSubtype, baseType.expanded(), false));
             nativeDataTypes.put(definition.nodeId(), nodeId);
+            if (definition.isStructure() && definition.hasDefaultEncoding()) {
+                var encodingId = newNodeId("encodings/" + definition.nodeId() + "/DefaultBinary");
+                UaObjectNode encoding = UaObjectNode.builder(getNodeContext())
+                        .setNodeId(encodingId)
+                        .setBrowseName(newQualifiedName("Default Binary"))
+                        .setDisplayName(LocalizedText.english("Default Binary"))
+                        .setTypeDefinition(Identifiers.DataTypeEncodingType)
+                        .build();
+                getNodeManager().addNode(encoding);
+                encoding.addReference(new Reference(encodingId, Identifiers.HasEncoding, nodeId.expanded(), false));
+                nativeDataTypeEncodings.put(definition.nodeId(), encodingId);
+            }
         }
+    }
+
+    org.eclipse.milo.opcua.stack.core.types.builtin.NodeId localEncodingId(String sourceTypeId) {
+        return nativeDataTypeEncodings.get(sourceTypeId);
     }
 
     private org.eclipse.milo.opcua.stack.core.types.builtin.NodeId declaredDataType(VarDef def) {

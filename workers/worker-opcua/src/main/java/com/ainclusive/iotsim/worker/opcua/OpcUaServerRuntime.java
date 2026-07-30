@@ -169,6 +169,10 @@ final class OpcUaServerRuntime {
         namespace.updateValue(nodeId, opcUaValue);
     }
 
+    NodeId localEncodingId(String sourceTypeId) {
+        return namespace.localEncodingId(sourceTypeId);
+    }
+
     String endpointUrl() {
         return endpointUrl;
     }

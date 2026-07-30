@@ -3,6 +3,7 @@ package com.ainclusive.iotsim.worker.opcua;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.ainclusive.iotsim.workercontract.v1.DataTypeEnumValueMsg;
+import com.ainclusive.iotsim.workercontract.v1.DataTypeMemberMsg;
 import com.ainclusive.iotsim.workercontract.v1.SchemaNodeMsg;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -98,6 +99,37 @@ class OpcUaDiscoveryIT {
         try {
             assertThat(OpcUaDiscovery.testConnection(runtime.endpointUrl(), ANON).status())
                     .isEqualTo(OpcUaDiscovery.OK);
+        } finally {
+            runtime.stop();
+        }
+    }
+
+    @Test
+    void createsLocalEncodingForSchemaOwnedStructure() throws Exception {
+        int port = freePort();
+        NativeDataTypeDef reading = new NativeDataTypeDef(
+                "ns=2;i=7001",
+                "Reading",
+                List.of(DataTypeMemberMsg.newBuilder().setName("value").setDataType("INT32").build()),
+                List.of(),
+                "ns=2;i=7002",
+                "STRUCTURE");
+        OpcUaServerRuntime runtime = new OpcUaServerRuntime(
+                port,
+                "127.0.0.1",
+                "127.0.0.1",
+                List.of(new VarDef("reading", null, "Reading", "VARIABLE", "", "ns=2;i=7001", null,
+                        null, null, null, null)),
+                List.of(reading),
+                AuthConfig.anonymous(),
+                event -> { },
+                event -> { });
+        runtime.start();
+        try {
+            var localEncoding = runtime.localEncodingId("ns=2;i=7001");
+            assertThat(localEncoding).isNotNull();
+            assertThat(localEncoding.toParseableString()).isNotEqualTo("ns=2;i=7002");
+            assertThat(localEncoding.getNamespaceIndex().intValue()).isGreaterThan(0);
         } finally {
             runtime.stop();
         }
