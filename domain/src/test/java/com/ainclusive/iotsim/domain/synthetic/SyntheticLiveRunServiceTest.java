@@ -1,6 +1,7 @@
 package com.ainclusive.iotsim.domain.synthetic;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.ainclusive.iotsim.domain.run.FakeRuntimeEventRepository;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRepository;
@@ -180,6 +181,42 @@ class SyntheticLiveRunServiceTest {
         assertThat(runtime.applied).hasSize(7);
         // Idempotent second stop.
         assertThat(service.stopIfLive(s.runId())).isFalse();
+    }
+
+    @Test
+    void startFailureFinalizesRunAndEvidenceInsteadOfLeavingThemDangling() {
+        // #694/#695: when the runtime fails to start the worker (e.g. WorkerLaunchException),
+        // the run and its evidence must reach a terminal state -- not stay QUEUED/RUNNING and
+        // CAPTURING ("Incomplete" / "Still running") forever.
+        CapturingRuntime throwingOnStart = new CapturingRuntime() {
+            @Override public String start(String id, RuntimeStartSpec spec) {
+                throw new IllegalStateException("worker did not become ready in time");
+            }
+        };
+        SyntheticLiveRunService failing = new SyntheticLiveRunService(
+                new FakeDataSources("SYNTHETIC", json.writeValueAsString(config(5L))),
+                new EmptySchemas(), throwingOnStart, runs, evidence, events, runValueTimeline, json, wall);
+
+        wall.advance(Duration.ofMillis(1)); // so endedAt is distinguishable from startedAt
+        assertThatThrownBy(() -> failing.start(PROJECT, SOURCE, null, "MANUAL", "local"))
+                .isInstanceOf(IllegalStateException.class);
+
+        // Exactly one run/evidence pair was created for the failed attempt.
+        assertThat(runs.byId).hasSize(1);
+        assertThat(evidence.byId).hasSize(1);
+        RunRow run = runs.byId.values().iterator().next();
+        EvidenceRow ev = evidence.byId.values().iterator().next();
+
+        assertThat(run.state()).isEqualTo("FAILED");
+        assertThat(run.endedAt()).isNotNull();
+        // Evidence leaves CAPTURING for a terminal status (PARTIAL, same vocabulary as any
+        // other failed/stopped run) instead of being stuck as "Incomplete" forever.
+        assertThat(ev.status()).isEqualTo("PARTIAL");
+        // The manifest's endedAt must be stamped too -- this is what the evidence detail page
+        // reads to compute Duration; leaving it null is what made the record show
+        // "Still running" indefinitely even after status left CAPTURING.
+        assertThat(ev.manifestJson()).doesNotContain("\"endedAt\":null");
+        assertThat(events.appended).extracting("type").containsExactly("RUN_FAILED");
     }
 
     @Test
