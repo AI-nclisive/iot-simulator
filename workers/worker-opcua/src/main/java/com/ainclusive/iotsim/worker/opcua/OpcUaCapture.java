@@ -142,9 +142,22 @@ final class OpcUaCapture {
                     "capture cannot encode native DataType without an executable encoding for node "
                             + spec.nodeId());
         }
-        Object neutral = spec.array()
-                ? OpcUaArrayValues.captureNeutral(spec.dataType(), raw, spec.arrayDimensions())
-                : OpcUaTypes.fromOpcUaValue(spec.dataType(), raw);
+        Object neutral;
+        if ("OPTION_SET".equals(spec.dataType())) {
+            if (!(raw instanceof org.eclipse.milo.opcua.sdk.core.types.DynamicOptionSetType optionSet)) {
+                throw new IllegalArgumentException(
+                        "capture expected DynamicOptionSetType for option set node " + spec.nodeId() +
+                        " but got " + (raw == null ? "null" : raw.getClass().getSimpleName()));
+            }
+            Map<String, Object> tree = new HashMap<>();
+            tree.put("value", optionSet.getValue().bytes());
+            tree.put("validBits", optionSet.getValidBits().bytes());
+            neutral = tree;
+        } else if (spec.array()) {
+            neutral = OpcUaArrayValues.captureNeutral(spec.dataType(), raw, spec.arrayDimensions());
+        } else {
+            neutral = OpcUaTypes.fromOpcUaValue(spec.dataType(), raw);
+        }
         ValueCodec.Encoded enc = ValueCodec.encode(neutral);
         return protoValue(spec, dv, enc);
     }
@@ -175,4 +188,5 @@ final class OpcUaCapture {
         }
         return status.isBad() ? Quality.BAD : Quality.UNCERTAIN;
     }
+
 }

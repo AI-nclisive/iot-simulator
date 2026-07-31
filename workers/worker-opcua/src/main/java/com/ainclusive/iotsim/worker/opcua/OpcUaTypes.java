@@ -173,6 +173,7 @@ final class OpcUaTypes {
         return value.toString();
     }
 
+
     /** Coerces a value decoded by {@link ValueCodec} to the OPC UA Java type. */
     static Object toOpcUaValue(String dataType, Object decoded) {
         if (decoded == null) {
