@@ -406,7 +406,9 @@ final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
     }
 
     private static boolean isStandardOpcUaDataType(String nodeId) {
-        return nodeId != null && nodeId.startsWith("ns=0;");
+        // Milo's NodeId.toParseableString() omits "ns=0;" for namespace 0 (e.g. "i=28"), so a
+        // preserved standard-catalog NodeId (see Identifiers) may arrive in either form.
+        return nodeId != null && (nodeId.startsWith("ns=0;") || nodeId.matches("i=\\d+"));
     }
 
     /** IS-189: Resolves a reference type name to its OPC UA NodeId. */
