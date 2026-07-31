@@ -344,14 +344,21 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
             }
             String dataType = node.getDataType();
             String defaultEncodingId = "";
+            String nativeTypeKind = "";
             if (dataType.isEmpty() && !node.getDataTypeNodeId().isEmpty()) {
                 SchemaNodeMsg declaration = declarations.get(node.getDataTypeNodeId());
-                if (declaration != null && declaration.getDataTypeEnumValuesCount() > 0
-                        && (declaration.getNativeTypeKind().isBlank()
-                                || "ENUM".equals(declaration.getNativeTypeKind()))) {
-                    dataType = "INT32";
+                if (declaration != null && declaration.getDataTypeEnumValuesCount() > 0) {
+                    nativeTypeKind = declaration.getNativeTypeKind();
+                    if (nativeTypeKind.isBlank() || "ENUM".equals(nativeTypeKind)) {
+                        // Plain enum: coerce to INT32
+                        dataType = "INT32";
+                    } else if ("OPTION_SET".equals(nativeTypeKind)) {
+                        // Option set: use encoding id
+                        defaultEncodingId = declaration.getDataTypeDefaultEncodingId();
+                    }
                 } else if (declaration != null && declaration.getDataTypeMembersCount() > 0
                         && !declaration.getDataTypeDefaultEncodingId().isEmpty()) {
+                    nativeTypeKind = declaration.getNativeTypeKind();
                     defaultEncodingId = declaration.getDataTypeDefaultEncodingId();
                 }
             }
@@ -363,7 +370,7 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
                         "capture cannot encode native DataType without an executable encoding: " + declared);
             }
             nodes.add(new OpcUaCapture.NodeSpec(node.getNodeId(), dataType.isEmpty() ? null : dataType,
-                    defaultEncodingId.isEmpty() ? null : defaultEncodingId));
+                    defaultEncodingId.isEmpty() ? null : defaultEncodingId, nativeTypeKind.isEmpty() ? null : nativeTypeKind));
         }
         return nodes;
     }

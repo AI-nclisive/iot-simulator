@@ -12,6 +12,8 @@ import java.util.function.Consumer;
 import org.eclipse.milo.opcua.sdk.client.OpcUaClient;
 import org.eclipse.milo.opcua.sdk.client.subscriptions.OpcUaMonitoredItem;
 import org.eclipse.milo.opcua.sdk.client.subscriptions.OpcUaSubscription;
+import org.eclipse.milo.opcua.sdk.core.types.DynamicOptionSetType;
+import org.eclipse.milo.opcua.sdk.core.types.DynamicUnionType;
 import org.eclipse.milo.opcua.stack.core.types.builtin.DataValue;
 import org.eclipse.milo.opcua.stack.core.types.builtin.DateTime;
 import org.eclipse.milo.opcua.stack.core.types.builtin.ExtensionObject;
@@ -42,14 +44,30 @@ final class OpcUaCapture {
     }
 
     /** A variable to capture: its neutral node id (parseable OPC UA NodeId) and neutral type. */
-    record NodeSpec(String nodeId, String dataType, String defaultEncodingId) {
+    record NodeSpec(String nodeId, String dataType, String defaultEncodingId, String nativeTypeKind) {
         NodeSpec(String nodeId, String dataType) {
-            this(nodeId, dataType, null);
+            this(nodeId, dataType, null, null);
+        }
+
+        NodeSpec(String nodeId, String dataType, String defaultEncodingId) {
+            this(nodeId, dataType, defaultEncodingId, null);
+        }
+
+        boolean isNativeType() {
+            return (dataType == null || dataType.isBlank())
+                    && defaultEncodingId != null && !defaultEncodingId.isBlank();
         }
 
         boolean isNativeStructure() {
-            return (dataType == null || dataType.isBlank())
-                    && defaultEncodingId != null && !defaultEncodingId.isBlank();
+            return isNativeType() && (nativeTypeKind == null || nativeTypeKind.isBlank() || "STRUCTURE".equals(nativeTypeKind));
+        }
+
+        boolean isUnion() {
+            return isNativeType() && "UNION".equals(nativeTypeKind);
+        }
+
+        boolean isOptionSet() {
+            return isNativeType() && "OPTION_SET".equals(nativeTypeKind);
         }
     }
 
@@ -105,6 +123,47 @@ final class OpcUaCapture {
 
     /** Visible to package tests so non-neutral capture encoding remains covered. */
     static Value toProtoValue(NodeSpec spec, DataValue dv) {
+        if (spec.isOptionSet()) {
+            var variant = dv.getValue();
+            Object raw = variant == null ? null : variant.getValue();
+            if (!(raw instanceof DynamicOptionSetType optionSet)) {
+                throw new IllegalArgumentException(
+                        "capture expected DynamicOptionSetType for native option set node " + spec.nodeId() +
+                        " but got " + (raw == null ? "null" : raw.getClass().getSimpleName()));
+            }
+            Map<String, Object> tree = new HashMap<>();
+            tree.put("value", optionSet.getValue().bytes());
+            tree.put("validBits", optionSet.getValidBits().bytes());
+            ValueCodec.Encoded enc = ValueCodec.encode(tree);
+            return Value.newBuilder()
+                    .setNodeId(spec.nodeId())
+                    .setSourceTimeMicros(sourceMicros(dv))
+                    .setValueEnc(ByteString.copyFrom(enc.bytes()))
+                    .setValueKind(enc.kind().name())
+                    .setQuality(quality(dv.getStatusCode()))
+                    .build();
+        }
+        if (spec.isUnion()) {
+            var variant = dv.getValue();
+            Object raw = variant == null ? null : variant.getValue();
+            if (!(raw instanceof DynamicUnionType union)) {
+                throw new IllegalArgumentException(
+                        "capture expected DynamicUnionType for native union node " + spec.nodeId() +
+                        " but got " + (raw == null ? "null" : raw.getClass().getSimpleName()));
+            }
+            Map<String, Object> tree = new HashMap<>();
+            String fieldName = union.getMemberName();
+            Object fieldValue = union.getMember(fieldName);
+            tree.put(fieldName, fieldValue);
+            ValueCodec.Encoded enc = ValueCodec.encode(tree);
+            return Value.newBuilder()
+                    .setNodeId(spec.nodeId())
+                    .setSourceTimeMicros(sourceMicros(dv))
+                    .setValueEnc(ByteString.copyFrom(enc.bytes()))
+                    .setValueKind(enc.kind().name())
+                    .setQuality(quality(dv.getStatusCode()))
+                    .build();
+        }
         if (spec.isNativeStructure()) {
             var variant = dv.getValue();
             Object raw = variant == null ? null : variant.getValue();
