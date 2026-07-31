@@ -40,4 +40,11 @@ class OpcUaArrayValuesTest {
                 OpcUaArrayValues.captureNeutral("INT32", new Integer[] {1, 2}, List.of(3)))
                 .withMessageContaining("shape mismatch");
     }
+
+    @Test
+    void treatsWireDimensionsAsUnsignedUint32Values() {
+        assertThatIllegalArgumentException().isThrownBy(() ->
+                OpcUaArrayValues.captureNeutral("INT32", new Integer[] {1}, List.of(-1)))
+                .withMessageContaining("expected 4294967295 elements");
+    }
 }

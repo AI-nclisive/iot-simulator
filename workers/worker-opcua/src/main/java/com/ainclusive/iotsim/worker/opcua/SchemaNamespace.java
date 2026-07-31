@@ -149,7 +149,7 @@ final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
             if ("ARRAY".equals(def.valueRank())) {
                 node.setValueRank(def.arrayDimensions().size());
                 node.setArrayDimensions(def.arrayDimensions().stream()
-                        .map(dimension -> uint(dimension.longValue())).toArray(UInteger[]::new));
+                        .map(dimension -> uint(Integer.toUnsignedLong(dimension))).toArray(UInteger[]::new));
             }
             if (!isStandardOpcUaDataType(def.dataTypeNodeId()) && def.dataType() != null && !def.dataType().isBlank()) {
                 node.setValue(new DataValue(new Variant(OpcUaTypes.defaultValue(def.dataType()))));

@@ -150,20 +150,26 @@ final class OpcUaArrayValues {
                     + " dimensions but received " + actual.length);
         }
         for (int i = 0; i < actual.length; i++) {
-            if (expected.get(i) > 0 && expected.get(i) != actual[i]) {
+            long expectedDimension = Integer.toUnsignedLong(expected.get(i));
+            if (expectedDimension > 0 && expectedDimension != actual[i]) {
                 throw new IllegalArgumentException("OPC UA array dimension " + i + " mismatch: expected "
-                        + expected.get(i) + " but received " + actual[i]);
+                        + expectedDimension + " but received " + actual[i]);
             }
         }
     }
 
     private static void validateSize(int size, List<Integer> dimensions) {
-        if (dimensions == null || dimensions.isEmpty() || dimensions.stream().anyMatch(d -> d == null || d <= 0)) {
+        if (dimensions == null || dimensions.isEmpty()
+                || dimensions.stream().anyMatch(d -> d == null || Integer.toUnsignedLong(d) == 0)) {
             return;
         }
         long expected = 1;
         for (int dimension : dimensions) {
-            expected *= dimension;
+            try {
+                expected = Math.multiplyExact(expected, Integer.toUnsignedLong(dimension));
+            } catch (ArithmeticException overflow) {
+                throw new IllegalArgumentException("OPC UA array dimensions exceed supported value size", overflow);
+            }
         }
         if (expected != size) {
             throw new IllegalArgumentException("OPC UA array value shape mismatch: expected " + expected
