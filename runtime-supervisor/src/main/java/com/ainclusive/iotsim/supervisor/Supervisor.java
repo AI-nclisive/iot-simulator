@@ -760,6 +760,7 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
                     .setDataTypeDefaultEncodingId(orEmpty(n.defaultEncodingId()))
                     .setNativeTypeKind(n.nativeTypeKind() == null ? "" : n.nativeTypeKind().name())
                     .setValueRank(n.valueRank() == null ? "" : n.valueRank().name())
+                    .addAllArrayDimensions(n.arrayDimensions())
                     .setAccess(n.access() == null ? "" : n.access().name())
                     .setUnit(orEmpty(n.unit()))
                     .setDescription(orEmpty(n.description()))
