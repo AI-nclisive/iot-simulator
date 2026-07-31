@@ -123,7 +123,7 @@ class OpcUaCaptureIT {
         OpcUaCapture capture = null;
         try {
             capture = OpcUaCapture.start(runtime.endpointUrl(), "ANONYMOUS", null, null,
-                    List.of(new OpcUaCapture.NodeSpec(nodeId, null, null, "OPTION_SET")), received::addAll);
+                    List.of(new OpcUaCapture.NodeSpec(nodeId, "OPTION_SET")), received::addAll);
 
             // A change on the real server must surface as a captured neutral value tree.
             runtime.updateValue("flags", runtime.optionSetValue(typeId, new byte[] {3}, new byte[] {3}));
