@@ -198,6 +198,20 @@ class RecordingServiceTest {
     }
 
     @Test
+    void startCaptureRejectsAVariableReferencingAnOpaqueNativeType() {
+        SchemaNode opaque = new SchemaNode("dtOpaque", null, "dtOpaque", "VendorBlob", NodeKind.DATA_TYPE,
+                null, null, null, null, null, List.of(), null, List.of(), null, List.of(),
+                null, null, null, null, null);
+        SchemaNode blob = new SchemaNode("v1", null, "v1", "Blob", NodeKind.VARIABLE,
+                null, ValueRank.SCALAR, Access.READ, null, null, List.of(), null, List.of(), "dtOpaque", List.of(),
+                null, null, null, null);
+        schemas.set(1, List.of(opaque, blob));
+
+        assertThatThrownBy(() -> service.startCapture(PROJECT, SOURCE, "alice"))
+                .isInstanceOf(com.ainclusive.iotsim.domain.common.UnsupportedTypesException.class);
+    }
+
+    @Test
     void stopCaptureWithoutActiveCaptureIsRejected() {
         assertThatThrownBy(() -> service.stopCapture(PROJECT, SOURCE))
                 .isInstanceOf(IllegalArgumentException.class)
