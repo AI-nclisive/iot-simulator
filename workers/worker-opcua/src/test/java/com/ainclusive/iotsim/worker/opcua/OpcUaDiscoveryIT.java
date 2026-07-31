@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.eclipse.milo.opcua.stack.core.types.enumerated.NodeClass;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -259,6 +260,13 @@ class OpcUaDiscoveryIT {
         } finally {
             runtime.stop();
         }
+    }
+
+    @Test
+    void methodNodesAreLeavesDuringDiscoverySoArgumentPropertiesAreNotImported() {
+        assertThat(OpcUaDiscovery.isBrowsableContainer(NodeClass.Method)).isFalse();
+        assertThat(OpcUaDiscovery.isBrowsableContainer(NodeClass.Object)).isTrue();
+        assertThat(OpcUaDiscovery.isBrowsableContainer(NodeClass.Variable)).isTrue();
     }
 
     @Test

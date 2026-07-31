@@ -270,8 +270,12 @@ final class OpcUaDiscovery {
 
                 // A Variable can itself have children (e.g. a structured/complex
                 // value's component Variables via HasComponent), not just
-                // Objects/Folders — keep descending.
-                stack.push(new Frame(childId, neutralId, path));
+                // Objects/Folders — keep descending. Methods are deliberately
+                // leaves: browsing them would import their InputArguments and
+                // OutputArguments Properties as values in the source schema.
+                if (isBrowsableContainer(ref.getNodeClass())) {
+                    stack.push(new Frame(childId, neutralId, path));
+                }
                 if (nodes.size() % PROGRESS_STEP == 0) {
                     onProgress.onDiscovered(nodes.size());
                 }
@@ -286,6 +290,11 @@ final class OpcUaDiscovery {
     }
 
     private record Frame(NodeId nodeId, String parentId, String path) {}
+
+    /** Methods are schema nodes, but their OPC UA argument Properties are not process data. */
+    static boolean isBrowsableContainer(NodeClass nodeClass) {
+        return nodeClass == NodeClass.Object || nodeClass == NodeClass.Variable;
+    }
 
     /** Milo 1.x omits the namespace-zero prefix; schemas retain the canonical OPC UA form. */
     private static String nodeIdText(NodeId nodeId) {
