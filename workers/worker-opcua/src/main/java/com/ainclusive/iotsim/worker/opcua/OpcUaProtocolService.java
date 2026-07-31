@@ -141,7 +141,7 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
         unsupportedNativeTypes.clear();
         for (SchemaNodeMsg node : request.getSchema().getNodesList()) {
             if ("VARIABLE".equals(node.getKind()) || "FOLDER".equals(node.getKind())
-                    || "OBJECT".equals(node.getKind())) {
+                    || "OBJECT".equals(node.getKind()) || "METHOD".equals(node.getKind())) {
                 variables.add(new VarDef(node.getNodeId(), node.getParentId().isBlank() ? null : node.getParentId(),
                         node.getName(), node.getKind(), node.getDataType(), node.getDataTypeNodeId(),
                         node.getDeclaredDataTypeNodeId(), null,

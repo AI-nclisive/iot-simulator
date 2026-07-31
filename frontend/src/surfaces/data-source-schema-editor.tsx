@@ -19,7 +19,7 @@ export type NodeDto = {
   parentId: string | null;
   path: string;
   name: string;
-  kind: "FOLDER" | "OBJECT" | "VARIABLE" | "DATA_TYPE";
+  kind: "FOLDER" | "OBJECT" | "VARIABLE" | "METHOD" | "DATA_TYPE";
   dataType: string | null;
   valueRank: string | null;
   access: string | null;

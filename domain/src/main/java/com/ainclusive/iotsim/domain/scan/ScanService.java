@@ -378,8 +378,13 @@ public class ScanService implements DisposableBean {
                             valueRank(n.valueRank()), access(n.access()), null, n.dataTypeNodeId()));
                 }
             } else {
+                NodeKind kind = switch (n.kind()) {
+                    case "METHOD" -> NodeKind.METHOD;
+                    case "OBJECT" -> NodeKind.OBJECT;
+                    default -> NodeKind.FOLDER;
+                };
                 nodes.add(new SchemaNode(n.nodeId(), n.parentId(), schemaPaths.get(n.nodeId()), n.name(),
-                        NodeKind.FOLDER, null, null, null, n.unit(), n.description()));
+                        kind, null, null, null, n.unit(), n.description()));
             }
         }
         return nodes;
