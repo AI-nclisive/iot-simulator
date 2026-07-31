@@ -82,12 +82,15 @@ export function ScenariosPage() {
     direction: "asc",
   });
 
-  // Load on mount when scenarios are empty and not already loading or in error state
+  // Load once per project id change (mirrors data-sources-list-page /
+  // manual-schemas-page). Using isLoading/error/scenarios.length as guards
+  // here caused a refetch loop: a legitimately-empty result also has
+  // scenarios.length === 0, so the effect kept re-firing forever (#693).
   useEffect(() => {
-    if (currentProjectId && !isLoading && !error && scenarios.length === 0) {
+    if (currentProjectId) {
       void loadScenarios(currentProjectId);
     }
-  }, [currentProjectId, isLoading, error, scenarios.length, loadScenarios]);
+  }, [currentProjectId, loadScenarios]);
 
   const filtered = useMemo(() => {
     const query = searchValue.trim().toLowerCase();
