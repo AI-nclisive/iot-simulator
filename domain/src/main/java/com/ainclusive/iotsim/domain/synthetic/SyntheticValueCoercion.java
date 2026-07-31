@@ -17,12 +17,23 @@ import java.util.UUID;
  * SyntheticPattern.Constant} (IS-168) — {@link SyntheticVariable} rejects any
  * other pattern for them upstream, so their raw value is always the fixed
  * constant payload, never a generated series.
+ *
+ * <p>IS-200: Native types (STRUCTURE, ENUM, UNION, OPTION_SET) pass through directly
+ * as their constant value (Map, String, byte[], etc.) without coercion.
  */
 final class SyntheticValueCoercion {
 
     private SyntheticValueCoercion() {}
 
     static Object coerce(Object raw, DataType type) {
+        if (type == null) {
+            // IS-200: native type - pass through directly
+            return raw;
+        }
+        return coercePrimitive(raw, type);
+    }
+
+    private static Object coercePrimitive(Object raw, DataType type) {
         return switch (type) {
             case BOOL -> toBool(raw);
             case STRING, LOCALIZED_TEXT, QUALIFIED_NAME, NODE_ID, EXPANDED_NODE_ID, XML_ELEMENT ->
