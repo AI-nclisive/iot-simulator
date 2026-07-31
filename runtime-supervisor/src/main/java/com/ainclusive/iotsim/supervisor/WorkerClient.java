@@ -70,8 +70,17 @@ public final class WorkerClient implements AutoCloseable {
         this.scanTimeoutSeconds = scanTimeoutSeconds;
     }
 
-    public HelloResponse hello() {
-        HelloResponse response = stub.hello(
+    /**
+     * Handshakes with the worker under a deadline. Without a bound here, a control port
+     * that accepts a TCP connection but never completes the RPC (e.g. something else is
+     * squatting on the port the supervisor just handed the child, or the process is stuck
+     * mid-startup) hangs this call indefinitely — the caller's own overall ready-wait budget
+     * ({@link Supervisor#awaitReady}) is only checked *between* attempts, so one hung attempt
+     * defeats it entirely. Mirrors the deadline already applied to {@link #testConnection},
+     * {@link #scan}, and {@link #isHealthy}.
+     */
+    public HelloResponse hello(Duration timeout) {
+        HelloResponse response = stub.withDeadlineAfter(timeout.toMillis(), TimeUnit.MILLISECONDS).hello(
                 HelloRequest.newBuilder().setContractVersion(WorkerContract.VERSION).build());
         if (WorkerContract.major(response.getContractVersion()) != WorkerContract.major(WorkerContract.VERSION)) {
             throw new WorkerContractMismatchException(WorkerContract.VERSION, response.getContractVersion());
