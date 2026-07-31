@@ -137,7 +137,7 @@ class OpcUaCaptureIT {
 
             // Decode the captured value tree and verify structure
             Map<?, ?> tree = (Map<?, ?>) ValueCodec.decode(ValueCodec.Kind.TREE, captured.getValueEnc().toByteArray());
-            assertThat(tree).hasSize(2).containsKeys("value", "validBits");
+            assertThat(tree).hasSize(2);
             assertThat(tree.get("value")).isEqualTo(new byte[] {3});
             assertThat(tree.get("validBits")).isEqualTo(new byte[] {3});
         } finally {
