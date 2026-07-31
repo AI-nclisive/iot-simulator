@@ -702,6 +702,76 @@ describe("CreateDataSourceWizardPage — scan step (UI-458)", () => {
     expect(btn.disabled).toBe(false);
   });
 
+  it("stays responsive when a real-device scan discovers 1024 nodes with 253 preserved native types (bug #692)", async () => {
+    // Mirrors the field report: a real-device scan discovering 1024 nodes,
+    // 253 of them native OPC UA type declarations (dataTypeNodeId set) that
+    // get rendered as a "Native OPC UA types preserved" list, plus a further
+    // batch of genuinely unresolved nodes needing a scalar mapping. The
+    // reported symptom was the Scan step becoming permanently unresponsive
+    // right after this list rendered.
+    const NATIVE_COUNT = 253;
+    const UNRESOLVED_COUNT = 120;
+    const nodes: DiscoveredNodeResponse[] = [];
+    for (let i = 0; i < 1024; i++) {
+      const isNative = i < NATIVE_COUNT;
+      const isUnresolved = !isNative && i < NATIVE_COUNT + UNRESOLVED_COUNT;
+      nodes.push({
+        nodeId: `ns=2;s=n${i}`,
+        parentId: null,
+        path: `/n${i}`,
+        name: `n${i}`,
+        kind: "Variable",
+        dataType: isNative || isUnresolved ? null : "Float",
+        valueRank: 1,
+        access: "READ",
+        unit: null,
+        description: null,
+        unknownType: isNative || isUnresolved,
+        dataTypeNodeId: isNative ? `ns=2;i=${900 + i}` : null,
+      });
+    }
+
+    mockApiFetch
+      .mockImplementationOnce(() => Promise.resolve({ jobId: "job-big", status: "RUNNING" }))
+      .mockImplementationOnce(() =>
+        Promise.resolve({
+          jobId: "job-big",
+          status: "OK",
+          truncated: false,
+          discoveredCount: nodes.length,
+          unknownCount: NATIVE_COUNT + UNRESOLVED_COUNT,
+          message: null,
+        }),
+      )
+      .mockImplementationOnce(() => makeNodesPage(nodes));
+
+    await navigateToScanStep();
+
+    const renderStart = performance.now();
+    await advanceIntervalAndFlush(2000);
+    const renderElapsedMs = performance.now() - renderStart;
+
+    expect(await screen.findByText(/Discovered 1024 nodes/i)).toBeTruthy();
+    expect(screen.getByText("Native OPC UA types preserved")).toBeTruthy();
+    expect(
+      screen.getByText(`${NATIVE_COUNT} native OPC UA type declarations will be preserved unchanged`),
+    ).toBeTruthy();
+    // Generous ceiling: real rendering here takes low tens of ms. This exists
+    // to catch a regression back to unvirtualized/O(n^2) rendering, not to
+    // pin an exact number — a genuine hang would blow well past it.
+    expect(renderElapsedMs).toBeLessThan(3000);
+
+    // Resolving one of many unresolved nodes must also stay fast — this is
+    // the exact interaction path that used to re-run an O(n*m) validation
+    // check (scanStepValidationMessage) on every wizard render.
+    const selects = screen.getAllByLabelText(/Data type for/i);
+    expect(selects.length).toBeGreaterThan(0);
+    const interactionStart = performance.now();
+    await userEvent.selectOptions(selects[0], "FLOAT64");
+    const interactionElapsedMs = performance.now() - interactionStart;
+    expect(interactionElapsedMs).toBeLessThan(3000);
+  }, 20000);
+
   it("requires a scalar mapping for a genuinely unresolved node", async () => {
     mockApiFetch
       .mockImplementationOnce(() => Promise.resolve({ jobId: "job-1", status: "RUNNING" }))
