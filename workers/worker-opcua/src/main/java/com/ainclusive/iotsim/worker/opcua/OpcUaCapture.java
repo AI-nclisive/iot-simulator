@@ -144,7 +144,7 @@ final class OpcUaCapture {
         }
         Object neutral;
         if ("OPTION_SET".equals(spec.dataType())) {
-            if (!(raw instanceof org.eclipse.milo.opcua.stack.core.types.DynamicOptionSetType optionSet)) {
+            if (!(raw instanceof org.eclipse.milo.opcua.sdk.core.types.DynamicOptionSetType optionSet)) {
                 throw new IllegalArgumentException(
                         "capture expected DynamicOptionSetType for option set node " + spec.nodeId() +
                         " but got " + (raw == null ? "null" : raw.getClass().getSimpleName()));
