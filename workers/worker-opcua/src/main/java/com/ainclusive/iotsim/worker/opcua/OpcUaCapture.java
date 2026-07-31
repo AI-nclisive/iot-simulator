@@ -144,7 +144,15 @@ final class OpcUaCapture {
         }
         Object neutral;
         if ("OPTION_SET".equals(spec.dataType())) {
-            neutral = captureOptionSet(raw);
+            if (!(raw instanceof org.eclipse.milo.opcua.stack.core.types.DynamicOptionSetType optionSet)) {
+                throw new IllegalArgumentException(
+                        "capture expected DynamicOptionSetType for option set node " + spec.nodeId() +
+                        " but got " + (raw == null ? "null" : raw.getClass().getSimpleName()));
+            }
+            Map<String, Object> tree = new HashMap<>();
+            tree.put("value", optionSet.getValue().bytes());
+            tree.put("validBits", optionSet.getValidBits().bytes());
+            neutral = tree;
         } else if (spec.array()) {
             neutral = OpcUaArrayValues.captureNeutral(spec.dataType(), raw, spec.arrayDimensions());
         } else {
@@ -181,11 +189,4 @@ final class OpcUaCapture {
         return status.isBad() ? Quality.BAD : Quality.UNCERTAIN;
     }
 
-    private static Map<String, Object> captureOptionSet(Object raw) {
-        if (raw instanceof ExtensionObject extension
-                && extension.getBody() instanceof org.eclipse.milo.opcua.stack.core.types.builtin.ByteString body) {
-            return OpcUaTypes.decodeOptionSet(body.bytes());
-        }
-        return Map.of();
-    }
 }

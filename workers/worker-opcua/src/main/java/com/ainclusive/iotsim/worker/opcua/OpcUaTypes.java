@@ -173,48 +173,6 @@ final class OpcUaTypes {
         return value.toString();
     }
 
-    static Map<String, Object> decodeOptionSet(byte[] bytes) {
-        if (bytes == null || bytes.length == 0) {
-            return Map.of("value", new byte[0], "validBits", new byte[0]);
-        }
-        // OptionSet in OPC UA binary format: 4-byte length of validBits, validBits bytes,
-        // 4-byte length of value, value bytes
-        if (bytes.length < 4) {
-            return Map.of();
-        }
-        int validBitsLen = readInt32LE(bytes, 0);
-        int offset = 4;
-        if (bytes.length < offset + validBitsLen) {
-            return Map.of();
-        }
-        byte[] validBits = new byte[validBitsLen];
-        System.arraycopy(bytes, offset, validBits, 0, validBitsLen);
-        offset += validBitsLen;
-
-        if (bytes.length < offset + 4) {
-            return Map.of();
-        }
-        int valueLen = readInt32LE(bytes, offset);
-        offset += 4;
-        if (bytes.length < offset + valueLen) {
-            return Map.of();
-        }
-        byte[] value = new byte[valueLen];
-        System.arraycopy(bytes, offset, value, 0, valueLen);
-
-        return Map.of("value", value, "validBits", validBits);
-    }
-
-    private static int readInt32LE(byte[] bytes, int offset) {
-        return ((bytes[offset] & 0xFF)
-                | ((bytes[offset + 1] & 0xFF) << 8)
-                | ((bytes[offset + 2] & 0xFF) << 16)
-                | ((bytes[offset + 3] & 0xFF) << 24));
-    }
-
-    static Map<String, Object> decodeOptionSetFromStructure(Object s) {
-        return Map.of();
-    }
 
     /** Coerces a value decoded by {@link ValueCodec} to the OPC UA Java type. */
     static Object toOpcUaValue(String dataType, Object decoded) {
