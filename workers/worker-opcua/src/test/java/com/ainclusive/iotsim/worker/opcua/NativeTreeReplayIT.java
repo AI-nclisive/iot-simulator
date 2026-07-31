@@ -26,9 +26,11 @@ import org.eclipse.milo.opcua.sdk.client.OpcUaClient;
 import org.eclipse.milo.opcua.sdk.core.types.DynamicOptionSetType;
 import org.eclipse.milo.opcua.sdk.core.types.DynamicStructType;
 import org.eclipse.milo.opcua.sdk.core.types.DynamicUnionType;
+import org.eclipse.milo.opcua.stack.core.Identifiers;
 import org.eclipse.milo.opcua.stack.core.types.builtin.DataValue;
 import org.eclipse.milo.opcua.stack.core.types.builtin.ExtensionObject;
 import org.eclipse.milo.opcua.stack.core.types.builtin.NodeId;
+import org.eclipse.milo.opcua.stack.core.types.builtin.unsigned.Unsigned;
 import org.eclipse.milo.opcua.stack.core.types.enumerated.TimestampsToReturn;
 import org.junit.jupiter.api.Test;
 
@@ -188,6 +190,47 @@ class NativeTreeReplayIT {
                     assertThat(selected.fieldName()).isEqualTo("count");
                     assertThat(selected.fieldValue()).isEqualTo(7);
                 });
+            } finally {
+                client.disconnect();
+            }
+        } finally {
+            channel.shutdownNow().awaitTermination(5, TimeUnit.SECONDS);
+            worker.stop();
+        }
+    }
+
+    @Test
+    void appliesCanonicalTreeToAnAbstractlyTypedVariable() throws Exception {
+        OpcUaProtocolService service = new OpcUaProtocolService();
+        WorkerServer worker = new WorkerServer(0, service).start();
+        ManagedChannel channel = ManagedChannelBuilder.forAddress("127.0.0.1", worker.port())
+                .usePlaintext().build();
+        try {
+            ProtocolDataSourceGrpc.ProtocolDataSourceBlockingStub blocking =
+                    ProtocolDataSourceGrpc.newBlockingStub(channel);
+            blocking.configure(ConfigureRequest.newBuilder().setListenPort(freePort()).setSchema(Schema.newBuilder()
+                    .addNodes(SchemaNodeMsg.newBuilder().setNodeId("level").setKind("VARIABLE")
+                            .setName("Level").setDataTypeNodeId(Identifiers.UInteger.toParseableString()))
+                    .build()).build());
+            assertThat(blocking.start(StartRequest.getDefaultInstance()).getOk()).isTrue();
+
+            ValueCodec.Encoded tree = ValueCodec.encode(Map.of("type", "UINT32", "value", 7L));
+            CountDownLatch completed = new CountDownLatch(1);
+            StreamObserver<ValueBatch> values = ProtocolDataSourceGrpc.newStub(channel).applyValues(new StreamObserver<>() {
+                @Override public void onNext(Ack ignored) {}
+                @Override public void onError(Throwable ignored) { completed.countDown(); }
+                @Override public void onCompleted() { completed.countDown(); }
+            });
+            values.onNext(ValueBatch.newBuilder().addValues(Value.newBuilder().setNodeId("level")
+                    .setValueKind(tree.kind().name()).setValueEnc(ByteString.copyFrom(tree.bytes()))).build());
+            values.onCompleted();
+            assertThat(completed.await(5, TimeUnit.SECONDS)).isTrue();
+
+            OpcUaClient client = OpcUaClient.create(service.opcUaEndpointUrl());
+            client.connect();
+            try {
+                DataValue read = client.readValue(0.0, TimestampsToReturn.Neither, NodeId.parse("ns=2;s=level"));
+                assertThat(read.getValue().getValue()).isEqualTo(Unsigned.uint(7L));
             } finally {
                 client.disconnect();
             }

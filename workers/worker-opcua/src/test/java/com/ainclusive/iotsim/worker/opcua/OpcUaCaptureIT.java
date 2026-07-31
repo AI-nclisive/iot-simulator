@@ -47,6 +47,19 @@ class OpcUaCaptureIT {
     }
 
     @Test
+    void capturesAbstractValuesWithATypeDiscriminatorTree() {
+        Value captured = OpcUaCapture.toProtoValue(
+                new OpcUaCapture.NodeSpec("ns=2;s=any", "ABSTRACT"),
+                new DataValue(new Variant(Unsigned.uint(42))));
+
+        assertThat(captured.getValueKind()).isEqualTo("TREE");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> tree = (Map<String, Object>)
+                ValueCodec.decode(ValueCodec.Kind.TREE, captured.getValueEnc().toByteArray());
+        assertThat(tree).containsEntry("type", "UINT32").containsEntry("value", 42L);
+    }
+
+    @Test
     void capturesValueChangesFromRunningServer() throws Exception {
         int port = freePort();
         OpcUaServerRuntime runtime = new OpcUaServerRuntime(

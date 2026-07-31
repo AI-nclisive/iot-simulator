@@ -45,6 +45,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import org.eclipse.milo.opcua.stack.core.Identifiers;
 import org.eclipse.milo.opcua.stack.core.types.builtin.ByteString;
 import org.eclipse.milo.opcua.stack.core.types.builtin.ExtensionObject;
 import org.eclipse.milo.opcua.stack.core.types.builtin.NodeId;
@@ -73,6 +74,9 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
     private final Map<String, String> treeDataTypes = new ConcurrentHashMap<>();
     private final Map<String, NativeDataTypeDef> nativeTypeDefinitions = new ConcurrentHashMap<>();
     private final Map<String, String> unsupportedNativeTypes = new ConcurrentHashMap<>();
+    /** Variables declared with an abstract DataType (BaseDataType/UInteger, IS-197): the
+     * concrete type is carried per-value in a discriminated TREE rather than fixed by the schema. */
+    private final Set<String> abstractTypeNodes = ConcurrentHashMap.newKeySet();
     private final ClientEventHub clientEventHub = new ClientEventHub();
     private final RuntimeEventHub runtimeEventHub = new RuntimeEventHub();
     /**
@@ -139,6 +143,7 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
         treeDataTypes.clear();
         nativeTypeDefinitions.clear();
         unsupportedNativeTypes.clear();
+        abstractTypeNodes.clear();
         for (SchemaNodeMsg node : request.getSchema().getNodesList()) {
             if ("VARIABLE".equals(node.getKind()) || "FOLDER".equals(node.getKind())
                     || "OBJECT".equals(node.getKind()) || "METHOD".equals(node.getKind())) {
@@ -189,6 +194,8 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
             } else if (nativeTypeDefinitions.containsKey(node.getDataTypeNodeId())
                     && nativeTypeDefinitions.get(node.getDataTypeNodeId()).isOptionSet()) {
                 treeDataTypes.put(node.getNodeId(), node.getDataTypeNodeId());
+            } else if (isAbstractDataType(node.getDataTypeNodeId())) {
+                abstractTypeNodes.add(node.getNodeId());
             } else if (!node.getDataTypeNodeId().isBlank()) {
                 unsupportedNativeTypes.put(node.getNodeId(), node.getDataTypeNodeId());
             }
@@ -605,6 +612,10 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
                 Object decoded = ValueCodec.decode(ValueCodec.Kind.TREE, value.getValueEnc().toByteArray());
                 runtime.updateValue(value.getNodeId(), treeNativeValue(
                         runtime, treeDataTypes.get(value.getNodeId()), decoded));
+            } else if (abstractTypeNodes.contains(value.getNodeId())
+                    && !nodeArrayDimensions.containsKey(value.getNodeId())) {
+                Object decoded = ValueCodec.decode(ValueCodec.Kind.TREE, value.getValueEnc().toByteArray());
+                runtime.updateValue(value.getNodeId(), OpcUaTypes.toOpcUaVariant(decoded));
             } else if (structureEncodings.containsKey(value.getNodeId())) {
                 // A native structure is replayed as its original binary body. Its
                 // encoding id is schema metadata, not inferred from the bytes.
@@ -632,6 +643,20 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
                                 + unsupportedNativeTypes.get(value.getNodeId()))
                         .build());
             }
+        }
+    }
+
+    /** Whether a declared DataType NodeId is one of the abstract roots (BaseDataType/UInteger,
+     * IS-197) whose variables carry a dynamic concrete type per value. */
+    private static boolean isAbstractDataType(String dataTypeNodeId) {
+        if (dataTypeNodeId.isBlank()) {
+            return false;
+        }
+        try {
+            NodeId id = NodeId.parse(dataTypeNodeId);
+            return Identifiers.BaseDataType.equals(id) || Identifiers.UInteger.equals(id);
+        } catch (RuntimeException e) {
+            return false;
         }
     }
 

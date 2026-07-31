@@ -153,6 +153,10 @@ final class OpcUaCapture {
             tree.put("value", optionSet.getValue().bytes());
             tree.put("validBits", optionSet.getValidBits().bytes());
             neutral = tree;
+        } else if ("ABSTRACT".equals(spec.dataType())) {
+            // BaseDataType/UInteger (IS-197): the concrete type varies per value, so it is
+            // captured as a discriminated tree rather than assumed from the schema.
+            neutral = OpcUaTypes.fromOpcUaVariant(raw);
         } else if (spec.array()) {
             neutral = OpcUaArrayValues.captureNeutral(spec.dataType(), raw, spec.arrayDimensions());
         } else {
