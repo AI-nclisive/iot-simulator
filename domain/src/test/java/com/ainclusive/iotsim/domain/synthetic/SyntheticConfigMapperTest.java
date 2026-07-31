@@ -176,7 +176,7 @@ class SyntheticConfigMapperTest {
     void mapsRandomDateTimeIsoRangeToEpochMillis() {
         var variable = new SyntheticVariableConfig("timestamp", DataType.DATETIME,
                 new PatternSpec("RANDOM_UNIFORM", null, null, null, null, null, null, null,
-                        null, null, null, "2026-07-01T00:00:00Z", "2026-07-31T00:00:00Z"), 500);
+                        null, null, null, "2026-07-01T00:00:00Z", "2026-07-31T00:00:00Z", null), 500);
 
         assertThat(SyntheticConfigMapper.toVariables(new SyntheticConfig(7L, List.of(variable))))
                 .extracting(SyntheticVariable::pattern)
@@ -189,7 +189,7 @@ class SyntheticConfigMapperTest {
     void rejectsInvalidRandomDateTimeRange() {
         var variable = new SyntheticVariableConfig("timestamp", DataType.DATETIME,
                 new PatternSpec("RANDOM_UNIFORM", null, null, null, null, null, null, null,
-                        null, null, null, "2026-08-01T00:00:00Z", "2026-07-01T00:00:00Z"), 500);
+                        null, null, null, "2026-08-01T00:00:00Z", "2026-07-01T00:00:00Z", null), 500);
 
         assertThatThrownBy(() -> SyntheticConfigMapper.toVariables(new SyntheticConfig(7L, List.of(variable))))
                 .isInstanceOf(IllegalArgumentException.class)
