@@ -64,6 +64,8 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
     private final AtomicInteger configuredNodes = new AtomicInteger();
     private final AtomicReference<OpcUaServerRuntime> serverRuntime = new AtomicReference<>();
     private final Map<String, String> nodeDataTypes = new ConcurrentHashMap<>();
+    /** Declared array dimensions for variables; absence means scalar. */
+    private final Map<String, List<Integer>> nodeArrayDimensions = new ConcurrentHashMap<>();
     /** Default binary encodings for native structures, keyed by variable node id. */
     private final Map<String, NodeId> structureEncodings = new ConcurrentHashMap<>();
     private final Map<String, String> structureDataTypes = new ConcurrentHashMap<>();
@@ -131,6 +133,7 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
         List<VarDef> variables = new ArrayList<>();
         List<NativeDataTypeDef> typeDefinitions = new ArrayList<>();
         nodeDataTypes.clear();
+        nodeArrayDimensions.clear();
         structureEncodings.clear();
         structureDataTypes.clear();
         treeDataTypes.clear();
@@ -138,11 +141,11 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
         unsupportedNativeTypes.clear();
         for (SchemaNodeMsg node : request.getSchema().getNodesList()) {
             if ("VARIABLE".equals(node.getKind()) || "FOLDER".equals(node.getKind())
-                    || "OBJECT".equals(node.getKind())) {
+                    || "OBJECT".equals(node.getKind()) || "METHOD".equals(node.getKind())) {
                 variables.add(new VarDef(node.getNodeId(), node.getParentId().isBlank() ? null : node.getParentId(),
                         node.getName(), node.getKind(), node.getDataType(), node.getDataTypeNodeId(),
                         node.getDeclaredDataTypeNodeId(), null,
-                        null, null, null, null));
+                        null, null, null, null, node.getValueRank(), node.getArrayDimensionsList()));
             }
             if ("DATA_TYPE".equals(node.getKind())) {
                 typeDefinitions.add(new NativeDataTypeDef(
@@ -171,6 +174,9 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
         for (SchemaNodeMsg node : request.getSchema().getNodesList()) {
             if (!"VARIABLE".equals(node.getKind())) {
                 continue;
+            }
+            if ("ARRAY".equals(node.getValueRank())) {
+                nodeArrayDimensions.put(node.getNodeId(), List.copyOf(node.getArrayDimensionsList()));
             }
             if (!node.getDataType().isBlank()) {
                 nodeDataTypes.put(node.getNodeId(), node.getDataType());
@@ -344,21 +350,14 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
             }
             String dataType = node.getDataType();
             String defaultEncodingId = "";
-            String nativeTypeKind = "";
             if (dataType.isEmpty() && !node.getDataTypeNodeId().isEmpty()) {
                 SchemaNodeMsg declaration = declarations.get(node.getDataTypeNodeId());
-                if (declaration != null && declaration.getDataTypeEnumValuesCount() > 0) {
-                    nativeTypeKind = declaration.getNativeTypeKind();
-                    if (nativeTypeKind.isBlank() || "ENUM".equals(nativeTypeKind)) {
-                        // Plain enum: coerce to INT32
-                        dataType = "INT32";
-                    } else if ("OPTION_SET".equals(nativeTypeKind)) {
-                        // Option set: use encoding id
-                        defaultEncodingId = declaration.getDataTypeDefaultEncodingId();
-                    }
+                if (declaration != null && declaration.getDataTypeEnumValuesCount() > 0
+                        && (declaration.getNativeTypeKind().isBlank()
+                                || "ENUM".equals(declaration.getNativeTypeKind()))) {
+                    dataType = "INT32";
                 } else if (declaration != null && declaration.getDataTypeMembersCount() > 0
                         && !declaration.getDataTypeDefaultEncodingId().isEmpty()) {
-                    nativeTypeKind = declaration.getNativeTypeKind();
                     defaultEncodingId = declaration.getDataTypeDefaultEncodingId();
                 }
             }
@@ -370,7 +369,8 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
                         "capture cannot encode native DataType without an executable encoding: " + declared);
             }
             nodes.add(new OpcUaCapture.NodeSpec(node.getNodeId(), dataType.isEmpty() ? null : dataType,
-                    defaultEncodingId.isEmpty() ? null : defaultEncodingId, nativeTypeKind.isEmpty() ? null : nativeTypeKind));
+                    defaultEncodingId.isEmpty() ? null : defaultEncodingId,
+                    "ARRAY".equals(node.getValueRank()), node.getArrayDimensionsList()));
         }
         return nodes;
     }
@@ -585,9 +585,13 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
             String dataType = nodeDataTypes.get(value.getNodeId());
             if (dataType != null) {
                 try {
-                    Object decoded = ValueCodec.decode(
-                            OpcUaTypes.codecKind(dataType), value.getValueEnc().toByteArray());
-                    runtime.updateValue(value.getNodeId(), OpcUaTypes.toOpcUaValue(dataType, decoded));
+                    boolean array = nodeArrayDimensions.containsKey(value.getNodeId());
+                    Object decoded = ValueCodec.decode(array ? ValueCodec.Kind.TREE : OpcUaTypes.codecKind(dataType),
+                            value.getValueEnc().toByteArray());
+                    runtime.updateValue(value.getNodeId(), array
+                            ? OpcUaArrayValues.replayNeutral(dataType, decoded,
+                                    nodeArrayDimensions.get(value.getNodeId()))
+                            : OpcUaTypes.toOpcUaValue(dataType, decoded));
                 } catch (RuntimeException e) {
                     runtimeEventHub.emit(RuntimeEvent.newBuilder()
                             .setType("ERROR")
@@ -596,7 +600,8 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
                                     + ": " + e.getMessage())
                             .build());
                 }
-            } else if ("TREE".equals(value.getValueKind()) && treeDataTypes.containsKey(value.getNodeId())) {
+            } else if ("TREE".equals(value.getValueKind()) && treeDataTypes.containsKey(value.getNodeId())
+                    && !nodeArrayDimensions.containsKey(value.getNodeId())) {
                 Object decoded = ValueCodec.decode(ValueCodec.Kind.TREE, value.getValueEnc().toByteArray());
                 runtime.updateValue(value.getNodeId(), treeNativeValue(
                         runtime, treeDataTypes.get(value.getNodeId()), decoded));
@@ -613,7 +618,12 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
                             .build());
                     continue;
                 }
-                runtime.updateValue(value.getNodeId(), structureValue(localEncoding, value.getValueEnc().toByteArray()));
+                boolean array = nodeArrayDimensions.containsKey(value.getNodeId());
+                Object decoded = array ? ValueCodec.decode(ValueCodec.Kind.TREE, value.getValueEnc().toByteArray()) : null;
+                runtime.updateValue(value.getNodeId(), array
+                        ? OpcUaArrayValues.replayStructure(decoded, localEncoding,
+                                nodeArrayDimensions.get(value.getNodeId()))
+                        : structureValue(localEncoding, value.getValueEnc().toByteArray()));
             } else if (unsupportedNativeTypes.containsKey(value.getNodeId())) {
                 runtimeEventHub.emit(RuntimeEvent.newBuilder()
                         .setType("ERROR")

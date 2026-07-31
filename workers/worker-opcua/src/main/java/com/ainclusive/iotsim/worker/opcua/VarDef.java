@@ -15,18 +15,30 @@ package com.ainclusive.iotsim.worker.opcua;
  */
 record VarDef(String nodeId, String parentId, String name, String kind, String dataType, String dataTypeNodeId,
         String declaredDataTypeNodeId, String referenceType,
-        Integer accessLevelFull, Integer minimumSamplingInterval, Integer writeMask, Boolean historizing) {
+        Integer accessLevelFull, Integer minimumSamplingInterval, Integer writeMask, Boolean historizing,
+        String valueRank, java.util.List<Integer> arrayDimensions) {
+    VarDef {
+        arrayDimensions = arrayDimensions == null ? java.util.List.of() : java.util.List.copyOf(arrayDimensions);
+    }
+
+    VarDef(String nodeId, String parentId, String name, String kind, String dataType, String dataTypeNodeId,
+            String declaredDataTypeNodeId, String referenceType,
+            Integer accessLevelFull, Integer minimumSamplingInterval, Integer writeMask, Boolean historizing) {
+        this(nodeId, parentId, name, kind, dataType, dataTypeNodeId, declaredDataTypeNodeId, referenceType,
+                accessLevelFull, minimumSamplingInterval, writeMask, historizing, "SCALAR", java.util.List.of());
+    }
+
     VarDef(String nodeId, String parentId, String name, String kind, String dataType, String dataTypeNodeId,
             String referenceType, Integer accessLevelFull, Integer minimumSamplingInterval, Integer writeMask,
             Boolean historizing) {
         this(nodeId, parentId, name, kind, dataType, dataTypeNodeId, null, referenceType,
-                accessLevelFull, minimumSamplingInterval, writeMask, historizing);
+                accessLevelFull, minimumSamplingInterval, writeMask, historizing, "SCALAR", java.util.List.of());
     }
 
     VarDef(String nodeId, String parentId, String name, String kind, String dataType, String referenceType,
             Integer accessLevelFull, Integer minimumSamplingInterval, Integer writeMask, Boolean historizing) {
         this(nodeId, parentId, name, kind, dataType, null, null, referenceType,
-                accessLevelFull, minimumSamplingInterval, writeMask, historizing);
+                accessLevelFull, minimumSamplingInterval, writeMask, historizing, "SCALAR", java.util.List.of());
     }
 
     VarDef(String nodeId, String parentId, String name, String kind, String dataType, String referenceType) {
@@ -34,10 +46,12 @@ record VarDef(String nodeId, String parentId, String name, String kind, String d
     }
 
     VarDef(String nodeId, String parentId, String name, String kind, String dataType) {
-        this(nodeId, parentId, name, kind, dataType, null, null, null, null, null, null, null);
+        this(nodeId, parentId, name, kind, dataType, null, null, null, null, null, null, null,
+                "SCALAR", java.util.List.of());
     }
 
     VarDef(String nodeId, String name, String dataType) {
-        this(nodeId, null, name, "VARIABLE", dataType, null, null, null, null, null, null, null);
+        this(nodeId, null, name, "VARIABLE", dataType, null, null, null, null, null, null, null,
+                "SCALAR", java.util.List.of());
     }
 }

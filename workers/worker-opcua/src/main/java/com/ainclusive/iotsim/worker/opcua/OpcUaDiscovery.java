@@ -238,7 +238,8 @@ final class OpcUaDiscovery {
                     continue;
                 }
                 boolean isVariable = ref.getNodeClass() == NodeClass.Variable;
-                if (!isVariable && ref.getNodeClass() != NodeClass.Object) {
+                boolean isMethod = ref.getNodeClass() == NodeClass.Method;
+                if (!isVariable && !isMethod && ref.getNodeClass() != NodeClass.Object) {
                     continue;
                 }
 
@@ -263,13 +264,18 @@ final class OpcUaDiscovery {
 
                 DataTypeDeclaration declaration = isVariable
                         ? dataTypeOf(client, childId, unknown) : null;
-                nodes.add(toNode(neutralId, frame.parentId(), path, name, isVariable,
+                nodes.add(toNode(neutralId, frame.parentId(), path, name,
+                        isVariable ? "VARIABLE" : isMethod ? "METHOD" : "FOLDER",
                         declaration, referenceType, attrs));
 
                 // A Variable can itself have children (e.g. a structured/complex
                 // value's component Variables via HasComponent), not just
-                // Objects/Folders — keep descending.
-                stack.push(new Frame(childId, neutralId, path));
+                // Objects/Folders — keep descending. Methods are deliberately
+                // leaves: browsing them would import their InputArguments and
+                // OutputArguments Properties as values in the source schema.
+                if (isBrowsableContainer(ref.getNodeClass())) {
+                    stack.push(new Frame(childId, neutralId, path));
+                }
                 if (nodes.size() % PROGRESS_STEP == 0) {
                     onProgress.onDiscovered(nodes.size());
                 }
@@ -284,6 +290,11 @@ final class OpcUaDiscovery {
     }
 
     private record Frame(NodeId nodeId, String parentId, String path) {}
+
+    /** Methods are schema nodes, but their OPC UA argument Properties are not process data. */
+    static boolean isBrowsableContainer(NodeClass nodeClass) {
+        return nodeClass == NodeClass.Object || nodeClass == NodeClass.Variable;
+    }
 
     /** Milo 1.x omits the namespace-zero prefix; schemas retain the canonical OPC UA form. */
     private static String nodeIdText(NodeId nodeId) {
@@ -300,7 +311,7 @@ final class OpcUaDiscovery {
                 BrowseDirection.Forward,
                 Identifiers.HierarchicalReferences,
                 true,
-                uint(NodeClass.Object.getValue() | NodeClass.Variable.getValue()),
+                uint(NodeClass.Object.getValue() | NodeClass.Variable.getValue() | NodeClass.Method.getValue()),
                 uint(BrowseResultMask.All.getValue()));
         BrowseResult result = client.browse(browse);
         List<ReferenceDescription> all = new ArrayList<>();
@@ -579,14 +590,14 @@ final class OpcUaDiscovery {
     }
 
     private static SchemaNodeMsg toNode(String nodeId, String parentId, String path, String name,
-            boolean variable, DataTypeDeclaration declaration, String referenceType, VariableAttributes attrs) {
+            String kind, DataTypeDeclaration declaration, String referenceType, VariableAttributes attrs) {
         SchemaNodeMsg.Builder b = SchemaNodeMsg.newBuilder()
                 .setNodeId(nodeId)
                 .setParentId(parentId == null ? "" : parentId)
                 .setPath(path)
                 .setName(name)
-                .setKind(variable ? "VARIABLE" : "FOLDER");
-        if (variable) {
+                .setKind(kind);
+        if ("VARIABLE".equals(kind)) {
             b.setDataType(declaration == null || declaration.neutralType() == null
                             ? "" : declaration.neutralType())
                     .setDataTypeNodeId(declaration == null || declaration.dataTypeNodeId() == null

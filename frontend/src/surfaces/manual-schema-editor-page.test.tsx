@@ -102,6 +102,27 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
     expect(screen.getByText("Level")).not.toBeNull();
   });
 
+  it("adds a browseable OPC UA method to a manual schema", async () => {
+    mockLoadManualSchemaById.mockResolvedValueOnce(schemaWithFolder);
+    mockUpdateManualSchema.mockResolvedValueOnce(schemaWithFolder);
+    renderPage();
+    await waitFor(() => screen.getByText("Reactor"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Add method" }));
+    fireEvent.change(screen.getByLabelText("Parent folder for new node"), { target: { value: "f1" } });
+    fireEvent.change(screen.getAllByLabelText("Name")[1], { target: { value: "Reset" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByLabelText(/Save in this schema/));
+    fireEvent.click(screen.getAllByRole("button", { name: "Save" })[1]);
+
+    await waitFor(() => expect(mockUpdateManualSchema).toHaveBeenCalledWith(
+      "proj-1", "ms-1", expect.objectContaining({ nodes: expect.arrayContaining([
+        expect.objectContaining({ name: "Reset", kind: "METHOD", parentId: "f1" }),
+      ]) }),
+    ));
+  });
+
   it("adds Range from the standard OPC UA type catalog and prevents a duplicate", async () => {
     mockLoadManualSchemaById.mockResolvedValueOnce(schema);
     renderPage();
@@ -495,15 +516,14 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
     });
   });
 
-  it("uses plain language for node classes that are not available yet", async () => {
+  it("describes methods as callable operations in the editor", async () => {
     mockLoadManualSchemaById.mockResolvedValueOnce(schemaWithFolder);
     renderPage();
 
     await waitFor(() => screen.getByText("Reactor"));
-    fireEvent.click(screen.getByRole("button", { name: "Add variable" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add method" }));
 
-    expect(screen.getByText("Coming soon:")).toBeTruthy();
-    expect(screen.getByText(/Data types can be defined here and selected by variables/i)).toBeTruthy();
+    expect(screen.getByText(/Methods are browseable callable operations/i)).toBeTruthy();
     expect(screen.queryByText(/address-space model/i)).toBeNull();
   });
 

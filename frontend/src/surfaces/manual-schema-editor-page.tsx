@@ -202,7 +202,6 @@ const STRUCTURE_TEMPLATES = [
 
 const VALUE_RANKS = ["SCALAR", "ARRAY"] as const;
 const ACCESS_LEVELS = ["READ", "READ_WRITE"] as const;
-const UPCOMING_NODE_CLASSES = ["Method"] as const;
 const REFERENCE_TYPES = ["ORGANIZES", "HAS_COMPONENT", "HAS_PROPERTY", "HAS_TYPE_DEFINITION", "GENERIC"] as const;
 
 // Available without scanning: these are standard OPC UA declarations whose
@@ -426,7 +425,7 @@ export function ManualSchemaEditorPage() {
   });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
-  const [addKind, setAddKind] = useState<"FOLDER" | "OBJECT" | "VARIABLE" | "DATA_TYPE" | null>(null);
+  const [addKind, setAddKind] = useState<"FOLDER" | "OBJECT" | "VARIABLE" | "METHOD" | "DATA_TYPE" | null>(null);
   const [addName, setAddName] = useState("");
   const [addType, setAddType] = useState<string>("FLOAT64");
   const [addValueRank, setAddValueRank] = useState<string>("SCALAR");
@@ -860,7 +859,7 @@ export function ManualSchemaEditorPage() {
     setSelectedSuggestion("");
   }
 
-  function openAdd(kind: "FOLDER" | "OBJECT" | "VARIABLE") {
+  function openAdd(kind: "FOLDER" | "OBJECT" | "VARIABLE" | "METHOD") {
     setAddKind(kind);
     setAddParentId(selectedNode && canHaveChildren(selectedNode.kind) ? selectedNode.nodeId : null);
   }
@@ -1065,7 +1064,7 @@ export function ManualSchemaEditorPage() {
               {isEmpty ? "Create your OPC UA server structure" : "Continue building this server structure"}
             </p>
             <p className="mt-1 text-sm text-shell-muted">
-              A <strong>folder</strong> groups items clients can browse (for example, “Tank 1”). A <strong>variable</strong> is a value clients can read or write (for example, Temperature).
+              A <strong>folder</strong> groups items clients can browse (for example, “Tank 1”). A <strong>variable</strong> is a value clients can read or write (for example, Temperature). A <strong>method</strong> is a callable operation; it is exposed with an explicit not-implemented response until business logic is authored.
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
             <button className="shell-action" type="button" onClick={() => openAdd("FOLDER")}>
@@ -1079,6 +1078,11 @@ export function ManualSchemaEditorPage() {
             {containers.length > 0 ? (
               <button className="shell-action" type="button" onClick={() => openAdd("VARIABLE")}>
                 Add variable
+              </button>
+            ) : null}
+            {containers.length > 0 ? (
+              <button className="shell-action" type="button" onClick={() => openAdd("METHOD")}>
+                Add method
               </button>
             ) : null}
             <span className="text-xs text-shell-muted">
@@ -1096,20 +1100,17 @@ export function ManualSchemaEditorPage() {
           <div className="mb-4 space-y-3 rounded-md border border-shell-line bg-white px-4 py-4">
             <fieldset>
               <legend className="text-sm font-medium text-shell-ink">Choose a node class</legend>
-              <p className="mt-1 text-xs text-shell-muted">Folders and objects organize the server tree. Variables hold values clients can read or write.</p>
+              <p className="mt-1 text-xs text-shell-muted">Folders and objects organize the server tree. Variables hold values clients can read or write. Methods are browseable callable operations.</p>
               <div className="mt-3 flex flex-wrap gap-2" role="radiogroup" aria-label="Node class">
-                {(["FOLDER", "OBJECT", "VARIABLE", "DATA_TYPE"] as const).map((kind) => (
+                {(["FOLDER", "OBJECT", "VARIABLE", "METHOD", "DATA_TYPE"] as const).map((kind) => (
                   <label key={kind} className={`cursor-pointer rounded-md border px-3 py-2 text-sm ${addKind === kind ? "border-shell-accent bg-shell-accent/5 text-shell-ink" : "border-shell-line text-shell-muted"}`}>
                     <input checked={addKind === kind} className="sr-only" name="node-class" type="radio" value={kind} onChange={() => setAddKind(kind)} />
-                    <span className="font-medium">{kind === "FOLDER" ? "Folder" : kind === "OBJECT" ? "Object" : kind === "VARIABLE" ? "Variable" : "Data type"}</span>
-                    <span className="block text-xs">{kind === "FOLDER" ? "Contains nodes" : kind === "OBJECT" ? "Groups related nodes" : kind === "VARIABLE" ? "Stores a value" : "Reusable structured value shape"}</span>
+                    <span className="font-medium">{kind === "FOLDER" ? "Folder" : kind === "OBJECT" ? "Object" : kind === "VARIABLE" ? "Variable" : kind === "METHOD" ? "Method" : "Data type"}</span>
+                    <span className="block text-xs">{kind === "FOLDER" ? "Contains nodes" : kind === "OBJECT" ? "Groups related nodes" : kind === "VARIABLE" ? "Stores a value" : kind === "METHOD" ? "Callable operation (no implementation)" : "Reusable structured value shape"}</span>
                   </label>
                 ))}
               </div>
             </fieldset>
-            <div className="rounded-md bg-shell-base/60 px-3 py-2 text-xs text-shell-muted">
-              <span className="font-medium text-shell-ink">Coming soon: </span>{UPCOMING_NODE_CLASSES.join(", ")}. Data types can be defined here and selected by variables in this schema.
-            </div>
             <div className="rounded-md border border-shell-line bg-shell-base/30 px-3 py-3">
               <p className="text-sm font-medium text-shell-ink">Standard OPC UA type catalog</p>
               <p className="mt-1 text-xs text-shell-muted">Available without a scan. Adding one makes its exact type and fields selectable by variables in this schema.</p>
