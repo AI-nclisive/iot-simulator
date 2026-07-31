@@ -9,6 +9,8 @@ import com.ainclusive.iotsim.platform.capture.CaptureSpec;
 import com.ainclusive.iotsim.platform.secret.ConnectionCredentials;
 import com.ainclusive.iotsim.protocolmodel.Access;
 import com.ainclusive.iotsim.protocolmodel.DataType;
+import com.ainclusive.iotsim.protocolmodel.DataTypeMember;
+import com.ainclusive.iotsim.protocolmodel.NativeTypeKind;
 import com.ainclusive.iotsim.protocolmodel.NeutralValue;
 import com.ainclusive.iotsim.protocolmodel.NodeKind;
 import com.ainclusive.iotsim.protocolmodel.SchemaNode;
@@ -74,6 +76,37 @@ class SupervisorCaptureTest {
         session.stop();
         assertThat(launcher.last().service().awaitCaptureCancelled(5)).isTrue();
         assertThat(launcher.allServersShutDown()).isTrue();
+    }
+
+    @Test
+    void captureAcceptsNativeStructureWithExecutableEncoding() throws Exception {
+        Supervisor supervisor = supervisor();
+        List<NeutralValue> received = new CopyOnWriteArrayList<>();
+        CountDownLatch got = new CountDownLatch(1);
+        SchemaNode range = new SchemaNode("ns=0;i=884", null, "Types/Range", "Range", NodeKind.DATA_TYPE,
+                null, null, null, null, null, List.of(), null, List.of(), null,
+                List.of(new DataTypeMember("low", DataType.FLOAT64, null),
+                        new DataTypeMember("high", DataType.FLOAT64, null)),
+                List.of(), "ns=0;i=886", NativeTypeKind.STRUCTURE, null, null, null, null, null);
+        SchemaNode variable = new SchemaNode("range", null, "/range", "Range", NodeKind.VARIABLE,
+                null, ValueRank.SCALAR, Access.READ, null, null, List.of(), null, List.of(), "ns=0;i=884",
+                List.of(), List.of(), null, null, null, null, null, null, null);
+
+        CaptureSession session = supervisor.startCapture(new CaptureSpec("OPC_UA", "opc.tcp://plant:4840/ua",
+                ConnectionCredentials.anonymous(), 3, List.of(range, variable)), values -> {
+                    received.addAll(values);
+                    got.countDown();
+                });
+
+        assertThat(got.await(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(received).singleElement().satisfies(value -> {
+            assertThat(value.nodeId()).isEqualTo("range");
+            assertThat(value.value()).isInstanceOf(byte[].class);
+        });
+        assertThat(launcher.last().service().lastCaptureRequest().getSchema().getNodesList())
+                .anySatisfy(node -> assertThat(node.getDataTypeDefaultEncodingId()).isEqualTo("ns=0;i=886"));
+
+        session.stop();
     }
 
     @Test

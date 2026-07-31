@@ -543,6 +543,14 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
                 kinds.put(node.nodeId(), ValueCodec.Kind.INT);
                 continue;
             }
+            if (declaration != null && !declaration.members().isEmpty()
+                    && declaration.defaultEncodingId() != null && !declaration.defaultEncodingId().isBlank()) {
+                // The worker verifies the ExtensionObject encoding id and emits its binary body.
+                // Value messages include BYTES explicitly, but the fallback kind keeps capture
+                // safe for a worker that omits valueKind.
+                kinds.put(node.nodeId(), ValueCodec.Kind.BYTES);
+                continue;
+            }
             if (declaration != null) {
                 throw new CaptureException(CaptureException.Kind.UNSUPPORTED,
                         "capture cannot decode native DataType without an executable encoding: "

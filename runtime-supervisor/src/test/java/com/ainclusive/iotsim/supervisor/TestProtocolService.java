@@ -163,9 +163,14 @@ final class TestProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSourc
         ((ServerCallStreamObserver<ValueBatch>) obs).setOnCancelHandler(captureCancelled::countDown);
         // Emit one value the supervisor must decode against the request schema's types.
         ValueCodec.Encoded enc = ValueCodec.encode(21.5);
+        String nodeId = request.getSchema().getNodesList().stream()
+                .filter(node -> "VARIABLE".equals(node.getKind()))
+                .findFirst()
+                .map(node -> node.getNodeId())
+                .orElse("temp");
         obs.onNext(ValueBatch.newBuilder()
                 .addValues(Value.newBuilder()
-                        .setNodeId("temp")
+                        .setNodeId(nodeId)
                         .setSourceTimeMicros(1_000_000L)
                         .setValueEnc(ByteString.copyFrom(enc.bytes()))
                         .setQuality(Quality.GOOD))
