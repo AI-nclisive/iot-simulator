@@ -173,6 +173,38 @@ final class OpcUaTypes {
         return value.toString();
     }
 
+    static Map<String, Object> decodeOptionSet(byte[] bytes) {
+        if (bytes == null || bytes.length == 0) {
+            return Map.of("value", new byte[0], "validBits", new byte[0]);
+        }
+        // OptionSet encoded as: validBits (byte array), value (byte array)
+        // First byte is the length of validBits, then validBits bytes, then value bytes
+        if (bytes.length < 1) {
+            return Map.of();
+        }
+        int validBitsLen = bytes[0] & 0xFF;
+        if (bytes.length < 1 + validBitsLen) {
+            return Map.of();
+        }
+        byte[] validBits = new byte[validBitsLen];
+        System.arraycopy(bytes, 1, validBits, 0, validBitsLen);
+        byte[] value = new byte[bytes.length - 1 - validBitsLen];
+        System.arraycopy(bytes, 1 + validBitsLen, value, 0, value.length);
+        return Map.of("value", value, "validBits", validBits);
+    }
+
+    static Map<String, Object> decodeOptionSetFromStructure(Object s) {
+        if (s instanceof org.eclipse.milo.opcua.stack.core.types.builtin.Structure structure) {
+            Object[] values = structure.getFields();
+            if (values != null && values.length >= 2) {
+                return Map.of(
+                        "value", values[0] instanceof byte[] ? values[0] : new byte[0],
+                        "validBits", values[1] instanceof byte[] ? values[1] : new byte[0]);
+            }
+        }
+        return Map.of();
+    }
+
     /** Coerces a value decoded by {@link ValueCodec} to the OPC UA Java type. */
     static Object toOpcUaValue(String dataType, Object decoded) {
         if (decoded == null) {
