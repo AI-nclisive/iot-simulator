@@ -186,9 +186,6 @@ final class OpcUaCapture {
                 && extension.getBody() instanceof org.eclipse.milo.opcua.stack.core.types.builtin.ByteString body) {
             return OpcUaTypes.decodeOptionSet(body.bytes());
         }
-        if (raw instanceof org.eclipse.milo.opcua.stack.core.types.builtin.Structure s) {
-            return OpcUaTypes.decodeOptionSetFromStructure(s);
-        }
         return Map.of();
     }
 }

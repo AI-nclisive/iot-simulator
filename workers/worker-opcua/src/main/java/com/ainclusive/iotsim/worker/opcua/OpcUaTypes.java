@@ -177,8 +177,7 @@ final class OpcUaTypes {
         if (bytes == null || bytes.length == 0) {
             return Map.of("value", new byte[0], "validBits", new byte[0]);
         }
-        // OptionSet encoded as: validBits (byte array), value (byte array)
-        // First byte is the length of validBits, then validBits bytes, then value bytes
+        // OptionSet in OPC UA UA binary format: 1-byte length of validBits, then validBits, then value
         if (bytes.length < 1) {
             return Map.of();
         }
@@ -194,14 +193,6 @@ final class OpcUaTypes {
     }
 
     static Map<String, Object> decodeOptionSetFromStructure(Object s) {
-        if (s instanceof org.eclipse.milo.opcua.stack.core.types.builtin.Structure structure) {
-            Object[] values = structure.getFields();
-            if (values != null && values.length >= 2) {
-                return Map.of(
-                        "value", values[0] instanceof byte[] ? values[0] : new byte[0],
-                        "validBits", values[1] instanceof byte[] ? values[1] : new byte[0]);
-            }
-        }
         return Map.of();
     }
 
