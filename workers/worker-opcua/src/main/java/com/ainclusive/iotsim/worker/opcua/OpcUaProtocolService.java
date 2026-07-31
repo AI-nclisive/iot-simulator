@@ -612,7 +612,7 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
                 Object decoded = ValueCodec.decode(ValueCodec.Kind.TREE, value.getValueEnc().toByteArray());
                 runtime.updateValue(value.getNodeId(), treeNativeValue(
                         runtime, treeDataTypes.get(value.getNodeId()), decoded));
-            } else if (abstractTypeNodes.contains(value.getNodeId())
+            } else if ("TREE".equals(value.getValueKind()) && abstractTypeNodes.contains(value.getNodeId())
                     && !nodeArrayDimensions.containsKey(value.getNodeId())) {
                 Object decoded = ValueCodec.decode(ValueCodec.Kind.TREE, value.getValueEnc().toByteArray());
                 runtime.updateValue(value.getNodeId(), OpcUaTypes.toOpcUaVariant(decoded));
