@@ -47,14 +47,14 @@ class SyntheticNativeTypesTest {
     void nativeTypeVariableWithConstantPatternAccepted() {
         // IS-200: native type variables accept CONSTANT patterns
         Map<String, Object> structValue = Map.of("field1", "value1");
-        var var = new SyntheticVariable(
+        var variable = new SyntheticVariable(
                 "myStructVar",
                 null,
                 new SyntheticPattern.Constant(structValue),
                 1000,
                 "myStructTypeId");
-        assertThat(var.dataTypeNodeId()).isEqualTo("myStructTypeId");
-        assertThat(var.dataType()).isNull();
+        assertThat(variable.dataTypeNodeId()).isEqualTo("myStructTypeId");
+        assertThat(variable.dataType()).isNull();
     }
 
     @Test
@@ -79,11 +79,11 @@ class SyntheticNativeTypesTest {
 
         var variables = SyntheticConfigMapper.toVariables(config);
         assertThat(variables).hasSize(1);
-        var var = variables.get(0);
-        assertThat(var.nodeId()).isEqualTo("enumNode");
-        assertThat(var.dataType()).isNull();
-        assertThat(var.dataTypeNodeId()).isEqualTo("enumTypeId");
-        assertThat(var.pattern()).isInstanceOf(SyntheticPattern.Constant.class);
+        var variable = variables.get(0);
+        assertThat(variable.nodeId()).isEqualTo("enumNode");
+        assertThat(variable.dataType()).isNull();
+        assertThat(variable.dataTypeNodeId()).isEqualTo("enumTypeId");
+        assertThat(variable.pattern()).isInstanceOf(SyntheticPattern.Constant.class);
     }
 
     @Test
@@ -98,12 +98,12 @@ class SyntheticNativeTypesTest {
     @Test
     void syntheticVariableBackwardCompatibilityConstructor() {
         // Backward compatibility: SyntheticVariable can be created without dataTypeNodeId
-        var var = new SyntheticVariable(
+        var variable = new SyntheticVariable(
                 "node1",
                 DataType.FLOAT64,
                 new SyntheticPattern.Constant(5.0),
                 1000);
-        assertThat(var.dataTypeNodeId()).isNull();
-        assertThat(var.dataType()).isEqualTo(DataType.FLOAT64);
+        assertThat(variable.dataTypeNodeId()).isNull();
+        assertThat(variable.dataType()).isEqualTo(DataType.FLOAT64);
     }
 }

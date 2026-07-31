@@ -51,6 +51,9 @@ public record SyntheticVariable(
         }
         // IS-200: native types (dataTypeNodeId set) only support CONSTANT patterns
         if (dataTypeNodeId != null) {
+            if (dataType != null) {
+                throw new IllegalArgumentException("dataType must be null when dataTypeNodeId is set");
+            }
             if (!(pattern instanceof SyntheticPattern.Constant)) {
                 throw new IllegalArgumentException(
                         "synthetic generation for native types only supports CONSTANT patterns");
