@@ -107,6 +107,8 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
             "external-ref credential resolution is not yet supported for real-source access (IS-082); "
                     + "use anonymous or password credentials";
     private static final Duration READY_TIMEOUT = Duration.ofSeconds(10);
+    /** Per-attempt bound on a single {@code Hello} RPC inside {@link #awaitReady}; see its javadoc. */
+    private static final Duration HELLO_ATTEMPT_TIMEOUT = Duration.ofSeconds(2);
 
     private final WorkerLauncher launcher;
     private final RestartPolicy restartPolicy;
@@ -788,12 +790,29 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
         return value == null ? "" : value;
     }
 
+    /**
+     * Retries {@code Hello} until the worker answers or {@link #READY_TIMEOUT} elapses.
+     *
+     * <p>Each attempt is itself bounded (never more than {@link #HELLO_ATTEMPT_TIMEOUT}, and
+     * clamped to whatever remains of the overall budget) — {@code hello()} otherwise has no
+     * deadline of its own, so a control port that accepts a TCP connection but never completes
+     * the RPC (something else briefly holding the port the supervisor just handed the child, or
+     * a process stuck mid-startup) would hang a single attempt indefinitely. Since this loop's
+     * own deadline is only checked *between* attempts, that one hung attempt would silently
+     * defeat {@link #READY_TIMEOUT} — the "did not become ready in time" bound would never
+     * actually fire, and the caller could block far longer than 10 seconds instead of failing
+     * fast with a clear error.
+     */
     private static void awaitReady(WorkerClient client) {
         long deadline = System.nanoTime() + READY_TIMEOUT.toNanos();
         RuntimeException last = null;
         while (System.nanoTime() < deadline) {
+            long remainingNanos = deadline - System.nanoTime();
+            Duration attemptTimeout = remainingNanos < HELLO_ATTEMPT_TIMEOUT.toNanos()
+                    ? Duration.ofNanos(Math.max(remainingNanos, 1))
+                    : HELLO_ATTEMPT_TIMEOUT;
             try {
-                client.hello();
+                client.hello(attemptTimeout);
                 return;
             } catch (RuntimeException e) {
                 last = e;

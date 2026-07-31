@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useNavigate } from "react-router-dom";
 import { resolveAccess } from "../shell/access-policy";
@@ -109,7 +109,16 @@ export function preservesNativeType(node: DiscoveredNodeResponse): boolean {
   return node.unknownType && Boolean(node.dataTypeNodeId);
 }
 
-export function PreservedNativeNodesList({ nodes }: { nodes: DiscoveredNodeResponse[] }) {
+// Memoized so an unrelated wizard re-render (e.g. editing an unresolved-node
+// dropdown, or any other step's state changing) doesn't force this list — and
+// the virtualizer instance backing it — to tear down and redo its layout work
+// when its `nodes` prop hasn't actually changed. The caller already passes a
+// `useMemo`-derived array, so this bails out on reference equality.
+export const PreservedNativeNodesList = memo(function PreservedNativeNodesList({
+  nodes,
+}: {
+  nodes: DiscoveredNodeResponse[];
+}) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const virtualizer = useVirtualizer({
     count: nodes.length,
@@ -141,15 +150,17 @@ export function PreservedNativeNodesList({ nodes }: { nodes: DiscoveredNodeRespo
       </div>
     </div>
   );
-}
+});
 
 /**
  * Renders unknown-typed discovered nodes for type resolution. Virtualized (IS-165
  * removed the backend node-count ceiling, so a scan can surface thousands of
  * unknown-typed nodes) — only rows scrolled into view are ever mounted, so the DOM
- * stays bounded regardless of how many nodes a scan discovers.
+ * stays bounded regardless of how many nodes a scan discovers. Also memoized: the
+ * caller passes stable (`useMemo`/`useCallback`-derived) props, so resolving one
+ * node's type doesn't force this whole list to redo its virtualizer setup.
  */
-export function UnknownNodesList({
+export const UnknownNodesList = memo(function UnknownNodesList({
   nodes,
   typeResolutionsByNodeId,
   onChange,
@@ -213,7 +224,7 @@ export function UnknownNodesList({
       </div>
     </div>
   );
-}
+});
 
 type ScanStepStatus = "idle" | "scanning" | "complete" | "error" | "partial" | "cancelled";
 
@@ -472,13 +483,21 @@ export function scanStepValidationMessage(
   const unresolved = scanResult?.nodes.filter(
     (node) => node.unknownType && !preservesNativeType(node),
   ) ?? [];
-  const unresolvedNodeIds = new Set(
-    typeResolutions.filter((resolution) => !resolution.exclude && !resolution.dataType).map((resolution) => resolution.nodeId),
+  if (unresolved.length === 0) return null;
+  // A node is "settled" once it has a resolution entry that is either excluded
+  // or has a chosen scalar type. Building this as a single Set (O(n)) replaces
+  // the previous check, which called `typeResolutions.some(...)` once per
+  // unresolved node (O(n*m)) — with real-device scans surfacing thousands of
+  // unknown-typed nodes (IS-165 removed the backend node-count ceiling), and
+  // this function running unmemoized on every wizard render, the quadratic
+  // version scaled badly enough to make the Scan step feel unresponsive.
+  const settledNodeIds = new Set(
+    typeResolutions
+      .filter((resolution) => resolution.exclude || resolution.dataType)
+      .map((resolution) => resolution.nodeId),
   );
-  if (unresolved.some((node) => unresolvedNodeIds.has(node.nodeId) || !typeResolutions.some((resolution) => resolution.nodeId === node.nodeId))) {
-    return "Choose a scalar type or exclude every unresolved node.";
-  }
-  return null;
+  const hasUnsettledNode = unresolved.some((node) => !settledNodeIds.has(node.nodeId));
+  return hasUnsettledNode ? "Choose a scalar type or exclude every unresolved node." : null;
 }
 
 function configureValidationMessage(form: WizardFormState, synthetic: SyntheticProfileValue) {
@@ -1518,11 +1537,14 @@ export function CreateDataSourceWizardPage() {
     );
   }
 
-  function handleTypeResolutionChange(nodeId: string, patch: Partial<TypeResolutionEntry>) {
+  // useCallback keeps this a stable reference across renders — UnknownNodesList
+  // is memoized, and passing a freshly-created function here on every render
+  // would defeat that memoization for every row's onChange handler.
+  const handleTypeResolutionChange = useCallback((nodeId: string, patch: Partial<TypeResolutionEntry>) => {
     setTypeResolutions((prev) =>
       prev.map((entry) => (entry.nodeId === nodeId ? { ...entry, ...patch } : entry)),
     );
-  }
+  }, []);
 
   function handleBulkTypeResolutionChange(patch: Partial<TypeResolutionEntry>) {
     setTypeResolutions((prev) => prev.map((entry) => ({ ...entry, ...patch })));
