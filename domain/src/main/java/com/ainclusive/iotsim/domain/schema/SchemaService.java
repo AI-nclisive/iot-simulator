@@ -2,6 +2,7 @@ package com.ainclusive.iotsim.domain.schema;
 
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.domain.common.SchemaImpactException;
+import com.ainclusive.iotsim.domain.common.SchemaNodeValidationUtil;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRepository;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRow;
 import com.ainclusive.iotsim.persistence.schema.SchemaRepository;
@@ -60,6 +61,7 @@ public class SchemaService {
     public Schema save(String projectId, String dataSourceId, List<SchemaNode> nodes) {
         DataSourceRow source = requireSource(projectId, dataSourceId);
         validate(nodes);
+        SchemaNodeValidationUtil.validateTypes(nodes);
         assertNoBreakingImpact(source, nodes);
         return map(schemas.saveNewVersion(dataSourceId, nodes));
     }

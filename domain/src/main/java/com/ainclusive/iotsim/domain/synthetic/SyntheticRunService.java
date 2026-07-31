@@ -1,6 +1,7 @@
 package com.ainclusive.iotsim.domain.synthetic;
 
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
+import com.ainclusive.iotsim.domain.common.SchemaNodeValidationUtil;
 import com.ainclusive.iotsim.domain.datasource.RuntimeStartSpecs;
 import com.ainclusive.iotsim.domain.run.EvidenceCompletionStamp;
 import com.ainclusive.iotsim.domain.run.RunCompletionEvents;
@@ -105,6 +106,8 @@ public class SyntheticRunService {
         }
         SyntheticConfig config = parseConfig(source.runtimeConfig());
         List<SyntheticVariable> variables = SyntheticConfigMapper.toVariables(config);
+        // Opaque/vendor type validation (IS-199), before any run row is created.
+        schemas.findCurrent(dataSourceId).ifPresent(schema -> SchemaNodeValidationUtil.validateTypes(schema.nodes()));
 
         DeterministicSettings settings = config.seed() == null
                 ? DeterministicSettings.withRandomSeed(clock.instant())

@@ -8,6 +8,7 @@ import com.ainclusive.iotsim.domain.common.RetentionDependencyException;
 import com.ainclusive.iotsim.domain.common.ScenarioInvalidException;
 import com.ainclusive.iotsim.domain.common.SchemaImpactException;
 import com.ainclusive.iotsim.domain.common.SchemaVersionMismatchException;
+import com.ainclusive.iotsim.domain.common.UnsupportedTypesException;
 import com.ainclusive.iotsim.domain.io.ProjectImportException;
 import com.ainclusive.iotsim.platform.capture.CaptureException;
 import com.ainclusive.iotsim.platform.runtime.RuntimeCapacityException;
@@ -90,6 +91,13 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(SchemaImpactException.class)
     public ProblemDetail schemaImpact(SchemaImpactException e) {
+        ProblemDetail pd = problem(HttpStatus.UNPROCESSABLE_ENTITY, e.getMessage());
+        pd.setProperty("issues", e.issues());
+        return pd;
+    }
+
+    @ExceptionHandler(UnsupportedTypesException.class)
+    public ProblemDetail unsupportedTypes(UnsupportedTypesException e) {
         ProblemDetail pd = problem(HttpStatus.UNPROCESSABLE_ENTITY, e.getMessage());
         pd.setProperty("issues", e.issues());
         return pd;

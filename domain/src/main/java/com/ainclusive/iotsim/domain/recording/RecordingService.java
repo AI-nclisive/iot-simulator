@@ -4,6 +4,7 @@ import com.ainclusive.iotsim.domain.activityevent.ActivityEventService;
 import com.ainclusive.iotsim.domain.common.JsonField;
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.domain.common.RetentionDependencyException;
+import com.ainclusive.iotsim.domain.common.SchemaNodeValidationUtil;
 import com.ainclusive.iotsim.domain.support.Page;
 import com.ainclusive.iotsim.domain.support.PageCursor;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRepository;
@@ -147,6 +148,7 @@ public class RecordingService {
         if (!hasVariables) {
             throw new IllegalArgumentException("schema has no variables to capture");
         }
+        SchemaNodeValidationUtil.validateTypes(schema.nodes());
         // computeIfAbsent serializes concurrent starts for the same source: only the
         // first creates the recording and opens the session; a second start sees the
         // existing mapping and is rejected below. If the session fails to open, the

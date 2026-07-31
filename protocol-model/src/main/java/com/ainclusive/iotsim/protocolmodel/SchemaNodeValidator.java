@@ -1,5 +1,6 @@
 package com.ainclusive.iotsim.protocolmodel;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -9,6 +10,52 @@ import java.util.Set;
 /** Validates address-space topology before a schema is persisted or projected. */
 public final class SchemaNodeValidator {
     private SchemaNodeValidator() {}
+
+    /**
+     * Detects variables whose declared native type cannot be captured/replayed
+     * (IS-199: opaque/vendor types) — an OPAQUE declaration the source never
+     * supplied a definition for, or a structure/union with no default binary
+     * encoding. Returns one diagnostic per affected variable rather than
+     * throwing, so a caller can report every issue at once (schema save or run
+     * start), not just the first.
+     */
+    public static List<String> validateTypes(List<SchemaNode> nodes) {
+        if (nodes == null || nodes.isEmpty()) {
+            return List.of();
+        }
+        Map<String, NativeTypeDefinition> catalog = new HashMap<>();
+        for (NativeTypeDefinition definition : NativeTypeCatalog.fromSchemaNodes(nodes)) {
+            catalog.put(definition.typeId(), definition);
+        }
+        List<String> issues = new ArrayList<>();
+        for (SchemaNode node : nodes) {
+            if (node.kind() != NodeKind.VARIABLE || node.dataTypeNodeId() == null) {
+                continue;
+            }
+            NativeTypeDefinition definition = catalog.get(node.dataTypeNodeId());
+            if (definition == null) {
+                continue; // a standard OPC UA DataType NodeId, not a schema-native declaration
+            }
+            NativeTypeCapability capability = definition.capability();
+            if (capability.materializable() && capability.captureDecodable() && capability.replayEncodable()) {
+                continue;
+            }
+            issues.add("variable '" + node.name() + "' (" + node.nodeId() + ") uses unsupported native type '"
+                    + definition.browseName() + "' (" + definition.kind() + "): " + capability.unavailableReason()
+                    + " — " + recoveryHint(definition.kind()));
+        }
+        return issues;
+    }
+
+    private static String recoveryHint(NativeTypeKind kind) {
+        return switch (kind) {
+            case OPAQUE -> "re-scan the source so its native type definition is captured, "
+                    + "or change this variable to a supported type";
+            case STRUCTURE, UNION -> "supply a default binary encoding for this type, "
+                    + "or change this variable to a supported type";
+            case ENUM, OPTION_SET -> "change this variable to a supported type";
+        };
+    }
 
     public static void validate(List<SchemaNode> nodes) {
         if (nodes == null) {

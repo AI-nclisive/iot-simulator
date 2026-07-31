@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.domain.common.SchemaImpactException;
+import com.ainclusive.iotsim.domain.common.UnsupportedTypesException;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRepository;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRow;
 import com.ainclusive.iotsim.persistence.schema.SchemaRepository;
@@ -71,6 +72,22 @@ class SchemaServiceTest {
         service.save(PROJECT, SOURCE, sampleNodes());
         assertThatThrownBy(() -> service.get("other", SOURCE))
                 .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void saveRejectsAVariableReferencingAnOpaqueNativeType() {
+        List<SchemaNode> nodes = List.of(
+                new SchemaNode("dtOpaque", null, "dtOpaque", "VendorBlob", NodeKind.DATA_TYPE,
+                        null, null, null, null, null, List.of(), null, List.of(), null, List.of(),
+                        null, null, null, null, null),
+                new SchemaNode("v1", null, "v1", "Blob", NodeKind.VARIABLE,
+                        null, ValueRank.SCALAR, Access.READ, null, null, List.of(), null, List.of(), "dtOpaque",
+                        List.of(), null, null, null, null));
+
+        assertThatThrownBy(() -> service.save(PROJECT, SOURCE, nodes))
+                .isInstanceOf(UnsupportedTypesException.class)
+                .satisfies(e -> assertThat(((UnsupportedTypesException) e).issues())
+                        .anyMatch(issue -> issue.contains("Blob") && issue.contains("VendorBlob")));
     }
 
     @Test
