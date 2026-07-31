@@ -91,10 +91,6 @@ final class OpcUaTypes {
     }
 
     static ValueCodec.Kind codecKind(String dataType) {
-        // Abstract types (BaseDataType, Variant, UInteger) encode as VARIANT
-        if ("Variant".equals(dataType) || "BaseDataType".equals(dataType) || "UInteger".equals(dataType)) {
-            return ValueCodec.Kind.VARIANT;
-        }
         try {
             return ValueCodec.kindOf(DataType.valueOf(dataType));
         } catch (IllegalArgumentException unknownOrEmpty) {
