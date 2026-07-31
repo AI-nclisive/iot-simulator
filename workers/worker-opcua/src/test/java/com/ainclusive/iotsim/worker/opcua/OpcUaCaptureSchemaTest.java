@@ -97,4 +97,16 @@ class OpcUaCaptureSchemaTest {
         assertThat(OpcUaProtocolService.captureNodes(request))
                 .containsExactly(new OpcUaCapture.NodeSpec("ns=2;s=reading", null, "ns=2;i=7002"));
     }
+
+    @Test
+    void retainsArrayRankAndDimensionsInCaptureSpec() {
+        CaptureRequest request = CaptureRequest.newBuilder().setSchema(Schema.newBuilder()
+                .addNodes(SchemaNodeMsg.newBuilder().setNodeId("ns=2;s=values")
+                        .setKind("VARIABLE").setDataType("INT32")
+                        .setValueRank("ARRAY").addArrayDimensions(2).addArrayDimensions(3)))
+                .build();
+
+        assertThat(OpcUaProtocolService.captureNodes(request)).containsExactly(
+                new OpcUaCapture.NodeSpec("ns=2;s=values", "INT32", null, true, java.util.List.of(2, 3)));
+    }
 }
