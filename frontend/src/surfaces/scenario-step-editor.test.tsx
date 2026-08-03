@@ -110,10 +110,13 @@ describe("ScenarioStepEditor", () => {
     },
   );
 
-  it("does not fetch data sources for step types with no source field (wait/marker)", () => {
-    render(<ScenarioStepEditor step={makeStep("wait")} projectId="p1" canEdit onChange={() => {}} />);
-    expect(mockLoadDataSources).not.toHaveBeenCalled();
-  });
+  it.each<ScenarioStepType>(["wait", "marker"])(
+    "does not fetch data sources for step types with no source field (%s)",
+    (type) => {
+      render(<ScenarioStepEditor step={makeStep(type)} projectId="p1" canEdit onChange={() => {}} />);
+      expect(mockLoadDataSources).not.toHaveBeenCalled();
+    },
+  );
 
   // Locks in the exact two-dropdown Replay-recording case from the bug report:
   // Recording was already populated correctly, Target source was not.
