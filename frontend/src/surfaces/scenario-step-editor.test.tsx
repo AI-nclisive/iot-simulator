@@ -16,7 +16,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ScenarioStepEditor } from "./scenario-step-editor";
 import type { ScenarioStep, ScenarioStepType } from "./scenario-steps";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
 
 const mockSources = [
   { id: "src-01", name: "Line A telemetry" },
@@ -28,20 +31,29 @@ const mockArtifacts = [
   { id: "rec-02", sourceId: "src-02" },
 ];
 
+const mockLoadDataSources = vi.fn();
+
 vi.mock("../shell/data-sources-store", () => ({
-  useDataSourcesStore: vi.fn((selector: (s: { dataSources: typeof mockSources }) => unknown) =>
-    selector({ dataSources: mockSources }),
+  useDataSourcesStore: vi.fn(
+    (
+      selector: (s: {
+        dataSources: typeof mockSources;
+        loadDataSources: typeof mockLoadDataSources;
+      }) => unknown,
+    ) => selector({ dataSources: mockSources, loadDataSources: mockLoadDataSources }),
   ),
 }));
+
+const mockLoadRecordings = vi.fn();
 
 vi.mock("../shell/artifacts-store", () => ({
   useArtifactsStore: vi.fn(
     (
       selector: (s: {
         artifacts: typeof mockArtifacts;
-        loadRecordings: () => void;
+        loadRecordings: typeof mockLoadRecordings;
       }) => unknown,
-    ) => selector({ artifacts: mockArtifacts, loadRecordings: vi.fn() }),
+    ) => selector({ artifacts: mockArtifacts, loadRecordings: mockLoadRecordings }),
   ),
 }));
 
@@ -73,6 +85,55 @@ describe("ScenarioStepEditor", () => {
     expect(last.config.sourceId).toBe(src.id);
     expect(last.configured).toBe(true);
     expect(last.label).toBe(src.name);
+  });
+
+  // Regression for #700: the Target-source dropdown was always empty because
+  // nothing in the scenario flow ever called loadDataSources — the store's
+  // dataSources array only ever got populated by other pages (Data Sources
+  // list, recording wizards, ...). Every step type with a "source" field must
+  // trigger that fetch itself.
+  it.each<ScenarioStepType>(["start", "stop", "synthetic", "fault"])(
+    "fetches data sources for a %s step's Target-source dropdown",
+    (type) => {
+      render(
+        <ScenarioStepEditor step={makeStep(type)} projectId="p1" canEdit onChange={() => {}} />,
+      );
+      expect(mockLoadDataSources).toHaveBeenCalledWith("p1");
+
+      // The dropdown's options must include the project's data sources, matching
+      // what the Data Sources list page and the Recording dropdown already show.
+      const select = screen.getByLabelText(/Target source/) as HTMLSelectElement;
+      const optionLabels = Array.from(select.options).map((o) => o.textContent);
+      expect(optionLabels).toEqual(
+        expect.arrayContaining(mockSources.map((s) => s.name)),
+      );
+    },
+  );
+
+  it("does not fetch data sources for step types with no source field (wait/marker)", () => {
+    render(<ScenarioStepEditor step={makeStep("wait")} projectId="p1" canEdit onChange={() => {}} />);
+    expect(mockLoadDataSources).not.toHaveBeenCalled();
+  });
+
+  // Locks in the exact two-dropdown Replay-recording case from the bug report:
+  // Recording was already populated correctly, Target source was not.
+  it("replay step fetches both data sources and recordings, and both dropdowns are populated", () => {
+    render(
+      <ScenarioStepEditor step={makeStep("replay")} projectId="p1" canEdit onChange={() => {}} />,
+    );
+
+    expect(mockLoadDataSources).toHaveBeenCalledWith("p1");
+    expect(mockLoadRecordings).toHaveBeenCalledWith("p1");
+
+    const sourceSelect = screen.getByLabelText(/Target source/) as HTMLSelectElement;
+    const sourceOptionLabels = Array.from(sourceSelect.options).map((o) => o.textContent);
+    expect(sourceOptionLabels).toEqual(expect.arrayContaining(mockSources.map((s) => s.name)));
+
+    const recordingSelect = screen.getByLabelText(/Recording/) as HTMLSelectElement;
+    const recordingOptionLabels = Array.from(recordingSelect.options).map((o) => o.textContent ?? "");
+    for (const artifact of mockArtifacts) {
+      expect(recordingOptionLabels.some((label) => label.includes(artifact.id))).toBe(true);
+    }
   });
 
   it("replay step needs both source and recording", async () => {
