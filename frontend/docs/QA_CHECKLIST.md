@@ -1,7 +1,7 @@
 # QA Checklist — IoT Data Source Simulator (Web UI)
 
 Direct user scenarios with expected results. Grounded in the **actually implemented**
-frontend behavior (surfaces + tests), not just SPEC.md. Known stubs are flagged with ⚠️.
+frontend behavior (surfaces + tests), not just `openspec/specs/`. Known stubs are flagged with ⚠️.
 
 Legend: `[ ]` scenario to verify · **→** expected result · ⚠️ = stub / not-yet-wired.
 
@@ -382,7 +382,7 @@ Legend: `[ ]` scenario to verify · **→** expected result · ⚠️ = stub / n
 - [ ] **Error** → message + retry/back where applicable.
 - [ ] **Locked** (permission) → info panel + role restriction (Evidence, Settings, Admin, Notifications).
 
-### 12.2 Responsive (per DESIGN.md)
+### 12.2 Responsive (per openspec/specs/frontend-shell/spec.md)
 - [ ] `≥1024px` two-column shell always visible.
 - [ ] `768–1023px` single column, rail behind hamburger, tables scroll horizontally, forms stack.
 - [ ] `<768px` accessible (not optimized); dense tables scroll; forms usable.
@@ -402,13 +402,13 @@ Legend: `[ ]` scenario to verify · **→** expected result · ⚠️ = stub / n
 ---
 
 ## 13. Stub Routes & Known Gaps
-- ⚠️ `/activity` → **SurfaceStubPage** "Activity" placeholder (no activity stream yet).
+- ✅ `/activity` is fully wired (actor/action/object filters, cursor pagination) — no longer a stub.
 - ⚠️ `/projects/import` → **SurfaceStubPage** "Import Project" placeholder.
 - ⚠️ `/design-system`, `/notifications-demo` → developer surfaces (notifications is admin-gated).
 - ⚠️ Overview: no "Automated" or per-run evidence badge yet.
 - ⚠️ Data source header parameter count may show 0 (schema node count not fetched — UI-097).
 - ⚠️ Values tab: pin filter present, no pin control.
-- ⚠️ Schema editor: edit-lock always "unlocked" (backend lock not exposed — UI-097).
+- ✅ Schema editor: edit-lock reflects the real backend lease (`useEditLease`, UI-459) — no longer always "unlocked".
 - ⚠️ Scenario run view: source & events sections are placeholders.
 - ⚠️ Create-source wizard: no "Manual schema" basis (UI-121).
 - ⚠️ Recording/replay import dialogs use mock validation heuristics, not real file inspection.

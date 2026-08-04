@@ -43,7 +43,7 @@ author's** — you only respond.
 
 - Verdict is `✅ Mergeable` with no unresolved comments → APPROVE lands and the PR
   auto-merges. After it merges, finish task tracking (board → Done, close issue,
-  catalog `[x]` already flipped in the PR — see `start-task` for board IDs).
+  openspec change already archived in the PR — see `start-task` for board IDs).
 - Or **3 rounds** completed → summarize any still-open points in the PR description
   for a human reviewer, then stop.
 

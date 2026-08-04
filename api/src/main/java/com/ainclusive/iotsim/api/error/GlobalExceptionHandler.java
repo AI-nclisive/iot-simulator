@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 
-/** Maps domain/API exceptions to RFC 9457 problem responses (backend-specs/05). */
+/** Maps domain/API exceptions to RFC 9457 problem responses (openspec/specs/api-contract/spec.md). */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -113,7 +113,7 @@ public class GlobalExceptionHandler {
 
     /**
      * Maps {@link AccessDeniedException} thrown by {@code @PreAuthorize} to RFC 9457 403
-     * (backend-specs/05).
+     * (openspec/specs/api-contract/spec.md).
      */
     @ExceptionHandler(AccessDeniedException.class)
     public ProblemDetail forbidden(AccessDeniedException e) {

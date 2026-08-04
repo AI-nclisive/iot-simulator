@@ -2,8 +2,8 @@
 
 Modular-monolith backend (Java 25 + Spring Boot) with out-of-process protocol
 workers, and a React/TypeScript Web UI. See the design docs at the repo root
-(`SPEC.md`, `ARCHITECTURE.md`, `STACK.md`), the UI docs under `frontend/docs/`
-(`DESIGN.md` and others), and the implementation specs in `backend-specs/`.
+(`ARCHITECTURE.md`, `STACK.md`), `frontend/docs/UI_PLAN.md`, and the living
+capability specs under `openspec/specs/`.
 
 ## Table of contents
 
@@ -224,7 +224,8 @@ Postgres:
 
 - **Board:** [IoT Simulator](https://github.com/orgs/AI-nclisive/projects/1) —
   live status by `IS-XXX` / `Area` (Todo / In Progress / In review / Done).
-- **Task catalog:** [`backend-specs/TASKS.md`](backend-specs/TASKS.md) — the source list of `IS-XXX` task IDs.
+- **Capability specs:** [`openspec/specs/`](openspec/specs/) — what the system does today.
+- **Change history:** [`openspec/changes/archive/`](openspec/changes/archive/) — completed `IS-XXX`/`UI-XXX` tasks.
 
 ## Debug tools
 

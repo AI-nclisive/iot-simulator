@@ -1,22 +1,24 @@
 ---
 name: board-sync
 description: >-
-  Reconcile the org Project #1 board with the task catalogs (TASKS.md /
-  UI_TASKS.md). Use when you add, rename, remove, or re-scope a task, or when the
-  board's Status/fields have drifted from the catalogs. Invoke as `/board-sync`
+  Reconcile the org Project #1 board with openspec's change/spec state. Use
+  when you add, rename, remove, or re-scope a task, or when the board's
+  Status/fields have drifted from openspec. Invoke as `/board-sync`
   (optionally with a task ID to reconcile just one).
 ---
 
-# Board ↔ catalog sync
+# Board ↔ openspec sync
 
-Owning rules: `CONTRIBUTING.md` → "Task tracking" and `AGENTS.md`. The **catalogs are
-the source of truth; the board mirrors them, never the reverse**:
+Owning rules: `CONTRIBUTING.md` → "Task tracking" and `AGENTS.md`. **openspec is the
+source of truth; the board mirrors it, never the reverse**:
 
-- `backend-specs/TASKS.md` — `IS-*`, areas `[BE]` / `[SDLC]`.
-- `frontend/docs/UI_TASKS.md` — `UI-*`, area `[FE]`.
+- `openspec/specs/<capability>/spec.md` — what the system does today.
+- `openspec/changes/<id>-<slug>/` — an active `IS-*`/`UI-*` task's proposal.
+- `openspec/changes/archive/<date>-<id>-<slug>/` — a completed task.
 
 Org **Project #1 "IoT Simulator"** is the live-status mirror: **one issue per task
-ID**, identified by the leading `IS-`/`UI-` token. Repo `AI-nclisive/iot-simulator`.
+ID**, identified by the leading `IS-`/`UI-` token in the change-folder name. Repo
+`AI-nclisive/iot-simulator`.
 
 ## Issue convention
 
@@ -26,25 +28,25 @@ SDLC**. Use the **Task** issue form (`.github/ISSUE_TEMPLATE/task.yml`).
 
 ## Status mapping
 
-| Catalog / state | Board `Status` |
+| openspec state | Board `Status` |
 | --- | --- |
-| `[ ]` ⬜ todo | Todo |
-| in-flight (claimed, coding) | In Progress |
+| no `openspec/changes/` folder for the ID yet | Todo |
+| `openspec/changes/<id>-<slug>/` exists, not archived (claimed, coding) | In Progress |
 | PR open / in review | In review |
-| `[x]` ✅ **and the implementing PR merged** | Done (+ close the issue) |
+| `openspec/changes/archive/<date>-<id>-<slug>/` exists **and the implementing PR merged** | Done (+ close the issue) |
 
-**Caveat:** the catalog `[x]` is flipped *inside* the implementation PR, so an `[x]`
-on an *open* PR still maps to **In review** — move to **Done** only once that PR
-**merges**. On conflict, **the board wins**.
+**Caveat:** the change is archived *inside* the implementation PR, so an archived
+change on an *open* PR still maps to **In review** — move to **Done** only once
+that PR **merges**. On conflict, **the board wins**.
 
 ## How to apply (idempotent by leading ID token)
 
 1. **Status change** → update that task's board `Status` by ID. Reuse the existing
    issue for an ID; **never create a duplicate**.
-2. **Task added / renamed / removed** in a catalog → create / edit / close the
-   matching issue + board item.
-3. **Done is two-step:** catalog `[x]` flipped in the PR (no catalog-only PR — direct
-   push to `master` is blocked), then board → Done + close issue **after merge**.
+2. **Task added / renamed / removed** → create / edit / close the matching issue +
+   board item; propose/archive the matching openspec change.
+3. **Done is two-step:** the change is archived in the PR (no archive-only PR —
+   direct push to `master` is blocked), then board → Done + close issue **after merge**.
 
 ### Small reconciliation (the common case) — drive the board directly with `gh`
 

@@ -7,7 +7,7 @@ import java.util.Set;
 /**
  * The serialized synthetic-generation setup stored in {@code DataSource.runtimeConfig}
  * — a master {@code seed} ({@code null} = run picks one) plus the per-variable
- * bindings. (backend-specs/06 "Synthetic generation model".)
+ * bindings. (openspec/specs/artifact-formats/spec.md "Synthetic generation model".)
  */
 public record SyntheticConfig(Long seed, List<SyntheticVariableConfig> variables) {
 

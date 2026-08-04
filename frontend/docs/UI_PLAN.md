@@ -120,18 +120,18 @@ Use the documents in this order:
 
 1. `UI_PLAN.md`:
    decide which stage and wave is active.
-2. `UI_TASKS.md`:
+2. an `openspec/changes/ui-*` change (or the org board):
    choose the exact task and confirm whether it can run in parallel.
-3. `UI_SCREEN_SPECS.md`:
+3. `openspec/specs/frontend-screens/spec.md`:
    read the surface requirements for that task.
-4. `DESIGN.md`:
+4. `openspec/specs/frontend-shell/spec.md`:
    confirm the broader UX rules the implementation must preserve.
 
 ## Documentation Status
 
 The UI documentation set is ready for development when used together:
 
-- `DESIGN.md` for product UX rules;
-- `UI_SCREEN_SPECS.md` for concrete surfaces;
-- `UI_TASKS.md` for execution order and ownership;
+- `openspec/specs/frontend-shell/spec.md` for product UX rules;
+- `openspec/specs/frontend-screens/spec.md` for concrete surfaces;
+- the org board / `openspec/changes/` for execution order and ownership;
 - `UI_PLAN.md` for stage-level sequencing.

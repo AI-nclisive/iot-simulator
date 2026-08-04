@@ -282,7 +282,7 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
      * observed value change back as neutral {@link ValueBatch}es until the supervisor
      * cancels the call. The request schema names the variables to subscribe to and
      * carries each one's data type so values are encoded neutrally. No Configure/Start
-     * — this is stateless client mode, like Scan. See backend-specs/02 §6.
+     * — this is stateless client mode, like Scan. See openspec/specs/worker-contract/spec.md §6.
      */
     @Override
     public void capture(CaptureRequest request, StreamObserver<ValueBatch> responseObserver) {

@@ -50,7 +50,7 @@ import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
-/** Recording lifecycle: create, capture values, finalize (backend-specs/03). */
+/** Recording lifecycle: create, capture values, finalize (openspec/specs/domain-model/spec.md). */
 @Service
 public class RecordingService {
 

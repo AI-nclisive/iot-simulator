@@ -365,7 +365,7 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
      * Real-source discovery (create-from-scan). Spawns a one-shot worker in client
      * mode, probes the endpoint, and tears the worker down — it is never adopted
      * into the managed {@code running} map. Only OPC UA is supported today; Modbus
-     * discovery lands with worker-modbus. See backend-specs/02 §6 / 05 §Scan.
+     * discovery lands with worker-modbus. See openspec/specs/worker-contract/spec.md §6 / 05 §Scan.
      */
     @Override
     public ConnectionTestResult testConnection(ScanSpec spec) {
@@ -422,7 +422,7 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
      * variables and streams observed value changes back; each batch is decoded
      * against the schema's types and handed to {@code sink}. The returned session
      * stops the stream (firing the worker's cancel handler) and tears the worker
-     * down. Only OPC UA is supported today. See backend-specs/02 §6.
+     * down. Only OPC UA is supported today. See openspec/specs/worker-contract/spec.md §6.
      */
     @Override
     public CaptureSession startCapture(CaptureSpec spec, Consumer<List<NeutralValue>> sink) {

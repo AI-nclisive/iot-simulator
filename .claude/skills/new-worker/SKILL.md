@@ -11,7 +11,7 @@ description: >-
 # Scaffold a new protocol worker
 
 Owning specs: `openspec/specs/worker-contract/spec.md` (contract/IPC) and
-`07_MODULE_STRUCTURE.md` (module layout). Architecture rule (`ARCHITECTURE.md` →
+`openspec/specs/module-structure/spec.md` (module layout). Architecture rule (`ARCHITECTURE.md` →
 Runtime model): **"Adding a protocol means adding a worker, not changing the
 supervisor."** The supervisor stays protocol-agnostic; protocol-specific code lives
 only in the worker.
@@ -83,7 +83,7 @@ Package `com.ainclusive.iotsim.worker.<proto>` (mirror `worker-opcua`):
   `OpcUaTypes.java`) as the single place housing this worker's native type ⇄
   neutral `DataType` mapping, default values, and to/from-native value
   conversion. `protocolmodel.DataType` is a **superset**, not an intersection
-  every protocol must fill (backend-specs/01 §2) — a schema/recording is always
+  every protocol must fill (openspec/specs/protocol-model/spec.md §2) — a schema/recording is always
   scoped to one protocol, so a value only your protocol produces doesn't affect
   others. Default to reusing existing `DataType` values; only propose adding a
   new shared enum value when your protocol has a genuinely distinct value type

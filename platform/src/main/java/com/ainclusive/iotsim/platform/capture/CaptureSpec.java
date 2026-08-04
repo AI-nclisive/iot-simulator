@@ -9,7 +9,7 @@ import java.util.List;
  * session-only credentials, and the data-source schema (its VARIABLE nodes are
  * subscribed to, and their data types let the capturer decode observed values
  * neutrally). {@code credentials} are used in memory only and never persisted
- * (backend-specs/08). {@code protocol} is a plain string so this port stays free
+ * (openspec/specs/auth-modes/spec.md). {@code protocol} is a plain string so this port stays free
  * of domain enums, mirroring {@link com.ainclusive.iotsim.platform.scan.ScanSpec}.
  */
 public record CaptureSpec(String protocol, String endpointUrl,

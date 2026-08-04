@@ -1,9 +1,9 @@
 # Architecture Diagram
 
 Brief visual companion to `ARCHITECTURE.md` (which stays the source of truth).
-Status markers (✅ done · 🟡 partial · ⬜ todo) reflect the current snapshot from
-`backend-specs/TASKS.md`; the text in `ARCHITECTURE.md` defines the binding
-constraints.
+Status markers (✅ done · 🟡 partial · ⬜ todo) are a periodic snapshot — check
+`openspec/specs/` (what's built) and the org board (what's in flight) for the
+live state; the text in `ARCHITECTURE.md` defines the binding constraints.
 
 ## Module map
 
@@ -18,7 +18,7 @@ flowchart TB
 
     subgraph BE["Backend — Spring Boot modular monolith"]
         API["api / application layer<br/>REST /api/v1 · OpenAPI · SSE/WS · auth (local/shared)"]
-        DOMAIN["domain<br/>projects · schemas · recordings · replay<br/>(scenarios/faults/evidence — todo)"]
+        DOMAIN["domain<br/>projects · schemas · recordings · replay ·<br/>scenarios · evidence ✅ (fault params inline, no Fault entity)"]
         SUP["runtime-supervisor<br/>worker lifecycle · IPC · ports · health"]
     end
 
@@ -34,7 +34,7 @@ flowchart TB
     end
 
     subgraph DATA["Persistence"]
-        PERSIST["persistence<br/>jOOQ repos · Flyway V1–V6"]
+        PERSIST["persistence<br/>jOOQ repos · Flyway (append-only, see openspec/specs/db-schema)"]
         PG[("PostgreSQL<br/>entities + value timeline")]
         OBJ[("Object storage<br/>large artifacts")]
     end

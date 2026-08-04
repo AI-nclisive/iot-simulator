@@ -28,11 +28,12 @@ skill by typing its slash command.
 | Skill | Use it to |
 | --- | --- |
 | `/start-task IS-XXX` | Claim a task before coding: verify free → board **In Progress** → linked branch. |
-| `/open-pr` | Run DoD checks, flip the catalog box in-PR, open the PR, arm auto-merge, board **In review**. |
+| `/open-pr` | Run DoD checks, archive the task's openspec change in-PR, open the PR, arm auto-merge, board **In review**. |
 | `/review-loop` | Work the Claude PR review to completion (fix/rebut → push → repeat). |
 | `/new-worker <proto>` | Scaffold a new out-of-process protocol worker (contract impl; no supervisor change). |
 | `/flyway-migration <name>` | Add a collision-safe, append-only DB migration. |
-| `/board-sync` | Reconcile org Project #1 with the task catalogs. |
+| `/board-sync` | Reconcile org Project #1 with openspec's change/spec state. |
+| `/opsx:propose <name>` | Create/continue a task's openspec change (proposal + spec delta + design + tasks). |
 
 Recommended **built-in** skills, by stage (run locally to cut review rounds):
 - Before `/open-pr`: **`/code-review`** (correctness + cleanup) and
@@ -44,11 +45,13 @@ Recommended **built-in** skills, by stage (run locally to cut review rounds):
   prompts; **`update-config`** to wire any team-agreed hooks into `settings.json`.
 
 ## Task IDs
-- Backend / repo / process: **`IS-XXX [AREA] short name`** from
-  `backend-specs/TASKS.md` (`[AREA]` is `[BE]` or `[SDLC]`).
-- Frontend: **`UI-XXX [FE] short name`** from `frontend/docs/UI_TASKS.md`.
+- Backend / repo / process: **`IS-XXX [AREA] short name`** (`[AREA]` is `[BE]` or
+  `[SDLC]`). Frontend: **`UI-XXX [FE] short name`**. File a **Task** issue to mint
+  a new ID (there is no catalog file to append to anymore); browse existing IDs
+  on the board or under `openspec/specs/`/`openspec/changes/`.
 - Reuse the ID everywhere: branch `feat/IS-038-...`, issue title `IS-038 short name`
-  (area via the form's **Area** field), PR `Implements: IS-038`.
+  (area via the form's **Area** field), PR `Implements: IS-038`, openspec change
+  folder `openspec/changes/is-038-short-slug/`.
 
 ## Branching
 - Branch off `master`; one task per branch/PR. Name: `feat/IS-123-short-slug`
@@ -99,32 +102,38 @@ to and `./gradlew build` is green.
 - Frontend changes: `npm ci`, `npm run typecheck`, `npm run build` green.
 - No secrets/credentials/PKI committed; secrets come from env/secret store.
 - Generated code (jOOQ/proto) stays under `build/` — never committed.
-- Public behavior changes reflected in OpenAPI and, if needed, the specs.
+- Public behavior changes reflected in OpenAPI and in the task's openspec spec
+  delta (merged into `openspec/specs/` on archive).
 - Every AI-review comment responded to (see "AI review loop").
 
 ## Task tracking
-`backend-specs/TASKS.md` and `frontend/docs/UI_TASKS.md` are the task **catalogs**;
-org **Project #1** is their live mirror, **one issue per ID**. When you add, rename,
-remove, or re-scope a task, update **both** the catalog and the board (never duplicate
-an ID).
+`openspec/specs/` (what exists) and `openspec/changes/` / `openspec/changes/archive/`
+(what's in flight / done) are the task **record**; org **Project #1** is their live
+mirror, **one issue per ID**. When you add, rename, remove, or re-scope a task,
+update **both** the openspec change and the board (never duplicate an ID).
 
-Live `In Progress` / `In review` status lives on the **board only** — don't track it
-with catalog checkboxes. Move it in lockstep with the work:
+Live `In Progress` / `In review` status lives on the **board only** — an
+un-archived change folder existing doesn't by itself mean "still in progress"
+(it could be stale). Move status in lockstep with the work:
 - **In Progress** — set **first, before any code**: verify the task is free → flip
-  `Status` → create the linked branch → then implement. Never backfill it after
-  coding, or the board still shows `Todo` and misleads other contributors.
+  `Status` → create the linked branch → propose the openspec change → then
+  implement. Never backfill it after coding, or the board still shows `Todo` and
+  misleads other contributors.
 - **In review** — as soon as you **open the PR** (don't wait for the reviewer's verdict).
-- **Done** — flip the catalog checkbox to `[x]` ✅ **in the implementing PR** (this
-  avoids a catalog-only PR that branch protection on `master` would otherwise force),
-  then move the board to **Done** and close the issue **after the PR merges**.
+- **Done** — archive the task's openspec change **in the implementing PR** (this
+  avoids an archive-only PR that branch protection on `master` would otherwise
+  force; it also merges the change's spec delta into `openspec/specs/`), then
+  move the board to **Done** and close the issue **after the PR merges**.
 
-Each PR edits only its own task line, so conflicts are rare. CI enforces the pairing:
-a PR whose body has `Implements: IS-/UI-…` must edit that task's catalog line in the
-same PR (`.github/workflows/ci.yml` → `catalog-sync`), so a merged task never leaves a
-stale `[ ]`. (`Closes: #…` is not the trigger — it can reference non-task issues such
-as bug reports; only `Implements: IS-/UI-…` arms catalog-sync.) **On conflict the board
-wins** — a task with a merged PR but an unchecked
-box is done; fix the box in your next related PR, don't re-implement.
+Each PR archives only its own task's change, so conflicts are rare. CI enforces the
+pairing: a PR whose body has `Implements: IS-/UI-…` must add an
+`openspec/changes/archive/<date>-<id>-<slug>/` in the same PR
+(`.github/workflows/ci.yml` → `catalog-sync`), so a merged task never leaves
+`openspec/specs/` undocumented. (`Closes: #…` is not the trigger — it can
+reference non-task issues such as bug reports; only `Implements: IS-/UI-…` arms
+catalog-sync.) **On conflict the board wins** — a task with a merged PR but no
+archived change is still done; archive it in your next related PR, don't
+re-implement.
 
 File tasks with the **Task** issue form (labels in `.github/labels.yml`); board fields
 are `Status`, `Task ID`, and `Area` (BE/FE/SDLC).
@@ -136,7 +145,7 @@ are `Status`, `Task ID`, and `Area` (BE/FE/SDLC).
 - Add/bump dependencies only in `gradle/libs.versions.toml`.
 
 ## Governance
-`SPEC.md`, `ARCHITECTURE.md`, `STACK.md`, and `backend-specs/` change only with prior
+`ARCHITECTURE.md`, `STACK.md`, and `openspec/specs/` change only with prior
 owner approval — propose first (see `AGENTS.md`). No new dependency without approval.
 
 ## Branch protection (repo admin)

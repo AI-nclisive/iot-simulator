@@ -3,7 +3,7 @@ package com.ainclusive.iotsim.persistence.clientconnection;
 import java.time.OffsetDateTime;
 
 /**
- * Persistence-level projection of a {@code client_connections} row (backend-specs/04).
+ * Persistence-level projection of a {@code client_connections} row (openspec/specs/db-schema/spec.md).
  * One row per client connection observed at a running data source's protocol
  * endpoint (IS-047/IS-052): {@code connectedAt} is set on connect, {@code
  * disconnectedAt} stays {@code null} while the client is connected and is set on

@@ -33,7 +33,7 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * Replays a recording through a (started) data-source by streaming its value
- * timeline to the runtime. Core of the Record -> Replay flow (backend-specs/03).
+ * timeline to the runtime. Core of the Record -> Replay flow (openspec/specs/domain-model/spec.md).
  *
  * <p>Each replay opens a {@code REPLAY} {@link RunRow} and a {@code CAPTURING}
  * {@link EvidenceRow} (IS-057): the run is started, ended {@code COMPLETED} on

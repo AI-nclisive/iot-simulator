@@ -41,7 +41,7 @@ import org.eclipse.milo.opcua.stack.core.types.structured.StructureField;
 /**
  * Builds the OPC UA address space from the protocol-neutral schema: each VARIABLE
  * becomes a {@link UaVariableNode} under the Objects folder, and ApplyValues
- * updates node values. See backend-specs/01 §5 and 02.
+ * updates node values. See openspec/specs/protocol-model/spec.md §5 and 02.
  */
 final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
 

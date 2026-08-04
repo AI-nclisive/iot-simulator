@@ -46,7 +46,7 @@ import org.springframework.web.bind.annotation.RestController;
  * /api/v1, ETag / If-Match optimistic concurrency, start/stop runtime control.
  * See openspec/specs/api-contract/spec.md.
  *
- * <p>Authorization (IS-077, backend-specs/08 §Authorization):
+ * <p>Authorization (IS-077, openspec/specs/auth-modes/spec.md §Authorization):
  * <ul>
  *   <li>List / get — {@link Permission#OBSERVE} (user + admin).
  *   <li>Create / update / delete / duplicate / credentials — {@link Permission#SOURCE_EDIT} (admin).

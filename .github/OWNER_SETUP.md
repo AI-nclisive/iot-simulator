@@ -44,8 +44,9 @@ plus a downloadable `test-reports` artifact — no GitHub Pages (dropped in #6).
 Org project **IoT Simulator** — <https://github.com/orgs/AI-nclisive/projects/1>,
 linked to the repo, with fields: single-select `Status` (Todo / In Progress /
 In review / Done), text `Task ID` (`IS-XXX` or `UI-XXX`), single-select `Area`
-(BE / FE / SDLC). Live status lives here; `backend-specs/TASKS.md` and
-`frontend/docs/UI_TASKS.md` stay the catalogs. Created (needs the `project`
+(BE / FE / SDLC). Live status lives here; `openspec/changes/` (active) and
+`openspec/changes/archive/` (done) are the change record, and `openspec/specs/`
+is the living behavior contract. Created (needs the `project`
 token scope to re-create):
 ```bash
 gh auth refresh -s project,read:project

@@ -4,7 +4,7 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 
-/** Stores scenarios and their ordered steps (backend-specs/03, 04). */
+/** Stores scenarios and their ordered steps (openspec/specs/domain-model/spec.md, 04). */
 public interface ScenarioRepository {
     ScenarioRow create(String projectId, String name, String deterministicSettings,
             List<ScenarioStepInput> steps, String createdBy);

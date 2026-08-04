@@ -24,7 +24,7 @@ service ProtocolDataSource {
   // discovered nodes in NodeBatch chunks (bounded per-message so a huge address
   // space never exceeds gRPC's max message size), ending with exactly one
   // ScanEvent carrying the terminal ScanResponse (status/counts only — no
-  // nodes). See backend-specs/05 §Scan.
+  // nodes). See openspec/specs/api-contract/spec.md §Scan.
   rpc Scan (ScanRequest) returns (stream ScanEvent);
 
   // Live capture (record real data). Like Scan, the worker acts as a protocol
@@ -32,7 +32,7 @@ service ProtocolDataSource {
   // subscribes to the schema's variable nodes and streams every observed value
   // change back as neutral ValueBatches until the supervisor cancels the call.
   // Stateless/client mode — no Configure/Start needed. The recording-in path,
-  // kept distinct from the conflated live-out path. See backend-specs/02 §6.
+  // kept distinct from the conflated live-out path. See openspec/specs/worker-contract/spec.md §6.
   rpc Capture (CaptureRequest) returns (stream ValueBatch);
 
   // Supervisor pushes neutral value batches for the worker to project onto its

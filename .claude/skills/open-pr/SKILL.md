@@ -28,16 +28,23 @@ Repo: `AI-nclisive/iot-simulator`. Run from the task's feature branch.
   but local passes shorten the [[review-loop]]). For behavior-affecting changes,
   `/verify` (or `/run`) to confirm it actually works, not just that it compiles.
 
-## 2. Flip the catalog checkbox in THIS PR (catalog-sync gate)
+## 2. Archive the openspec change in THIS PR (catalog-sync gate)
 
 CI (`.github/workflows/ci.yml` → `catalog-sync`) requires that a PR whose body has
-`Implements: IS-/UI-XXX` also edits that task's catalog line in the same PR.
-Flip the box `[ ]` → `[x]` for this task now and commit it on the branch:
+`Implements: IS-/UI-XXX` also adds an
+`openspec/changes/archive/<date>-<id>-<slug>/` for that id in the same PR.
+Archive the task's change now and commit it on the branch:
 
-- `IS-*` → `backend-specs/TASKS.md`   ·   `UI-*` → `frontend/docs/UI_TASKS.md`
+```bash
+openspec change archive is-038-<slug>   # or /opsx:archive
+```
 
-Edit only this task's line (one line per PR keeps conflicts rare). The `[x]` maps
-to board **Done** only after the PR *merges* — see step 5.
+This merges the change's spec deltas into `openspec/specs/` and moves the
+change folder under `openspec/changes/archive/`. If the task had no
+spec-level behavior change (pure refactor/tooling — the change declared
+`skip_specs: true` when proposed), archive still moves the folder; it just
+skips the specs-merge step. This replaces the old catalog-checkbox flip. The
+archived change maps to board **Done** only after the PR *merges* — see step 5.
 
 ## 3. Push & create the PR
 

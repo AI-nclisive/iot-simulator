@@ -44,7 +44,7 @@ import org.eclipse.milo.opcua.stack.core.types.structured.StructureField;
  * a real server, optionally authenticates, and browses its address space into
  * protocol-neutral schema nodes. Stateless and one-shot — invoked via the
  * {@code Scan}/{@code TestConnection} worker RPCs; nothing here touches the
- * embedded server runtime. See backend-specs/02 §6 and 01 §5.
+ * embedded server runtime. See openspec/specs/worker-contract/spec.md §6 and 01 §5.
  *
  * <p>Folders/objects become {@code FOLDER} nodes; variables become {@code VARIABLE}
  * nodes whose neutral type is reverse-mapped from the OPC UA built-in type (an

@@ -4,7 +4,7 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * Manifest of an evidence artifact (backend-specs/06): always-visible origin
+ * Manifest of an evidence artifact (openspec/specs/artifact-formats/spec.md): always-visible origin
  * (which run, who initiated, how complete) plus source/scenario context. Carries
  * no secrets. {@code scenarioId} and {@code recordingId} are nullable (a replay run
  * has a recording but no scenario).

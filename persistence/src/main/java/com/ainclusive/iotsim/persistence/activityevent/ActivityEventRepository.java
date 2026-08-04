@@ -3,7 +3,7 @@ package com.ainclusive.iotsim.persistence.activityevent;
 import java.util.List;
 
 /**
- * Append-only store for user-activity audit events (IS-083, backend-specs/04).
+ * Append-only store for user-activity audit events (IS-083, openspec/specs/db-schema/spec.md).
  * Every user action that mutates system state is recorded here. Reads back the
  * activity feed for the team activity view (UI-023/UI-024).
  */

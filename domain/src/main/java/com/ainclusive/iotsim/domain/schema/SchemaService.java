@@ -22,7 +22,7 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/** Reads and saves the protocol-neutral schema of a data-source (backend-specs/01 & 05). */
+/** Reads and saves the protocol-neutral schema of a data-source (openspec/specs/protocol-model/spec.md & 05). */
 @Service
 public class SchemaService {
 

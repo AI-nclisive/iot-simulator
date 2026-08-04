@@ -27,7 +27,7 @@ import tools.jackson.databind.ObjectMapper;
 /**
  * Evidence resource (IS-057, SPEC "Export Run Evidence"): list/get run evidence,
  * trigger an export, and download the produced bundle. Export is idempotent-ish —
- * re-{@code POST}ing after an {@code EXPORT_FAILED} retries (backend-specs/05).
+ * re-{@code POST}ing after an {@code EXPORT_FAILED} retries (openspec/specs/api-contract/spec.md).
  *
  * <p>Authorization (IS-077): list/get/download — {@link Permission#OBSERVE} (user + admin);
  * export trigger — {@link Permission#IMPORT_EXPORT} (admin).

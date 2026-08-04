@@ -46,13 +46,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 /**
- * Create-from-scan: real-source discovery + data-source creation (backend-specs/05
+ * Create-from-scan: real-source discovery + data-source creation (openspec/specs/api-contract/spec.md
  * §Scan, SPEC "Create Data Source From Real Source Scan", IS-043).
  *
  * <p>A scan is an async job: {@link #startScan} returns a {@code jobId} immediately
  * and the browse runs on a worker pool; {@link #getScan} polls progress/result.
  * Connection secrets are passed straight to the {@link SourceScanner} for the
- * scan's duration and are never stored in a job, result, or row (backend-specs/08).
+ * scan's duration and are never stored in a job, result, or row (openspec/specs/auth-modes/spec.md).
  */
 @Service
 public class ScanService implements DisposableBean {
@@ -261,7 +261,7 @@ public class ScanService implements DisposableBean {
      * are kept as-is; each unknown-typed variable must be addressed by a
      * {@link TypeResolution} — assigned a neutral type (kept) or excluded (dropped).
      * An unknown-typed variable with no resolution rejects the create (400), per
-     * backend-specs/01 §2 "unknown types require user resolution before create".
+     * openspec/specs/protocol-model/spec.md §2 "unknown types require user resolution before create".
      *
      * @param resolutions user decisions for unknown-typed nodes; may be {@code null}/empty
      */

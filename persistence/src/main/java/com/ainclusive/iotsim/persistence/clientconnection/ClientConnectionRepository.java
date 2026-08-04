@@ -8,7 +8,7 @@ import java.util.List;
  * {@code ClientEvents} worker stream, IS-047). A connection is {@link #open opened}
  * on connect and {@link #close closed} on disconnect; reads are time-ordered
  * (newest first) and back connected-client observation (IS-052) and run evidence
- * (IS-057). See backend-specs/04.
+ * (IS-057). See openspec/specs/db-schema/spec.md.
  */
 public interface ClientConnectionRepository {
 

@@ -26,7 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
  * Projects resource. Path-based versioning (/api/v1); optimistic concurrency via
  * ETag / If-Match (decision D4). See openspec/specs/api-contract/spec.md.
  *
- * <p>Authorization (IS-077, backend-specs/08 §Authorization):
+ * <p>Authorization (IS-077, openspec/specs/auth-modes/spec.md §Authorization):
  * <ul>
  *   <li>List / get — {@link Permission#OBSERVE} (user + admin).
  *   <li>Create / update / duplicate / archive / delete — {@link Permission#PROJECT_EDIT} (admin).
