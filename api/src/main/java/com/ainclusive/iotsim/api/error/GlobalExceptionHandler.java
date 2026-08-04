@@ -20,6 +20,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 
 /** Maps domain/API exceptions to RFC 9457 problem responses (backend-specs/05). */
 @RestControllerAdvice
@@ -122,6 +123,25 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     public ProblemDetail badRequest(IllegalArgumentException e) {
         return problem(HttpStatus.BAD_REQUEST, e.getMessage());
+    }
+
+    /**
+     * A client that is gone (e.g. broken pipe) mid-{@code text/event-stream} response —
+     * SSE endpoints like {@code Subscriber}/{@code SseEmitterSink} hit this whenever
+     * {@code emitter.complete()}/{@code send()} is called on a connection Spring has
+     * already marked unusable. The response is already committed to
+     * {@code text/event-stream} (or gone outright), so writing a {@link ProblemDetail}
+     * body here — as the generic {@link #internalError(Exception)} handler below would —
+     * is itself impossible: Spring has no converter for {@code ProblemDetail} against a
+     * preset {@code text/event-stream} content type, so it throws a second
+     * {@code HttpMessageNotWritableException} while trying to report the first one,
+     * masking the real cause in the logs (#704). There is nothing to report to a client
+     * that is already gone, so just log at debug and write no body.
+     */
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    public void asyncRequestNotUsable(AsyncRequestNotUsableException e) {
+        LOG.debug("Async request no longer usable (client likely disconnected mid-stream): {}",
+                e.getMessage());
     }
 
     /**
