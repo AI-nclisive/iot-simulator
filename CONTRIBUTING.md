@@ -47,8 +47,8 @@ Recommended **built-in** skills, by stage (run locally to cut review rounds):
 - Before `/open-pr`: **`/code-review`** (correctness + cleanup) and
   **`/security-review`** (no secrets/PKI, authz, exportable artifacts) — the CI
   Claude reviewer runs anyway, but local passes shorten the loop.
-- For behavior-affecting changes: **`/verify`** or **`/run`** to confirm it works,
-  not just compiles.
+- For behavior-affecting changes: **`/run`** to confirm it actually works, not
+  just that it compiles (or `/run-local` for the full backend + frontend stack).
 - Environment: **`/fewer-permission-prompts`** to trim repeated `gh`/Gradle/npm
   prompts; **`update-config`** to wire any team-agreed hooks into `settings.json`.
 

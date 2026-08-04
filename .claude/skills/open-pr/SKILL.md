@@ -26,7 +26,8 @@ Repo: `AI-nclisive/iot-simulator`. Run from the task's feature branch.
 - **Run the review skills locally first to cut review rounds:** `/code-review` for
   correctness/cleanup, and `/security-review` (the CI Claude reviewer runs anyway,
   but local passes shorten the [[review-loop]]). For behavior-affecting changes,
-  `/verify` (or `/run`) to confirm it actually works, not just that it compiles.
+  `/run` (or `/run-local` for the full stack) to confirm it actually works, not
+  just that it compiles.
 
 ## 2. Archive the openspec change in THIS PR (catalog-sync gate)
 
