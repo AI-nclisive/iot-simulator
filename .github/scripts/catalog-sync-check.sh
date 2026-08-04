@@ -58,7 +58,7 @@ MATCHED="$(printf '%s\n' "$DIFF_FILES" | grep -i "$TASK_ID_LOWER" || true)"
 if [[ -z "$MATCHED" ]]; then
   echo "::error::catalog-sync: ${TASK_ID} is implemented by this PR, but no matching"
   echo "${ARCHIVE_DIR}/<date>-${TASK_ID_LOWER}-<slug>/ was added."
-  echo "Run 'openspec change archive <change-name>' (or /opsx:archive) for ${TASK_ID}'s"
+  echo "Run 'npx openspec archive <change-name>' (or /opsx:archive) for ${TASK_ID}'s"
   echo "change in THIS PR. See AGENTS.md -> Task Tracking."
   exit 1
 fi

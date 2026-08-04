@@ -41,6 +41,19 @@ Archive the change in the same PR that implements it (`/open-pr` does this) —
 that's what merges the delta into `openspec/specs/`. Never hand-edit
 `openspec/specs/*.md` directly; it's always the output of an archived change.
 
+**Only `### Requirement:` blocks survive archive.** Archive parses the delta's
+requirements and merges those; any other prose in a delta (a trailing
+"Known gaps" section, notes, tables) is dropped **silently**. `## Purpose` is
+the one exception, and only when the capability's main spec is being created.
+So express a limitation as normative requirement text — "X is rejected",
+"Y is Actuator-only", with scenarios — not as a footnote. State it positively
+where you can: an absence no scenario can assert is not a spec. After
+archiving, re-read the live spec and confirm your text is actually there.
+
+CLI: `npx openspec …` from the repo root (pinned devDependency; bare
+`openspec` is not on `PATH`). `archive` is top-level — there is no
+`openspec change archive`.
+
 ## Contributions and task tracking
 
 Follow `CONTRIBUTING.md` — it owns the full workflow (branching, PRs, the AI review

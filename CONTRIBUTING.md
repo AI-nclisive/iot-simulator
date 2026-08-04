@@ -8,6 +8,14 @@ pull requests. These rules keep that smooth.
 - Node.js 20 for the frontend (`nvm use`; version recorded in `.nvmrc`).
 - Docker for Testcontainers integration tests — they skip locally without it; CI
   always runs them.
+- The **OpenSpec CLI** — pinned as a devDependency, so `npm ci` installs it and
+  everyone runs the same version. Invoke it as `npx openspec …` from the repo
+  root. It drives the spec workflow below — see "Spec workflow".
+  - The bundled `/opsx:*` slash commands shell out to a bare `openspec`, which
+    resolves only when the CLI is also on `PATH`. If you use them, install the
+    **same pinned version** globally: `npm i -g @fission-ai/openspec@1.7.0`
+    (keep it in step with `package.json` when the pin moves). Everything else —
+    scripts, CI, the project skills — uses `npx` and needs no global install.
 
 ## Build & test
 ```bash
@@ -43,6 +51,31 @@ Recommended **built-in** skills, by stage (run locally to cut review rounds):
   not just compiles.
 - Environment: **`/fewer-permission-prompts`** to trim repeated `gh`/Gradle/npm
   prompts; **`update-config`** to wire any team-agreed hooks into `settings.json`.
+
+## Spec workflow
+
+Behavior is specified in OpenSpec, not in prose docs. `openspec/specs/<capability>/spec.md`
+is the living contract for what the system does **today**; a task changes it by
+proposing a delta under `openspec/changes/<id>-<slug>/` and archiving that change
+in the PR that implements it. README's
+[Specs & workflow](README.md#specs--workflow-openspec) has the orientation and the
+per-task loop; the rules that bind:
+
+- **`openspec/specs/*.md` is generated — never hand-edit it.** Edit the delta under
+  `openspec/changes/<id>-<slug>/specs/`, then archive (`npx openspec archive <name>`,
+  or `/opsx:archive`). Archive is what merges the delta into the live spec.
+- **Only `### Requirement:` blocks survive archive.** Any other prose in a delta —
+  a trailing "known gaps" list, notes, tables — is dropped silently. Write a
+  limitation as normative requirement text with scenarios, and state it positively
+  ("liveness comes from Actuator") rather than as an absence no scenario can assert.
+  Re-read the live spec after archiving to confirm your text landed.
+- **A change with no spec-level behavior change** (pure refactor, tooling, docs)
+  sets `skip_specs: true` in its `.openspec.yaml`; `openspec validate` rejects a
+  zero-delta change without that marker. Don't invent a requirement to satisfy the
+  validator.
+- Name the change folder with the task ID as its prefix (`is-038-short-slug`,
+  `ui-012-short-slug`) — the CI gate matches the archived folder against the PR's
+  `Implements:` ID.
 
 ## Task IDs
 - Backend / repo / process: **`IS-XXX [AREA] short name`** (`[AREA]` is `[BE]` or

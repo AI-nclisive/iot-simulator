@@ -36,8 +36,12 @@ CI (`.github/workflows/ci.yml` → `catalog-sync`) requires that a PR whose body
 Archive the task's change now and commit it on the branch:
 
 ```bash
-openspec change archive is-038-<slug>   # or /opsx:archive
+npx openspec archive is-038-<slug>   # or /opsx:archive
 ```
+
+(The CLI is a devDependency — `npx openspec` resolves it locally, no global
+install. There is no `openspec change archive` subcommand; `archive` is
+top-level.)
 
 This merges the change's spec deltas into `openspec/specs/` and moves the
 change folder under `openspec/changes/archive/`. If the task had no

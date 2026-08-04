@@ -28,8 +28,8 @@ Repo: `AI-nclisive/iot-simulator`. Board: org Project **#1** "IoT Simulator".
 - No issue yet ("new" task)? File one first (Task issue form,
   `.github/ISSUE_TEMPLATE/task.yml`), then add it to the board via
   `/board-sync`.
-- Ensure the task's openspec change exists: `openspec list` (or
-  `openspec change show is-038-<slug>` if you know the slug already). If it
+- Ensure the task's openspec change exists: `npx openspec list` (or
+  `npx openspec change show is-038-<slug>` if you know the slug already). If it
   doesn't exist yet, create it with the `IS-XXX`/`UI-XXX` id as the folder-name
   prefix (keeps the change linkable to this issue/board item):
   ```bash
