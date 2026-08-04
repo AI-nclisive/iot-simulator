@@ -37,7 +37,7 @@ skill by typing its slash command.
 | --- | --- |
 | `/start-task IS-XXX` | Claim a task before coding: verify free → board **In Progress** → linked branch. |
 | `/open-pr` | Run DoD checks, archive the task's openspec change in-PR, open the PR, arm auto-merge, board **In review**. |
-| `/review-loop` | Work the Claude PR review to completion (fix/rebut → push → repeat). |
+| `/review-loop` | Work the Claude PR review to completion (fix/rebut → push → repeat), then board **Done** + close the issue once the PR merges. |
 | `/new-worker <proto>` | Scaffold a new out-of-process protocol worker (contract impl; no supervisor change). |
 | `/flyway-migration <name>` | Add a collision-safe, append-only DB migration. |
 | `/board-sync` | Reconcile org Project #1 with openspec's change/spec state. |
