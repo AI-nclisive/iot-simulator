@@ -19,6 +19,7 @@ capability specs under `openspec/specs/`.
   - [Useful Gradle tasks](#useful-gradle-tasks)
 - [Specs & workflow (OpenSpec)](#specs--workflow-openspec)
 - [Project tracking](#project-tracking)
+- [Device templates](#device-templates)
 - [Debug tools](#debug-tools)
 - [Notes](#notes)
 
@@ -263,6 +264,12 @@ archived change) is in
   live status by `IS-XXX` / `Area` (Todo / In Progress / In review / Done).
 - **Capability specs:** [`openspec/specs/`](openspec/specs/) — what the system does today.
 - **Change history:** [`openspec/changes/archive/`](openspec/changes/archive/) — completed `IS-XXX`/`UI-XXX` tasks.
+
+## Device templates
+
+[`docs/TEMPLATES_GUIDE.md`](docs/TEMPLATES_GUIDE.md) describes the 15 OPC UA device
+templates the manual schema editor offers. The definitions live in
+`domain/.../manualschema/OpcUaTemplates.java` and are the source of truth.
 
 ## Debug tools
 
