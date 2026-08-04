@@ -2,7 +2,7 @@
 
 **Task:** IS-089 [BE] · Wave F — Advanced workflows & hardening · P2
 **Issue:** [#110](https://github.com/AI-nclisive/iot-simulator/issues/110)
-**Owning spec:** `backend-specs/05_API_CONTRACT.md` §"Runs (and test-control for automation)"; `SPEC.md` → *Control Simulations From Automated Tests* (P1)
+**Owning spec:** `openspec/specs/api-contract/spec.md` §"Runs (and test-control for automation)"; `SPEC.md` → *Control Simulations From Automated Tests* (P1)
 **Branch:** `feat/IS-089-runs-resource`
 **Builds on:** RunRepository (+`parentRunId`, IS-124), the three run services (ReplayService/SyntheticRunService/ScenarioRunService, IS-028/065/086), IS-122 `ActiveRunService` enrichment, `RuntimeController.health`.
 

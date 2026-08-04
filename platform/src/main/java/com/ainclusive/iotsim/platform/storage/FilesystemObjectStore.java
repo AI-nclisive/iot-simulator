@@ -12,7 +12,7 @@ import java.util.Optional;
 
 /**
  * Filesystem {@link ObjectStore} adapter — the local (default) blob store
- * (decision D3, {@code backend-specs/08_AUTH_AND_MODES.md}). Objects are written
+ * (decision D3, {@code openspec/specs/auth-modes/spec.md}). Objects are written
  * as files under a configured root directory; the returned reference is the
  * object's key relative to that root, so a stored ref keeps resolving across
  * restarts.

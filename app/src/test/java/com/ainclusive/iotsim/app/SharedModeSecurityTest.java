@@ -18,7 +18,7 @@ import org.springframework.test.web.servlet.MockMvc;
 /**
  * IS-078 / IS-075: in shared mode workspace endpoints require an authenticated
  * bearer JWT; the JWT is converted to an {@code IotSimPrincipal} via
- * {@code JwtPrincipalConverter}. See backend-specs/08_AUTH_AND_MODES.md.
+ * {@code JwtPrincipalConverter}. See openspec/specs/auth-modes/spec.md.
  */
 @WebMvcTest(controllers = MetaController.class)
 @Import(SecurityConfig.class)

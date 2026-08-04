@@ -2,7 +2,7 @@
 
 **Task:** IS-085 [BE] · Wave F — Advanced workflows & hardening · P2
 **Issue:** [#106](https://github.com/AI-nclisive/iot-simulator/issues/106)
-**Owning spec:** `backend-specs/03_DOMAIN_MODEL.md` (Scenario / ScenarioStep) + `06_ARTIFACT_FORMATS.md` (serialized scenario model) + `05_API_CONTRACT.md` (Scenarios endpoints); supports `SPEC.md` → *Build Custom Scenarios*
+**Owning spec:** `openspec/specs/domain-model/spec.md` (Scenario / ScenarioStep) + `06_ARTIFACT_FORMATS.md` (serialized scenario model) + `05_API_CONTRACT.md` (Scenarios endpoints); supports `SPEC.md` → *Build Custom Scenarios*
 **Branch:** `feat/IS-085-scenario-model`
 
 ## Problem

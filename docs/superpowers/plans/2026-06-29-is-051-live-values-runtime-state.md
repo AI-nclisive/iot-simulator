@@ -783,7 +783,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
  * Live (conflated) values for a data source's Values tab (SSE, IS-051). On connect the
  * client gets a {@code values-snapshot} (current latest-per-node) and then {@code values}
  * deltas. {@code Last-Event-ID} is intentionally ignored — the snapshot is the resync.
- * See backend-specs/05_API_CONTRACT.md.
+ * See openspec/specs/api-contract/spec.md.
  */
 @RestController
 public class ValuesStreamController {

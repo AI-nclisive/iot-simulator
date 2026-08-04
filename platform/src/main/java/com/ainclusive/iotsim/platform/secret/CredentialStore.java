@@ -9,7 +9,7 @@ import java.util.Optional;
  * <p>The default adapter keeps credentials in process memory only
  * (session-only). A persistent adapter, when added, must store secrets via an
  * external secret store and never inline in entity rows, exports, evidence,
- * activity, or summaries — see {@code backend-specs/08_AUTH_AND_MODES.md}.
+ * activity, or summaries — see {@code openspec/specs/auth-modes/spec.md}.
  */
 public interface CredentialStore {
 

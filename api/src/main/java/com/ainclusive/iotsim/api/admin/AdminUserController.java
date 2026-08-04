@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Admin user-management endpoints (IS-118, backend-specs/05_API_CONTRACT.md §Admin).
+ * Admin user-management endpoints (IS-118, openspec/specs/api-contract/spec.md §Admin).
  *
  * <p>All endpoints require {@code admin.access} permission. In local (trusted) mode the
  * implicit principal holds all permissions, so no token is needed.

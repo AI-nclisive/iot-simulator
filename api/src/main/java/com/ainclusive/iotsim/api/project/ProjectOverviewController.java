@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
  * counts, reusable-artifact counts, and an attention count of unhealthy sources.
  * Read-only derived view — no ETag/concurrency. The literal {@code /overview}
  * segment is matched ahead of {@code ProjectController}'s {@code /{id}} pattern.
- * See backend-specs/05_API_CONTRACT.md.
+ * See openspec/specs/api-contract/spec.md.
  *
  * <p>Authorization (IS-077): read-only — {@link Permission#OBSERVE} (user + admin).
  */

@@ -7,7 +7,7 @@ import java.util.random.RandomGeneratorFactory;
 
 /**
  * Seeded source of independent, reproducible random streams — the RNG half of the
- * determinism foundation in {@code backend-specs/01_PROTOCOL_NEUTRAL_MODEL.md} §4.
+ * determinism foundation in {@code openspec/specs/protocol-model/spec.md} §4.
  *
  * <p>From a single master seed it derives any number of <em>named</em> streams via
  * {@link #stream(String)}. Each stream is seeded deterministically from the master

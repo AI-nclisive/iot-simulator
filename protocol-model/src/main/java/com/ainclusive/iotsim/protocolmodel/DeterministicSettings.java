@@ -6,9 +6,9 @@ import java.util.Objects;
 import java.util.random.RandomGeneratorFactory;
 
 /**
- * The reproducibility inputs of a run — the "deterministic run settings" of
- * {@code SPEC.md} "Run Deterministic Scenarios", built on the determinism
- * foundation in {@code backend-specs/01_PROTOCOL_NEUTRAL_MODEL.md} §4.
+ * The reproducibility inputs of a run — the "deterministic run settings" built
+ * on the determinism foundation in {@code openspec/specs/protocol-model/spec.md}
+ * (Determinism).
  *
  * <p>A run is fully determined by its {@code seed} (feeds the {@link SeededRng})
  * and its {@code startTime} (feeds the {@link MutableClock}): the same settings +

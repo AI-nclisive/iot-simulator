@@ -3,7 +3,7 @@ spring:
     name: iot-simulator
   # DB connection is externally configured (env-based DataSource) so one build
   # targets containerized Postgres or a managed instance. Defaults match
-  # docker-compose.yml. See backend-specs/08_AUTH_AND_MODES.md.
+  # docker-compose.yml. See openspec/specs/auth-modes/spec.md.
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/iotsim}
     username: ${DB_USER:iotsim}
@@ -26,7 +26,7 @@ spring:
   # iotsim.oidc.jwks-uri directly instead of (or in addition to) issuer-uri.
 
 # Deployment mode: local (auth optional) | shared (OAuth2/OIDC). D2/D6.
-# See backend-specs/08_AUTH_AND_MODES.md and IS-075/IS-078.
+# See openspec/specs/auth-modes/spec.md and IS-075/IS-078.
 iotsim:
   mode: ${IOTSIM_MODE:local}
 
@@ -62,7 +62,7 @@ iotsim:
   # Runtime controller: memory (default, no workers) | supervisor (real
   # out-of-process protocol workers). In supervisor mode, `workers` maps each
   # protocol to the base launch command (installDist bin script); the supervisor
-  # appends the loopback control port. See backend-specs/02_WORKER_CONTRACT_AND_IPC.md.
+  # appends the loopback control port. See openspec/specs/worker-contract/spec.md.
   runtime:
     mode: ${IOTSIM_RUNTIME_MODE:memory}
     # workers:
@@ -78,7 +78,7 @@ iotsim:
     #   max-restarts: 5
   # Object storage for large artifacts (evidence exports, prepared-data imports).
   # Filesystem adapter is the local default; no blobs live in Postgres. The
-  # S3-compatible adapter for shared mode lands later. See backend-specs/08_AUTH_AND_MODES.md.
+  # S3-compatible adapter for shared mode lands later. See openspec/specs/auth-modes/spec.md.
   storage:
     filesystem:
       base-dir: ${IOTSIM_STORAGE_DIR:data/objects}

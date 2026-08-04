@@ -8,7 +8,7 @@ import org.springframework.context.annotation.Configuration;
 /**
  * Wires the {@link CredentialStore}. The default is session-only (in memory):
  * connection secrets live for the current process only and are never persisted
- * (backend-specs/08_AUTH_AND_MODES.md). A persistent, external-secret-store
+ * (openspec/specs/auth-modes/spec.md). A persistent, external-secret-store
  * adapter can be selected here later without touching the domain.
  */
 @Configuration

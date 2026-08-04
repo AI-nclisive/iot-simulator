@@ -1,6 +1,6 @@
 # IS-048 — RuntimeEvents stream (worker → supervisor)
 
-**Task:** IS-048 [BE] · owning spec `backend-specs/02_WORKER_CONTRACT_AND_IPC.md` · Wave C (observability & evidence, P0)
+**Task:** IS-048 [BE] · owning spec `openspec/specs/worker-contract/spec.md` · Wave C (observability & evidence, P0)
 **Date:** 2026-06-29
 
 ## Summary

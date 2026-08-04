@@ -8,7 +8,7 @@ import java.util.Objects;
 
 /**
  * An advanceable {@link Clock} — the time half of the determinism foundation in
- * {@code backend-specs/01_PROTOCOL_NEUTRAL_MODEL.md} §4.
+ * {@code openspec/specs/protocol-model/spec.md} §4.
  *
  * <p>Production code depends on the standard injectable {@link Clock}; a
  * deterministic run injects this implementation so simulated time steps forward

@@ -9,7 +9,7 @@ import java.util.Objects;
  *
  * <p>One context belongs to one run. A generator or scenario engine advances
  * {@link #clock()} and pulls named streams from {@link #rng()}; together they make
- * the run reproducible (see {@code backend-specs/01_PROTOCOL_NEUTRAL_MODEL.md} §4).
+ * the run reproducible (see {@code openspec/specs/protocol-model/spec.md} §4).
  */
 public record DeterminismContext(MutableClock clock, SeededRng rng) {
 

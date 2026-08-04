@@ -5,7 +5,7 @@ package com.ainclusive.iotsim.worker.modbus;
  * and passes the loopback control port. It will host a gRPC
  * {@code ProtocolDataSource} server (worker-contract) and a j2mod Modbus slave.
  *
- * <p>Scaffold placeholder — see backend-specs/02_WORKER_CONTRACT_AND_IPC.md.
+ * <p>Scaffold placeholder — see openspec/specs/worker-contract/spec.md.
  */
 public final class ModbusWorkerMain {
 

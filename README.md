@@ -23,7 +23,7 @@ workers, and a React/TypeScript Web UI. See the design docs at the repo root
 
 ## Module map
 
-Dependencies flow downward only (`backend-specs/07_MODULE_STRUCTURE.md`):
+Dependencies flow downward only (`openspec/specs/module-structure/spec.md`):
 
 | Module | Role |
 | --- | --- |
@@ -203,7 +203,7 @@ Postgres:
 | `DB_URL` | `jdbc:postgresql://localhost:5432/iotsim` | JDBC URL for Postgres. |
 | `DB_USER` / `DB_PASSWORD` | `iotsim` / `iotsim` | DB credentials. |
 | `SERVER_PORT` | `8080` | HTTP port. |
-| `IOTSIM_MODE` | `local` | `local` = auth off (implicit `local` principal); `shared` = OAuth2/OIDC resource server (set `spring.security.oauth2.resourceserver.jwt.issuer-uri`). See `backend-specs/08_AUTH_AND_MODES.md`. |
+| `IOTSIM_MODE` | `local` | `local` = auth off (implicit `local` principal); `shared` = OAuth2/OIDC resource server (set `spring.security.oauth2.resourceserver.jwt.issuer-uri`). See `openspec/specs/auth-modes/spec.md`. |
 | `IOTSIM_RUNTIME_MODE` | `memory` | `memory` = no workers (app default for dev/tests); `supervisor` = real out-of-process protocol workers (the `/run-local` skill runs this). |
 
 **Frontend** (`.env.example`):

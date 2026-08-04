@@ -2,7 +2,7 @@
 
 **Task:** IS-065 [BE] · Wave D — Creation/reuse breadth & synthetic generation · P1
 **Issue:** [#86](https://github.com/AI-nclisive/iot-simulator/issues/86)
-**Owning spec:** `backend-specs/06_ARTIFACT_FORMATS.md` (Synthetic generation model) + `03_DOMAIN_MODEL.md` (DataSource basis/runtimeConfig); supports `SPEC.md` → *Generate Synthetic Data* / *Manually Create Data Source Schemas*
+**Owning spec:** `openspec/specs/artifact-formats/spec.md` (Synthetic generation model) + `03_DOMAIN_MODEL.md` (DataSource basis/runtimeConfig); supports `SPEC.md` → *Generate Synthetic Data* / *Manually Create Data Source Schemas*
 **Branch:** `feat/IS-065-create-from-synthetic`
 
 ## Problem

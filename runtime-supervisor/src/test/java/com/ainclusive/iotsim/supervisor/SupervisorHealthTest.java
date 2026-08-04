@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Health-monitoring loop + stale/error state propagation (IS-041). A fast poll
  * keeps tests quick while still exercising the probe → stale → recover path. See
- * backend-specs/02_WORKER_CONTRACT_AND_IPC.md §4.
+ * openspec/specs/worker-contract/spec.md §4.
  */
 class SupervisorHealthTest {
 

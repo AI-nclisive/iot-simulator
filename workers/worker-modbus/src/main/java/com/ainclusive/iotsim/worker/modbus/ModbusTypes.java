@@ -3,7 +3,7 @@ package com.ainclusive.iotsim.worker.modbus;
 /**
  * Maps the protocol-neutral data types onto Modbus's native register/coil model.
  * Mirrors {@code OpcUaTypes} in the worker-opcua module — see
- * backend-specs/01_PROTOCOL_NEUTRAL_MODEL.md §2 for the "superset, not
+ * openspec/specs/protocol-model/spec.md §2 for the "superset, not
  * intersection" rule this follows.
  *
  * <p><strong>Scaffold placeholder</strong> — {@code worker-modbus} has no gRPC

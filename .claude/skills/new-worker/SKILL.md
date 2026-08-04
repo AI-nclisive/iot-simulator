@@ -10,7 +10,7 @@ description: >-
 
 # Scaffold a new protocol worker
 
-Owning specs: `backend-specs/02_WORKER_CONTRACT_AND_IPC.md` (contract/IPC) and
+Owning specs: `openspec/specs/worker-contract/spec.md` (contract/IPC) and
 `07_MODULE_STRUCTURE.md` (module layout). Architecture rule (`ARCHITECTURE.md` →
 Runtime model): **"Adding a protocol means adding a worker, not changing the
 supervisor."** The supervisor stays protocol-agnostic; protocol-specific code lives

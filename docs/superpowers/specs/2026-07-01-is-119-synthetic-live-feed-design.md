@@ -2,7 +2,7 @@
 
 **Task:** IS-119 [BE] · Wave D — Creation/reuse breadth & synthetic generation · P2
 **Issue:** [#300](https://github.com/AI-nclisive/iot-simulator/issues/300)
-**Owning spec:** `backend-specs/02_WORKER_CONTRACT_AND_IPC.md` (runtime apply path) + `03_DOMAIN_MODEL.md` (run lifecycle) + `05_API_CONTRACT.md` (runs surface); supports `SPEC.md` → *Generate Synthetic Data* / *Run Deterministic Scenarios*
+**Owning spec:** `openspec/specs/worker-contract/spec.md` (runtime apply path) + `03_DOMAIN_MODEL.md` (run lifecycle) + `05_API_CONTRACT.md` (runs surface); supports `SPEC.md` → *Generate Synthetic Data* / *Run Deterministic Scenarios*
 **Branch:** `feat/IS-119-synthetic-continuous-feed`
 **Pairs with:** IS-069 (replay real-time pacing) — deferred sibling from the IS-065 design.
 

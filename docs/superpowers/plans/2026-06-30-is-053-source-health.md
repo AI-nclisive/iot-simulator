@@ -931,7 +931,7 @@ import org.springframework.web.bind.annotation.RestController;
  * ({@code GET /api/v1/projects/{pid}/stream/runtime}); this is the point-in-time
  * query. An unknown {@code id} returns 200 with {@code STOPPED} + no error,
  * mirroring the sibling observability endpoints. See
- * backend-specs/05_API_CONTRACT.md and SPEC.md → Observe Data Source Health And
+ * openspec/specs/api-contract/spec.md and SPEC.md → Observe Data Source Health And
  * Errors.
  */
 @RestController

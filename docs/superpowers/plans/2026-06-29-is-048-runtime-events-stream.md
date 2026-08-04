@@ -103,7 +103,7 @@ import java.util.Objects;
  * new event kinds need no model change; {@code detail} is optional human-readable
  * context; {@code at} is when the worker observed the event.
  *
- * <p>See backend-specs/02_WORKER_CONTRACT_AND_IPC.md.
+ * <p>See openspec/specs/worker-contract/spec.md.
  */
 public record RuntimeActivityEvent(String dataSourceId, String type, Instant at, String detail) {
 
@@ -354,7 +354,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  *
  * <p>Events are point-in-time and not buffered — one published while no stream is
  * open is dropped. The supervisor opens the stream before Start, so SOURCE_START
- * is captured. See backend-specs/02_WORKER_CONTRACT_AND_IPC.md.
+ * is captured. See openspec/specs/worker-contract/spec.md.
  */
 final class RuntimeEventHub {
 
@@ -518,7 +518,7 @@ Add the RPC implementation next to `clientEvents(...)` (after line 179):
      * observer with the {@link RuntimeEventHub} and leaves it open. The running server
      * publishes SOURCE_START/SOURCE_STOP and value-apply failures publish ERROR; the
      * stream ends when the supervisor cancels it.
-     * See backend-specs/02_WORKER_CONTRACT_AND_IPC.md.
+     * See openspec/specs/worker-contract/spec.md.
      */
     @Override
     public void runtimeEvents(StreamRequest request, StreamObserver<RuntimeEvent> responseObserver) {
@@ -732,7 +732,7 @@ Add this method right after `clientEvents(...)` (after line 201):
      * event; {@code onError} on a non-cancel stream failure (a worker that does not
      * implement the stream fails here with {@code UNIMPLEMENTED} — the caller treats
      * that as "no runtime events", never fatal).
-     * See backend-specs/02_WORKER_CONTRACT_AND_IPC.md.
+     * See openspec/specs/worker-contract/spec.md.
      */
     public StreamHandle runtimeEvents(Consumer<RuntimeEvent> onEvent, Consumer<Throwable> onError) {
         ProtocolDataSourceGrpc.ProtocolDataSourceStub async = ProtocolDataSourceGrpc.newStub(channel);

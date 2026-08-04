@@ -24,7 +24,7 @@ import tools.jackson.databind.ObjectMapper;
  * History". Live events are on the SSE runtime stream ({@code .../stream/runtime});
  * this is the history. Filters are project-scoped with optional source/run/type and
  * a {@code [from, to)} time window; paging is keyset via the opaque {@code cursor}.
- * Distinct from the user-activity audit stream. See backend-specs/05_API_CONTRACT.md.
+ * Distinct from the user-activity audit stream. See openspec/specs/api-contract/spec.md.
  *
  * <p>Authorization (IS-077): read-only — {@link Permission#OBSERVE} (user + admin).
  */

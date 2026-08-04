@@ -15,7 +15,7 @@ import java.util.Map;
 /**
  * Compact, protocol-neutral encoding of a value into a (kind, bytes) pair for the
  * value timeline and IPC. Numeric/boolean/text values are stored as UTF-8 text;
- * raw byte values are stored verbatim. See backend-specs/04_DB_SCHEMA.md.
+ * raw byte values are stored verbatim. See openspec/specs/db-schema/spec.md.
  */
 public final class ValueCodec {
 

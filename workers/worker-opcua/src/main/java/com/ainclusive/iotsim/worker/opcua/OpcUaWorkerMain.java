@@ -4,7 +4,7 @@ package com.ainclusive.iotsim.worker.opcua;
  * OPC UA worker entry point. The supervisor launches this as a child process and
  * passes the loopback control port (0 = ephemeral). It hosts a gRPC
  * {@code ProtocolDataSource} server; the Eclipse Milo OPC UA server is wired in a
- * later step. See backend-specs/02_WORKER_CONTRACT_AND_IPC.md.
+ * later step. See openspec/specs/worker-contract/spec.md.
  */
 public final class OpcUaWorkerMain {
 

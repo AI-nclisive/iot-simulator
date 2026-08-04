@@ -1,7 +1,7 @@
 -- Manual schemas (IS-171): a reusable, standalone protocol-neutral structure artifact
 -- (folders + typed variables, no values) — symmetric to `recordings` but for structure
 -- instead of values. Not bound to any data-source; consumed only as the parameter set
--- for a synthetic source (see backend-specs/03_DOMAIN_MODEL.md §ManualSchema). Nodes are
+-- for a synthetic source (see openspec/specs/domain-model/spec.md §ManualSchema). Nodes are
 -- stored as a single jsonb column (same SchemaNode[] shape as recordings.schema_nodes,
 -- IS-161) rather than normalized schema_nodes rows — there is no versioned schema_id to
 -- key normalized rows off here, and no consumer needs per-node querying.

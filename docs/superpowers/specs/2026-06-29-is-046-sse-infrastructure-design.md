@@ -17,7 +17,7 @@ The rich semantics — live-value conflation (IS-051), connected-client snapshot
 (IS-055) — are **out of scope**; they layer onto this transport later. This task
 delivers transport + two passthrough endpoints.
 
-Per `backend-specs/05_API_CONTRACT.md` §"Live updates (SSE)" and decisions **D6**
+Per `openspec/specs/api-contract/spec.md` §"Live updates (SSE)" and decisions **D6**
 (SSE-only at start) / **D7** (`/api/v1`).
 
 ## Constraints

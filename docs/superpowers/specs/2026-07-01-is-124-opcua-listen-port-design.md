@@ -2,7 +2,7 @@
 
 **Task:** IS-124 [BE] · P2 · backend enabler
 **Issue:** [#337](https://github.com/AI-nclisive/iot-simulator/issues/337)
-**Owning spec:** `backend-specs/03_DOMAIN_MODEL.md` (§DataSource — endpoint/runtimeConfig) + `02` (worker listen port)
+**Owning spec:** `openspec/specs/domain-model/spec.md` (§DataSource — endpoint/runtimeConfig) + `02` (worker listen port)
 **Branch:** `feat/IS-124-opcua-listen-port`
 **Unblocks:** IS-123 (`/run-local` supervisor mode — turnkey local OPC UA e2e).
 

@@ -1,4 +1,4 @@
-# Single source of dependency versions (backend-specs/07_MODULE_STRUCTURE.md).
+# Single source of dependency versions (openspec/specs/module-structure/spec.md).
 # Versions managed by the Spring Boot BOM (jOOQ, Flyway, PostgreSQL, JUnit,
 # AssertJ, Testcontainers) are intentionally omitted and resolved from the BOM
 # imported in the java-conventions plugin.

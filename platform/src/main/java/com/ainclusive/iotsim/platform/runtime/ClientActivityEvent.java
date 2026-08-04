@@ -15,7 +15,7 @@ import java.util.Objects;
  * own identifier for the connecting client (may be empty if the protocol does not
  * supply one); {@code at} is when the worker observed the event.
  *
- * <p>See backend-specs/02_WORKER_CONTRACT_AND_IPC.md.
+ * <p>See openspec/specs/worker-contract/spec.md.
  */
 public record ClientActivityEvent(String dataSourceId, Kind kind, String clientId, Instant at) {
 

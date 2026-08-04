@@ -2,7 +2,7 @@
 
 **Task:** IS-086 [BE] · Wave F — Advanced workflows & hardening · P2
 **Issue:** [#107](https://github.com/AI-nclisive/iot-simulator/issues/107)
-**Owning spec:** `backend-specs/05_API_CONTRACT.md` (`GET /scenarios/{id}/validate`, `POST /scenarios/{id}/run`) + `03_DOMAIN_MODEL.md` (Scenario/Run) + `06_ARTIFACT_FORMATS.md` (step params); supports `SPEC.md` → *Run Deterministic Scenarios*
+**Owning spec:** `openspec/specs/api-contract/spec.md` (`GET /scenarios/{id}/validate`, `POST /scenarios/{id}/run`) + `03_DOMAIN_MODEL.md` (Scenario/Run) + `06_ARTIFACT_FORMATS.md` (step params); supports `SPEC.md` → *Run Deterministic Scenarios*
 **Branch:** `feat/IS-086-scenario-run-execution`
 **Builds on:** IS-085 (scenario model + CRUD, merged). Prerequisite for IS-089 (unified `/runs` incl. scenario runs).
 

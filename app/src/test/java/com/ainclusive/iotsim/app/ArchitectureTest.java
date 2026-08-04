@@ -8,7 +8,7 @@ import com.tngtech.archunit.core.importer.ImportOption;
 import org.junit.jupiter.api.Test;
 
 /**
- * Enforces the module boundaries from backend-specs/07_MODULE_STRUCTURE.md.
+ * Enforces the module boundaries from openspec/specs/module-structure/spec.md.
  * Dependencies flow downward only; the protocol-neutral kernel stays pure.
  */
 class ArchitectureTest {

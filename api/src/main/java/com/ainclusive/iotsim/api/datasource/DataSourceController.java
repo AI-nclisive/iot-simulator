@@ -44,7 +44,7 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * Data-sources under a project. Mirrors the Projects resource conventions:
  * /api/v1, ETag / If-Match optimistic concurrency, start/stop runtime control.
- * See backend-specs/05_API_CONTRACT.md.
+ * See openspec/specs/api-contract/spec.md.
  *
  * <p>Authorization (IS-077, backend-specs/08 §Authorization):
  * <ul>

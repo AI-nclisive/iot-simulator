@@ -10,7 +10,7 @@
  *   - stale detection (no event — including heartbeat — within a window);
  *   - `Last-Event-ID` resume via the browser's native handling.
  *
- * Backend contract (see backend-specs/05_API_CONTRACT.md, IS-046/051/052/055):
+ * Backend contract (see openspec/specs/api-contract/spec.md, IS-046/051/052/055):
  *   GET /api/v1/data-sources/{id}/stream/values   → values-snapshot, values
  *   GET /api/v1/data-sources/{id}/stream/clients   → clients-snapshot, clients
  *   GET /api/v1/projects/{pid}/stream/runtime      → runtime-snapshot, runtime

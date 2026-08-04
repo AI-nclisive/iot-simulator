@@ -21,7 +21,7 @@ import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Project lifecycle (backend-specs/03_DOMAIN_MODEL.md). */
+/** Project lifecycle (openspec/specs/domain-model/spec.md). */
 @Service
 public class ProjectService {
 

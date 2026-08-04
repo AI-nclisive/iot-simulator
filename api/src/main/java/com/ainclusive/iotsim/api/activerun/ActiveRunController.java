@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Dashboard overview: currently-active (RUNNING or QUEUED) runs for a project (IS-122).
- * See backend-specs/05_API_CONTRACT.md.
+ * See openspec/specs/api-contract/spec.md.
  *
  * <p>GET /api/v1/projects/{projectId}/active-runs → {@code ActiveRunsResponse}
  */

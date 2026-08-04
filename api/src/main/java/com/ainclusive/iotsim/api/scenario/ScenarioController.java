@@ -34,7 +34,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
- * Scenario authoring CRUD within a project (backend-specs/05_API_CONTRACT.md, IS-085).
+ * Scenario authoring CRUD within a project (openspec/specs/api-contract/spec.md, IS-085).
  *
  * <p>Authorization (IS-077): list/get — {@link Permission#OBSERVE};
  * create/update/delete/duplicate — {@link Permission#SCENARIO_EDIT} (admin).

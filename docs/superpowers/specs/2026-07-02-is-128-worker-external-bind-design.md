@@ -2,7 +2,7 @@
 
 **Task:** IS-128 [BE] · worker/supervisor enabler
 **Issue:** created at task claim via `/start-task` (board-sync mirrors it to Project #1)
-**Owning spec:** `backend-specs/02_WORKER_CONTRACT_AND_IPC.md` (worker configure) + `08_AUTH_AND_MODES.md` (deployment config)
+**Owning spec:** `openspec/specs/worker-contract/spec.md` (worker configure) + `08_AUTH_AND_MODES.md` (deployment config)
 **Branch:** `feat/IS-128-worker-external-bind` (new, off `master`)
 **Builds on:** IS-127 (introduced `iotsim.simulator.advertised-host` for the derived `serveUrl`) and the memory note `worker-bind-external-access`.
 

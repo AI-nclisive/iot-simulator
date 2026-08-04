@@ -2,7 +2,7 @@
 
 **Task:** IS-061 [BE] · Wave D — Creation/reuse breadth & synthetic generation · P1
 **Issue:** [#82](https://github.com/AI-nclisive/iot-simulator/issues/82)
-**Owning spec:** `backend-specs/02_WORKER_CONTRACT_AND_IPC.md` §5 (Port allocation & resource governance); supports `SPEC.md` → *Run Multiple Data Sources Concurrently*
+**Owning spec:** `openspec/specs/worker-contract/spec.md` §5 (Port allocation & resource governance); supports `SPEC.md` → *Run Multiple Data Sources Concurrently*
 **Branch:** `feat/IS-061-resource-governance`
 
 ## Problem

@@ -31,7 +31,7 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * Imports a project from a versioned ZIP+manifest bundle (IS-073,
- * backend-specs/06_ARTIFACT_FORMATS.md).
+ * openspec/specs/artifact-formats/spec.md).
  *
  * <p>Only {@code formatVersion} major == 1 is supported; a newer or incompatible
  * version is rejected with {@link ProjectImportException} (IS-091 compat guard).

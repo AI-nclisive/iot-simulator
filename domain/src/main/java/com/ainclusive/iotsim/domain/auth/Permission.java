@@ -10,7 +10,7 @@ package com.ainclusive.iotsim.domain.auth;
  * <p>Permission names are dot-scoped strings stored in the {@code permissions} DB table and seeded
  * by {@link PermissionSeeder}. Each constant's string value is what is persisted.
  *
- * <p>Baseline mapping (see backend-specs/08_AUTH_AND_MODES.md):
+ * <p>Baseline mapping (see openspec/specs/auth-modes/spec.md):
  * <ul>
  *   <li>{@code user} role: observe everything + operate runtime (start/stop sources and replays).
  *       Cannot edit, import/export, or manage access.

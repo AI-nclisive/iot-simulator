@@ -25,7 +25,7 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * Serializes {@link ProjectExportContent} into a versioned ZIP+manifest bundle
- * (IS-073, backend-specs/06_ARTIFACT_FORMATS.md).
+ * (IS-073, openspec/specs/artifact-formats/spec.md).
  *
  * <p>ZIP layout:
  * <ul>
@@ -43,7 +43,7 @@ import tools.jackson.databind.ObjectMapper;
  * are session-only and never stored on {@code DataSource} — they remain excluded structurally.
  * The simulated-server accepted credentials in {@code securityConfig} are intentionally
  * exported as non-recoverable PBKDF2 hashes; they are part of the simulation configuration
- * (see backend-specs/08_AUTH_AND_MODES.md, IS-131) and contain no plaintext secrets.
+ * (see openspec/specs/auth-modes/spec.md, IS-131) and contain no plaintext secrets.
  */
 @Component
 public class ProjectZipExporter {

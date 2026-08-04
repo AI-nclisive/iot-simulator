@@ -2,7 +2,7 @@ package com.ainclusive.iotsim.platform.scan;
 
 /**
  * Outcome of a real-source connection probe or scan. Mirrors the states named in
- * {@code backend-specs/05_API_CONTRACT.md} §Scan.
+ * {@code openspec/specs/api-contract/spec.md} §Scan.
  */
 public enum ScanStatus {
     /** Reachable/authenticated; a scan returned the full discovered structure. */

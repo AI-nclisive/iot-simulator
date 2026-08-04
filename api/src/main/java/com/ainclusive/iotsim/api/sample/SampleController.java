@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Named sample subsets/snapshots within a project (backend-specs/05_API_CONTRACT.md).
+ * Named sample subsets/snapshots within a project (openspec/specs/api-contract/spec.md).
  *
  * <p>Authorization (IS-077): list/get — {@link Permission#OBSERVE};
  * create/delete — {@link Permission#SOURCE_EDIT} (admin: editing recording data).

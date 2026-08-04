@@ -10,7 +10,7 @@ import java.util.Map;
  * in-memory one is used when no workers are launched. State is a plain string
  * (e.g. RUNNING, STOPPED) to keep this port free of domain types.
  *
- * <p>See backend-specs/02_WORKER_CONTRACT_AND_IPC.md and 03_DOMAIN_MODEL.md.
+ * <p>See openspec/specs/worker-contract/spec.md and 03_DOMAIN_MODEL.md.
  */
 public interface RuntimeController {
 

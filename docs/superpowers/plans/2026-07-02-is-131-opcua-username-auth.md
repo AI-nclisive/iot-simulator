@@ -1501,8 +1501,8 @@ git commit -m "feat(IS-131): export/import round-trips security config (hashed)"
 ### Task 13: Governance docs + full-build verification
 
 **Files:**
-- Modify: `backend-specs/08_AUTH_AND_MODES.md`
-- Modify: `backend-specs/02_WORKER_CONTRACT_AND_IPC.md`
+- Modify: `openspec/specs/auth-modes/spec.md`
+- Modify: `openspec/specs/worker-contract/spec.md`
 - Modify: `SPEC.md`
 - Modify: `docs/superpowers/specs/2026-07-02-is-130-opcua-endpoint-security-design.md` (mark IS-131 slice done if desired)
 
@@ -1548,7 +1548,7 @@ Expected: BUILD SUCCESSFUL — all modules, including `worker-opcua` auth IT, `p
 - [ ] **Step 5: Commit**
 
 ```bash
-git add backend-specs/08_AUTH_AND_MODES.md backend-specs/02_WORKER_CONTRACT_AND_IPC.md SPEC.md \
+git add openspec/specs/auth-modes/spec.md openspec/specs/worker-contract/spec.md SPEC.md \
         docs/superpowers/specs/2026-07-02-is-130-opcua-endpoint-security-design.md
 git commit -m "docs(IS-131): clarify simulated-server credential governance + contract"
 ```

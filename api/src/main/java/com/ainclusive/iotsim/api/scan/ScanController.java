@@ -30,7 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * Create-from-scan: test a real source's connection, run an async discovery scan,
  * poll the job, and create a data source from the discovered structure. Mirrors
- * backend-specs/05_API_CONTRACT.md §Scan. Credentials are write-only and never
+ * openspec/specs/api-contract/spec.md §Scan. Credentials are write-only and never
  * echoed; secrets are session-only (backend-specs/08).
  *
  * <p>Authorization (IS-077): all scan operations are part of creating a data source

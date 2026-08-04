@@ -9,7 +9,7 @@ import java.util.Set;
 /**
  * Binds a {@link SyntheticPattern} to one schema variable node: which node, of what
  * {@link DataType}, driven by which pattern, sampled every {@code updateRateMs}
- * (per {@code backend-specs/06_ARTIFACT_FORMATS.md} "Synthetic generation model").
+ * (per {@code openspec/specs/artifact-formats/spec.md} "Synthetic generation model").
  *
  * <p>{@code BYTES} and the identifier/structural types
  * ({@code STATUS_CODE}, {@code QUALIFIED_NAME}, {@code NODE_ID},

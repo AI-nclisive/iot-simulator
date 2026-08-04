@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Minimal versioned endpoint confirming the API surface is wired. Real resource
- * controllers (projects, data-sources, ...) follow backend-specs/05_API_CONTRACT.md.
+ * controllers (projects, data-sources, ...) follow openspec/specs/api-contract/spec.md.
  * Path-based major versioning at /api/v1 (decision D7).
  */
 @RestController

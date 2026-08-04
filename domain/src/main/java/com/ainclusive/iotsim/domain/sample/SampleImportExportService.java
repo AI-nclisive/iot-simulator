@@ -28,7 +28,7 @@ import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Export and import of sample artifacts as ZIP bundles (IS-070,
- * backend-specs/06_ARTIFACT_FORMATS.md §"Recording / sample export").
+ * openspec/specs/artifact-formats/spec.md §"Recording / sample export").
  *
  * <p>Sample export additionally records the {@code selection} field (node subset +
  * time window) alongside the value timeline. The manifest carries {@code formatVersion},

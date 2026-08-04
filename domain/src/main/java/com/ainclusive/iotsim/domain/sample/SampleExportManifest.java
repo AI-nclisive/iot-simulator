@@ -4,7 +4,7 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * Manifest embedded in a sample export ZIP (IS-070, backend-specs/06_ARTIFACT_FORMATS.md).
+ * Manifest embedded in a sample export ZIP (IS-070, openspec/specs/artifact-formats/spec.md).
  * Extends the recording manifest with the {@code selection} field that describes the
  * node-subset / time-window used to create the sample.
  */

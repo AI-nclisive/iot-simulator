@@ -999,7 +999,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Scenario authoring CRUD within a project (backend-specs/05_API_CONTRACT.md, IS-085). */
+/** Scenario authoring CRUD within a project (openspec/specs/api-contract/spec.md, IS-085). */
 @RestController
 @RequestMapping("/api/v1/projects/{projectId}/scenarios")
 public class ScenarioController {

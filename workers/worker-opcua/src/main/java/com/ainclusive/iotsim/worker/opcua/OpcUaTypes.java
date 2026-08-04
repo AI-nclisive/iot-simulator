@@ -24,7 +24,7 @@ import org.eclipse.milo.opcua.stack.core.types.builtin.unsigned.Unsigned;
 /**
  * Maps the protocol-neutral data types onto OPC UA built-in types and converts
  * decoded values to the matching Milo Java representation.
- * See backend-specs/01_PROTOCOL_NEUTRAL_MODEL.md §5.
+ * See openspec/specs/protocol-model/spec.md §5.
  */
 final class OpcUaTypes {
 

@@ -2,7 +2,7 @@
 
 **Task:** IS-127 [BE] · payload / domain-model redesign (+ UI-115 [FE] for the UI half)
 **Issue:** created at task claim via `/start-task` (board-sync mirrors it to Project #1)
-**Owning spec:** `backend-specs/03_DOMAIN_MODEL.md` (§DataSource — endpoint / runtimeConfig)
+**Owning spec:** `openspec/specs/domain-model/spec.md` (§DataSource — endpoint / runtimeConfig)
 **Branch:** `feat/IS-127-datasource-payload-redesign` (new, off `master`)
 **Supersedes decisions in:** IS-124 (listen port in `runtimeConfig.listenPort`; the "move the
 real scanned URL out of `endpoint`" item IS-124 explicitly deferred is resolved here).
