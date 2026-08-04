@@ -88,7 +88,8 @@ class ProjectOverviewServiceTest {
             }
         };
         RecordingService recordingService = new RecordingService(null, null, null, null, null, null, null,
-                new ActivityEventService(new NoOpActivityEventRepository()), null, null, null, null) {
+                new ActivityEventService(new NoOpActivityEventRepository()), null, null, null, null,
+                com.ainclusive.iotsim.platform.runtime.LiveValueListener.NONE) {
             @Override
             public List<Recording> list(String projectId) {
                 return recordingsByProject.getOrDefault(projectId, List.of());
