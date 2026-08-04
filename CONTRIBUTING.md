@@ -16,6 +16,13 @@ pull requests. These rules keep that smooth.
     **same pinned version** globally: `npm i -g @fission-ai/openspec@1.7.0`
     (keep it in step with `package.json` when the pin moves). Everything else —
     scripts, CI, the project skills — uses `npx` and needs no global install.
+  - The CLI can install its workflows twice, as `/opsx:*` commands **and** as
+    `.claude/skills/openspec-*/` skills with identical bodies. This repo commits
+    the commands only; `openspec config set delivery commands` makes that the
+    local default. That setting is machine-global
+    (`~/.config/openspec/config.json`), not part of the repo — so an `openspec
+    update` run with the default `both` recreates the skill directories. Delete
+    them again rather than committing the duplicate set.
 
 ## Build & test
 ```bash
@@ -182,21 +189,8 @@ are `Status`, `Task ID`, and `Area` (BE/FE/SDLC).
 owner approval — propose first (see `AGENTS.md`). No new dependency without approval.
 
 ## Branch protection (repo admin)
-Configuration record: [`.github/OWNER_SETUP.md`](.github/OWNER_SETUP.md). Requires
-repo **admin**. `master` is protected (status check `build` = the CI job name):
-```bash
-gh api -X PUT repos/AI-nclisive/iot-simulator/branches/master/protection \
-  --input - <<'JSON'
-{
-  "required_status_checks": { "strict": true, "contexts": ["build"] },
-  "enforce_admins": false,
-  "required_pull_request_reviews": { "required_approving_review_count": 1 },
-  "required_linear_history": true,
-  "allow_force_pushes": false,
-  "allow_deletions": false,
-  "restrictions": null
-}
-JSON
-```
-Also in repo Settings: allow **squash merging only** and "Automatically delete head
-branches". (Set `enforce_admins: true` later once more than one approver is available.)
+What it means for you: `master` requires a green `build` check, one approving
+review, and linear history; force-push and deletion are off. The admin
+configuration and the `gh` commands that (re-)apply it — branch protection,
+squash-only merging, auto-delete of merged branches, auto-merge — are recorded in
+[`.github/OWNER_SETUP.md`](.github/OWNER_SETUP.md) and live only there.

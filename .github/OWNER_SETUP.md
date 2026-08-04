@@ -4,8 +4,10 @@ Record of the one-time **admin** configuration applied to `AI-nclisive/iot-simul
 with the `gh` commands to re-apply it (after a settings reset, or when recreating /
 forking the repo). Run them as an admin (`gh auth status` shows admin).
 
-Status: **all applied.** The trunk is established on `master` (IS-097 [SDLC]); CI,
-PR/issue templates, `CONTRIBUTING.md`, `AGENTS.md` rules, and repo labels are in place.
+Status: everything below is applied **except** the board's "Pull request merged →
+Done" workflow, which still needs a project owner (see the TODO under "Project
+board"). The trunk is established on `master` (IS-097 [SDLC]); CI, PR/issue
+templates, `CONTRIBUTING.md`, `AGENTS.md` rules, and repo labels are in place.
 
 ## Branch protection — `master` (IS-099 [SDLC])
 Required status check `build` (= the CI job name), 1 approving review, linear history,

@@ -5,7 +5,8 @@ Approved technologies only. No new dependency without explicit approval (see
 history.
 
 ## Backend
-- Java 25 LTS (baseline; 21 also supported); Spring Boot 4.x — REST/OpenAPI via
+- Java 25 LTS — the only supported baseline: the Gradle toolchain pins
+  `JavaLanguageVersion.of(25)` and CI builds on JDK 25; Spring Boot 4.x — REST/OpenAPI via
   springdoc, SSE/WebSocket.
 - Eclipse Milo — OPC UA server SDK (Apache 2.0). Needs JAXB on the worker
   runtime (`javax.xml.bind:jaxb-api` + `org.glassfish.jaxb:jaxb-runtime`):

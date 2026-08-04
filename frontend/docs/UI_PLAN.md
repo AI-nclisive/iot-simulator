@@ -20,7 +20,8 @@ Use it to understand:
   but it must not introduce visible login, mode switching, or shared-first
   shell chrome into the local-first core surfaces.
 - Later stages should extend the same UX model rather than introduce a new one.
-- Tasks inside a stage may run in parallel only when `UI_TASKS.md` says they can.
+- Tasks inside a stage may run in parallel only when their board items say they
+  can (org Project #1, `Area = FE`).
 
 ## Stage Summary
 
@@ -60,7 +61,8 @@ Exit gate:
 
 Implementation entry:
 
-- start with [UI_TASKS.md](UI_TASKS.md), section `P0 - Core Shell And Primary Flow`.
+- pick a `UI-XXX` task from the board in stage `P0` (core shell and primary flow),
+  then create its change with `/opsx:propose ui-XXX-<slug>`.
 
 ## P1
 
@@ -87,7 +89,8 @@ Exit gate:
 
 Implementation entry:
 
-- continue with [UI_TASKS.md](UI_TASKS.md), section `P1 - Shared Usage, Reuse, And Operational Breadth`.
+- continue with the board's `P1` tasks (shared usage, reuse, and operational
+  breadth).
 
 ## P2
 
@@ -112,7 +115,7 @@ Exit gate:
 
 Implementation entry:
 
-- continue with [UI_TASKS.md](UI_TASKS.md), section `P2 - Advanced Shared Workflows`.
+- continue with the board's `P2` tasks (advanced shared workflows).
 
 ## Delivery Hand-Off
 
