@@ -1318,6 +1318,10 @@ Parallel execution:
   Goal: remove duplicate node-class controls and repair affected editor layout.
   Done when: catalog controls are compact and detail rows fit their panel.
 
+- [x] `UI-511` Evidence list export shortcut
+  Goal: make the row-level Export action start the evidence export it advertises.
+  Done when: the shortcut starts export and reports its outcome.
+
 ## Recommended Sequence
 
 1. Complete the P0 shell and shared-pattern tasks first.
