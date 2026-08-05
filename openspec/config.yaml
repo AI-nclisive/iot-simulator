@@ -1,0 +1,41 @@
+schema: spec-driven
+
+context: |
+  iot-simulator: IoT protocol device simulator (OPC UA, Modbus, ...). Backend:
+  Java 25, Spring Boot 4.1.0, multi-module Gradle, jOOQ 3.21.6 + Flyway over
+  Postgres, gRPC for an out-of-process protocol-worker contract
+  (worker-contract/src/main/proto). Adding a protocol means adding a
+  workers/worker-<proto> module, never changing the supervisor. Frontend:
+  separate npm/Vite build at repo root (source in frontend/src), React 18.3,
+  react-router-dom 6.28, zustand 5.0, Tailwind 3.4 - not part of the Gradle
+  build.
+  Conventions: Conventional Commit style PR titles; all GitHub-facing text in
+  English. Task IDs: backend/SDLC use IS-XXX, frontend uses UI-XXX - both are
+  now openspec change-directory prefixes (openspec/changes/is-038-slug/,
+  openspec/changes/ui-012-slug/), matching the existing GitHub issue/PR/board
+  numbering so history stays linkable. Org GitHub Project #1 "IoT Simulator"
+  mirrors change status; see .claude/skills/board-sync.
+  Governance: no new dependency without explicit owner approval; DB migrations
+  are append-only under persistence/src/main/resources/db/migration.
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always include a "Non-goals" section
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
+
+# Per-operation guidance (optional)
+# Add advisory guidance for how apply and archive work should be conducted.
+# This is separate from artifact rules above.
+# Example:
+#   operations:
+#     apply:
+#       guidance:
+#         - Keep test summaries concise
+#     archive:
+#       guidance:
+#         - Summarize the archive outcome before finishing

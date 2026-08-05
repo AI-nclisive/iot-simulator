@@ -15,7 +15,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 /**
  * Live runtime-context stream for a project (SSE). Carries runtime activity events
  * plus {@code heartbeat}/{@code resync}; richer aggregation (active runs, health)
- * lands in IS-051/IS-053/IS-054. See backend-specs/05_API_CONTRACT.md.
+ * lands in IS-051/IS-053/IS-054. See openspec/specs/api-contract/spec.md.
  *
  * <p>Authorization (IS-077): read-only SSE — {@link Permission#OBSERVE} (user + admin).
  */

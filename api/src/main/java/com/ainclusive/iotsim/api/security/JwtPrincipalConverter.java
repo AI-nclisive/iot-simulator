@@ -27,7 +27,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
  * not enforce it by default; a missing {@code sub} is rejected here with a 401 rather
  * than a 500.
  *
- * <p>See backend-specs/08_AUTH_AND_MODES.md.
+ * <p>See openspec/specs/auth-modes/spec.md.
  */
 public class JwtPrincipalConverter implements Converter<Jwt, AbstractAuthenticationToken> {
 

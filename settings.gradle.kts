@@ -14,7 +14,7 @@ dependencyResolutionManagement {
 
 rootProject.name = "iot-simulator"
 
-// Module map per backend-specs/07_MODULE_STRUCTURE.md.
+// Module map per openspec/specs/module-structure/spec.md.
 // Dependencies flow downward only; workers depend on nothing but worker-contract.
 include(
     "protocol-model",

@@ -7,7 +7,7 @@ package com.ainclusive.iotsim.platform.scan;
  * no workers are launched. Kept protocol-neutral and free of domain types so the
  * domain need not depend on the supervisor.
  *
- * <p>See backend-specs/02_WORKER_CONTRACT_AND_IPC.md §6 and 05_API_CONTRACT.md §Scan.
+ * <p>See openspec/specs/worker-contract/spec.md §6 and 05_API_CONTRACT.md §Scan.
  */
 public interface SourceScanner {
 

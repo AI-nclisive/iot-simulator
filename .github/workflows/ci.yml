@@ -15,9 +15,10 @@ concurrency:
 
 jobs:
   catalog-sync:
-    # Enforces AGENTS.md "Done is recorded in two places": a PR that implements a
-    # task (Implements: IS-/UI-XXX) must also flip that task's catalog checkbox in
-    # the same PR, so a merged task never leaves a stale "[ ]" behind.
+    # Enforces AGENTS.md "Done is recorded in openspec": a PR that implements a
+    # task (Implements: IS-/UI-XXX) must archive that task's openspec change
+    # (openspec/changes/archive/<date>-<id>-<slug>/) in the same PR, so a merged
+    # task never leaves openspec/specs/ undocumented.
     # PR-only — there is no PR body to inspect on a direct push to master.
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
@@ -26,7 +27,7 @@ jobs:
         with:
           fetch-depth: 0 # need the merge-base to diff against the PR base
 
-      - name: Check catalog checkbox is updated for the linked task
+      - name: Check openspec change is archived for the linked task
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}

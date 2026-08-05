@@ -7,7 +7,7 @@ import java.util.List;
 /**
  * Everything a worker needs to begin serving a data-source: protocol, the
  * protocol-neutral schema to project, and the protocol listen port (0 =
- * ephemeral). See backend-specs/02_WORKER_CONTRACT_AND_IPC.md.
+ * ephemeral). See openspec/specs/worker-contract/spec.md.
  */
 public record RuntimeStartSpec(
         String protocol,

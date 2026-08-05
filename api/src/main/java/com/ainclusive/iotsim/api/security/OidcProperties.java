@@ -15,7 +15,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * Cognito without OIDC discovery enabled). Both are optional — absent values
  * fall through to the Spring Boot auto-configuration defaults.
  *
- * <p>See backend-specs/08_AUTH_AND_MODES.md.
+ * <p>See openspec/specs/auth-modes/spec.md.
  *
  * @param issuerUri  OIDC issuer URI (e.g. {@code https://idp.example/realms/iotsim}).
  *                   Drives issuer validation + JWKS discovery.

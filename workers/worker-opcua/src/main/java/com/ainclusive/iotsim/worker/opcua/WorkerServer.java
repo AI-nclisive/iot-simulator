@@ -10,7 +10,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * gRPC server bound to loopback only (never exposed externally), per
- * backend-specs/02_WORKER_CONTRACT_AND_IPC.md. Pass port 0 for an ephemeral port.
+ * openspec/specs/worker-contract/spec.md. Pass port 0 for an ephemeral port.
  */
 public final class WorkerServer {
 

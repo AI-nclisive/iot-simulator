@@ -9,7 +9,7 @@ import java.util.List;
 /**
  * A reusable, project-scoped, protocol-scoped structure artifact (folders + typed
  * variables, no values) — not bound to any data-source; the parameter-set counterpart
- * to {@code Recording}. See backend-specs/03_DOMAIN_MODEL.md §ManualSchema.
+ * to {@code Recording}. See openspec/specs/domain-model/spec.md §ManualSchema.
  *
  * <p>Save model is save-in-place or save-as-new (no monotonic version chain like
  * {@code Schema}); {@code version} exists only for optimistic concurrency on save-in-place.

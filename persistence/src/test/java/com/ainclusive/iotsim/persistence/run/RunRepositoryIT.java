@@ -19,7 +19,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-/** Runs and their run_sources join against real Postgres (backend-specs/04, IS-050). */
+/** Runs and their run_sources join against real Postgres (openspec/specs/db-schema/spec.md, IS-050). */
 @Testcontainers(disabledWithoutDocker = true)
 class RunRepositoryIT {
 

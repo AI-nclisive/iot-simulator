@@ -1,4 +1,4 @@
--- Recordings, samples, scenarios, faults. See backend-specs/03 & 04.
+-- Recordings, samples, scenarios, faults. See openspec/specs/domain-model/spec.md & 04.
 
 create table recordings (
     id              varchar primary key,

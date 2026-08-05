@@ -6,7 +6,7 @@ import java.util.Optional;
 
 /**
  * Stores evidence metadata: status, content manifest, and the ObjectStore blob
- * reference once exported (backend-specs/04). The captured artifacts themselves
+ * reference once exported (openspec/specs/db-schema/spec.md). The captured artifacts themselves
  * (value timelines, runtime events, the export bundle) live elsewhere; this repo
  * owns the evidence record and its lifecycle.
  */

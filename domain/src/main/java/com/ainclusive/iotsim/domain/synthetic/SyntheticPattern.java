@@ -8,7 +8,7 @@ import java.util.random.RandomGenerator;
 
 /**
  * A synthetic value-generation pattern — the protocol-neutral "shape" of a
- * generated signal, per {@code backend-specs/06_ARTIFACT_FORMATS.md} "Synthetic
+ * generated signal, per {@code openspec/specs/artifact-formats/spec.md} "Synthetic
  * generation model" and {@code 01 §4} (determinism).
  *
  * <p>A pattern is immutable configuration. {@link #bind(RandomGenerator)} produces a

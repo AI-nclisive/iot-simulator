@@ -12,7 +12,7 @@ import java.util.function.Consumer;
  * Kept protocol-neutral and free of domain types so the domain need not depend on
  * the supervisor — mirrors {@link com.ainclusive.iotsim.platform.scan.SourceScanner}.
  *
- * <p>See backend-specs/02_WORKER_CONTRACT_AND_IPC.md §6.
+ * <p>See openspec/specs/worker-contract/spec.md §6.
  */
 public interface SourceCapturer {
 

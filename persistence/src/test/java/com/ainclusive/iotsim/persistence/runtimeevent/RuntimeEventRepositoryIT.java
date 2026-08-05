@@ -15,7 +15,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-/** Append-only runtime-event log against real Postgres (backend-specs/04, IS-049). */
+/** Append-only runtime-event log against real Postgres (openspec/specs/db-schema/spec.md, IS-049). */
 @Testcontainers(disabledWithoutDocker = true)
 class RuntimeEventRepositoryIT {
 

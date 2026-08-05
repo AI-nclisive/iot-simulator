@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test;
  * returns {@code Ack(ok=false)} on Start; the supervisor must keep the source in the
  * runtime map as {@code ERROR} carrying the bind reason (rather than throwing the
  * failure out to the caller), so {@code state()/health()} report it. See
- * backend-specs/02_WORKER_CONTRACT_AND_IPC.md (IS-127).
+ * openspec/specs/worker-contract/spec.md (IS-127).
  */
 class SupervisorBindFailureIT {
 

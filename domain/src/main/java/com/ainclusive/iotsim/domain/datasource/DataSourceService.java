@@ -24,7 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
-/** Data-source lifecycle and runtime control (backend-specs/03 & 05). */
+/** Data-source lifecycle and runtime control (openspec/specs/domain-model/spec.md & 05). */
 @Service
 public class DataSourceService {
 
@@ -208,7 +208,7 @@ public class DataSourceService {
     /**
      * Stores or clears credentials for the source. {@code null} leaves them
      * unchanged; {@code ANONYMOUS} clears them; otherwise they are stored
-     * session-only (never persisted in the row — backend-specs/08).
+     * session-only (never persisted in the row — openspec/specs/auth-modes/spec.md).
      */
     private void applyCredentials(String id, ConnectionCredentials connectionCredentials) {
         if (connectionCredentials == null) {

@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Restart-with-backoff on unexpected worker failure (IS-040). Uses a fast policy
  * so the backoff is observable but tests stay quick. See
- * backend-specs/02_WORKER_CONTRACT_AND_IPC.md §4.
+ * openspec/specs/worker-contract/spec.md §4.
  */
 class SupervisorRestartTest {
 

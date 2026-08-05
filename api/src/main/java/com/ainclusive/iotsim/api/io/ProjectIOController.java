@@ -26,7 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
- * Project import/export endpoints (IS-073, backend-specs/05 & 06).
+ * Project import/export endpoints (IS-073, openspec/specs/api-contract/spec.md & 06).
  *
  * <ul>
  *   <li>{@code POST /api/v1/projects/{id}/export} — exports the project as a

@@ -13,7 +13,7 @@ import org.springframework.stereotype.Service;
  * attention count of sources in an unhealthy runtime state (ERROR or STALE).
  * Composes the existing project, data-source and recording services so runtime
  * state uses the same source of truth as the data-source API.
- * See backend-specs/05_API_CONTRACT.md and the IS-054 design doc.
+ * See openspec/specs/api-contract/spec.md and the IS-054 design doc.
  */
 @Service
 public class ProjectOverviewService {

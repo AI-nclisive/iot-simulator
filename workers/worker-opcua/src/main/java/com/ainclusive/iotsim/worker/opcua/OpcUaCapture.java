@@ -23,9 +23,9 @@ import org.eclipse.milo.opcua.stack.core.types.builtin.StatusCode;
  * subscribes to its schema variables, and forwards every observed value change as
  * protocol-neutral proto {@link Value}s to a sink until {@link #stop()}. Mirrors
  * {@link OpcUaDiscovery} (one-shot/client mode) and never touches the embedded
- * server runtime. See backend-specs/02 §6 and 01 §3.
+ * server runtime. See openspec/specs/worker-contract/spec.md §6 and 01 §3.
  *
- * <p>"Every change, no sampling" per backend-specs/01: a subscription with a short
+ * <p>"Every change, no sampling" per openspec/specs/protocol-model/spec.md: a subscription with a short
  * publishing interval reports each value change the server samples; the recording
  * path keeps the full fidelity (distinct from the conflated live-out path).
  */

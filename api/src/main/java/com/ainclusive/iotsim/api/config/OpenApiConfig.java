@@ -24,7 +24,7 @@ public class OpenApiConfig {
                         .title("IoT Data Source Simulator API")
                         .version("v1")
                         .description("Backend API for the IoT Data Source Simulator. "
-                                + "See backend-specs/05_API_CONTRACT.md."))
+                                + "See openspec/specs/api-contract/spec.md."))
                 .tags(List.of(
                         new Tag().name("Platform")
                                 .description("API nameplate and liveness/build probes — the versioned metadata"
@@ -62,7 +62,7 @@ public class OpenApiConfig {
                                 .description("Advisory time-bounded locks that signal to other users that an"
                                         + " editor is open. Acquire (or renew) a lease when entering an editor,"
                                         + " release it on exit; leases expire automatically for crash recovery."
-                                        + " See backend-specs/08_AUTH_AND_MODES.md §Optimistic concurrency."),
+                                        + " See openspec/specs/auth-modes/spec.md §Optimistic concurrency."),
                         new Tag().name("Admin — Users")
                                 .description("Admin-only user management: list all registered users, change"
                                         + " roles (admin ↔ user), and activate/suspend accounts."

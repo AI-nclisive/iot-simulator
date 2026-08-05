@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Create-from-synthetic data sources (backend-specs/05; IS-065).
+ * Create-from-synthetic data sources (openspec/specs/api-contract/spec.md; IS-065).
  *
  * <p>Authorization (IS-077): creating a synthetic source is admin-level —
  * {@link Permission#SOURCE_EDIT}.

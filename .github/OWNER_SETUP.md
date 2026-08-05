@@ -4,8 +4,10 @@ Record of the one-time **admin** configuration applied to `AI-nclisive/iot-simul
 with the `gh` commands to re-apply it (after a settings reset, or when recreating /
 forking the repo). Run them as an admin (`gh auth status` shows admin).
 
-Status: **all applied.** The trunk is established on `master` (IS-097 [SDLC]); CI,
-PR/issue templates, `CONTRIBUTING.md`, `AGENTS.md` rules, and repo labels are in place.
+Status: everything below is applied **except** the board's "Pull request merged →
+Done" workflow, which still needs a project owner (see the TODO under "Project
+board"). The trunk is established on `master` (IS-097 [SDLC]); CI, PR/issue
+templates, `CONTRIBUTING.md`, `AGENTS.md` rules, and repo labels are in place.
 
 ## Branch protection — `master` (IS-099 [SDLC])
 Required status check `build` (= the CI job name), 1 approving review, linear history,
@@ -44,13 +46,28 @@ plus a downloadable `test-reports` artifact — no GitHub Pages (dropped in #6).
 Org project **IoT Simulator** — <https://github.com/orgs/AI-nclisive/projects/1>,
 linked to the repo, with fields: single-select `Status` (Todo / In Progress /
 In review / Done), text `Task ID` (`IS-XXX` or `UI-XXX`), single-select `Area`
-(BE / FE / SDLC). Live status lives here; `backend-specs/TASKS.md` and
-`frontend/docs/UI_TASKS.md` stay the catalogs. Created (needs the `project`
+(BE / FE / SDLC). Live status lives here; `openspec/changes/` (active) and
+`openspec/changes/archive/` (done) are the change record, and `openspec/specs/`
+is the living behavior contract. Created (needs the `project`
 token scope to re-create):
 ```bash
 gh auth refresh -s project,read:project
 gh project create --owner AI-nclisive --title "IoT Simulator"
 ```
+
+### TODO — enable the built-in "merged → Done" workflow
+Every `Status` transition is currently a manual `gh` call inside a project skill
+(`/start-task` → In Progress, `/open-pr` → In review, `/review-loop` → Done). The
+last one is fragile: auto-merge lands whenever the Claude reviewer approves and
+`build` goes green — often after the author has moved on — and **nothing in CI
+moves the board**, so a merged task can sit in `In review` until someone runs
+`/board-sync`.
+
+Fix it with the board's own automation instead of more scripting: Project
+**Settings → Workflows** → enable **"Pull request merged" → set `Status` = Done**
+(and optionally **"Item closed" → Done**). Needs project-owner rights, so it
+cannot be done from the repo. The `gh` commands in `/review-loop` then become the
+manual fallback rather than the only mechanism.
 
 ## Claude PR review setup (IS-112 [SDLC])
 The `.github/workflows/claude-review.yml` workflow runs a Claude review on

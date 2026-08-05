@@ -6,7 +6,7 @@ import java.time.Instant;
 
 /**
  * An async create-from-scan job. Ephemeral (held in memory only, never persisted —
- * scans are modelled as polled async jobs per backend-specs/05_API_CONTRACT.md).
+ * scans are modelled as polled async jobs per openspec/specs/api-contract/spec.md).
  * Immutable: the worker thread replaces the registry entry on completion, and on
  * every in-flight progress tick (IS-163) so a poller always reads a consistent
  * snapshot.

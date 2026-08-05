@@ -47,7 +47,7 @@ import org.springframework.security.web.access.intercept.AuthorizationFilter;
  * and a role-backed resolver in shared mode (IS-077).
  *
  * <p>Exactly one chain is active per startup ({@link ConditionalOnProperty}).
- * See backend-specs/08_AUTH_AND_MODES.md.
+ * See openspec/specs/auth-modes/spec.md.
  */
 @Configuration
 @EnableWebSecurity
@@ -144,7 +144,7 @@ public class SecurityConfig {
                     "iotsim.mode=shared requires an OIDC issuer: set "
                     + "spring.security.oauth2.resourceserver.jwt.issuer-uri (or "
                     + "iotsim.oidc.jwks-uri) so bearer JWTs validate via JWKS. "
-                    + "See backend-specs/08_AUTH_AND_MODES.md.");
+                    + "See openspec/specs/auth-modes/spec.md.");
         }
         return decoder;
     }

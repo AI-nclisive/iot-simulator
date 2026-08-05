@@ -8,7 +8,7 @@ import java.util.Optional;
  * Stores run records and their participating data sources (the {@code run_sources}
  * join). Owns the run lifecycle ({@code QUEUED → RUNNING → terminal}); the live
  * {@code runtimeState} of individual sources is the supervisor's, not this repo's
- * (backend-specs/03 &amp; 04).
+ * (openspec/specs/domain-model/spec.md &amp; 04).
  */
 public interface RunRepository {
 

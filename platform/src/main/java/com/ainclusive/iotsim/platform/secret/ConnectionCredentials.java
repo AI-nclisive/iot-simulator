@@ -5,7 +5,7 @@ import java.util.Objects;
 /**
  * Connection secrets used to scan or record a real data source.
  *
- * <p>Per {@code backend-specs/08_AUTH_AND_MODES.md} these are used in memory
+ * <p>Per {@code openspec/specs/auth-modes/spec.md} these are used in memory
  * only: they must never appear in entity rows, exports, evidence, activity, or
  * summaries. {@link #toString()} is redacted so a secret cannot leak through
  * logs or error messages.

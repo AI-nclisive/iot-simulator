@@ -15,7 +15,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 /**
  * IS-078: in local mode the API is open — unauthenticated requests run as the
- * implicit {@code local} principal (no login). See backend-specs/08_AUTH_AND_MODES.md.
+ * implicit {@code local} principal (no login). See openspec/specs/auth-modes/spec.md.
  */
 @WebMvcTest(controllers = MetaController.class)
 @Import(SecurityConfig.class)

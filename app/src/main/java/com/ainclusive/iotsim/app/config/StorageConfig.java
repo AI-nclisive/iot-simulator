@@ -11,7 +11,7 @@ import org.springframework.context.annotation.Configuration;
  * Wires the {@link ObjectStore}. The default is the local filesystem adapter
  * rooted at {@code iotsim.storage.filesystem.base-dir}; the S3-compatible adapter
  * for shared mode can be selected here later without touching the domain
- * (backend-specs/08_AUTH_AND_MODES.md).
+ * (openspec/specs/auth-modes/spec.md).
  */
 @Configuration
 @EnableConfigurationProperties(StorageProperties.class)

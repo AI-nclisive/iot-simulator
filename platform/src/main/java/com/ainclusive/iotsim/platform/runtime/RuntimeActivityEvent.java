@@ -17,7 +17,7 @@ import java.util.Objects;
  * attributes health/error events ({@code SIMULATOR} for supervisor-detected,
  * {@code PROTOCOL} for worker-reported); it is {@code null} for non-health events.
  *
- * <p>See backend-specs/02_WORKER_CONTRACT_AND_IPC.md.
+ * <p>See openspec/specs/worker-contract/spec.md.
  */
 public record RuntimeActivityEvent(
         String dataSourceId, String type, Instant at, String detail, HealthOrigin origin) {

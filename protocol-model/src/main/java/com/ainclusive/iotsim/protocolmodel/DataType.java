@@ -12,7 +12,7 @@ package com.ainclusive.iotsim.protocolmodel;
  * a first-class entry here stays "unknown" for the user to resolve or exclude
  * (IS-044).
  *
- * <p>See {@code backend-specs/01_PROTOCOL_NEUTRAL_MODEL.md} §2.
+ * <p>See {@code openspec/specs/protocol-model/spec.md} §2.
  */
 public enum DataType {
     BOOL,

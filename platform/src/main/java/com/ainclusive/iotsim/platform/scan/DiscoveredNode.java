@@ -10,7 +10,7 @@ import java.util.List;
  * {@code protocol-model.SchemaNode}: a discovered VARIABLE may have a {@code null}
  * {@code dataType} ("unknown" — outside the neutral type set), which a SchemaNode
  * forbids. Unknown types are surfaced for the user to resolve before they become a
- * persisted schema (backend-specs/01 §2; resolution is IS-044).
+ * persisted schema (openspec/specs/protocol-model/spec.md §2; resolution is IS-044).
  *
  * @param kind {@code FOLDER} or {@code VARIABLE}
  * @param dataType neutral data type for a VARIABLE, or {@code null} if its declaration

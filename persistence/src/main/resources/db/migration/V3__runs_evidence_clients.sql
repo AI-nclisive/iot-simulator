@@ -1,4 +1,4 @@
--- Runs, evidence, client connections. See backend-specs/03 & 04.
+-- Runs, evidence, client connections. See openspec/specs/domain-model/spec.md & 04.
 
 create table evidence (
     id          varchar primary key,

@@ -5,7 +5,7 @@ import java.util.List;
 
 /**
  * Persistence-level projection of a {@code runs} row plus its {@code run_sources}
- * join: a runtime execution, manual or automated (backend-specs/03 &amp; 04).
+ * join: a runtime execution, manual or automated (openspec/specs/domain-model/spec.md &amp; 04).
  *
  * <p>{@code state} moves {@code QUEUED → RUNNING → STOPPED | FAILED | COMPLETED};
  * {@code startedAt}/{@code endedAt} are null until the run starts/ends.

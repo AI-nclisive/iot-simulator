@@ -7,7 +7,7 @@ import java.util.List;
 
 /**
  * Append-optimized value timeline: every value change is captured (no sampling);
- * time-ordered range reads serve replay and evidence (backend-specs/04).
+ * time-ordered range reads serve replay and evidence (openspec/specs/db-schema/spec.md).
  */
 public interface ValueTimelineRepository {
 

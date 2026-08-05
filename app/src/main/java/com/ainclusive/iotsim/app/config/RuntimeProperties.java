@@ -24,7 +24,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  *       (default 50; {@code <= 0} = unlimited). See {@link Governance}.
  * </ul>
  *
- * <p>See backend-specs/02_WORKER_CONTRACT_AND_IPC.md.
+ * <p>See openspec/specs/worker-contract/spec.md.
  */
 @ConfigurationProperties(prefix = "iotsim.runtime")
 public record RuntimeProperties(

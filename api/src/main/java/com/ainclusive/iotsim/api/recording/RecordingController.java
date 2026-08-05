@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Recordings within a project (backend-specs/05_API_CONTRACT.md).
+ * Recordings within a project (openspec/specs/api-contract/spec.md).
  *
  * <p>Authorization (IS-077): list/get — {@link Permission#OBSERVE};
  * create (manual recording shell) / delete (IS-092: retention &amp; cleanup) —

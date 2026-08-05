@@ -3,7 +3,7 @@ package com.ainclusive.iotsim.domain.recording;
 import java.time.Instant;
 
 /**
- * Captured real data over time from a data-source (backend-specs/03).
+ * Captured real data over time from a data-source (openspec/specs/domain-model/spec.md).
  *
  * <p>Scoped to a {@code protocol} type, not to the specific {@code dataSourceId} it was
  * captured from (IS-160) — {@code dataSourceId} is kept only as an optional "originally

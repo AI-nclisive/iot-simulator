@@ -8,7 +8,7 @@ import java.util.concurrent.ConcurrentMap;
 /**
  * Session-only {@link CredentialStore}: credentials live in process memory and
  * are never persisted, so they vanish on restart. This is the safe default
- * ({@code backend-specs/08_AUTH_AND_MODES.md}: connection secrets are used in
+ * ({@code openspec/specs/auth-modes/spec.md}: connection secrets are used in
  * memory; persistence is optional and only via an external secret store).
  */
 public final class InMemoryCredentialStore implements CredentialStore {

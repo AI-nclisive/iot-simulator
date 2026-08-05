@@ -37,7 +37,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Manual schemas: a reusable, standalone structure library, not bound to any data-source
- * (backend-specs/05_API_CONTRACT.md §Manual schemas; SPEC "Manually Create Data Source Schemas").
+ * (openspec/specs/api-contract/spec.md §Manual schemas; SPEC "Manually Create Data Source Schemas").
  * Consumed only via a synthetic source's {@code manualSchemaId} (IS-173).
  *
  * <p>Authorization (IS-077): list/get — {@link Permission#OBSERVE}; create/update/delete/duplicate —

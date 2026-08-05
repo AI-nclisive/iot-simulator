@@ -3,7 +3,7 @@ package com.ainclusive.iotsim.domain.sample;
 import java.time.Instant;
 import java.util.List;
 
-/** Named reusable subset/snapshot derived from a recording (backend-specs/03). */
+/** Named reusable subset/snapshot derived from a recording (openspec/specs/domain-model/spec.md). */
 public record Sample(
         String id,
         String projectId,

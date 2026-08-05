@@ -54,7 +54,7 @@ import org.eclipse.milo.opcua.stack.core.types.builtin.NodeId;
  * Implements the {@code ProtocolDataSource} contract backed by a real Milo OPC UA
  * server: Configure builds the address space from the schema, Start/Stop run the
  * server, ApplyValues projects neutral values onto OPC UA variables.
- * See backend-specs/02_WORKER_CONTRACT_AND_IPC.md.
+ * See openspec/specs/worker-contract/spec.md.
  */
 public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSourceImplBase {
 
@@ -282,7 +282,7 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
      * observed value change back as neutral {@link ValueBatch}es until the supervisor
      * cancels the call. The request schema names the variables to subscribe to and
      * carries each one's data type so values are encoded neutrally. No Configure/Start
-     * — this is stateless client mode, like Scan. See backend-specs/02 §6.
+     * — this is stateless client mode, like Scan. See openspec/specs/worker-contract/spec.md §6.
      */
     @Override
     public void capture(CaptureRequest request, StreamObserver<ValueBatch> responseObserver) {
@@ -387,7 +387,7 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
      * observer with the {@link ClientEventHub} and leaves it open. The running OPC UA
      * server publishes a {@link ClientEvent} to the hub for each protocol client that
      * connects or disconnects; the stream ends when the supervisor cancels it.
-     * See backend-specs/02_WORKER_CONTRACT_AND_IPC.md.
+     * See openspec/specs/worker-contract/spec.md.
      */
     @Override
     public void clientEvents(StreamRequest request, StreamObserver<ClientEvent> responseObserver) {
@@ -399,7 +399,7 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
      * observer with the {@link RuntimeEventHub} and leaves it open. The running server
      * publishes SOURCE_START/SOURCE_STOP and value-apply failures publish ERROR; the
      * stream ends when the supervisor cancels it.
-     * See backend-specs/02_WORKER_CONTRACT_AND_IPC.md.
+     * See openspec/specs/worker-contract/spec.md.
      */
     @Override
     public void runtimeEvents(StreamRequest request, StreamObserver<RuntimeEvent> responseObserver) {
@@ -500,7 +500,7 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
     }
 
     /**
-     * Graceful process exit, per backend-specs/02_WORKER_CONTRACT_AND_IPC.md. Stops the
+     * Graceful process exit, per openspec/specs/worker-contract/spec.md. Stops the
      * OPC UA runtime, acknowledges, then exits on a separate daemon thread so the
      * response has time to flush over gRPC before the process ends. The supervisor's
      * terminate-with-grace-then-kill remains the fallback if this does not happen fast

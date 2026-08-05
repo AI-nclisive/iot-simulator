@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration xmlns="http://www.jooq.org/xsd/jooq-codegen-3.21.0.xsd">
   <!-- Generates jOOQ classes by parsing the Flyway migration SQL directly via
-       DDLDatabase — no live database required. See backend-specs/04_DB_SCHEMA.md. -->
+       DDLDatabase — no live database required. See openspec/specs/db-schema/spec.md. -->
   <generator>
     <database>
       <name>org.jooq.meta.extensions.ddl.DDLDatabase</name>

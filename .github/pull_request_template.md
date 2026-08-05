@@ -13,8 +13,10 @@ Closes: <!-- #issue -->
 - [ ] Conventional Commit title (`type(scope): subject`)
 - [ ] No secrets/credentials/PKI committed; secrets come from env
 - [ ] Generated code (jOOQ/proto) is **not** committed (stays under `build/`)
-- [ ] Governance docs (`SPEC.md`, `ARCHITECTURE.md`, `STACK.md`, `backend-specs/`)
+- [ ] Governance docs (`ARCHITECTURE.md`, `STACK.md`, `openspec/specs/`)
       changed only with prior owner approval
+- [ ] This task's `openspec/changes/<id>-<slug>/` is archived in this PR
+      (`openspec/changes/archive/...`)
 - [ ] New Flyway migration uses a unique version (no collision with open PRs)
 
 ## Notes for reviewers

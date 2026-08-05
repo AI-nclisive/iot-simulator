@@ -6,7 +6,7 @@ import java.util.List;
  * Serialized form of a {@link SyntheticPattern}: a {@code type} discriminator plus
  * the union of pattern parameters (only those relevant to the type are set).
  * Durations are milliseconds. {@link SyntheticConfigMapper} maps this to the domain
- * pattern. (backend-specs/06 "Synthetic generation model".)
+ * pattern. (openspec/specs/artifact-formats/spec.md "Synthetic generation model".)
  *
  * <p>A {@code CONSTANT} pattern carries its value in exactly one of several shapes
  * (IS-168, IS-200): {@code value} for the common numeric case (unchanged from before),

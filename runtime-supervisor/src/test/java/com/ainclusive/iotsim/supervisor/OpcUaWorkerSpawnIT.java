@@ -27,7 +27,7 @@ import org.junit.jupiter.api.Test;
  * agnostic: proves the spawn + {@code Hello/Configure/Start} handshake, that the
  * worker bound its OPC UA listen port, that ApplyValues streams to the live
  * process, and that stop tears everything down. The full neutral→OPC UA read
- * round-trip is verified in the app module. See backend-specs/02 (IS-039).
+ * round-trip is verified in the app module. See openspec/specs/worker-contract/spec.md (IS-039).
  */
 class OpcUaWorkerSpawnIT {
 

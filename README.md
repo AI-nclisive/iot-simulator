@@ -2,8 +2,8 @@
 
 Modular-monolith backend (Java 25 + Spring Boot) with out-of-process protocol
 workers, and a React/TypeScript Web UI. See the design docs at the repo root
-(`SPEC.md`, `ARCHITECTURE.md`, `STACK.md`), the UI docs under `frontend/docs/`
-(`DESIGN.md` and others), and the implementation specs in `backend-specs/`.
+(`ARCHITECTURE.md`, `STACK.md`), `frontend/docs/UI_PLAN.md`, and the living
+capability specs under `openspec/specs/`.
 
 ## Table of contents
 
@@ -17,13 +17,15 @@ workers, and a React/TypeScript Web UI. See the design docs at the repo root
 - [API & OpenAPI documentation](#api--openapi-documentation)
 - [Configuration (environment variables)](#configuration-environment-variables)
   - [Useful Gradle tasks](#useful-gradle-tasks)
+- [Specs & workflow (OpenSpec)](#specs--workflow-openspec)
 - [Project tracking](#project-tracking)
+- [Device templates](#device-templates)
 - [Debug tools](#debug-tools)
 - [Notes](#notes)
 
 ## Module map
 
-Dependencies flow downward only (`backend-specs/07_MODULE_STRUCTURE.md`):
+Dependencies flow downward only (`openspec/specs/module-structure/spec.md`):
 
 | Module | Role |
 | --- | --- |
@@ -45,13 +47,9 @@ The frontend (React + Vite) lives in `frontend/`, with its build config and
 
 ### Prerequisites
 
-| Tool | Version | Used for |
-| --- | --- | --- |
-| JDK | 25 (toolchain target) | Backend build & run. Gradle itself may run on JDK 17+ or 25; the build provisions a JDK 25 toolchain to compile/run. |
-| Docker | Docker Desktop / colima | Postgres for local runs, and Testcontainers integration tests (ITs skip locally if Docker is absent; CI always runs them). |
-| Node.js | 20 (with npm) | Frontend dev server, tests, and build (React + Vite). Pinned in `.nvmrc`. |
-
-The Gradle wrapper (`./gradlew`) is committed — no separate Gradle install needed.
+JDK 25, Node.js 20, Docker — see
+[`CONTRIBUTING.md` → Prerequisites](CONTRIBUTING.md#prerequisites). The Gradle
+wrapper (`./gradlew`) is committed, so no separate Gradle install is needed.
 
 ### Get the code & install dependencies
 
@@ -168,14 +166,10 @@ Frontend scripts:
 
 ## Test locally
 
-```bash
-./gradlew build      # backend: compile + all tests (unit + ITs + ArchUnit)
-npm run typecheck    # frontend: TypeScript check
-npm test             # frontend: Vitest suite
-```
-
-Integration tests use Testcontainers and need Docker running; they skip silently
-under `./gradlew build` if Docker is absent (CI always runs them).
+The command set and what must be green before a PR live in
+[`CONTRIBUTING.md` → Build & test](CONTRIBUTING.md#build--test). Integration
+tests use Testcontainers and need Docker running; they skip silently under
+`./gradlew build` if Docker is absent (CI always runs them).
 
 ## API & OpenAPI documentation
 
@@ -203,14 +197,14 @@ Postgres:
 | `DB_URL` | `jdbc:postgresql://localhost:5432/iotsim` | JDBC URL for Postgres. |
 | `DB_USER` / `DB_PASSWORD` | `iotsim` / `iotsim` | DB credentials. |
 | `SERVER_PORT` | `8080` | HTTP port. |
-| `IOTSIM_MODE` | `local` | `local` = auth off (implicit `local` principal); `shared` = OAuth2/OIDC resource server (set `spring.security.oauth2.resourceserver.jwt.issuer-uri`). See `backend-specs/08_AUTH_AND_MODES.md`. |
+| `IOTSIM_MODE` | `local` | `local` = auth off (implicit `local` principal); `shared` = OAuth2/OIDC resource server (set `spring.security.oauth2.resourceserver.jwt.issuer-uri`). See `openspec/specs/auth-modes/spec.md`. |
 | `IOTSIM_RUNTIME_MODE` | `memory` | `memory` = no workers (app default for dev/tests); `supervisor` = real out-of-process protocol workers (the `/run-local` skill runs this). |
 
 **Frontend** (`.env.example`):
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `VITE_API_BASE_URL` | empty | Base URL for API calls. Leave **unset in dev** so requests stay relative (`/api/...`) and go through the Vite proxy. Only set it for a production static build deployed on a different origin than the API. |
+| `VITE_API_BASE_URL` | unset → empty | Base URL for API calls. Leave it **unset in dev** so requests stay relative (`/api/...`) and go through the Vite proxy — no `.env` file is committed, so that is the default. Only set it for a production static build served from a different origin than the API; `.env.example` shows that form (`http://localhost:8080`) and is a template, not a loaded file. |
 
 ### Useful Gradle tasks
 
@@ -220,11 +214,62 @@ Postgres:
 ./gradlew :app:bootJar                       # build the runnable app jar (used by the Dockerfile)
 ```
 
+## Specs & workflow (OpenSpec)
+
+This project is spec-driven via [OpenSpec](https://github.com/Fission-AI/OpenSpec).
+Three paths carry the whole picture:
+
+| Path | What it holds |
+| --- | --- |
+| `openspec/specs/<capability>/spec.md` | **What the system does today** — the living behavior contract, one file per capability. |
+| `openspec/changes/<id>-<slug>/` | **What is changing now** — one in-flight task's `proposal.md`, `specs/` delta, `design.md`, `tasks.md`. |
+| `openspec/changes/archive/` | Completed changes, kept for history. |
+
+Capabilities: `protocol-model`, `worker-contract`, `domain-model`, `db-schema`,
+`api-contract`, `artifact-formats`, `module-structure`, `auth-modes`,
+`frontend-shell`, `frontend-screens`.
+
+The CLI is a pinned devDependency (`npm ci` installs it) — invoke it as
+`npx openspec` from the repo root:
+
+```bash
+npx openspec list --specs                 # what capabilities exist
+npx openspec spec show api-contract       # read one capability
+npx openspec list                         # changes currently in flight
+npx openspec validate --strict            # check specs + changes are well-formed
+```
+
+### The loop for one task
+
+```
+/start-task IS-038      →  claim on the board, create the linked branch,
+                           and propose the change (openspec/changes/is-038-…/)
+/opsx:propose            →  proposal.md → specs delta → design.md → tasks.md
+   ...implement...       →  work tasks.md; keep the spec delta honest
+/open-pr                 →  DoD checks, `npx openspec archive is-038-…`,
+                           open the PR, arm auto-merge, board → In review
+/review-loop             →  work the automated review until it approves
+```
+
+Two rules bite on a first change — never hand-editing `openspec/specs/*.md`, and
+only `### Requirement:` blocks surviving archive. They are stated once, in
+[`AGENTS.md` → Working with openspec](AGENTS.md#working-with-openspec); the rest
+of the workflow (including the CI gate that pairs `Implements: IS-XXX` with an
+archived change) is in
+[`CONTRIBUTING.md` → Spec workflow](CONTRIBUTING.md#spec-workflow).
+
 ## Project tracking
 
 - **Board:** [IoT Simulator](https://github.com/orgs/AI-nclisive/projects/1) —
   live status by `IS-XXX` / `Area` (Todo / In Progress / In review / Done).
-- **Task catalog:** [`backend-specs/TASKS.md`](backend-specs/TASKS.md) — the source list of `IS-XXX` task IDs.
+- **Capability specs:** [`openspec/specs/`](openspec/specs/) — what the system does today.
+- **Change history:** [`openspec/changes/archive/`](openspec/changes/archive/) — completed `IS-XXX`/`UI-XXX` tasks.
+
+## Device templates
+
+[`docs/TEMPLATES_GUIDE.md`](docs/TEMPLATES_GUIDE.md) describes the 15 OPC UA device
+templates the manual schema editor offers. The definitions live in
+`domain/.../manualschema/OpcUaTemplates.java` and are the source of truth.
 
 ## Debug tools
 

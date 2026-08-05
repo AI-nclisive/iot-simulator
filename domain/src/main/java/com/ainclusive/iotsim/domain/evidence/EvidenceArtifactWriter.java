@@ -4,7 +4,7 @@ import java.io.OutputStream;
 
 /**
  * Serializes assembled {@link EvidenceContent} into a portable artifact in one
- * {@link EvidenceFormat} (backend-specs/06). IS-057 shipped the ZIP {@code BUNDLE}
+ * {@link EvidenceFormat} (openspec/specs/artifact-formats/spec.md). IS-057 shipped the ZIP {@code BUNDLE}
  * ({@link ZipEvidenceArtifactWriter}); IS-058 adds the JSON {@code SUMMARY}
  * ({@link JsonSummaryEvidenceWriter}). Every artifact stamps {@link #FORMAT_VERSION}
  * into its manifest, and implementations must never serialize secrets/PKI.

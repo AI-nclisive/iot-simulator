@@ -13,7 +13,7 @@ body:
     id: task-id
     attributes:
       label: Task ID
-      description: IS-ID from backend-specs/TASKS.md, UI-ID from frontend/docs/UI_TASKS.md, or "new" if not yet cataloged.
+      description: Existing IS-/UI-ID from the task board, or "new" if not yet catalogued.
       placeholder: UI-022
     validations:
       required: true

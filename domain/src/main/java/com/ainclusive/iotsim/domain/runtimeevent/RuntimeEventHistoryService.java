@@ -18,7 +18,7 @@ import org.springframework.stereotype.Service;
  * cursor, requested page size) into the persistence {@link RuntimeEventQuery}
  * (UTC offsets, keyset bounds, fixed limit): it clamps the page size, decodes the
  * cursor, over-fetches one row to know whether a further page exists, and hands
- * back the next opaque cursor. See backend-specs/05_API_CONTRACT.md.
+ * back the next opaque cursor. See openspec/specs/api-contract/spec.md.
  */
 @Service
 public class RuntimeEventHistoryService {

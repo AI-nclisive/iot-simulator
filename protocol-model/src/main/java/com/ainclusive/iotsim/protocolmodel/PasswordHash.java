@@ -13,7 +13,7 @@ import javax.crypto.spec.PBEKeySpec;
  * Salted PBKDF2 password hashing (pure JDK — no dependency). Used by the domain to
  * hash a simulated OPC UA server's accepted passwords on write, and by the worker
  * to verify a client-supplied password on session activation. See
- * docs/superpowers/specs/2026-07-02-is-130-opcua-endpoint-security-design.md.
+ * openspec/specs/auth-modes/spec.md.
  */
 public final class PasswordHash {
 

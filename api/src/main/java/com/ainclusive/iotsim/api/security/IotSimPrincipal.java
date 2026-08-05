@@ -21,7 +21,7 @@ import org.springframework.security.core.GrantedAuthority;
  *
  * The record is intentionally lightweight — it carries only what domain code needs
  * and does not expose Spring Security internals to the domain layer.
- * See backend-specs/08_AUTH_AND_MODES.md.
+ * See openspec/specs/auth-modes/spec.md.
  *
  * @param subject     Identity token (JWT {@code sub} in shared mode; {@code "local"}
  *                    in local mode). Never null or blank.

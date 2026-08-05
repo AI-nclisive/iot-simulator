@@ -5,7 +5,7 @@ plugins {
     alias(libs.plugins.protobuf)
 }
 
-description = "ProtocolDataSource contract + supervisor⇄worker gRPC IPC (backend-specs/02)."
+description = "ProtocolDataSource contract + supervisor⇄worker gRPC IPC (openspec/specs/worker-contract/spec.md)."
 
 dependencies {
     api(project(":protocol-model"))

@@ -14,7 +14,7 @@ public interface LaunchedWorker extends AutoCloseable {
      * and trigger restart-with-backoff; an exit that follows an intentional
      * {@code Stop} is not restarted. Never completes exceptionally.
      *
-     * <p>See backend-specs/02_WORKER_CONTRACT_AND_IPC.md §4.
+     * <p>See openspec/specs/worker-contract/spec.md §4.
      */
     CompletionStage<Void> onExit();
 }

@@ -24,7 +24,7 @@ import org.eclipse.milo.opcua.stack.core.types.builtin.unsigned.Unsigned;
 /**
  * Maps the protocol-neutral data types onto OPC UA built-in types and converts
  * decoded values to the matching Milo Java representation.
- * See backend-specs/01_PROTOCOL_NEUTRAL_MODEL.md §5.
+ * See openspec/specs/protocol-model/spec.md §5.
  */
 final class OpcUaTypes {
 
@@ -57,8 +57,9 @@ final class OpcUaTypes {
     /**
      * Reverse mapping used by scan/discovery: an OPC UA DataType node id back to a
      * protocol-neutral data type, or {@code null} when the declaration has a
-     * distinct native NodeId. The caller preserves that NodeId exactly; a named
-     * subtype must not be silently replaced by its primitive parent.
+     * distinct native NodeId (see openspec/specs/protocol-model/spec.md). The caller
+     * preserves that NodeId exactly; a named subtype must not be silently replaced by
+     * its primitive parent.
      */
     static String neutralTypeOf(NodeId dataTypeId) {
         if (dataTypeId == null) {

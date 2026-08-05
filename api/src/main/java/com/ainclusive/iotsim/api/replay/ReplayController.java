@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Replays a recording through a data-source (backend-specs/05_API_CONTRACT.md).
+ * Replays a recording through a data-source (openspec/specs/api-contract/spec.md).
  *
  * <p>Authorization (IS-077): replay is a runtime-operate action —
  * {@link Permission#REPLAY_START} (user + admin).

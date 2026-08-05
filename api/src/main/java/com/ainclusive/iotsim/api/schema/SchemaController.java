@@ -25,7 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * The protocol-neutral schema of a data-source. GET returns the current version;
- * PUT saves a new version (full-editor save). See backend-specs/05_API_CONTRACT.md.
+ * PUT saves a new version (full-editor save). See openspec/specs/api-contract/spec.md.
  *
  * <p>Authorization (IS-077): GET — {@link Permission#OBSERVE}; PUT — {@link Permission#SCHEMA_EDIT}.
  */

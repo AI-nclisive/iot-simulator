@@ -15,7 +15,7 @@ import org.jooq.InsertSetMoreStep;
 import org.jooq.Result;
 import org.springframework.stereotype.Repository;
 
-/** jOOQ-backed {@link RunRepository} (backend-specs/04). */
+/** jOOQ-backed {@link RunRepository} (openspec/specs/db-schema/spec.md). */
 @Repository
 public class JooqRunRepository implements RunRepository {
 

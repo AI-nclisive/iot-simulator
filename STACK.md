@@ -5,7 +5,8 @@ Approved technologies only. No new dependency without explicit approval (see
 history.
 
 ## Backend
-- Java 25 LTS (baseline; 21 also supported); Spring Boot 4.x — REST/OpenAPI via
+- Java 25 LTS — the only supported baseline: the Gradle toolchain pins
+  `JavaLanguageVersion.of(25)` and CI builds on JDK 25; Spring Boot 4.x — REST/OpenAPI via
   springdoc, SSE/WebSocket.
 - Eclipse Milo — OPC UA server SDK (Apache 2.0). Needs JAXB on the worker
   runtime (`javax.xml.bind:jaxb-api` + `org.glassfish.jaxb:jaxb-runtime`):
@@ -27,8 +28,9 @@ history.
   adoption, especially on the hot recording path.
 
 ## Frontend
-- React + TypeScript + Vite + React Router + TanStack Query/Table/Virtual +
-  Zustand + Radix UI + Tailwind.
+- React + TypeScript + Vite + React Router + TanStack Virtual + Zustand +
+  Tailwind. (No TanStack Query/Table, no Radix UI — plain fetch + hand-built
+  components today; add only with approval if a screen genuinely needs them.)
 - openapi-typescript (devDependency) — generates TypeScript types from the backend
   OpenAPI spec (`/openapi.json`); run via `npm run generate:api`.
 - react-datepicker — controlled date/time picker for the Create Data Source
@@ -40,8 +42,9 @@ history.
 ## Platform and tooling
 - Auth: OAuth2/OIDC (e.g. Keycloak, AWS Cognito, Azure Entra ID).
 - Build: Gradle (Kotlin DSL). Deploy: Docker Compose.
-- Testing: JUnit 5, Testcontainers, AssertJ, ArchUnit, Vitest, Testing Library,
-  Playwright.
+- Testing: JUnit 5, Testcontainers, AssertJ, ArchUnit, Vitest, Testing Library.
+  (No Playwright/e2e browser testing yet — only a transitive, unused
+  `@vitest/browser-playwright` lockfile entry exists today.)
 
 ## Rejected (do not introduce)
 - Node.js/NestJS as the primary simulator runtime — server-side scaling/memory risk.

@@ -4,7 +4,7 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * Top-level manifest of a project export ZIP (backend-specs/06_ARTIFACT_FORMATS.md).
+ * Top-level manifest of a project export ZIP (openspec/specs/artifact-formats/spec.md).
  *
  * <p>Carries {@code formatVersion} (semver), project metadata, content index,
  * and per-entry checksums. Secrets, credentials, and PKI material are never

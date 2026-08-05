@@ -33,7 +33,7 @@ import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Export and import of recording artifacts as ZIP bundles (IS-070,
- * backend-specs/06_ARTIFACT_FORMATS.md §"Recording / sample export").
+ * openspec/specs/artifact-formats/spec.md §"Recording / sample export").
  *
  * <p>Export: assembles a ZIP containing {@code manifest.json} and
  * {@code value-timeline.json}, stores it in the {@link ObjectStore}, and returns a

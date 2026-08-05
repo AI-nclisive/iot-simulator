@@ -4,7 +4,7 @@ import java.time.Instant;
 
 /**
  * A project: the workspace boundary grouping a simulator setup and its reusable
- * artifacts. See {@code backend-specs/03_DOMAIN_MODEL.md}.
+ * artifacts. See {@code openspec/specs/domain-model/spec.md}.
  */
 public record Project(
         String id,

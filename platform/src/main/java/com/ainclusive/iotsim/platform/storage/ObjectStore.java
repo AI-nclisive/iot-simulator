@@ -8,7 +8,7 @@ import java.util.Optional;
  * imports, recording/sample blobs). No large blobs live in the relational store.
  *
  * <p>Adapters (decision D3): filesystem (local, default) and S3-compatible
- * (shared). See {@code backend-specs/08_AUTH_AND_MODES.md}.
+ * (shared). See {@code openspec/specs/auth-modes/spec.md}.
  */
 public interface ObjectStore {
 

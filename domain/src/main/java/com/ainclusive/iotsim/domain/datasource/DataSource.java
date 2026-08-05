@@ -8,7 +8,7 @@ import java.time.Instant;
  * credential store and never carries the secret itself. {@code serveUrl} is the
  * advertised endpoint a client connects to, derived from the protocol, the
  * configured {@code advertisedHost}, and {@code simulatorPort}.
- * See backend-specs/03_DOMAIN_MODEL.md.
+ * See openspec/specs/domain-model/spec.md.
  */
 public record DataSource(
         String id,

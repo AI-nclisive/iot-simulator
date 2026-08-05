@@ -14,7 +14,7 @@ import tools.jackson.databind.node.ObjectNode;
  * API-write (plaintext {@code password}), storage ({@code passwordHash}), and the
  * neutral {@link EndpointSecurity} runtime model. Hashes passwords on write and
  * redacts hashes for the API response. Passwords never leave this class in plaintext
- * once stored. See docs/superpowers/specs/2026-07-02-is-130-opcua-endpoint-security-design.md.
+ * once stored. See openspec/specs/auth-modes/spec.md.
  */
 final class EndpointSecurityCodec {
 

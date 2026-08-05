@@ -1,6 +1,6 @@
 -- Append-optimized value timeline. Captures every value change on the recording
 -- path (no sampling). Time-ordered range reads for replay and evidence.
--- No TimescaleDB / no required extension. See backend-specs/04_DB_SCHEMA.md.
+-- No TimescaleDB / no required extension. See openspec/specs/db-schema/spec.md.
 --
 -- Native range partitioning by source_time (declarative, no extension): the
 -- partition key (source_time) is part of the primary key, as Postgres requires.

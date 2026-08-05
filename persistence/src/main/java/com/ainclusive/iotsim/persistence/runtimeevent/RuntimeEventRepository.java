@@ -8,7 +8,7 @@ import java.util.Optional;
  * Append-only store for runtime events (the {@code RuntimeEvents} worker stream,
  * IS-048): source start/stop, errors, fault state changes. Reads are time-ordered
  * (newest first) and back the runtime-event history (IS-055). Distinct from the
- * user-activity audit stream, which is never merged in (backend-specs/04).
+ * user-activity audit stream, which is never merged in (openspec/specs/db-schema/spec.md).
  */
 public interface RuntimeEventRepository {
 

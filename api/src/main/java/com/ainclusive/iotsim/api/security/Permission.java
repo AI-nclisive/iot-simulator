@@ -3,7 +3,7 @@ package com.ainclusive.iotsim.api.security;
 /**
  * Fine-grained API-layer capabilities checked at every enforcement point (IS-077).
  *
- * <p>Role→permission mapping (per backend-specs/08_AUTH_AND_MODES.md, §Authorization):
+ * <p>Role→permission mapping (per openspec/specs/auth-modes/spec.md, §Authorization):
  * <ul>
  *   <li>{@code user}: {@link #SOURCE_START}, {@link #SOURCE_STOP}, {@link #REPLAY_START},
  *       {@link #REPLAY_STOP}, {@link #OBSERVE} — observe everything and operate the runtime.

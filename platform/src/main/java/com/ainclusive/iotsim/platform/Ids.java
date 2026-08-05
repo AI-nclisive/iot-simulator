@@ -5,8 +5,9 @@ import java.util.UUID;
 /**
  * Entity id generation. Ids are opaque, stable strings.
  *
- * <p>Scaffold uses UUIDv4; backend-specs target ULID (sortable) — swap the
- * implementation here without touching callers.
+ * <p>Today's implementation is UUIDv4. A sortable form (e.g. ULID) can replace it
+ * here without touching callers; no spec requires one, so this stays UUIDv4 until
+ * a task asks otherwise.
  */
 public final class Ids {
 

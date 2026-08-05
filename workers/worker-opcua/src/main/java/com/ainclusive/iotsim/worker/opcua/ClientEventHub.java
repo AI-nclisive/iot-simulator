@@ -13,7 +13,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * <p>Events are point-in-time and not buffered — one published while no stream is
  * open is dropped. In practice the supervisor opens the stream as soon as the
  * worker reaches RUNNING, before any protocol client can connect.
- * See backend-specs/02_WORKER_CONTRACT_AND_IPC.md.
+ * See openspec/specs/worker-contract/spec.md.
  */
 final class ClientEventHub {
 

@@ -18,7 +18,7 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * CRUD + duplicate over standalone {@link ManualSchema} artifacts (IS-172).
- * See backend-specs/03_DOMAIN_MODEL.md §ManualSchema and 05_API_CONTRACT.md §Manual schemas.
+ * See openspec/specs/domain-model/spec.md §ManualSchema and 05_API_CONTRACT.md §Manual schemas.
  *
  * <p>Consumed only via synthetic source creation's {@code manualSchemaId} (IS-173), which
  * copies a schema's nodes by snapshot — later edits here never affect a source already created
