@@ -185,6 +185,12 @@ class EvidenceServiceTest {
     }
 
     @Test
+    void deliberatelyStoppedRunMapsToStoppedCompleteness() {
+        seedReplayEvidence("STOPPED");
+        assertThat(service().assemble("ev-1").manifest().completeness()).isEqualTo(Completeness.STOPPED);
+    }
+
+    @Test
     void filtersRuntimeEventsAndClientsToTheRunWindow() {
         seedReplayEvidence("COMPLETED");
         runtimeEvents.bySource.put("src-1", List.of(

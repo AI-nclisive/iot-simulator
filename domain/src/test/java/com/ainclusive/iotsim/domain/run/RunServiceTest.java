@@ -101,8 +101,8 @@ class RunServiceTest {
         verify(runtime).stop("ds2");
         verify(runs).end(eq("r1"), eq("STOPPED"), any());
         assertThat(v.state()).isEqualTo("STOPPED");
-        // IS-187: the shared manual-stop path must also flip evidence off CAPTURING.
-        verify(evidence).updateStatus(eq("ev-1"), eq("PARTIAL"), org.mockito.ArgumentMatchers.isNull());
+        // A deliberate stop finishes evidence cleanly; PARTIAL is reserved for missing data.
+        verify(evidence).updateStatus(eq("ev-1"), eq("READY"), org.mockito.ArgumentMatchers.isNull());
     }
 
     @Test

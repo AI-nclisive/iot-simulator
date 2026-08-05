@@ -205,7 +205,10 @@ public class EvidenceService {
             evidence.updateManifest(evidenceId, json.writeValueAsString(content.manifest()));
             // evidence.status has no FAILED value (CAPTURING|READY|PARTIAL|EXPORT_FAILED); a
             // failed/incomplete run exports as PARTIAL, with manifest.completeness carrying the detail.
-            String status = content.manifest().completeness() == Completeness.COMPLETE ? "READY" : "PARTIAL";
+            String status = switch (content.manifest().completeness()) {
+                case COMPLETE, STOPPED -> "READY";
+                case PARTIAL, FAILED -> "PARTIAL";
+            };
             return EvidenceView.from(evidence.updateStatus(evidenceId, status, ref));
         } catch (RuntimeException e) {
             // Export failure is a first-class state (UI shows it + offers retry); log so a
@@ -227,6 +230,7 @@ public class EvidenceService {
         }
         return switch (run.state()) {
             case "COMPLETED" -> Completeness.COMPLETE;
+            case "STOPPED" -> Completeness.STOPPED;
             case "FAILED" -> Completeness.FAILED;
             default -> Completeness.PARTIAL;
         };
