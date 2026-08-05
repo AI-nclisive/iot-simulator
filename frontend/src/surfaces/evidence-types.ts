@@ -6,7 +6,7 @@ export type EvidenceStatus = "CAPTURING" | "READY" | "PARTIAL" | "EXPORT_FAILED"
 
 export type EvidenceKind = "REPLAY" | "SYNTHETIC" | "SCENARIO" | "RECORDING";
 
-export type EvidenceCompleteness = "COMPLETE" | "PARTIAL" | "FAILED";
+export type EvidenceCompleteness = "COMPLETE" | "STOPPED" | "PARTIAL" | "FAILED";
 
 /** Display-friendly status label */
 export type EvidenceStatusLabel = "In progress" | "Ready" | "Incomplete" | "Export failed";
@@ -130,6 +130,8 @@ export function evidenceCompletenessLabel(completeness: EvidenceCompleteness): s
   switch (completeness) {
     case "COMPLETE":
       return "Complete";
+    case "STOPPED":
+      return "Stopped by user";
     case "PARTIAL":
       return "Partial";
     case "FAILED":
@@ -141,4 +143,3 @@ export function evidenceCompletenessLabel(completeness: EvidenceCompleteness): s
 export function evidenceTitle(kind: EvidenceKind, runId: string): string {
   return `${evidenceKindLabel(kind)} run · ${runId}`;
 }
-

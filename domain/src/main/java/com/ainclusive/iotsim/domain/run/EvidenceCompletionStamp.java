@@ -33,6 +33,7 @@ public final class EvidenceCompletionStamp {
     }
 
     private static String statusFor(String terminalState) {
-        return "COMPLETED".equals(terminalState) ? "READY" : "PARTIAL";
+        return "COMPLETED".equals(terminalState) || "STOPPED".equals(terminalState)
+                ? "READY" : "PARTIAL";
     }
 }

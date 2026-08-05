@@ -185,6 +185,12 @@ class EvidenceServiceTest {
     }
 
     @Test
+    void deliberatelyStoppedRunMapsToStoppedCompleteness() {
+        seedReplayEvidence("STOPPED");
+        assertThat(service().assemble("ev-1").manifest().completeness()).isEqualTo(Completeness.STOPPED);
+    }
+
+    @Test
     void filtersRuntimeEventsAndClientsToTheRunWindow() {
         seedReplayEvidence("COMPLETED");
         runtimeEvents.bySource.put("src-1", List.of(
@@ -214,6 +220,15 @@ class EvidenceServiceTest {
         assertThat(result.status()).isEqualTo("READY");
         assertThat(result.objectRef()).isEqualTo("evidence/ev-1/bundle.zip");
         assertThat(evidence.byId.get("ev-1").manifestJson()).contains("\"formatVersion\":\"1.0.0\"");
+    }
+
+    @Test
+    void exportOfDeliberatelyStoppedRunMarksEvidenceReady() {
+        seedReplayEvidence("STOPPED");
+
+        EvidenceView result = service().export("p1", "ev-1", EvidenceFormat.BUNDLE);
+
+        assertThat(result.status()).isEqualTo("READY");
     }
 
     @Test
