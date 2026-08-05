@@ -1314,6 +1314,10 @@ Parallel execution:
   unresolved choices include the complete neutral type set; manual authoring
   can select catalog native types; typecheck, vitest, and build are green.
 
+- [x] `UI-514` Manual Schema editor control cleanup
+  Goal: remove duplicate node-class controls and repair affected editor layout.
+  Done when: catalog controls are compact and detail rows fit their panel.
+
 ## Recommended Sequence
 
 1. Complete the P0 shell and shared-pattern tasks first.
