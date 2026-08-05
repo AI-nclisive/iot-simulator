@@ -772,7 +772,7 @@ export function ManualSchemaEditorPage() {
         return;
       }
     }
-    const parentId = addParentId;
+    const parentId = addKind === "DATA_TYPE" ? null : addParentId;
     const node: NodeDto = {
       nodeId: newNodeId(),
       parentId,
@@ -1123,20 +1123,24 @@ export function ManualSchemaEditorPage() {
               </div>
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
-              <label className="flex flex-col gap-1.5 text-sm text-shell-muted">
-                Parent
-                <select
-                  aria-label="Parent folder for new node"
-                  className="shell-field"
-                  value={addParentId ?? ""}
-                  onChange={(e) => setAddParentId(e.target.value || null)}
-                >
-                  <option value="">Top level of server</option>
-                  {containers.map((container) => (
-                    <option key={container.nodeId} value={container.nodeId}>{container.path}</option>
-                  ))}
-                </select>
-              </label>
+              {addKind === "DATA_TYPE" ? (
+                <p className="self-end pb-3 text-xs text-shell-muted">Data types are always created at the top level.</p>
+              ) : (
+                <label className="flex flex-col gap-1.5 text-sm text-shell-muted">
+                  Parent
+                  <select
+                    aria-label="Parent folder for new node"
+                    className="shell-field"
+                    value={addParentId ?? ""}
+                    onChange={(e) => setAddParentId(e.target.value || null)}
+                  >
+                    <option value="">Top level of server</option>
+                    {containers.map((container) => (
+                      <option key={container.nodeId} value={container.nodeId}>{container.path}</option>
+                    ))}
+                  </select>
+                </label>
+              )}
               <label className="flex flex-col gap-1.5 text-sm text-shell-muted">
                 Name
                 <input
