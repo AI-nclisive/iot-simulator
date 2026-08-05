@@ -223,6 +223,15 @@ class EvidenceServiceTest {
     }
 
     @Test
+    void exportOfDeliberatelyStoppedRunMarksEvidenceReady() {
+        seedReplayEvidence("STOPPED");
+
+        EvidenceView result = service().export("p1", "ev-1", EvidenceFormat.BUNDLE);
+
+        assertThat(result.status()).isEqualTo("READY");
+    }
+
+    @Test
     void exportSummaryStoresJsonArtifact() {
         seedReplayEvidence("COMPLETED");
 
