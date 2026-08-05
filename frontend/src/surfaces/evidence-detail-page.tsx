@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { apiFetch, authHeaders } from "../api/client";
 import { resolveAccess } from "../shell/access-policy";
@@ -97,6 +97,27 @@ export function EvidenceDetailPage() {
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
 
+  const handleExport = useCallback(() => {
+    if (!currentProjectId || !evidenceId) return;
+    setIsExporting(true);
+    setExportError(null);
+
+    apiFetch<unknown>(
+      `/api/v1/projects/${currentProjectId}/evidence/${evidenceId}/export?format=BUNDLE`,
+      { method: "POST" },
+    )
+      .then(() => {
+        setExportOutcome("success");
+      })
+      .catch((err: unknown) => {
+        setExportOutcome("failed");
+        setExportError(err instanceof Error ? err.message : "Export failed");
+      })
+      .finally(() => {
+        setIsExporting(false);
+      });
+  }, [currentProjectId, evidenceId]);
+
   useEffect(() => {
     if (!currentProjectId || !evidenceId) {
       setIsLoading(false);
@@ -139,7 +160,7 @@ export function EvidenceDetailPage() {
     const next = new URLSearchParams(searchParams);
     next.delete("export");
     setSearchParams(next, { replace: true });
-  }, [access.isAdmin, item, searchParams, setSearchParams]);
+  }, [access.isAdmin, handleExport, item, searchParams, setSearchParams]);
 
   if (isLoading) {
     return (
@@ -192,27 +213,6 @@ export function EvidenceDetailPage() {
   const recoveryMode = exportStateLbl === "Export failed";
   const title = evidenceTitle(item.kind, item.runId);
   const duration = deriveDuration(item.startedAt, item.endedAt);
-
-  function handleExport() {
-    if (!currentProjectId || !evidenceId) return;
-    setIsExporting(true);
-    setExportError(null);
-
-    apiFetch<unknown>(
-      `/api/v1/projects/${currentProjectId}/evidence/${evidenceId}/export?format=BUNDLE`,
-      { method: "POST" },
-    )
-      .then(() => {
-        setExportOutcome("success");
-      })
-      .catch((err: unknown) => {
-        setExportOutcome("failed");
-        setExportError(err instanceof Error ? err.message : "Export failed");
-      })
-      .finally(() => {
-        setIsExporting(false);
-      });
-  }
 
   function handleDownload() {
     if (!currentProjectId || !evidenceId) return;
