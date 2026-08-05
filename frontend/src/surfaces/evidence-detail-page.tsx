@@ -130,11 +130,12 @@ export function EvidenceDetailPage() {
     if (currentProjectId) loadScenarios(currentProjectId);
   }, [currentProjectId, loadScenarios]);
 
-  // Trigger export dialog from URL param
+  // The list's Export shortcut deliberately lands here with this parameter so the
+  // detail view can reuse the same export state and feedback as its own action.
   useEffect(() => {
     if (searchParams.get("export") !== "1" || !access.isAdmin || !item) return;
     if (item.status === "CAPTURING" && !item.endedAt) return;
-    // Clear the param — the export UI is always visible on this page
+    handleExport();
     const next = new URLSearchParams(searchParams);
     next.delete("export");
     setSearchParams(next, { replace: true });
