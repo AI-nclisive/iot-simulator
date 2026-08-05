@@ -218,6 +218,21 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
     expect((screen.getByLabelText("Structure member 1 type") as HTMLSelectElement).value).toBe("INT32");
   });
 
+  it("always adds a data type at the top level", async () => {
+    mockLoadManualSchemaById.mockResolvedValueOnce(schemaWithFolder);
+    renderPage();
+    await waitFor(() => screen.getByText("Reactor"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Add folder" }));
+    fireEvent.click(screen.getByRole("radio", { name: /Data type/ }));
+    expect(screen.queryByLabelText("Parent folder for new node")).toBeNull();
+    expect(screen.getByText("Data types are always created at the top level.")).not.toBeNull();
+    fireEvent.change(screen.getAllByLabelText("Name")[1], { target: { value: "PumpState" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+
+    await waitFor(() => expect(screen.getAllByText("PumpState").length).toBeGreaterThan(0));
+  });
+
   it("creates a manual enum DATA_TYPE with editable numeric literals", async () => {
     mockLoadManualSchemaById.mockResolvedValueOnce(schema);
     renderPage();
