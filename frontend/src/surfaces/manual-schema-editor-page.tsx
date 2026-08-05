@@ -446,6 +446,7 @@ export function ManualSchemaEditorPage() {
   const [showLibrary, setShowLibrary] = useState(false);
   const [showBatch, setShowBatch] = useState(false);
   const [catalogQuery, setCatalogQuery] = useState("");
+  const [standardTypeId, setStandardTypeId] = useState<string>(STANDARD_OPC_UA_TYPE_TEMPLATES[0].nodeId);
   const [saveMode, setSaveMode] = useState<SaveMode | null>(null);
   const [saveAsName, setSaveAsName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -859,7 +860,7 @@ export function ManualSchemaEditorPage() {
     setSelectedSuggestion("");
   }
 
-  function openAdd(kind: "FOLDER" | "OBJECT" | "VARIABLE" | "METHOD") {
+  function openAdd(kind: "FOLDER" | "OBJECT" | "VARIABLE" | "METHOD" | "DATA_TYPE") {
     setAddKind(kind);
     setAddParentId(selectedNode && canHaveChildren(selectedNode.kind) ? selectedNode.nodeId : null);
   }
@@ -1085,6 +1086,9 @@ export function ManualSchemaEditorPage() {
                 Add method
               </button>
             ) : null}
+            <button className="shell-action" type="button" onClick={() => openAdd("DATA_TYPE")}>
+              Add data type
+            </button>
             <span className="text-xs text-shell-muted">
               {selectedNode && canHaveChildren(selectedNode.kind)
                 ? `New items will be placed inside ${selectedNode.path}.`
@@ -1098,30 +1102,9 @@ export function ManualSchemaEditorPage() {
 
         {addKind ? (
           <div className="mb-4 space-y-3 rounded-md border border-shell-line bg-white px-4 py-4">
-            <fieldset>
-              <legend className="text-sm font-medium text-shell-ink">Choose a node class</legend>
-              <p className="mt-1 text-xs text-shell-muted">Folders and objects organize the server tree. Variables hold values clients can read or write. Methods are browseable callable operations.</p>
-              <div className="mt-3 flex flex-wrap gap-2" role="radiogroup" aria-label="Node class">
-                {(["FOLDER", "OBJECT", "VARIABLE", "METHOD", "DATA_TYPE"] as const).map((kind) => (
-                  <label key={kind} className={`cursor-pointer rounded-md border px-3 py-2 text-sm ${addKind === kind ? "border-shell-accent bg-shell-accent/5 text-shell-ink" : "border-shell-line text-shell-muted"}`}>
-                    <input checked={addKind === kind} className="sr-only" name="node-class" type="radio" value={kind} onChange={() => setAddKind(kind)} />
-                    <span className="font-medium">{kind === "FOLDER" ? "Folder" : kind === "OBJECT" ? "Object" : kind === "VARIABLE" ? "Variable" : kind === "METHOD" ? "Method" : "Data type"}</span>
-                    <span className="block text-xs">{kind === "FOLDER" ? "Contains nodes" : kind === "OBJECT" ? "Groups related nodes" : kind === "VARIABLE" ? "Stores a value" : kind === "METHOD" ? "Callable operation (no implementation)" : "Reusable structured value shape"}</span>
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-            <div className="rounded-md border border-shell-line bg-shell-base/30 px-3 py-3">
-              <p className="text-sm font-medium text-shell-ink">Standard OPC UA type catalog</p>
-              <p className="mt-1 text-xs text-shell-muted">Available without a scan. Adding one makes its exact type and fields selectable by variables in this schema.</p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {STANDARD_OPC_UA_TYPE_TEMPLATES.map((template) => (
-                  <button className="shell-action" key={template.nodeId} type="button" onClick={() => addStandardTypeTemplate(template)}>
-                    Add {template.name}
-                  </button>
-                ))}
-              </div>
-            </div>
+            {addKind === "METHOD" ? (
+              <p className="text-xs text-shell-muted">Methods are browseable callable operations; they have no implementation until business logic is authored.</p>
+            ) : null}
             <div className="grid gap-3 sm:grid-cols-3">
               {addKind === "DATA_TYPE" ? (
                 <p className="self-end pb-3 text-xs text-shell-muted">Data types are always created at the top level.</p>
@@ -1228,7 +1211,7 @@ export function ManualSchemaEditorPage() {
                   <div className="space-y-2 rounded-md border border-shell-line p-3">
                     <p className="text-sm font-medium text-shell-ink">Enum values</p>
                     {addEnumValues.map((value, index) => (
-                      <div className="grid gap-2 sm:grid-cols-[minmax(8rem,1fr)_7rem_minmax(10rem,1fr)_auto]" key={value.id}>
+                      <div className="grid gap-2 sm:grid-cols-2" key={value.id}>
                         <label className="text-xs text-shell-muted">Name<input aria-label={`Enum value ${index + 1} name`} className="shell-field mt-1 w-full" value={value.name} onChange={(e) => setAddEnumValues((prev) => prev.map((candidate) => candidate.id === value.id ? { ...candidate, name: e.target.value } : candidate))} /></label>
                         <label className="text-xs text-shell-muted">Value<input aria-label={`Enum value ${index + 1} numeric value`} className="shell-field mt-1 w-full" inputMode="numeric" value={value.value} onChange={(e) => setAddEnumValues((prev) => prev.map((candidate) => candidate.id === value.id ? { ...candidate, value: e.target.value } : candidate))} /></label>
                         <label className="text-xs text-shell-muted">Description<input aria-label={`Enum value ${index + 1} description`} className="shell-field mt-1 w-full" value={value.description} onChange={(e) => setAddEnumValues((prev) => prev.map((candidate) => candidate.id === value.id ? { ...candidate, description: e.target.value } : candidate))} /></label>
@@ -1355,6 +1338,26 @@ export function ManualSchemaEditorPage() {
                       <span className="mt-2 block text-xs text-shell-muted">Adds a folder and {template.variables.length} variables.</span>
                     </button>
                   ))}
+                </div>
+              </div>
+              <div className="mt-4 border-t border-shell-line pt-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-shell-muted">Native OPC UA types</p>
+                <p className="mt-1 text-xs text-shell-muted">Add a standard declaration only when a variable or structure member needs that exact native type.</p>
+                <div className="mt-2 flex flex-wrap items-end gap-2">
+                  <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm text-shell-muted">
+                    OPC UA native type
+                    <select aria-label="OPC UA native type" className="shell-field" value={standardTypeId} onChange={(event) => setStandardTypeId(event.target.value)}>
+                      {STANDARD_OPC_UA_TYPE_TEMPLATES.map((template) => (
+                        <option key={template.nodeId} value={template.nodeId}>{template.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <button className="shell-action" type="button" onClick={() => {
+                    const template = STANDARD_OPC_UA_TYPE_TEMPLATES.find((candidate) => candidate.nodeId === standardTypeId);
+                    if (template) addStandardTypeTemplate(template);
+                  }}>
+                    Add type
+                  </button>
                 </div>
               </div>
             </div>
@@ -1549,7 +1552,7 @@ export function ManualSchemaEditorPage() {
                       {isEnum ? (
                         <div className="space-y-2">
                           {(selectedNode.enumValues ?? []).map((value, index) => (
-                            <div className="grid gap-2 sm:grid-cols-[minmax(7rem,1fr)_5rem_minmax(8rem,1fr)_auto]" key={`${value.name}-${value.value}-${index}`}>
+                            <div className="grid gap-2 sm:grid-cols-2" key={`${value.name}-${value.value}-${index}`}>
                               <input aria-label={`Enum value ${index + 1} name`} className="shell-field" disabled={!access.isAdmin} value={value.name} onChange={(e) => updateDataTypeEnumValues((selectedNode.enumValues ?? []).map((candidate, candidateIndex) => candidateIndex === index ? { ...candidate, name: e.target.value } : candidate))} />
                               <input aria-label={`Enum value ${index + 1} numeric value`} className="shell-field" disabled={!access.isAdmin} inputMode="numeric" value={value.value} onChange={(e) => {
                                 const next = Number(e.target.value);
@@ -1564,7 +1567,7 @@ export function ManualSchemaEditorPage() {
                       ) : (
                         <div className="space-y-2">
                           {(selectedNode.members ?? []).map((member, index) => (
-                            <div className="grid gap-2 sm:grid-cols-[minmax(8rem,1fr)_minmax(8rem,1fr)_7rem_minmax(7rem,1fr)_auto]" key={`${member.name}-${index}`}>
+                            <div className="grid gap-2 sm:grid-cols-2" key={`${member.name}-${index}`}>
                               <input aria-label={`Structure member ${index + 1} name`} className="shell-field" disabled={!access.isAdmin} value={member.name} onChange={(e) => updateDataTypeMembers((selectedNode.members ?? []).map((candidate, candidateIndex) => candidateIndex === index ? { ...candidate, name: e.target.value } : candidate))} />
                               <select aria-label={`Structure member ${index + 1} type`} className="shell-field" disabled={!access.isAdmin} value={member.dataTypeNodeId ? `native:${member.dataTypeNodeId}` : member.dataType ?? "FLOAT64"} onChange={(e) => updateDataTypeMembers((selectedNode.members ?? []).map((candidate, candidateIndex) => candidateIndex === index ? (e.target.value.startsWith("native:") ? { ...candidate, dataType: null, dataTypeNodeId: e.target.value.slice("native:".length) } : { ...candidate, dataType: e.target.value, dataTypeNodeId: null }) : candidate))}>
                                 {DATA_TYPES.map((type) => <option key={type} value={type}>{formatDataType(type)}</option>)}
