@@ -44,7 +44,7 @@ import java.util.function.Consumer;
 /**
  * Supervisor-side IPC client to one worker over loopback gRPC. The {@code hello}
  * handshake refuses a mismatched contract major version.
- * See backend-specs/02_WORKER_CONTRACT_AND_IPC.md.
+ * See openspec/specs/worker-contract/spec.md.
  */
 public final class WorkerClient implements AutoCloseable {
 
@@ -70,8 +70,17 @@ public final class WorkerClient implements AutoCloseable {
         this.scanTimeoutSeconds = scanTimeoutSeconds;
     }
 
-    public HelloResponse hello() {
-        HelloResponse response = stub.hello(
+    /**
+     * Handshakes with the worker under a deadline. Without a bound here, a control port
+     * that accepts a TCP connection but never completes the RPC (e.g. something else is
+     * squatting on the port the supervisor just handed the child, or the process is stuck
+     * mid-startup) hangs this call indefinitely — the caller's own overall ready-wait budget
+     * ({@link Supervisor#awaitReady}) is only checked *between* attempts, so one hung attempt
+     * defeats it entirely. Mirrors the deadline already applied to {@link #testConnection},
+     * {@link #scan}, and {@link #isHealthy}.
+     */
+    public HelloResponse hello(Duration timeout) {
+        HelloResponse response = stub.withDeadlineAfter(timeout.toMillis(), TimeUnit.MILLISECONDS).hello(
                 HelloRequest.newBuilder().setContractVersion(WorkerContract.VERSION).build());
         if (WorkerContract.major(response.getContractVersion()) != WorkerContract.major(WorkerContract.VERSION)) {
             throw new WorkerContractMismatchException(WorkerContract.VERSION, response.getContractVersion());
@@ -99,7 +108,7 @@ public final class WorkerClient implements AutoCloseable {
      * Starts the worker's protocol server. A worker that cannot bind its listen port
      * returns {@code Ack(ok=false)} with the reason (rather than a raw gRPC error);
      * this surfaces that as a {@link WorkerBindException} so the supervisor can record
-     * the source as ERROR. See backend-specs/02_WORKER_CONTRACT_AND_IPC.md.
+     * the source as ERROR. See openspec/specs/worker-contract/spec.md.
      */
     public Ack start() {
         Ack ack = stub.start(StartRequest.getDefaultInstance());
@@ -118,7 +127,7 @@ public final class WorkerClient implements AutoCloseable {
      * worker that is unreachable or already gone (e.g. after an unexpected crash)
      * fails this call, which the caller ignores — {@link ProcessWorkerLauncher}'s
      * terminate-with-grace-then-kill remains the safety net.
-     * See backend-specs/02_WORKER_CONTRACT_AND_IPC.md.
+     * See openspec/specs/worker-contract/spec.md.
      */
     public Ack shutdown() {
         return stub.shutdown(ShutdownRequest.getDefaultInstance());
@@ -141,7 +150,7 @@ public final class WorkerClient implements AutoCloseable {
     /**
      * Probes a real source's reachability/auth via the worker (client mode). The
      * worker bounds its own connect attempt; the deadline guards against a hung
-     * worker. See backend-specs/05_API_CONTRACT.md §Scan.
+     * worker. See openspec/specs/api-contract/spec.md §Scan.
      */
     public TestConnectionResponse testConnection(TestConnectionRequest request) {
         return stub.withDeadlineAfter(TEST_CONNECTION_TIMEOUT_SECONDS, TimeUnit.SECONDS)
@@ -295,7 +304,7 @@ public final class WorkerClient implements AutoCloseable {
      * IS-047). {@code onEvent} is called per event; {@code onError} on a non-cancel
      * stream failure (a worker that does not implement the stream fails here with
      * {@code UNIMPLEMENTED} — the caller treats that as "no client events", never
-     * fatal). See backend-specs/02_WORKER_CONTRACT_AND_IPC.md.
+     * fatal). See openspec/specs/worker-contract/spec.md.
      */
     public StreamHandle clientEvents(Consumer<ClientEvent> onEvent, Consumer<Throwable> onError) {
         ProtocolDataSourceGrpc.ProtocolDataSourceStub async = ProtocolDataSourceGrpc.newStub(channel);
@@ -339,7 +348,7 @@ public final class WorkerClient implements AutoCloseable {
      * event; {@code onError} on a non-cancel stream failure (a worker that does not
      * implement the stream fails here with {@code UNIMPLEMENTED} — the caller treats
      * that as "no runtime events", never fatal).
-     * See backend-specs/02_WORKER_CONTRACT_AND_IPC.md.
+     * See openspec/specs/worker-contract/spec.md.
      */
     public StreamHandle runtimeEvents(Consumer<RuntimeEvent> onEvent, Consumer<Throwable> onError) {
         ProtocolDataSourceGrpc.ProtocolDataSourceStub async = ProtocolDataSourceGrpc.newStub(channel);

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useNavigate } from "react-router-dom";
 import { resolveAccess } from "../shell/access-policy";
@@ -99,15 +99,68 @@ export async function fetchAllScanNodes(
 }
 
 const UNKNOWN_NODE_ROW_HEIGHT = 68;
-export const UNKNOWN_NODE_TYPE_OPTIONS = ["FLOAT64", "INT32", "BOOL", "STRING"] as const;
+export const UNKNOWN_NODE_TYPE_OPTIONS = [
+  "BOOL", "INT8", "UINT8", "INT16", "UINT16", "INT32", "UINT32", "INT64", "UINT64",
+  "FLOAT32", "FLOAT64", "STRING", "BYTES", "DATETIME", "LOCALIZED_TEXT", "GUID",
+  "STATUS_CODE", "QUALIFIED_NAME", "NODE_ID", "EXPANDED_NODE_ID", "XML_ELEMENT",
+] as const;
+
+export function preservesNativeType(node: DiscoveredNodeResponse): boolean {
+  return node.unknownType && Boolean(node.dataTypeNodeId);
+}
+
+// Memoized so an unrelated wizard re-render (e.g. editing an unresolved-node
+// dropdown, or any other step's state changing) doesn't force this list — and
+// the virtualizer instance backing it — to tear down and redo its layout work
+// when its `nodes` prop hasn't actually changed. The caller already passes a
+// `useMemo`-derived array, so this bails out on reference equality.
+export const PreservedNativeNodesList = memo(function PreservedNativeNodesList({
+  nodes,
+}: {
+  nodes: DiscoveredNodeResponse[];
+}) {
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const virtualizer = useVirtualizer({
+    count: nodes.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => UNKNOWN_NODE_ROW_HEIGHT,
+    overscan: 8,
+  });
+
+  return (
+    <div ref={scrollRef} className="max-h-[28rem] overflow-y-auto" role="list">
+      <div style={{ position: "relative", height: virtualizer.getTotalSize() }}>
+        {virtualizer.getVirtualItems().map((row) => {
+          const node = nodes[row.index];
+          return (
+            <div
+              key={node.nodeId}
+              role="listitem"
+              className="absolute left-0 top-0 w-full pb-2"
+              style={{ transform: `translateY(${row.start}px)` }}
+            >
+              <div className="rounded-md border border-shell-line bg-white px-4 py-3">
+                <p className="truncate text-sm font-medium text-shell-ink">{node.name || node.nodeId}</p>
+                <p className="truncate text-xs text-shell-muted">{node.path || node.nodeId}</p>
+                <p className="mt-1 truncate text-xs text-shell-muted">OPC UA DataType: {node.dataTypeNodeId}</p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+});
 
 /**
  * Renders unknown-typed discovered nodes for type resolution. Virtualized (IS-165
  * removed the backend node-count ceiling, so a scan can surface thousands of
  * unknown-typed nodes) — only rows scrolled into view are ever mounted, so the DOM
- * stays bounded regardless of how many nodes a scan discovers.
+ * stays bounded regardless of how many nodes a scan discovers. Also memoized: the
+ * caller passes stable (`useMemo`/`useCallback`-derived) props, so resolving one
+ * node's type doesn't force this whole list to redo its virtualizer setup.
  */
-export function UnknownNodesList({
+export const UnknownNodesList = memo(function UnknownNodesList({
   nodes,
   typeResolutionsByNodeId,
   onChange,
@@ -171,7 +224,7 @@ export function UnknownNodesList({
       </div>
     </div>
   );
-}
+});
 
 type ScanStepStatus = "idle" | "scanning" | "complete" | "error" | "partial" | "cancelled";
 
@@ -427,7 +480,24 @@ export function scanStepValidationMessage(
   if (scanStatus === "error") return "Scan failed";
   if (scanStatus === "cancelled") return "Scan was stopped";
   if (scanStatus === "idle") return "Scan has not started yet";
-  return null;
+  const unresolved = scanResult?.nodes.filter(
+    (node) => node.unknownType && !preservesNativeType(node),
+  ) ?? [];
+  if (unresolved.length === 0) return null;
+  // A node is "settled" once it has a resolution entry that is either excluded
+  // or has a chosen scalar type. Building this as a single Set (O(n)) replaces
+  // the previous check, which called `typeResolutions.some(...)` once per
+  // unresolved node (O(n*m)) — with real-device scans surfacing thousands of
+  // unknown-typed nodes (IS-165 removed the backend node-count ceiling), and
+  // this function running unmemoized on every wizard render, the quadratic
+  // version scaled badly enough to make the Scan step feel unresponsive.
+  const settledNodeIds = new Set(
+    typeResolutions
+      .filter((resolution) => resolution.exclude || resolution.dataType)
+      .map((resolution) => resolution.nodeId),
+  );
+  const hasUnsettledNode = unresolved.some((node) => !settledNodeIds.has(node.nodeId));
+  return hasUnsettledNode ? "Choose a scalar type or exclude every unresolved node." : null;
 }
 
 function configureValidationMessage(form: WizardFormState, synthetic: SyntheticProfileValue) {
@@ -627,8 +697,12 @@ export function CreateDataSourceWizardPage() {
   // wizard render — a scan can discover thousands of nodes (IS-165), so re-filtering
   // the whole list or re-scanning typeResolutions on unrelated re-renders is wasted
   // work at that scale.
-  const unknownNodes = useMemo(
-    () => (scanResult ? scanResult.nodes.filter((n) => n.unknownType) : []),
+  const preservedNativeNodes = useMemo(
+    () => (scanResult ? scanResult.nodes.filter(preservesNativeType) : []),
+    [scanResult],
+  );
+  const unresolvedNodes = useMemo(
+    () => (scanResult ? scanResult.nodes.filter((node) => node.unknownType && !preservesNativeType(node)) : []),
     [scanResult],
   );
   const typeResolutionsByNodeId = useMemo(
@@ -758,8 +832,9 @@ export function CreateDataSourceWizardPage() {
               truncated: result.truncated,
               nodes,
             });
-            // Pre-populate typeResolutions for unknown nodes
-            const unknownNodes = nodes.filter((n) => n.unknownType);
+            // Native nodes with an original DataType NodeId are retained unchanged.
+            // Only genuinely unresolved nodes need an explicit scalar mapping.
+            const unknownNodes = nodes.filter((node) => node.unknownType && !preservesNativeType(node));
             setTypeResolutions(
               unknownNodes.map((n) => ({
                 nodeId: n.nodeId,
@@ -1462,11 +1537,14 @@ export function CreateDataSourceWizardPage() {
     );
   }
 
-  function handleTypeResolutionChange(nodeId: string, patch: Partial<TypeResolutionEntry>) {
+  // useCallback keeps this a stable reference across renders — UnknownNodesList
+  // is memoized, and passing a freshly-created function here on every render
+  // would defeat that memoization for every row's onChange handler.
+  const handleTypeResolutionChange = useCallback((nodeId: string, patch: Partial<TypeResolutionEntry>) => {
     setTypeResolutions((prev) =>
       prev.map((entry) => (entry.nodeId === nodeId ? { ...entry, ...patch } : entry)),
     );
-  }
+  }, []);
 
   function handleBulkTypeResolutionChange(patch: Partial<TypeResolutionEntry>) {
     setTypeResolutions((prev) => prev.map((entry) => ({ ...entry, ...patch })));
@@ -1589,9 +1667,9 @@ export function CreateDataSourceWizardPage() {
           <p className="text-sm font-medium text-shell-ink">
             Discovered {scanResult.discoveredCount} nodes
           </p>
-          {scanResult.unknownCount > 0 ? (
+          {preservedNativeNodes.length > 0 ? (
             <p className="mt-1 text-sm text-shell-muted">
-              {scanResult.unknownCount} native OPC UA type declarations preserved
+              {preservedNativeNodes.length} native OPC UA type declaration{preservedNativeNodes.length === 1 ? "" : "s"} will be preserved unchanged
             </p>
           ) : null}
           {scanStatus === "partial" ? (
@@ -1607,16 +1685,28 @@ export function CreateDataSourceWizardPage() {
           </section>
         ) : null}
 
-        {unknownNodes.length > 0 ? (
+        {preservedNativeNodes.length > 0 ? (
           <div className="space-y-3">
             <p className="text-sm font-medium text-shell-ink">
-              Native OPC UA types (optional mapping)
+              Native OPC UA types preserved
             </p>
             <p className="text-sm text-shell-muted">
-              The server declared these types outside the neutral scalar set. Their original OPC UA DataType NodeId is saved unchanged; optionally map a node to a scalar only when that is intentional, or exclude it.
+              Their original OPC UA DataType NodeId and declaration will be saved with the schema. No scalar mapping will be applied.
+            </p>
+            <PreservedNativeNodesList nodes={preservedNativeNodes} />
+          </div>
+        ) : null}
+
+        {unresolvedNodes.length > 0 ? (
+          <div className="space-y-3">
+            <p className="text-sm font-medium text-shell-ink">
+              Unresolved OPC UA types
+            </p>
+            <p className="text-sm text-shell-muted">
+              The server did not provide an original DataType NodeId for these nodes. Choose a neutral scalar type or exclude the node.
             </p>
             <div className="flex flex-wrap items-center gap-3 rounded-md border border-shell-line bg-shell-line/10 px-4 py-3">
-              <span className="text-sm text-shell-muted">Set all to</span>
+              <span className="text-sm text-shell-muted">Set all unresolved nodes to</span>
               <select
                 aria-label="Apply to all unknown nodes"
                 className="shell-field w-40 shrink-0"
@@ -1640,7 +1730,7 @@ export function CreateDataSourceWizardPage() {
               </select>
             </div>
             <UnknownNodesList
-              nodes={unknownNodes}
+              nodes={unresolvedNodes}
               typeResolutionsByNodeId={typeResolutionsByNodeId}
               onChange={handleTypeResolutionChange}
             />

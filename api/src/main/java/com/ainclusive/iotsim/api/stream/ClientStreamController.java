@@ -19,7 +19,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
  * Live client connect/disconnect stream for a data source (SSE, IS-052). On connect
  * the client gets a {@code clients-snapshot} (the clients currently connected) and
  * then {@code CONNECTED}/{@code DISCONNECTED} deltas. {@code Last-Event-ID} is
- * intentionally ignored — the snapshot is the resync. See backend-specs/05_API_CONTRACT.md.
+ * intentionally ignored — the snapshot is the resync. See openspec/specs/api-contract/spec.md.
  *
  * <p>Authorization (IS-077): read-only SSE — {@link Permission#OBSERVE} (user + admin).
  */

@@ -15,7 +15,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-/** Evidence record lifecycle against real Postgres (backend-specs/04, IS-050). */
+/** Evidence record lifecycle against real Postgres (openspec/specs/db-schema/spec.md, IS-050). */
 @Testcontainers(disabledWithoutDocker = true)
 class EvidenceRepositoryIT {
 

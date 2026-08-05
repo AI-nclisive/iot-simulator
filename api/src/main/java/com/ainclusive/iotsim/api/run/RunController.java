@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.util.UriComponentsBuilder;
 
-/** Unified runs resource + test-control for automation (backend-specs/05, IS-089). */
+/** Unified runs resource + test-control for automation (openspec/specs/api-contract/spec.md, IS-089). */
 @RestController
 @Tag(name = "Runs")
 @RequestMapping("/api/v1/projects/{projectId}/runs")

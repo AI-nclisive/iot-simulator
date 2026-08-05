@@ -4,6 +4,7 @@ import com.ainclusive.iotsim.domain.activityevent.ActivityEventService;
 import com.ainclusive.iotsim.domain.common.JsonField;
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
 import com.ainclusive.iotsim.domain.common.RetentionDependencyException;
+import com.ainclusive.iotsim.domain.common.SchemaNodeValidationUtil;
 import com.ainclusive.iotsim.domain.support.Page;
 import com.ainclusive.iotsim.domain.support.PageCursor;
 import com.ainclusive.iotsim.persistence.datasource.DataSourceRepository;
@@ -26,6 +27,7 @@ import com.ainclusive.iotsim.platform.capture.CaptureException;
 import com.ainclusive.iotsim.platform.capture.CaptureSession;
 import com.ainclusive.iotsim.platform.capture.CaptureSpec;
 import com.ainclusive.iotsim.platform.capture.SourceCapturer;
+import com.ainclusive.iotsim.platform.runtime.LiveValueListener;
 import com.ainclusive.iotsim.platform.secret.CredentialStore;
 import com.ainclusive.iotsim.protocolmodel.NeutralValue;
 import com.ainclusive.iotsim.protocolmodel.NodeKind;
@@ -48,7 +50,7 @@ import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
-/** Recording lifecycle: create, capture values, finalize (backend-specs/03). */
+/** Recording lifecycle: create, capture values, finalize (openspec/specs/domain-model/spec.md). */
 @Service
 public class RecordingService {
 
@@ -67,6 +69,7 @@ public class RecordingService {
     private final RunRepository runs;
     private final EvidenceRepository evidence;
     private final ObjectMapper json;
+    private final LiveValueListener valueListener;
 
     // Live captures in progress, keyed by data-source id (one capture per source).
     private final Map<String, ActiveCapture> active = new ConcurrentHashMap<>();
@@ -75,7 +78,7 @@ public class RecordingService {
             DataSourceRepository dataSources, SchemaRepository schemas, CredentialStore credentials,
             SourceCapturer capturer, ProjectRepository projects, ActivityEventService activity,
             ScenarioRepository scenarios, RunRepository runs, EvidenceRepository evidence,
-            ObjectMapper json) {
+            ObjectMapper json, LiveValueListener valueListener) {
         this.recordings = recordings;
         this.timeline = timeline;
         this.dataSources = dataSources;
@@ -88,6 +91,7 @@ public class RecordingService {
         this.runs = runs;
         this.evidence = evidence;
         this.json = json;
+        this.valueListener = valueListener;
     }
 
     @Transactional
@@ -147,6 +151,7 @@ public class RecordingService {
         if (!hasVariables) {
             throw new IllegalArgumentException("schema has no variables to capture");
         }
+        SchemaNodeValidationUtil.validateTypes(schema.nodes());
         // computeIfAbsent serializes concurrent starts for the same source: only the
         // first creates the recording and opens the session; a second start sees the
         // existing mapping and is rejected below. If the session fails to open, the
@@ -162,8 +167,20 @@ public class RecordingService {
                     schemaNodesJson));
             CaptureSpec spec = new CaptureSpec(source.protocol(), source.realDeviceEndpoint(),
                     credentials.find(dsId).orElse(null), schema.version(), schema.nodes());
-            CaptureSession session = capturer.startCapture(
-                    spec, values -> timeline.append(recording.id(), values));
+            CaptureSession session = capturer.startCapture(spec, values -> {
+                timeline.append(recording.id(), values);
+                // Tee into the same live-value listener applyValues() feeds for a running
+                // (synthetic) source, so a real-device recording's captured values also
+                // reach the data source's live SSE stream (`stream/values`) the frontend
+                // reads while recording — without this, the recording page shows 0
+                // captured values / "waiting for the first value" forever even though the
+                // values are being persisted (#704).
+                try {
+                    valueListener.onValues(dsId, values, Instant.now());
+                } catch (RuntimeException e) {
+                    // Best-effort live observation must never break capture persistence.
+                }
+            });
             return new ActiveCapture(recording.id(), session);
         });
         if (!started[0]) {

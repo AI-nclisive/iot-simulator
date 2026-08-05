@@ -17,6 +17,7 @@ import org.eclipse.milo.opcua.sdk.server.OpcUaServer;
 import org.eclipse.milo.opcua.sdk.server.items.DataItem;
 import org.eclipse.milo.opcua.sdk.server.items.MonitoredItem;
 import org.eclipse.milo.opcua.sdk.server.nodes.UaDataTypeNode;
+import org.eclipse.milo.opcua.sdk.server.nodes.UaMethodNode;
 import org.eclipse.milo.opcua.sdk.server.nodes.UaObjectNode;
 import org.eclipse.milo.opcua.sdk.server.nodes.UaVariableNode;
 import org.eclipse.milo.opcua.sdk.server.util.SubscriptionModel;
@@ -40,7 +41,7 @@ import org.eclipse.milo.opcua.stack.core.types.structured.StructureField;
 /**
  * Builds the OPC UA address space from the protocol-neutral schema: each VARIABLE
  * becomes a {@link UaVariableNode} under the Objects folder, and ApplyValues
- * updates node values. See backend-specs/01 §5 and 02.
+ * updates node values. See openspec/specs/protocol-model/spec.md §5 and 02.
  */
 final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
 
@@ -146,6 +147,11 @@ final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
                     .setDataType(declaredDataType(def))
                     .setTypeDefinition(Identifiers.BaseDataVariableType)
                     .build();
+            if ("ARRAY".equals(def.valueRank())) {
+                node.setValueRank(def.arrayDimensions().size());
+                node.setArrayDimensions(def.arrayDimensions().stream()
+                        .map(dimension -> uint(Integer.toUnsignedLong(dimension))).toArray(UInteger[]::new));
+            }
             if (!isStandardOpcUaDataType(def.dataTypeNodeId()) && def.dataType() != null && !def.dataType().isBlank()) {
                 node.setValue(new DataValue(new Variant(OpcUaTypes.defaultValue(def.dataType()))));
             }
@@ -155,6 +161,29 @@ final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
             var referenceType = def.referenceType() == null ? Identifiers.Organizes : referenceTypeId(def.referenceType());
             node.addReference(new Reference(node.getNodeId(), referenceType, parent.expanded(), false));
             nodes.put(def.nodeId(), node);
+        }
+        for (VarDef def : variables) {
+            if (!"METHOD".equals(def.kind())) {
+                continue;
+            }
+            boolean parentIsFolder = def.parentId() == null || hierarchy.containsKey(def.parentId());
+            boolean parentIsVariable = !parentIsFolder && nodes.containsKey(def.parentId());
+            if (!parentIsFolder && !parentIsVariable) {
+                throw new IllegalArgumentException("Method has a missing or unsupported parent: " + def.nodeId());
+            }
+            var nodeId = newNodeId(def.nodeId());
+            UaMethodNode method = new UaMethodNode(
+                    getNodeContext(), nodeId, newQualifiedName(def.name()), LocalizedText.english(def.name()),
+                    LocalizedText.english(def.name()),
+                    null, null, true, true);
+            // A scanned/manual schema describes the presence of a method but does not define
+            // executable business logic. Expose it truthfully and make invocation fail with
+            // the OPC UA standard Bad_NotImplemented response instead of silently omitting it.
+            method.setInvocationHandler(org.eclipse.milo.opcua.sdk.server.methods.MethodInvocationHandler.NOT_IMPLEMENTED);
+            getNodeManager().addNode(method);
+            var parent = def.parentId() == null ? Identifiers.ObjectsFolder
+                    : parentIsFolder ? hierarchy.get(def.parentId()) : nodes.get(def.parentId()).getNodeId();
+            method.addReference(new Reference(nodeId, Identifiers.HasComponent, parent.expanded(), false));
         }
     }
 
@@ -377,7 +406,9 @@ final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
     }
 
     private static boolean isStandardOpcUaDataType(String nodeId) {
-        return nodeId != null && nodeId.startsWith("ns=0;");
+        // Milo's NodeId.toParseableString() omits "ns=0;" for namespace 0 (e.g. "i=28"), so a
+        // preserved standard-catalog NodeId (see Identifiers) may arrive in either form.
+        return nodeId != null && (nodeId.startsWith("ns=0;") || nodeId.matches("i=\\d+"));
     }
 
     /** IS-189: Resolves a reference type name to its OPC UA NodeId. */

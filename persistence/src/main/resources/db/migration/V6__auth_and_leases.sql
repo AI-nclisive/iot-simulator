@@ -1,6 +1,6 @@
 -- Shared-mode auth (flexible permission model, D2) and advisory edit leases.
 -- Local trusted mode does not require these to be populated.
--- See backend-specs/08_AUTH_AND_MODES.md.
+-- See openspec/specs/auth-modes/spec.md.
 
 create table users (
     id           varchar primary key,

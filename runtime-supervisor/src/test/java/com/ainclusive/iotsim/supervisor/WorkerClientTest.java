@@ -23,6 +23,7 @@ import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -53,7 +54,7 @@ class WorkerClientTest {
     void helloSucceedsForCompatibleMajorVersion() throws Exception {
         int port = startServer("1.4.2");
         try (WorkerClient client = new WorkerClient("127.0.0.1", port)) {
-            HelloResponse hello = client.hello();
+            HelloResponse hello = client.hello(Duration.ofSeconds(5));
             assertThat(hello.getProtocol()).isEqualTo("TEST");
         }
     }
@@ -75,7 +76,8 @@ class WorkerClientTest {
     void mismatchedMajorVersionIsRefused() throws Exception {
         int port = startServer("2.0.0");
         try (WorkerClient client = new WorkerClient("127.0.0.1", port)) {
-            assertThatThrownBy(client::hello).isInstanceOf(WorkerContractMismatchException.class);
+            assertThatThrownBy(() -> client.hello(Duration.ofSeconds(5)))
+                    .isInstanceOf(WorkerContractMismatchException.class);
         }
     }
 

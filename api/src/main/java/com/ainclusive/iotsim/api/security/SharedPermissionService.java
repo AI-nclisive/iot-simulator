@@ -15,7 +15,7 @@ import org.springframework.stereotype.Service;
  * chain — full OIDC/role-claim mapping lands in IS-075/IS-076). Roles are matched by
  * the {@code ROLE_} prefix convention.
  *
- * <p>Baseline role→permission mapping (backend-specs/08_AUTH_AND_MODES.md §Authorization):
+ * <p>Baseline role→permission mapping (openspec/specs/auth-modes/spec.md §Authorization):
  * <ul>
  *   <li>{@code admin}: all permissions.
  *   <li>{@code user}: observe + runtime-operate (start/stop), but no edits,

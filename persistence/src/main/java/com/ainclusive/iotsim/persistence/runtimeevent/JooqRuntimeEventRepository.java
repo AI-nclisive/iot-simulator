@@ -14,7 +14,7 @@ import org.jooq.JSONB;
 import org.jooq.impl.DSL;
 import org.springframework.stereotype.Repository;
 
-/** jOOQ-backed, append-only {@link RuntimeEventRepository} (backend-specs/04). */
+/** jOOQ-backed, append-only {@link RuntimeEventRepository} (openspec/specs/db-schema/spec.md). */
 @Repository
 public class JooqRuntimeEventRepository implements RuntimeEventRepository {
 

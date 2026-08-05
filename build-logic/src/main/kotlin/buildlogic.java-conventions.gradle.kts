@@ -5,7 +5,7 @@ import org.gradle.api.tasks.testing.Test
 import org.gradle.testing.jacoco.tasks.JacocoReport
 
 // Shared Java conventions for every backend module.
-// Toolchain = Java 25 LTS (backend-specs/07_MODULE_STRUCTURE.md).
+// Toolchain = Java 25 LTS (openspec/specs/module-structure/spec.md).
 plugins {
     `java-library`
     checkstyle

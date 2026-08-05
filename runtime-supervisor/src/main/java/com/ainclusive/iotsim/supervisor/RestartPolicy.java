@@ -11,7 +11,7 @@ import java.time.Duration;
  * {@code maxRestarts} attempts. Intentional stops are never restarted, so the cap
  * only bounds recovery from genuine failures.
  *
- * <p>See backend-specs/02_WORKER_CONTRACT_AND_IPC.md §4.
+ * <p>See openspec/specs/worker-contract/spec.md §4.
  */
 public record RestartPolicy(
         Duration initialBackoff, double multiplier, Duration maxBackoff, int maxRestarts) {

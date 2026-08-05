@@ -10,14 +10,16 @@
  * `UnknownNodesList`/`fetchAllScanNodes` instead of duplicating them.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch, ApiError } from "../api";
 import { useDataSourcesStore } from "../shell/data-sources-store";
 import { useNotificationStore } from "../shell/notification-store";
 import type { DataSourceRow } from "../shell/data-sources-store";
 import {
   UnknownNodesList,
+  PreservedNativeNodesList,
   fetchAllScanNodes,
+  preservesNativeType,
   type DiscoveredNodeResponse,
   type TypeResolutionEntry,
 } from "./create-data-source-wizard-page";
@@ -109,7 +111,7 @@ export function DataSourceRescanPanel({
             setErrorMessage("Failed to load discovered nodes");
             return;
           }
-          const unknown = fetched.filter((n) => n.unknownType);
+          const unknown = fetched.filter((node) => node.unknownType && !preservesNativeType(node));
           setNodes(fetched);
           setSummary({ discoveredCount: result.discoveredCount, unknownCount: result.unknownCount });
           setTypeResolutions(
@@ -167,6 +169,11 @@ export function DataSourceRescanPanel({
 
   const unresolvedCount = typeResolutions.filter((r) => !r.exclude && !r.dataType).length;
   const canApply = status === "resolving" && unresolvedCount === 0;
+  const preservedNativeNodes = useMemo(() => nodes.filter(preservesNativeType), [nodes]);
+  const unresolvedNodes = useMemo(
+    () => nodes.filter((node) => node.unknownType && !preservesNativeType(node)),
+    [nodes],
+  );
 
   async function apply() {
     if (!jobId || !canApply) return;
@@ -209,13 +216,14 @@ export function DataSourceRescanPanel({
         <div className="space-y-3">
           <p className="text-sm text-shell-muted">
             {summary.discoveredCount} node{summary.discoveredCount === 1 ? "" : "s"} discovered
-            {summary.unknownCount > 0
-              ? ` — ${summary.unknownCount} native OPC UA type declaration${summary.unknownCount === 1 ? " is" : "s are"} preserved below.`
+            {preservedNativeNodes.length > 0
+              ? ` — ${preservedNativeNodes.length} native OPC UA type declaration${preservedNativeNodes.length === 1 ? " is" : "s are"} preserved unchanged.`
               : "."}
           </p>
-          {summary.unknownCount > 0 ? (
+          {preservedNativeNodes.length > 0 ? <PreservedNativeNodesList nodes={preservedNativeNodes} /> : null}
+          {unresolvedNodes.length > 0 ? (
             <UnknownNodesList
-              nodes={nodes.filter((n) => n.unknownType)}
+              nodes={unresolvedNodes}
               typeResolutionsByNodeId={new Map(typeResolutions.map((r) => [r.nodeId, r]))}
               onChange={(nodeId, patch) =>
                 setTypeResolutions((prev) =>

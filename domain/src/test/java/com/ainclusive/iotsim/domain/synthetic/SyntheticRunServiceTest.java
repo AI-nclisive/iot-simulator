@@ -139,6 +139,17 @@ class SyntheticRunServiceTest {
     }
 
     @Test
+    void rejectsASchemaReferencingAnOpaqueNativeTypeWithoutOpeningARun() {
+        SyntheticRunService service = new SyntheticRunService(
+                new FakeDataSources("SYNTHETIC", json.writeValueAsString(config(1L))),
+                new SchemasWithOpaqueType(), runtime, runs, evidence, events, runValueTimeline, json, FIXED);
+
+        assertThatThrownBy(() -> service.run(PROJECT, SOURCE, 1000))
+                .isInstanceOf(com.ainclusive.iotsim.domain.common.UnsupportedTypesException.class);
+        assertThat(runs.byId).isEmpty();
+    }
+
+    @Test
     void missingSourceThrowsNotFound() {
         SyntheticRunService service = new SyntheticRunService(new FakeDataSources("SYNTHETIC", "{}"),
                 new EmptySchemas(), runtime, runs, evidence, events, runValueTimeline, json, FIXED);
@@ -278,6 +289,27 @@ class SyntheticRunServiceTest {
     private record EmptySchemas() implements SchemaRepository {
         public Optional<SchemaWithNodes> findCurrent(String dataSourceId) {
             return Optional.empty();
+        }
+
+        public SchemaWithNodes saveNewVersion(String dataSourceId, List<SchemaNode> nodes) {
+            throw new UnsupportedOperationException();
+        }
+    }
+
+    /** A schema repository fake whose current schema references an opaque native type (IS-199). */
+    private record SchemasWithOpaqueType() implements SchemaRepository {
+        public Optional<SchemaWithNodes> findCurrent(String dataSourceId) {
+            com.ainclusive.iotsim.protocolmodel.NodeKind kind = com.ainclusive.iotsim.protocolmodel.NodeKind.DATA_TYPE;
+            SchemaNode opaque = new SchemaNode("dtOpaque", null, "dtOpaque", "VendorBlob", kind,
+                    null, null, null, null, null, List.of(), null, List.of(), null, List.of(),
+                    null, null, null, null, null);
+            SchemaNode blob = new SchemaNode("v1", null, "v1", "Blob",
+                    com.ainclusive.iotsim.protocolmodel.NodeKind.VARIABLE,
+                    null, com.ainclusive.iotsim.protocolmodel.ValueRank.SCALAR,
+                    com.ainclusive.iotsim.protocolmodel.Access.READ, null, null, List.of(), null, List.of(),
+                    "dtOpaque", List.of(), null, null, null, null);
+            return Optional.of(new SchemaWithNodes("s1", dataSourceId, 0,
+                    OffsetDateTime.now(ZoneOffset.UTC), List.of(opaque, blob)));
         }
 
         public SchemaWithNodes saveNewVersion(String dataSourceId, List<SchemaNode> nodes) {

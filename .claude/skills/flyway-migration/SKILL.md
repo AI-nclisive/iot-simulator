@@ -11,7 +11,10 @@ description: >-
 
 Owning rules: `CONTRIBUTING.md` → "Parallel-work conventions" (IS-109). Migrations
 are **append-only** and live in `persistence/src/main/resources/db/migration`
-(current latest: `V6__auth_and_leases.sql`).
+(check `ls persistence/src/main/resources/db/migration` for the current latest —
+don't hardcode a version here, it always drifts).
+The table/column shape those migrations produce is documented in
+`openspec/specs/db-schema/spec.md`.
 
 **Input:** a short snake_case description from the argument (e.g.
 `add_scenario_tags`). If none, ask.
@@ -58,3 +61,7 @@ Generated jOOQ code stays under `build/` and is **never committed** (`CONTRIBUTI
 `./gradlew build` green (ITs run the migration against Testcontainers Postgres) before
 finishing ([[always-compile-and-test]]). If Docker is unavailable locally the ITs skip
 — say so explicitly; CI always runs them.
+
+If the new table/column is externally observable behavior (not purely internal),
+add a delta to `openspec/specs/db-schema/spec.md` in this task's openspec change
+so the spec stays in sync with the migration.

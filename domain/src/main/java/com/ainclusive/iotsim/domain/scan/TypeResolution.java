@@ -2,9 +2,9 @@ package com.ainclusive.iotsim.domain.scan;
 
 /**
  * A user's optional decision for one discovered node whose data type a scan could not map
- * to the neutral set ("unknown type" — backend-specs/01 §2). IS-191: unknown-typed variables
- * are kept by their original native DataType declaration if left unresolved
- * (zero-information-loss fidelity).
+ * to the neutral set ("unknown type" — openspec/specs/protocol-model/spec.md). IS-191:
+ * unknown-typed variables are kept by their original native DataType declaration if left
+ * unresolved (zero-information-loss fidelity).
  * Optionally: assign a neutral {@code dataType} (the node is kept as a VARIABLE) or
  * {@code exclude} it (the node is dropped).
  *

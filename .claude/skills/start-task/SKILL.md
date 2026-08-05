@@ -21,11 +21,25 @@ Repo: `AI-nclisive/iot-simulator`. Board: org Project **#1** "IoT Simulator".
 
 ## 0. Resolve the task
 
-- Catalog line: `IS-*` → `backend-specs/TASKS.md`; `UI-*` → `frontend/docs/UI_TASKS.md`.
 - Find the issue (titled `IS-XXX name` / `UI-XXX name`):
   ```bash
   gh issue list --search "IS-038 in:title" --state all --json number,title,state -L 5
   ```
+- No issue yet ("new" task)? File one first (Task issue form,
+  `.github/ISSUE_TEMPLATE/task.yml`), then add it to the board via
+  `/board-sync`.
+- Ensure the task's openspec change exists: `npx openspec list` (or
+  `npx openspec change show is-038-<slug>` if you know the slug already). If it
+  doesn't exist yet, create it with the `IS-XXX`/`UI-XXX` id as the folder-name
+  prefix (keeps the change linkable to this issue/board item):
+  ```bash
+  /opsx:propose is-038-<short-slug>
+  ```
+  Work through `/opsx:propose` until proposal + specs (or an explicit
+  `skip_specs: true` for a pure refactor/tooling task) + design + tasks are
+  ready — see [[always-compile-and-test]] for when to stop planning and start
+  coding. This change folder is what `/open-pr` archives later (replaces the
+  old catalog-checkbox flip).
 
 ## 1. Verify it is FREE (in this order — on conflict the board wins)
 
@@ -38,7 +52,8 @@ Stop and report if any check fails; do not claim a taken task.
    ```
 3. **Issue is open and unclaimed.**
 
-The catalog checkbox alone is NOT proof of freedom — it can lag the board.
+An existing (non-archived) `openspec/changes/` folder for the id is NOT proof
+of freedom on its own either — check the board and open PRs above first.
 
 ## 2. Claim it — flip board Status → In Progress AND assign yourself (FIRST, before any code)
 

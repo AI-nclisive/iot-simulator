@@ -9,7 +9,7 @@ import java.util.Set;
 /**
  * Binds a {@link SyntheticPattern} to one schema variable node: which node, of what
  * {@link DataType}, driven by which pattern, sampled every {@code updateRateMs}
- * (per {@code backend-specs/06_ARTIFACT_FORMATS.md} "Synthetic generation model").
+ * (per {@code openspec/specs/artifact-formats/spec.md} "Synthetic generation model").
  *
  * <p>{@code BYTES} and the identifier/structural types
  * ({@code STATUS_CODE}, {@code QUALIFIED_NAME}, {@code NODE_ID},
@@ -23,12 +23,21 @@ import java.util.Set;
  * are exceptions: a clock and per-sample correlation ID naturally vary, so they
  * support their dedicated random patterns.
  *
- * @param nodeId       target variable node id
- * @param dataType     the node's neutral type; generated values are coerced to it
- * @param pattern      the signal shape
- * @param updateRateMs sample interval in milliseconds (&gt; 0)
+ * <p>IS-200: Native types (STRUCTURE, ENUM, UNION, OPTION_SET) referenced by {@code dataTypeNodeId}
+ * support only CONSTANT patterns with structured values (not dynamic generation).
+ *
+ * @param nodeId           target variable node id
+ * @param dataType         the node's neutral type; generated values are coerced to it (null for native types)
+ * @param pattern          the signal shape
+ * @param updateRateMs     sample interval in milliseconds (&gt; 0)
+ * @param dataTypeNodeId   reference to a native type (null for primitive types) — IS-200
  */
-public record SyntheticVariable(String nodeId, DataType dataType, SyntheticPattern pattern, long updateRateMs) {
+public record SyntheticVariable(
+        String nodeId, DataType dataType, SyntheticPattern pattern, long updateRateMs, String dataTypeNodeId) {
+
+    public SyntheticVariable(String nodeId, DataType dataType, SyntheticPattern pattern, long updateRateMs) {
+        this(nodeId, dataType, pattern, updateRateMs, null);
+    }
 
     private static final Set<DataType> CONSTANT_ONLY = EnumSet.of(
             DataType.BYTES, DataType.STATUS_CODE,
@@ -36,22 +45,34 @@ public record SyntheticVariable(String nodeId, DataType dataType, SyntheticPatte
 
     public SyntheticVariable {
         Objects.requireNonNull(nodeId, "nodeId");
-        Objects.requireNonNull(dataType, "dataType");
         Objects.requireNonNull(pattern, "pattern");
         if (updateRateMs <= 0) {
             throw new IllegalArgumentException("updateRateMs must be > 0: " + updateRateMs);
         }
-        if (CONSTANT_ONLY.contains(dataType) && !(pattern instanceof SyntheticPattern.Constant)) {
-            throw new IllegalArgumentException(
-                    "synthetic generation only supports a constant value for " + dataType + " (v1)");
-        }
-        if (dataType == DataType.DATETIME
-                && !(pattern instanceof SyntheticPattern.Constant || pattern instanceof SyntheticPattern.RandomUniform)) {
-            throw new IllegalArgumentException("synthetic generation only supports constant or random values for DATETIME");
-        }
-        if (dataType == DataType.GUID
-                && !(pattern instanceof SyntheticPattern.Constant || pattern instanceof SyntheticPattern.RandomUuid)) {
-            throw new IllegalArgumentException("synthetic generation only supports constant or random UUID values for GUID");
+        // IS-200: native types (dataTypeNodeId set) only support CONSTANT patterns
+        if (dataTypeNodeId != null) {
+            if (dataType != null) {
+                throw new IllegalArgumentException("dataType must be null when dataTypeNodeId is set");
+            }
+            if (!(pattern instanceof SyntheticPattern.Constant)) {
+                throw new IllegalArgumentException(
+                        "synthetic generation for native types only supports CONSTANT patterns");
+            }
+        } else {
+            // Primitive types validation
+            Objects.requireNonNull(dataType, "dataType");
+            if (CONSTANT_ONLY.contains(dataType) && !(pattern instanceof SyntheticPattern.Constant)) {
+                throw new IllegalArgumentException(
+                        "synthetic generation only supports a constant value for " + dataType + " (v1)");
+            }
+            if (dataType == DataType.DATETIME
+                    && !(pattern instanceof SyntheticPattern.Constant || pattern instanceof SyntheticPattern.RandomUniform)) {
+                throw new IllegalArgumentException("synthetic generation only supports constant or random values for DATETIME");
+            }
+            if (dataType == DataType.GUID
+                    && !(pattern instanceof SyntheticPattern.Constant || pattern instanceof SyntheticPattern.RandomUuid)) {
+                throw new IllegalArgumentException("synthetic generation only supports constant or random UUID values for GUID");
+            }
         }
     }
 

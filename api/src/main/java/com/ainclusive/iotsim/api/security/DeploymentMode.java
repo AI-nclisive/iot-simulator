@@ -3,7 +3,7 @@ package com.ainclusive.iotsim.api.security;
 /**
  * Deployment mode — one build serves both. Selected by configuration
  * ({@code iotsim.mode} / {@code IOTSIM_MODE}), never by a separate build.
- * See backend-specs/08_AUTH_AND_MODES.md.
+ * See openspec/specs/auth-modes/spec.md.
  */
 public enum DeploymentMode {
 

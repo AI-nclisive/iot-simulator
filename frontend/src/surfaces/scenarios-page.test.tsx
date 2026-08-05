@@ -13,7 +13,7 @@
  * - Empty/no-results states
  */
 
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -89,6 +89,13 @@ function setRole(opts: { accessMode?: "local" | "shared"; sharedRole?: "admin" |
   );
 }
 
+// The page's mount effect always calls loadScenarios (see #693 fix below), so
+// the fixture-based tests below stub it out to avoid clobbering the seeded
+// `testScenarios` with a real (mocked) API round-trip. The dedicated
+// regression tests further down restore the real action to exercise the
+// actual fetch-once/loading/empty-state behavior.
+const realLoadScenarios = useScenariosStore.getState().loadScenarios;
+
 beforeEach(() => {
   useScenariosStore.setState({
     scenarios: testScenarios.map((s) => ({ ...s })),
@@ -96,6 +103,7 @@ beforeEach(() => {
     versions: {},
     isLoading: false,
     error: null,
+    loadScenarios: vi.fn().mockResolvedValue(undefined),
   });
   mockNotifyPush.mockClear();
   setRole();
@@ -225,5 +233,70 @@ describe("ScenariosPage", () => {
     renderPage();
     await user.type(screen.getByPlaceholderText("Search scenarios"), "zzz-no-match");
     expect(screen.getByText("No matching scenarios.")).toBeTruthy();
+  });
+
+  describe("loading (regression #693 — runaway refetch loop)", () => {
+    beforeEach(() => {
+      // Exercise the real loadScenarios action against a freshly-empty store,
+      // starting from the same "not yet loaded" shape the app boots with.
+      useScenariosStore.setState({
+        scenarios: [],
+        steps: {},
+        versions: {},
+        isLoading: false,
+        error: null,
+        loadScenarios: realLoadScenarios,
+      });
+    });
+
+    it("fetches the scenarios list exactly once and resolves to the empty state", async () => {
+      vi.mocked(apiFetch).mockClear();
+      vi.mocked(apiFetch).mockResolvedValue({ items: [], nextCursor: null, limit: 50 });
+
+      renderPage();
+
+      expect(screen.getByText("Loading scenarios…")).toBeTruthy();
+
+      await waitFor(() => {
+        expect(screen.getByText("No scenarios yet.")).toBeTruthy();
+      });
+
+      // Give any runaway effect a chance to re-fire before asserting the
+      // count — the #693 bug re-triggered the fetch as soon as loading
+      // flipped back to false, even though the result was a valid empty page.
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      expect(apiFetch).toHaveBeenCalledTimes(1);
+      expect(useScenariosStore.getState().isLoading).toBe(false);
+      expect(useScenariosStore.getState().scenarios).toEqual([]);
+    });
+
+    it("fetches the scenarios list exactly once when the project has data", async () => {
+      const apiRow = {
+        id: "scn-01",
+        projectId: "proj-1",
+        name: "Morning ramp-up",
+        status: "VALID" as const,
+        deterministicSettings: null,
+        steps: [],
+        createdAt: "2026-06-29T07:00:00Z",
+        updatedAt: "2026-06-29T07:14:00Z",
+        createdBy: "Olena Ohii",
+        version: 1,
+      };
+      vi.mocked(apiFetch).mockClear();
+      vi.mocked(apiFetch).mockResolvedValue({ items: [apiRow], nextCursor: null, limit: 50 });
+
+      renderPage();
+
+      await waitFor(() => {
+        expect(screen.getByText("Morning ramp-up")).toBeTruthy();
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      expect(apiFetch).toHaveBeenCalledTimes(1);
+      expect(useScenariosStore.getState().isLoading).toBe(false);
+    });
   });
 });

@@ -34,7 +34,7 @@ import org.eclipse.milo.opcua.stack.transport.server.tcp.OpcTcpServerTransportCo
  * (Anonymous and/or UserName/password) come from the {@link AuthConfig} — an
  * empty config keeps the historical None/Anonymous behaviour (IS-131). Transport
  * message security (Sign/Encrypt) is a later phase (IS-132).
- * See backend-specs/02_WORKER_CONTRACT_AND_IPC.md.
+ * See openspec/specs/worker-contract/spec.md.
  */
 final class OpcUaServerRuntime {
 

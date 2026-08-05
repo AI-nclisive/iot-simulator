@@ -75,6 +75,11 @@ const unknownNode: DiscoveredNodeResponse = {
   unknownType: true,
 };
 
+const preservedNativeNode: DiscoveredNodeResponse = {
+  ...unknownNode,
+  dataTypeNodeId: "ns=2;i=884",
+};
+
 function makeNodesPage(nodes: DiscoveredNodeResponse[]) {
   return Promise.resolve({ items: nodes, nextCursor: null, limit: 200 });
 }
@@ -163,5 +168,27 @@ describe("DataSourceRescanPanel", () => {
     expect((screen.getByRole("button", { name: /^Apply rescan$/i }) as HTMLButtonElement).disabled).toBe(
       false,
     );
+  });
+
+  it("preserves a native type with its original NodeId without scalar mapping", async () => {
+    mockApiFetch
+      .mockImplementationOnce(() => Promise.resolve({ jobId: "job-3", status: "RUNNING" }))
+      .mockImplementationOnce(() => Promise.resolve({
+        jobId: "job-3", status: "OK", discoveredSoFar: 1, discoveredCount: 1, unknownCount: 1, message: null,
+      }))
+      .mockImplementationOnce(() => makeNodesPage([preservedNativeNode]));
+
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<DataSourceRescanPanel source={source} projectId="proj-1" />);
+
+    await user.click(screen.getByRole("button", { name: /^Rescan tags$/i }));
+    await advanceIntervalAndFlush(2000);
+
+    expect(screen.getByText("OPC UA DataType: ns=2;i=884")).toBeTruthy();
+    expect(screen.queryByRole("combobox")).toBeNull();
+    expect((screen.getByRole("button", { name: /^Apply rescan$/i }) as HTMLButtonElement).disabled).toBe(false);
+
+    await user.click(screen.getByRole("button", { name: /^Apply rescan$/i }));
+    await waitFor(() => expect(mockApplyRescan).toHaveBeenCalledWith("src-01", "job-3", [], "proj-1"));
   });
 });

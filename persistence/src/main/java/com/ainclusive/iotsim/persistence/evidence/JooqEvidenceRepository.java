@@ -12,7 +12,7 @@ import org.jooq.InsertSetMoreStep;
 import org.jooq.JSONB;
 import org.springframework.stereotype.Repository;
 
-/** jOOQ-backed {@link EvidenceRepository} (backend-specs/04). */
+/** jOOQ-backed {@link EvidenceRepository} (openspec/specs/db-schema/spec.md). */
 @Repository
 public class JooqEvidenceRepository implements EvidenceRepository {
 

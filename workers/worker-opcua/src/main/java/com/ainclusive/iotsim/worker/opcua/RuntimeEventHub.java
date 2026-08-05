@@ -12,7 +12,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  *
  * <p>Events are point-in-time and not buffered — one published while no stream is
  * open is dropped. The supervisor opens the stream before Start, so SOURCE_START
- * is captured. See backend-specs/02_WORKER_CONTRACT_AND_IPC.md.
+ * is captured. See openspec/specs/worker-contract/spec.md.
  */
 final class RuntimeEventHub {
 

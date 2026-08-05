@@ -93,7 +93,7 @@ import java.util.function.Function;
  * is propagation only: stale detection reflects worker health to the API/UI and
  * does not itself restart the worker.
  *
- * <p>See backend-specs/02_WORKER_CONTRACT_AND_IPC.md §4.
+ * <p>See openspec/specs/worker-contract/spec.md §4.
  */
 public final class Supervisor implements RuntimeController, SourceScanner, SourceCapturer, AutoCloseable {
 
@@ -107,6 +107,8 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
             "external-ref credential resolution is not yet supported for real-source access (IS-082); "
                     + "use anonymous or password credentials";
     private static final Duration READY_TIMEOUT = Duration.ofSeconds(10);
+    /** Per-attempt bound on a single {@code Hello} RPC inside {@link #awaitReady}; see its javadoc. */
+    private static final Duration HELLO_ATTEMPT_TIMEOUT = Duration.ofSeconds(2);
 
     private final WorkerLauncher launcher;
     private final RestartPolicy restartPolicy;
@@ -363,7 +365,7 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
      * Real-source discovery (create-from-scan). Spawns a one-shot worker in client
      * mode, probes the endpoint, and tears the worker down — it is never adopted
      * into the managed {@code running} map. Only OPC UA is supported today; Modbus
-     * discovery lands with worker-modbus. See backend-specs/02 §6 / 05 §Scan.
+     * discovery lands with worker-modbus. See openspec/specs/worker-contract/spec.md §6 / 05 §Scan.
      */
     @Override
     public ConnectionTestResult testConnection(ScanSpec spec) {
@@ -420,7 +422,7 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
      * variables and streams observed value changes back; each batch is decoded
      * against the schema's types and handed to {@code sink}. The returned session
      * stops the stream (firing the worker's cancel handler) and tears the worker
-     * down. Only OPC UA is supported today. See backend-specs/02 §6.
+     * down. Only OPC UA is supported today. See openspec/specs/worker-contract/spec.md §6.
      */
     @Override
     public CaptureSession startCapture(CaptureSpec spec, Consumer<List<NeutralValue>> sink) {
@@ -541,6 +543,14 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
             SchemaNode declaration = declarations.get(node.dataTypeNodeId());
             if (declaration != null && !declaration.enumValues().isEmpty()) {
                 kinds.put(node.nodeId(), ValueCodec.Kind.INT);
+                continue;
+            }
+            if (declaration != null && !declaration.members().isEmpty()
+                    && declaration.defaultEncodingId() != null && !declaration.defaultEncodingId().isBlank()) {
+                // The worker verifies the ExtensionObject encoding id and emits its binary body.
+                // Value messages include BYTES explicitly, but the fallback kind keeps capture
+                // safe for a worker that omits valueKind.
+                kinds.put(node.nodeId(), ValueCodec.Kind.BYTES);
                 continue;
             }
             if (declaration != null) {
@@ -752,6 +762,7 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
                     .setDataTypeDefaultEncodingId(orEmpty(n.defaultEncodingId()))
                     .setNativeTypeKind(n.nativeTypeKind() == null ? "" : n.nativeTypeKind().name())
                     .setValueRank(n.valueRank() == null ? "" : n.valueRank().name())
+                    .addAllArrayDimensions(n.arrayDimensions())
                     .setAccess(n.access() == null ? "" : n.access().name())
                     .setUnit(orEmpty(n.unit()))
                     .setDescription(orEmpty(n.description()))
@@ -779,12 +790,29 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
         return value == null ? "" : value;
     }
 
+    /**
+     * Retries {@code Hello} until the worker answers or {@link #READY_TIMEOUT} elapses.
+     *
+     * <p>Each attempt is itself bounded (never more than {@link #HELLO_ATTEMPT_TIMEOUT}, and
+     * clamped to whatever remains of the overall budget) — {@code hello()} otherwise has no
+     * deadline of its own, so a control port that accepts a TCP connection but never completes
+     * the RPC (something else briefly holding the port the supervisor just handed the child, or
+     * a process stuck mid-startup) would hang a single attempt indefinitely. Since this loop's
+     * own deadline is only checked *between* attempts, that one hung attempt would silently
+     * defeat {@link #READY_TIMEOUT} — the "did not become ready in time" bound would never
+     * actually fire, and the caller could block far longer than 10 seconds instead of failing
+     * fast with a clear error.
+     */
     private static void awaitReady(WorkerClient client) {
         long deadline = System.nanoTime() + READY_TIMEOUT.toNanos();
         RuntimeException last = null;
         while (System.nanoTime() < deadline) {
+            long remainingNanos = deadline - System.nanoTime();
+            Duration attemptTimeout = remainingNanos < HELLO_ATTEMPT_TIMEOUT.toNanos()
+                    ? Duration.ofNanos(Math.max(remainingNanos, 1))
+                    : HELLO_ATTEMPT_TIMEOUT;
             try {
-                client.hello();
+                client.hello(attemptTimeout);
                 return;
             } catch (RuntimeException e) {
                 last = e;

@@ -4,7 +4,7 @@ import java.time.OffsetDateTime;
 
 /**
  * Persistence-level projection of an {@code activity_events} row. Append-only:
- * user-initiated actions are recorded and never modified (backend-specs/04).
+ * user-initiated actions are recorded and never modified (openspec/specs/db-schema/spec.md).
  *
  * <p>{@code projectId} and {@code objectId} are nullable — admin-level events need
  * not name a project or object.

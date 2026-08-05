@@ -1,11 +1,65 @@
 package com.ainclusive.iotsim.protocolmodel;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class SchemaNodeValidatorTest {
+
+    @Test
+    void validateTypesFlagsAVariableUsingAnOpaqueNativeType() {
+        SchemaNode opaque = dataTypeNode("dtOpaque", "VendorBlob", List.of());
+        SchemaNode variable = new SchemaNode("v1", null, "v1", "Blob", NodeKind.VARIABLE,
+                null, ValueRank.SCALAR, Access.READ, null, null, List.of(), null, List.of(), "dtOpaque", List.of(),
+                null, null, null, null);
+
+        List<String> issues = SchemaNodeValidator.validateTypes(List.of(opaque, variable));
+
+        assertThat(issues).hasSize(1);
+        assertThat(issues.get(0)).contains("Blob").contains("VendorBlob").contains("OPAQUE")
+                .contains("re-scan the source");
+    }
+
+    @Test
+    void validateTypesFlagsAStructureWithNoDefaultEncoding() {
+        SchemaNode structure = dataTypeNode("dtBody", "Body",
+                List.of(new DataTypeMember("x", DataType.FLOAT64, null)));
+        SchemaNode variable = new SchemaNode("v1", null, "v1", "Body1", NodeKind.VARIABLE,
+                null, ValueRank.SCALAR, Access.READ, null, null, List.of(), null, List.of(), "dtBody", List.of(),
+                null, null, null, null);
+
+        List<String> issues = SchemaNodeValidator.validateTypes(List.of(structure, variable));
+
+        assertThat(issues).hasSize(1);
+        assertThat(issues.get(0)).contains("Body1").contains("Body").contains("default binary encoding");
+    }
+
+    @Test
+    void validateTypesAcceptsAStructureWithADefaultEncoding() {
+        SchemaNode structure = new SchemaNode("dtBody", null, "dtBody", "Body", NodeKind.DATA_TYPE,
+                null, null, null, null, null, List.of(), null, List.of(), null,
+                List.of(new DataTypeMember("x", DataType.FLOAT64, null)), List.of(),
+                "ns=4;s=Body.DefaultBinary", null, null, null, null, null);
+        SchemaNode variable = new SchemaNode("v1", null, "v1", "Body1", NodeKind.VARIABLE,
+                null, ValueRank.SCALAR, Access.READ, null, null, List.of(), null, List.of(), "dtBody", List.of(),
+                null, null, null, null);
+
+        assertThat(SchemaNodeValidator.validateTypes(List.of(structure, variable))).isEmpty();
+    }
+
+    @Test
+    void validateTypesIgnoresPrimitiveAndStandardNodeIdVariables() {
+        SchemaNode primitive = new SchemaNode("v1", null, "v1", "V1", NodeKind.VARIABLE,
+                DataType.FLOAT64, ValueRank.SCALAR, Access.READ, null, null, List.of(), null, List.of(), null,
+                List.of(), null, null, null, null);
+        SchemaNode standardNodeId = new SchemaNode("v2", null, "v2", "V2", NodeKind.VARIABLE,
+                null, ValueRank.SCALAR, Access.READ, null, null, List.of(), null, List.of(), "i=884", List.of(),
+                null, null, null, null);
+
+        assertThat(SchemaNodeValidator.validateTypes(List.of(primitive, standardNodeId))).isEmpty();
+    }
 
     @Test
     void acceptsObjectMethodArrayAndTypedReference() {

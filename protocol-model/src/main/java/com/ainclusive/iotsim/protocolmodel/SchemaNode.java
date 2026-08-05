@@ -8,7 +8,7 @@ import java.util.Objects;
  *
  * <p>{@code nodeId} is the only stable reference (used by recordings, samples,
  * scenarios, faults, evidence). {@code path} is unique within a schema. See
- * {@code backend-specs/01_PROTOCOL_NEUTRAL_MODEL.md} §1.
+ * {@code openspec/specs/protocol-model/spec.md} §1.
  *
  * @param dataType  executable protocol-neutral value type; may be accompanied by
  *                  {@code declaredDataTypeNodeId} when a scan must preserve its original OPC UA declaration

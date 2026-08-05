@@ -72,7 +72,7 @@ export const useManualSchemasStore = create<ManualSchemasState>((set) => ({
   error: null,
 
   // Manual schemas are a hand-authored library expected to stay small, but the
-  // endpoint is still cursor-paginated like every other collection (backend-specs/05
+  // endpoint is still cursor-paginated like every other collection (openspec/specs/api-contract/spec.md
   // "Collections" convention) — so a project with more than one page must not
   // silently truncate. Follows nextCursor to the end instead of a "Load more" control,
   // capped so a runaway backend cursor can't spin this into an infinite loop.

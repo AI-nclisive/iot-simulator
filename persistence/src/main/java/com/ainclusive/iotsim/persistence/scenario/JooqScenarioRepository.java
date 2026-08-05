@@ -17,7 +17,7 @@ import org.jooq.Result;
 import org.jooq.UpdateSetMoreStep;
 import org.springframework.stereotype.Repository;
 
-/** jOOQ-backed {@link ScenarioRepository} (backend-specs/04). */
+/** jOOQ-backed {@link ScenarioRepository} (openspec/specs/db-schema/spec.md). */
 @Repository
 public class JooqScenarioRepository implements ScenarioRepository {
 

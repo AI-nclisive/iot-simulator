@@ -11,7 +11,7 @@ import org.jooq.DSLContext;
 import org.jooq.InsertSetMoreStep;
 import org.springframework.stereotype.Repository;
 
-/** jOOQ-backed {@link ClientConnectionRepository} (backend-specs/04). */
+/** jOOQ-backed {@link ClientConnectionRepository} (openspec/specs/db-schema/spec.md). */
 @Repository
 public class JooqClientConnectionRepository implements ClientConnectionRepository {
 

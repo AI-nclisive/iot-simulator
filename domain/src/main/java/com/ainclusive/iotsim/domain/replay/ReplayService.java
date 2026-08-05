@@ -1,6 +1,7 @@
 package com.ainclusive.iotsim.domain.replay;
 
 import com.ainclusive.iotsim.domain.common.ResourceNotFoundException;
+import com.ainclusive.iotsim.domain.common.SchemaNodeValidationUtil;
 import com.ainclusive.iotsim.domain.common.SchemaVersionMismatchException;
 import com.ainclusive.iotsim.domain.datasource.RuntimeStartSpecs;
 import com.ainclusive.iotsim.domain.run.EvidenceCompletionStamp;
@@ -26,12 +27,13 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.ObjectMapper;
 
 /**
  * Replays a recording through a (started) data-source by streaming its value
- * timeline to the runtime. Core of the Record -> Replay flow (backend-specs/03).
+ * timeline to the runtime. Core of the Record -> Replay flow (openspec/specs/domain-model/spec.md).
  *
  * <p>Each replay opens a {@code REPLAY} {@link RunRow} and a {@code CAPTURING}
  * {@link EvidenceRow} (IS-057): the run is started, ended {@code COMPLETED} on
@@ -105,16 +107,18 @@ public class ReplayService {
         RecordingRow recording = requireRecording(projectId, recordingId);
         ReplayGuards.requireProtocolCompatible(recording, source);
 
-        // Load the current schema version for the compat check; the RuntimeStartSpec is built
-        // from the source (which carries the simulator port) and its current schema.
-        int currentSchemaVersion = schemas.findCurrent(dataSourceId)
-                .map(SchemaWithNodes::version).orElse(0);
+        // Load the current schema for the compat check; the RuntimeStartSpec is built from the
+        // source (which carries the simulator port) and its current schema.
+        Optional<SchemaWithNodes> currentSchema = schemas.findCurrent(dataSourceId);
+        int currentSchemaVersion = currentSchema.map(SchemaWithNodes::version).orElse(0);
 
         // Schema compatibility check (IS-069): guard if the recording was captured against a
         // different schema version than the data source currently has.
         if (recording.schemaVersion() != currentSchemaVersion && !compatibilityAck) {
             throw new SchemaVersionMismatchException(recordingId, recording.schemaVersion(), currentSchemaVersion);
         }
+        // Opaque/vendor type validation (IS-199), before any run row is created.
+        currentSchema.ifPresent(schema -> SchemaNodeValidationUtil.validateTypes(schema.nodes()));
 
         // Capture the seed used so the run is always reproducible from the evidence manifest.
         DeterministicSettings settings = deterministicSettings != null

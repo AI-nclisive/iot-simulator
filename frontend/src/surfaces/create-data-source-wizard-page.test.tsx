@@ -235,6 +235,11 @@ const unknownNode: DiscoveredNodeResponse = {
   unknownType: true,
 };
 
+const preservedNativeNode: DiscoveredNodeResponse = {
+  ...unknownNode,
+  dataTypeNodeId: "ns=2;i=884",
+};
+
 describe("scanStepValidationMessage (UI-458)", () => {
   it("returns scanning message while scanning", () => {
     expect(scanStepValidationMessage("scanning", [], null)).toBe("Scanning in progress…");
@@ -260,7 +265,7 @@ describe("scanStepValidationMessage (UI-458)", () => {
     ).toBeNull();
   });
 
-  it("returns null when a non-neutral node has no replacement type", () => {
+  it("requires a mapping only when an unresolved node has no original type id", () => {
     const resolutions: TypeResolutionEntry[] = [
       { nodeId: unknownNode.nodeId, dataType: "", valueRank: 1, access: "READ", exclude: false },
     ];
@@ -271,7 +276,7 @@ describe("scanStepValidationMessage (UI-458)", () => {
         unknownCount: 1,
         truncated: false,
       }),
-    ).toBeNull();
+    ).toBe("Choose a scalar type or exclude every unresolved node.");
   });
 
   it("returns null when all unknown nodes are excluded", () => {
@@ -684,19 +689,90 @@ describe("CreateDataSourceWizardPage — scan step (UI-458)", () => {
           message: null,
         }),
       )
-      .mockImplementationOnce(() => makeNodesPage([unknownNode]));
+      .mockImplementationOnce(() => makeNodesPage([preservedNativeNode]));
 
     await navigateToScanStep();
     await advanceIntervalAndFlush(2000);
 
-    expect(screen.getByText(/native OPC UA type declarations preserved/i)).toBeTruthy();
-    // The original DataType NodeId is enough to preserve the declaration; a
-    // scalar mapping is optional and must not block creation.
+    expect(screen.getByText("Native OPC UA types preserved")).toBeTruthy();
+    expect(screen.getByText("OPC UA DataType: ns=2;i=884")).toBeTruthy();
+    expect(screen.queryByLabelText(/Data type for/i)).toBeNull();
+    // The original DataType NodeId is enough to preserve the declaration.
     const btn = screen.getAllByRole("button", { name: "Next" })[0] as HTMLButtonElement;
     expect(btn.disabled).toBe(false);
   });
 
-  it("optionally maps a preserved native type to a neutral scalar", async () => {
+  it("stays responsive when a real-device scan discovers 1024 nodes with 253 preserved native types (bug #692)", async () => {
+    // Mirrors the field report: a real-device scan discovering 1024 nodes,
+    // 253 of them native OPC UA type declarations (dataTypeNodeId set) that
+    // get rendered as a "Native OPC UA types preserved" list, plus a further
+    // batch of genuinely unresolved nodes needing a scalar mapping. The
+    // reported symptom was the Scan step becoming permanently unresponsive
+    // right after this list rendered.
+    const NATIVE_COUNT = 253;
+    const UNRESOLVED_COUNT = 120;
+    const nodes: DiscoveredNodeResponse[] = [];
+    for (let i = 0; i < 1024; i++) {
+      const isNative = i < NATIVE_COUNT;
+      const isUnresolved = !isNative && i < NATIVE_COUNT + UNRESOLVED_COUNT;
+      nodes.push({
+        nodeId: `ns=2;s=n${i}`,
+        parentId: null,
+        path: `/n${i}`,
+        name: `n${i}`,
+        kind: "Variable",
+        dataType: isNative || isUnresolved ? null : "Float",
+        valueRank: 1,
+        access: "READ",
+        unit: null,
+        description: null,
+        unknownType: isNative || isUnresolved,
+        dataTypeNodeId: isNative ? `ns=2;i=${900 + i}` : null,
+      });
+    }
+
+    mockApiFetch
+      .mockImplementationOnce(() => Promise.resolve({ jobId: "job-big", status: "RUNNING" }))
+      .mockImplementationOnce(() =>
+        Promise.resolve({
+          jobId: "job-big",
+          status: "OK",
+          truncated: false,
+          discoveredCount: nodes.length,
+          unknownCount: NATIVE_COUNT + UNRESOLVED_COUNT,
+          message: null,
+        }),
+      )
+      .mockImplementationOnce(() => makeNodesPage(nodes));
+
+    await navigateToScanStep();
+
+    const renderStart = performance.now();
+    await advanceIntervalAndFlush(2000);
+    const renderElapsedMs = performance.now() - renderStart;
+
+    expect(await screen.findByText(/Discovered 1024 nodes/i)).toBeTruthy();
+    expect(screen.getByText("Native OPC UA types preserved")).toBeTruthy();
+    expect(
+      screen.getByText(`${NATIVE_COUNT} native OPC UA type declarations will be preserved unchanged`),
+    ).toBeTruthy();
+    // Generous ceiling: real rendering here takes low tens of ms. This exists
+    // to catch a regression back to unvirtualized/O(n^2) rendering, not to
+    // pin an exact number — a genuine hang would blow well past it.
+    expect(renderElapsedMs).toBeLessThan(3000);
+
+    // Resolving one of many unresolved nodes must also stay fast — this is
+    // the exact interaction path that used to re-run an O(n*m) validation
+    // check (scanStepValidationMessage) on every wizard render.
+    const selects = screen.getAllByLabelText(/Data type for/i);
+    expect(selects.length).toBeGreaterThan(0);
+    const interactionStart = performance.now();
+    await userEvent.selectOptions(selects[0], "FLOAT64");
+    const interactionElapsedMs = performance.now() - interactionStart;
+    expect(interactionElapsedMs).toBeLessThan(3000);
+  }, 20000);
+
+  it("requires a scalar mapping for a genuinely unresolved node", async () => {
     mockApiFetch
       .mockImplementationOnce(() => Promise.resolve({ jobId: "job-1", status: "RUNNING" }))
       .mockImplementationOnce(() =>
@@ -715,13 +791,12 @@ describe("CreateDataSourceWizardPage — scan step (UI-458)", () => {
     await advanceIntervalAndFlush(2000);
 
     expect(screen.getByLabelText(/Data type for/i)).toBeTruthy();
-
-    expect((screen.getAllByRole("button", { name: "Next" })[0] as HTMLButtonElement).disabled).toBe(false);
+    expect((screen.getAllByRole("button", { name: "Next" })[0] as HTMLButtonElement).disabled).toBe(true);
 
     // Resolve the unknown type
     await userEvent.selectOptions(screen.getByLabelText(/Data type for/i), "FLOAT64");
 
-    // Mapping remains optional and keeps Next enabled.
+    // A deliberate mapping enables the next step.
     expect((screen.getAllByRole("button", { name: "Next" })[0] as HTMLButtonElement).disabled).toBe(false);
   });
 

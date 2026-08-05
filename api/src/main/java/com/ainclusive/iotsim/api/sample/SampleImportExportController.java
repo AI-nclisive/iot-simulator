@@ -25,7 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
- * Sample import and export endpoints (IS-070, backend-specs/05 &amp; 06):
+ * Sample import and export endpoints (IS-070, openspec/specs/api-contract/spec.md &amp; 06):
  *
  * <ul>
  *   <li>{@code POST /api/v1/projects/{projectId}/samples/{id}/export} — build + stream a ZIP</li>

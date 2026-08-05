@@ -3,6 +3,7 @@ package com.ainclusive.iotsim.worker.opcua;
 import com.ainclusive.iotsim.protocolmodel.DataType;
 import com.ainclusive.iotsim.protocolmodel.ValueCodec;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import org.eclipse.milo.opcua.stack.core.Identifiers;
@@ -15,12 +16,15 @@ import org.eclipse.milo.opcua.stack.core.types.builtin.QualifiedName;
 import org.eclipse.milo.opcua.stack.core.types.builtin.StatusCode;
 import org.eclipse.milo.opcua.stack.core.types.builtin.XmlElement;
 import org.eclipse.milo.opcua.stack.core.types.builtin.unsigned.UByte;
+import org.eclipse.milo.opcua.stack.core.types.builtin.unsigned.UInteger;
+import org.eclipse.milo.opcua.stack.core.types.builtin.unsigned.ULong;
+import org.eclipse.milo.opcua.stack.core.types.builtin.unsigned.UShort;
 import org.eclipse.milo.opcua.stack.core.types.builtin.unsigned.Unsigned;
 
 /**
  * Maps the protocol-neutral data types onto OPC UA built-in types and converts
  * decoded values to the matching Milo Java representation.
- * See backend-specs/01_PROTOCOL_NEUTRAL_MODEL.md §5.
+ * See openspec/specs/protocol-model/spec.md §5.
  */
 final class OpcUaTypes {
 
@@ -53,8 +57,9 @@ final class OpcUaTypes {
     /**
      * Reverse mapping used by scan/discovery: an OPC UA DataType node id back to a
      * protocol-neutral data type, or {@code null} when the declaration has a
-     * distinct native NodeId. The caller preserves that NodeId exactly; a named
-     * subtype must not be silently replaced by its primitive parent.
+     * distinct native NodeId (see openspec/specs/protocol-model/spec.md). The caller
+     * preserves that NodeId exactly; a named subtype must not be silently replaced by
+     * its primitive parent.
      */
     static String neutralTypeOf(NodeId dataTypeId) {
         if (dataTypeId == null) {
@@ -91,11 +96,97 @@ final class OpcUaTypes {
     }
 
     static ValueCodec.Kind codecKind(String dataType) {
+        if ("ABSTRACT".equals(dataType)) {
+            return ValueCodec.Kind.TREE;
+        }
         try {
             return ValueCodec.kindOf(DataType.valueOf(dataType));
         } catch (IllegalArgumentException unknownOrEmpty) {
             return ValueCodec.Kind.INT; // unknown/empty -> default (integers + DATETIME)
         }
+    }
+
+    /**
+     * Captures a value read from a variable declared with an abstract OPC UA DataType
+     * (BaseDataType or UInteger, IS-197): the concrete Milo type varies value-to-value, so the
+     * neutral capture must carry its own type discriminator alongside the value — a canonical
+     * TREE with {@code type} (the concrete neutral {@link DataType} name, or {@code null} for a
+     * missing value) and {@code value} (that type's neutral value, converted via
+     * {@link #fromOpcUaValue}).
+     */
+    static Map<String, Object> fromOpcUaVariant(Object raw) {
+        Map<String, Object> tree = new HashMap<>();
+        if (raw == null) {
+            tree.put("type", null);
+            tree.put("value", null);
+            return tree;
+        }
+        String type = discriminatorOf(raw);
+        tree.put("type", type);
+        tree.put("value", fromOpcUaValue(type, raw));
+        return tree;
+    }
+
+    /** The inverse of {@link #fromOpcUaVariant}: rebuilds the concrete Milo value from its
+     * discriminated TREE for replay into an abstractly-typed variable. */
+    static Object toOpcUaVariant(Object decoded) {
+        if (!(decoded instanceof Map<?, ?> tree)) {
+            throw new IllegalArgumentException("abstract OPC UA value must decode to a tree");
+        }
+        Object type = tree.get("type");
+        if (type == null) {
+            return null;
+        }
+        return toOpcUaValue((String) type, tree.get("value"));
+    }
+
+    /** Maps a Milo Java runtime value to the neutral {@link DataType} name that describes it. */
+    private static String discriminatorOf(Object value) {
+        if (value instanceof Boolean) {
+            return "BOOL";
+        } else if (value instanceof Byte) {
+            return "INT8";
+        } else if (value instanceof UByte) {
+            return "UINT8";
+        } else if (value instanceof Short) {
+            return "INT16";
+        } else if (value instanceof UShort) {
+            return "UINT16";
+        } else if (value instanceof Integer) {
+            return "INT32";
+        } else if (value instanceof UInteger) {
+            return "UINT32";
+        } else if (value instanceof Long) {
+            return "INT64";
+        } else if (value instanceof ULong) {
+            return "UINT64";
+        } else if (value instanceof Float) {
+            return "FLOAT32";
+        } else if (value instanceof Double) {
+            return "FLOAT64";
+        } else if (value instanceof String) {
+            return "STRING";
+        } else if (value instanceof ByteString) {
+            return "BYTES";
+        } else if (value instanceof DateTime) {
+            return "DATETIME";
+        } else if (value instanceof LocalizedText) {
+            return "LOCALIZED_TEXT";
+        } else if (value instanceof UUID) {
+            return "GUID";
+        } else if (value instanceof StatusCode) {
+            return "STATUS_CODE";
+        } else if (value instanceof QualifiedName) {
+            return "QUALIFIED_NAME";
+        } else if (value instanceof NodeId) {
+            return "NODE_ID";
+        } else if (value instanceof ExpandedNodeId) {
+            return "EXPANDED_NODE_ID";
+        } else if (value instanceof XmlElement) {
+            return "XML_ELEMENT";
+        }
+        throw new IllegalArgumentException(
+                "unsupported concrete type for abstract OPC UA value: " + value.getClass().getName());
     }
 
     static Object defaultValue(String dataType) {
@@ -172,6 +263,7 @@ final class OpcUaTypes {
         }
         return value.toString();
     }
+
 
     /** Coerces a value decoded by {@link ValueCodec} to the OPC UA Java type. */
     static Object toOpcUaValue(String dataType, Object decoded) {

@@ -1,6 +1,6 @@
 package com.ainclusive.iotsim.domain.datasource;
 
-/** How a data-source was created (backend-specs/03_DOMAIN_MODEL.md). */
+/** How a data-source was created (openspec/specs/domain-model/spec.md). */
 public enum SourceBasis {
     SCAN,
     MANUAL,

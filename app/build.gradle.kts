@@ -31,7 +31,7 @@ dependencies {
 // The full spawn IT launches the real packaged OPC UA worker as a child process
 // and connects to its OPC UA endpoint. Hand the worker's installDist path and a
 // pinned JAVA_HOME (the build toolchain) to the test JVM; the IT self-skips if the
-// property is absent. See backend-specs/02_WORKER_CONTRACT_AND_IPC.md (IS-039).
+// property is absent. See openspec/specs/worker-contract/spec.md (IS-039).
 tasks.test {
     dependsOn(":workers:worker-opcua:installDist")
     val opcuaDist = project(":workers:worker-opcua").layout.buildDirectory

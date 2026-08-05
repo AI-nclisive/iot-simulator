@@ -102,13 +102,36 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
     expect(screen.getByText("Level")).not.toBeNull();
   });
 
-  it("adds Range from the standard OPC UA type catalog and prevents a duplicate", async () => {
+  it("adds a browseable OPC UA method to a manual schema", async () => {
+    mockLoadManualSchemaById.mockResolvedValueOnce(schemaWithFolder);
+    mockUpdateManualSchema.mockResolvedValueOnce(schemaWithFolder);
+    renderPage();
+    await waitFor(() => screen.getByText("Reactor"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Add method" }));
+    fireEvent.change(screen.getByLabelText("Parent folder for new node"), { target: { value: "f1" } });
+    fireEvent.change(screen.getAllByLabelText("Name")[1], { target: { value: "Reset" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByLabelText(/Save in this schema/));
+    fireEvent.click(screen.getAllByRole("button", { name: "Save" })[1]);
+
+    await waitFor(() => expect(mockUpdateManualSchema).toHaveBeenCalledWith(
+      "proj-1", "ms-1", expect.objectContaining({ nodes: expect.arrayContaining([
+        expect.objectContaining({ name: "Reset", kind: "METHOD", parentId: "f1" }),
+      ]) }),
+    ));
+  });
+
+  it("adds Range from the compact standard OPC UA type catalog and prevents a duplicate", async () => {
     mockLoadManualSchemaById.mockResolvedValueOnce(schema);
     renderPage();
     await waitFor(() => screen.getByText("Level"));
 
     fireEvent.click(screen.getByRole("button", { name: "Add folder" }));
-    fireEvent.click(screen.getByRole("button", { name: "Add Range" }));
+    fireEvent.click(screen.getByRole("button", { name: /Choose from parameter catalog/i }));
+    fireEvent.change(screen.getByLabelText("OPC UA native type"), { target: { value: "ns=0;i=884" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add type" }));
     await waitFor(() => expect(screen.getAllByText("Range").length).toBeGreaterThan(0));
 
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
@@ -120,7 +143,7 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
       ]) }),
     ));
 
-    fireEvent.click(screen.getByRole("button", { name: "Add Range" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add type" }));
     expect(mockPushNotification).toHaveBeenCalledWith(expect.objectContaining({ title: "Type already added" }));
   });
 
@@ -131,7 +154,9 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
     await waitFor(() => screen.getByText("Level"));
 
     fireEvent.click(screen.getByRole("button", { name: "Add folder" }));
-    fireEvent.click(screen.getByRole("button", { name: "Add UInteger" }));
+    fireEvent.click(screen.getByRole("button", { name: /Choose from parameter catalog/i }));
+    fireEvent.change(screen.getByLabelText("OPC UA native type"), { target: { value: "ns=0;i=28" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add type" }));
 
     await waitFor(() => expect(screen.getAllByText("UInteger").length).toBeGreaterThan(0));
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
@@ -154,9 +179,13 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
     await waitFor(() => screen.getByText("Level"));
 
     fireEvent.click(screen.getByRole("button", { name: "Add folder" }));
-    fireEvent.click(screen.getByRole("button", { name: "Add QualifiedName" }));
-    fireEvent.click(screen.getByRole("button", { name: "Add Duration" }));
-    fireEvent.click(screen.getByRole("button", { name: "Add NormalizedString" }));
+    fireEvent.click(screen.getByRole("button", { name: /Choose from parameter catalog/i }));
+    fireEvent.change(screen.getByLabelText("OPC UA native type"), { target: { value: "ns=0;i=20" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add type" }));
+    fireEvent.change(screen.getByLabelText("OPC UA native type"), { target: { value: "ns=0;i=290" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add type" }));
+    fireEvent.change(screen.getByLabelText("OPC UA native type"), { target: { value: "ns=0;i=12877" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add type" }));
 
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     fireEvent.click(screen.getByLabelText(/Save in this schema/));
@@ -185,8 +214,7 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
     renderPage();
     await waitFor(() => screen.getByText("Level"));
 
-    fireEvent.click(screen.getByRole("button", { name: "Add folder" }));
-    fireEvent.click(screen.getByRole("radio", { name: /Data type/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Add data type" }));
     fireEvent.change(screen.getAllByLabelText("Name")[1], { target: { value: "PumpState" } });
     fireEvent.change(screen.getByLabelText("First member name"), { target: { value: "mode" } });
     fireEvent.change(screen.getByLabelText("First member type"), { target: { value: "INT32" } });
@@ -197,13 +225,27 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
     expect((screen.getByLabelText("Structure member 1 type") as HTMLSelectElement).value).toBe("INT32");
   });
 
+  it("always adds a data type at the top level", async () => {
+    mockLoadManualSchemaById.mockResolvedValueOnce(schemaWithFolder);
+    renderPage();
+    await waitFor(() => screen.getByText("Reactor"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Add folder" }));
+    fireEvent.click(screen.getByRole("radio", { name: /Data type/ }));
+    expect(screen.queryByLabelText("Parent folder for new node")).toBeNull();
+    expect(screen.getByText("Data types are always created at the top level.")).not.toBeNull();
+    fireEvent.change(screen.getAllByLabelText("Name")[1], { target: { value: "PumpState" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+
+    await waitFor(() => expect(screen.getAllByText("PumpState").length).toBeGreaterThan(0));
+  });
+
   it("creates a manual enum DATA_TYPE with editable numeric literals", async () => {
     mockLoadManualSchemaById.mockResolvedValueOnce(schema);
     renderPage();
     await waitFor(() => screen.getByText("Level"));
 
-    fireEvent.click(screen.getByRole("button", { name: "Add folder" }));
-    fireEvent.click(screen.getByRole("radio", { name: /Data type/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Add data type" }));
     fireEvent.change(screen.getAllByLabelText("Name")[1], { target: { value: "PumpMode" } });
     fireEvent.click(screen.getByRole("radio", { name: "Enum" }));
     fireEvent.change(screen.getByLabelText("Enum value 1 name"), { target: { value: "Automatic" } });
@@ -222,8 +264,7 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
     renderPage();
     await waitFor(() => screen.getByText("Level"));
 
-    fireEvent.click(screen.getByRole("button", { name: "Add folder" }));
-    fireEvent.click(screen.getByRole("radio", { name: /Data type/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Add data type" }));
     fireEvent.change(screen.getAllByLabelText("Name")[1], { target: { value: "Selection" } });
     fireEvent.click(screen.getByRole("radio", { name: "Union" }));
     fireEvent.change(screen.getByLabelText("First member name"), { target: { value: "integer" } });
@@ -280,6 +321,25 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
     fireEvent.click(screen.getByText("Envelope"));
 
     expect(screen.getByRole("option", { name: "ServerStatus (enum) — not executable" })).not.toBeNull();
+  });
+
+  it("offers imported catalog types when adding a new variable", async () => {
+    mockLoadManualSchemaById.mockResolvedValueOnce({
+      ...schemaWithFolder,
+      typeDefinitions: [{
+        typeId: "ns=2;i=884", namespaceUri: null, nativeNodeId: "ns=2;i=884", browseName: "Range",
+        displayName: "Range", description: null, kind: "STRUCTURE", baseTypeId: null,
+        defaultBinaryEncodingId: "ns=2;i=886", defaultXmlEncodingId: null,
+        fields: [], enumValues: [],
+        capability: { materializable: true, captureDecodable: true, replayEncodable: true, unavailableReason: null },
+      }],
+    });
+    renderPage();
+    await waitFor(() => screen.getByText("Reactor"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Add variable" }));
+
+    expect(screen.getByRole("option", { name: "Range (structure)" })).not.toBeNull();
   });
 
   it("edits structure members and enum literals before saving", async () => {
@@ -476,15 +536,14 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
     });
   });
 
-  it("uses plain language for node classes that are not available yet", async () => {
+  it("describes methods as callable operations in the editor", async () => {
     mockLoadManualSchemaById.mockResolvedValueOnce(schemaWithFolder);
     renderPage();
 
     await waitFor(() => screen.getByText("Reactor"));
-    fireEvent.click(screen.getByRole("button", { name: "Add variable" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add method" }));
 
-    expect(screen.getByText("Coming soon:")).toBeTruthy();
-    expect(screen.getByText(/Data types can be defined here and selected by variables/i)).toBeTruthy();
+    expect(screen.getByText(/Methods are browseable callable operations/i)).toBeTruthy();
     expect(screen.queryByText(/address-space model/i)).toBeNull();
   });
 

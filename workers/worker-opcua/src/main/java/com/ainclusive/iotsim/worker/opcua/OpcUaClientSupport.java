@@ -17,7 +17,7 @@ import org.eclipse.milo.opcua.stack.core.types.builtin.LocalizedText;
  * ({@link OpcUaCapture}, IS-045): connect/authenticate against a real endpoint,
  * tear the client down, and classify failures. Kept in one place so both paths
  * stay consistent. None security / session-only credentials, per
- * backend-specs/02 §6 and 08.
+ * openspec/specs/worker-contract/spec.md §6 and 08.
  */
 final class OpcUaClientSupport {
 

@@ -26,6 +26,8 @@ import com.ainclusive.iotsim.protocolmodel.NativeTypeKind;
 import com.ainclusive.iotsim.protocolmodel.NodeKind;
 import com.ainclusive.iotsim.protocolmodel.SchemaNode;
 import com.ainclusive.iotsim.protocolmodel.ValueRank;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -44,13 +46,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 /**
- * Create-from-scan: real-source discovery + data-source creation (backend-specs/05
+ * Create-from-scan: real-source discovery + data-source creation (openspec/specs/api-contract/spec.md
  * §Scan, SPEC "Create Data Source From Real Source Scan", IS-043).
  *
  * <p>A scan is an async job: {@link #startScan} returns a {@code jobId} immediately
  * and the browse runs on a worker pool; {@link #getScan} polls progress/result.
  * Connection secrets are passed straight to the {@link SourceScanner} for the
- * scan's duration and are never stored in a job, result, or row (backend-specs/08).
+ * scan's duration and are never stored in a job, result, or row (openspec/specs/auth-modes/spec.md).
  */
 @Service
 public class ScanService implements DisposableBean {
@@ -259,7 +261,7 @@ public class ScanService implements DisposableBean {
      * are kept as-is; each unknown-typed variable must be addressed by a
      * {@link TypeResolution} — assigned a neutral type (kept) or excluded (dropped).
      * An unknown-typed variable with no resolution rejects the create (400), per
-     * backend-specs/01 §2 "unknown types require user resolution before create".
+     * openspec/specs/protocol-model/spec.md §2 "unknown types require user resolution before create".
      *
      * @param resolutions user decisions for unknown-typed nodes; may be {@code null}/empty
      */
@@ -339,6 +341,7 @@ public class ScanService implements DisposableBean {
     private static List<SchemaNode> populateSchema(
             List<DiscoveredNode> discovered, List<TypeResolution> resolutions) {
         Map<String, TypeResolution> byNodeId = indexResolutions(discovered, resolutions);
+        Map<String, String> schemaPaths = uniqueSchemaPaths(discovered);
         List<SchemaNode> nodes = new ArrayList<>();
         Set<String> importedTypeIds = new HashSet<>();
         for (DiscoveredNode n : discovered) {
@@ -350,34 +353,106 @@ public class ScanService implements DisposableBean {
                     // declaration instead of inventing a neutral primitive.
                     if (n.dataTypeNodeId() != null) {
                         addImportedType(nodes, importedTypeIds, n);
-                        nodes.add(variableNode(n, null, valueRank(n.valueRank()), access(n.access()),
+                        nodes.add(variableNode(n, schemaPaths.get(n.nodeId()), null,
+                                valueRank(n.valueRank()), access(n.access()),
                                 n.dataTypeNodeId()));
                     }
                 } else if (!r.exclude()) {
                     // A supplied resolution may preserve the original declaration,
                     // or replace it with an explicit neutral type.
                     if (r.dataType() != null && !r.dataType().isBlank()) {
-                        nodes.add(variableNode(n, DataType.valueOf(r.dataType()),
+                        nodes.add(variableNode(n, schemaPaths.get(n.nodeId()), DataType.valueOf(r.dataType()),
                                 r.valueRank() == null ? valueRank(n.valueRank()) : ValueRank.valueOf(r.valueRank()),
                                 r.access() == null ? access(n.access()) : Access.valueOf(r.access()), null));
                     } else if (n.dataTypeNodeId() != null) {
                         addImportedType(nodes, importedTypeIds, n);
-                        nodes.add(variableNode(n, null, valueRank(n.valueRank()), access(n.access()),
+                        nodes.add(variableNode(n, schemaPaths.get(n.nodeId()), null,
+                                valueRank(n.valueRank()), access(n.access()),
                                 n.dataTypeNodeId()));
                     }
                 }
             } else if ("VARIABLE".equals(n.kind())) {
                 // Known-typed variable with valid dataType from server
                 if (n.dataType() != null && !n.dataType().isBlank()) {
-                    nodes.add(variableNode(n, DataType.valueOf(n.dataType()),
+                    nodes.add(variableNode(n, schemaPaths.get(n.nodeId()), DataType.valueOf(n.dataType()),
                             valueRank(n.valueRank()), access(n.access()), null, n.dataTypeNodeId()));
                 }
             } else {
-                nodes.add(new SchemaNode(n.nodeId(), n.parentId(), n.path(), n.name(),
-                        NodeKind.FOLDER, null, null, null, n.unit(), n.description()));
+                NodeKind kind = switch (n.kind()) {
+                    case "METHOD" -> NodeKind.METHOD;
+                    case "OBJECT" -> NodeKind.OBJECT;
+                    default -> NodeKind.FOLDER;
+                };
+                nodes.add(new SchemaNode(n.nodeId(), n.parentId(), schemaPaths.get(n.nodeId()), n.name(),
+                        kind, null, null, null, n.unit(), n.description()));
             }
         }
         return nodes;
+    }
+
+    /**
+     * Schema paths are a UI-facing convenience and must be unique, whereas an OPC UA address
+     * space identifies nodes by NodeId. Servers are allowed to expose separate nodes through
+     * identical BrowsePaths. Keep the server-provided path unchanged when it is unique; for a
+     * collision, append a reversible, URL-safe NodeId marker to every colliding segment. Building
+     * each child from its resolved parent keeps descendants on the correct branch as well.
+     */
+    private static Map<String, String> uniqueSchemaPaths(List<DiscoveredNode> discovered) {
+        Map<String, Integer> originalPathCounts = new HashMap<>();
+        Map<String, DiscoveredNode> byNodeId = new HashMap<>();
+        for (DiscoveredNode node : discovered) {
+            originalPathCounts.merge(node.path(), 1, Integer::sum);
+            byNodeId.putIfAbsent(node.nodeId(), node);
+        }
+
+        Map<String, String> resolved = new HashMap<>();
+        Set<String> usedPaths = new HashSet<>();
+        for (DiscoveredNode node : discovered) {
+            resolveSchemaPath(node, byNodeId, originalPathCounts, resolved, usedPaths, new HashSet<>());
+        }
+        return resolved;
+    }
+
+    private static String resolveSchemaPath(
+            DiscoveredNode node,
+            Map<String, DiscoveredNode> byNodeId,
+            Map<String, Integer> originalPathCounts,
+            Map<String, String> resolved,
+            Set<String> usedPaths,
+            Set<String> resolving) {
+        String existing = resolved.get(node.nodeId());
+        if (existing != null) {
+            return existing;
+        }
+        if (!resolving.add(node.nodeId())) {
+            // SchemaNodeValidator will report the invalid parent cycle; do not recurse forever
+            // while merely deriving a presentation path for this scan result.
+            return node.path();
+        }
+
+        DiscoveredNode parent = node.parentId() == null ? null : byNodeId.get(node.parentId());
+        String parentPath = parent == null ? null
+                : resolveSchemaPath(parent, byNodeId, originalPathCounts, resolved, usedPaths, resolving);
+        String segment = lastPathSegment(node.path());
+        if (originalPathCounts.getOrDefault(node.path(), 0) > 1) {
+            segment = disambiguatedSegment(segment, node.nodeId());
+        }
+        String candidate = parentPath == null || parentPath.isEmpty() ? segment : parentPath + "/" + segment;
+        if (!usedPaths.add(candidate)) {
+            throw new IllegalArgumentException("could not derive a unique schema path for node: " + node.nodeId());
+        }
+        resolved.put(node.nodeId(), candidate);
+        resolving.remove(node.nodeId());
+        return candidate;
+    }
+
+    private static String lastPathSegment(String path) {
+        int separator = path.lastIndexOf('/');
+        return separator < 0 ? path : path.substring(separator + 1);
+    }
+
+    private static String disambiguatedSegment(String segment, String nodeId) {
+        return segment + " [id=" + URLEncoder.encode(nodeId, StandardCharsets.UTF_8) + "]";
     }
 
     /** Adds one top-level schema type for a scanned structured native declaration. */
@@ -479,14 +554,15 @@ public class ScanService implements DisposableBean {
     }
 
     private static SchemaNode variableNode(
-            DiscoveredNode n, DataType dataType, ValueRank valueRank, Access access, String dataTypeNodeId) {
-        return variableNode(n, dataType, valueRank, access, dataTypeNodeId, null);
+            DiscoveredNode n, String path, DataType dataType, ValueRank valueRank, Access access,
+            String dataTypeNodeId) {
+        return variableNode(n, path, dataType, valueRank, access, dataTypeNodeId, null);
     }
 
     private static SchemaNode variableNode(
-            DiscoveredNode n, DataType dataType, ValueRank valueRank, Access access, String dataTypeNodeId,
+            DiscoveredNode n, String path, DataType dataType, ValueRank valueRank, Access access, String dataTypeNodeId,
             String declaredDataTypeNodeId) {
-        return new SchemaNode(n.nodeId(), n.parentId(), n.path(), n.name(),
+        return new SchemaNode(n.nodeId(), n.parentId(), path, n.name(),
                 NodeKind.VARIABLE, dataType, valueRank, access, n.unit(), n.description(),
                 List.of(), null, List.of(), dataTypeNodeId, List.of(), List.of(), null, null,
                 null, null, null, null, declaredDataTypeNodeId);

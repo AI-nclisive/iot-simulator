@@ -29,6 +29,7 @@ import com.ainclusive.iotsim.platform.capture.CaptureException;
 import com.ainclusive.iotsim.platform.capture.CaptureSession;
 import com.ainclusive.iotsim.platform.capture.CaptureSpec;
 import com.ainclusive.iotsim.platform.capture.SourceCapturer;
+import com.ainclusive.iotsim.platform.runtime.LiveValueListener;
 import com.ainclusive.iotsim.platform.secret.InMemoryCredentialStore;
 import com.ainclusive.iotsim.protocolmodel.Access;
 import com.ainclusive.iotsim.protocolmodel.DataType;
@@ -64,6 +65,7 @@ class RecordingServiceTest {
     private InMemoryRunRepository runs;
     private InMemoryEvidenceRepository evidence;
     private RecordingRepository recordingsUsedByService;
+    private RecordingLiveValueListener liveValues;
 
     @BeforeEach
     void setUp() {
@@ -74,6 +76,7 @@ class RecordingServiceTest {
         runs = new InMemoryRunRepository();
         evidence = new InMemoryEvidenceRepository();
         recordingsUsedByService = new InMemoryRecordingRepository();
+        liveValues = new RecordingLiveValueListener();
         service = new RecordingService(
                 recordingsUsedByService,
                 new InMemoryValueTimelineRepository(),
@@ -86,7 +89,8 @@ class RecordingServiceTest {
                 scenarios,
                 runs,
                 evidence,
-                new ObjectMapper());
+                new ObjectMapper(),
+                liveValues);
     }
 
     @Test
@@ -158,6 +162,41 @@ class RecordingServiceTest {
         assertThat(capturer.stopped).isTrue();
     }
 
+    /**
+     * #704: real-device capture batches must also reach the live-value listener that
+     * feeds the data source's SSE stream, exactly like {@code Supervisor.applyValues}
+     * does for a running (synthetic) source — otherwise the recording page's "Captured
+     * values"/"Last received" never move even though values are being persisted.
+     */
+    @Test
+    void startCaptureTeesEveryBatchToTheLiveValueListener() {
+        schemas.set(2, List.of(variable("temp", DataType.FLOAT64)));
+        service.startCapture(PROJECT, SOURCE, "alice");
+
+        Instant t = Instant.parse("2026-01-01T00:00:00Z");
+        capturer.emit(List.of(NeutralValue.good("temp", t, 21.5)));
+        capturer.emit(List.of(NeutralValue.good("temp", t.plusSeconds(1), 22.0)));
+
+        assertThat(liveValues.dataSourceIds).containsExactly(SOURCE, SOURCE);
+        assertThat(liveValues.batches).hasSize(2);
+        assertThat(liveValues.batches.get(0)).extracting(NeutralValue::value).containsExactly(21.5);
+        assertThat(liveValues.batches.get(1)).extracting(NeutralValue::value).containsExactly(22.0);
+    }
+
+    /** A listener failure must not break capture persistence (best-effort tee). */
+    @Test
+    void startCaptureSurvivesAThrowingLiveValueListener() {
+        schemas.set(2, List.of(variable("temp", DataType.FLOAT64)));
+        liveValues.failWith = new RuntimeException("SSE hub unavailable");
+        service.startCapture(PROJECT, SOURCE, "alice");
+
+        Instant t = Instant.parse("2026-01-01T00:00:00Z");
+        capturer.emit(List.of(NeutralValue.good("temp", t, 21.5)));
+
+        Recording stopped = service.stopCapture(PROJECT, SOURCE);
+        assertThat(stopped.valueCount()).isEqualTo(1);
+    }
+
     @Test
     void startCaptureGeneratesADefaultNameFromTheSourceName() {
         schemas.set(1, List.of(variable("temp", DataType.FLOAT64)));
@@ -195,6 +234,20 @@ class RecordingServiceTest {
         assertThatThrownBy(() -> service.startCapture(PROJECT, SOURCE, "a"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("endpoint");
+    }
+
+    @Test
+    void startCaptureRejectsAVariableReferencingAnOpaqueNativeType() {
+        SchemaNode opaque = new SchemaNode("dtOpaque", null, "dtOpaque", "VendorBlob", NodeKind.DATA_TYPE,
+                null, null, null, null, null, List.of(), null, List.of(), null, List.of(),
+                null, null, null, null, null);
+        SchemaNode blob = new SchemaNode("v1", null, "v1", "Blob", NodeKind.VARIABLE,
+                null, ValueRank.SCALAR, Access.READ, null, null, List.of(), null, List.of(), "dtOpaque", List.of(),
+                null, null, null, null);
+        schemas.set(1, List.of(opaque, blob));
+
+        assertThatThrownBy(() -> service.startCapture(PROJECT, SOURCE, "alice"))
+                .isInstanceOf(com.ainclusive.iotsim.domain.common.UnsupportedTypesException.class);
     }
 
     @Test
@@ -262,7 +315,8 @@ class RecordingServiceTest {
                 new InMemoryScenarioRepository(),
                 new InMemoryRunRepository(),
                 new InMemoryEvidenceRepository(),
-                new ObjectMapper());
+                new ObjectMapper(),
+                LiveValueListener.NONE);
         svc.create(PROJECT, SOURCE, com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_AND_DATA, null, "alice");
         svc.create(PROJECT, SOURCE, com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_AND_DATA, null, "bob");
         svc.create(PROJECT, SOURCE, com.ainclusive.iotsim.protocolmodel.ScanType.SCHEMA_AND_DATA, null, "carol");
@@ -497,7 +551,8 @@ class RecordingServiceTest {
         CountingActivityEventRepository activityLog = new CountingActivityEventRepository();
         RecordingService raced = new RecordingService(staleRow, new InMemoryValueTimelineRepository(),
                 sources, schemas, new InMemoryCredentialStore(), capturer, fakeProjects(),
-                new ActivityEventService(activityLog), scenarios, runs, evidence, new ObjectMapper());
+                new ActivityEventService(activityLog), scenarios, runs, evidence, new ObjectMapper(),
+                LiveValueListener.NONE);
 
         raced.delete(PROJECT, r.id(), "alice");
 
@@ -611,6 +666,22 @@ class RecordingServiceTest {
 
         void emit(List<NeutralValue> values) {
             sink.accept(values);
+        }
+    }
+
+    /** Records every batch handed to {@link LiveValueListener#onValues}; optionally throws (#704). */
+    private static final class RecordingLiveValueListener implements LiveValueListener {
+        private final List<String> dataSourceIds = new ArrayList<>();
+        private final List<List<NeutralValue>> batches = new ArrayList<>();
+        private RuntimeException failWith;
+
+        @Override
+        public void onValues(String dataSourceId, List<NeutralValue> values, Instant at) {
+            dataSourceIds.add(dataSourceId);
+            batches.add(values);
+            if (failWith != null) {
+                throw failWith;
+            }
         }
     }
 

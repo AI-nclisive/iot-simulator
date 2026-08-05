@@ -8,6 +8,7 @@ import com.ainclusive.iotsim.domain.common.RetentionDependencyException;
 import com.ainclusive.iotsim.domain.common.ScenarioInvalidException;
 import com.ainclusive.iotsim.domain.common.SchemaImpactException;
 import com.ainclusive.iotsim.domain.common.SchemaVersionMismatchException;
+import com.ainclusive.iotsim.domain.common.UnsupportedTypesException;
 import com.ainclusive.iotsim.domain.io.ProjectImportException;
 import com.ainclusive.iotsim.platform.capture.CaptureException;
 import com.ainclusive.iotsim.platform.runtime.RuntimeCapacityException;
@@ -19,8 +20,9 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 
-/** Maps domain/API exceptions to RFC 9457 problem responses (backend-specs/05). */
+/** Maps domain/API exceptions to RFC 9457 problem responses (openspec/specs/api-contract/spec.md). */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -95,6 +97,13 @@ public class GlobalExceptionHandler {
         return pd;
     }
 
+    @ExceptionHandler(UnsupportedTypesException.class)
+    public ProblemDetail unsupportedTypes(UnsupportedTypesException e) {
+        ProblemDetail pd = problem(HttpStatus.UNPROCESSABLE_ENTITY, e.getMessage());
+        pd.setProperty("issues", e.issues());
+        return pd;
+    }
+
     @ExceptionHandler(RetentionDependencyException.class)
     public ProblemDetail retentionDependency(RetentionDependencyException e) {
         ProblemDetail pd = problem(HttpStatus.UNPROCESSABLE_ENTITY, e.getMessage());
@@ -104,7 +113,7 @@ public class GlobalExceptionHandler {
 
     /**
      * Maps {@link AccessDeniedException} thrown by {@code @PreAuthorize} to RFC 9457 403
-     * (backend-specs/05).
+     * (openspec/specs/api-contract/spec.md).
      */
     @ExceptionHandler(AccessDeniedException.class)
     public ProblemDetail forbidden(AccessDeniedException e) {
@@ -114,6 +123,25 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     public ProblemDetail badRequest(IllegalArgumentException e) {
         return problem(HttpStatus.BAD_REQUEST, e.getMessage());
+    }
+
+    /**
+     * A client that is gone (e.g. broken pipe) mid-{@code text/event-stream} response —
+     * SSE endpoints like {@code Subscriber}/{@code SseEmitterSink} hit this whenever
+     * {@code emitter.complete()}/{@code send()} is called on a connection Spring has
+     * already marked unusable. The response is already committed to
+     * {@code text/event-stream} (or gone outright), so writing a {@link ProblemDetail}
+     * body here — as the generic {@link #internalError(Exception)} handler below would —
+     * is itself impossible: Spring has no converter for {@code ProblemDetail} against a
+     * preset {@code text/event-stream} content type, so it throws a second
+     * {@code HttpMessageNotWritableException} while trying to report the first one,
+     * masking the real cause in the logs (#704). There is nothing to report to a client
+     * that is already gone, so just log at debug and write no body.
+     */
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    public void asyncRequestNotUsable(AsyncRequestNotUsableException e) {
+        LOG.debug("Async request no longer usable (client likely disconnected mid-stream): {}",
+                e.getMessage());
     }
 
     /**

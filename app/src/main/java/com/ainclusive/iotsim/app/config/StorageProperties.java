@@ -13,7 +13,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * </ul>
  *
  * <p>The S3-compatible adapter for shared mode lands later; it will add its own
- * sub-properties here. See backend-specs/08_AUTH_AND_MODES.md.
+ * sub-properties here. See openspec/specs/auth-modes/spec.md.
  */
 @ConfigurationProperties(prefix = "iotsim.storage")
 public record StorageProperties(Filesystem filesystem) {

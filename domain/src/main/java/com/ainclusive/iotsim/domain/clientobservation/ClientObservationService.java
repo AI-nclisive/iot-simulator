@@ -9,7 +9,7 @@ import org.springframework.stereotype.Service;
 /**
  * Connected-client observation per data source (IS-052): the currently-connected
  * clients and the full connection history, projected from the {@code
- * client_connections} log (backend-specs/04 & 05). Backs both the REST
+ * client_connections} log (openspec/specs/db-schema/spec.md & 05). Backs both the REST
  * {@code GET .../clients} endpoint and the SSE clients-stream snapshot.
  */
 @Service

@@ -8,7 +8,7 @@ package com.ainclusive.iotsim.platform.runtime;
  * fallback. Finer attribution (source configuration vs Edge Device) is carried in
  * the human-readable reason, not as a distinct value.
  *
- * <p>See SPEC.md → Observe Data Source Health And Errors.
+ * <p>See openspec/specs/api-contract/spec.md.
  */
 public enum HealthOrigin {
     SIMULATOR,

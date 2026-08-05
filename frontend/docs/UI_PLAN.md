@@ -20,7 +20,8 @@ Use it to understand:
   but it must not introduce visible login, mode switching, or shared-first
   shell chrome into the local-first core surfaces.
 - Later stages should extend the same UX model rather than introduce a new one.
-- Tasks inside a stage may run in parallel only when `UI_TASKS.md` says they can.
+- Tasks inside a stage may run in parallel only when their board items say they
+  can (org Project #1, `Area = FE`).
 
 ## Stage Summary
 
@@ -60,7 +61,8 @@ Exit gate:
 
 Implementation entry:
 
-- start with [UI_TASKS.md](UI_TASKS.md), section `P0 - Core Shell And Primary Flow`.
+- pick a `UI-XXX` task from the board in stage `P0` (core shell and primary flow),
+  then create its change with `/opsx:propose ui-XXX-<slug>`.
 
 ## P1
 
@@ -87,7 +89,8 @@ Exit gate:
 
 Implementation entry:
 
-- continue with [UI_TASKS.md](UI_TASKS.md), section `P1 - Shared Usage, Reuse, And Operational Breadth`.
+- continue with the board's `P1` tasks (shared usage, reuse, and operational
+  breadth).
 
 ## P2
 
@@ -112,7 +115,7 @@ Exit gate:
 
 Implementation entry:
 
-- continue with [UI_TASKS.md](UI_TASKS.md), section `P2 - Advanced Shared Workflows`.
+- continue with the board's `P2` tasks (advanced shared workflows).
 
 ## Delivery Hand-Off
 
@@ -120,18 +123,18 @@ Use the documents in this order:
 
 1. `UI_PLAN.md`:
    decide which stage and wave is active.
-2. `UI_TASKS.md`:
+2. an `openspec/changes/ui-*` change (or the org board):
    choose the exact task and confirm whether it can run in parallel.
-3. `UI_SCREEN_SPECS.md`:
+3. `openspec/specs/frontend-screens/spec.md`:
    read the surface requirements for that task.
-4. `DESIGN.md`:
+4. `openspec/specs/frontend-shell/spec.md`:
    confirm the broader UX rules the implementation must preserve.
 
 ## Documentation Status
 
 The UI documentation set is ready for development when used together:
 
-- `DESIGN.md` for product UX rules;
-- `UI_SCREEN_SPECS.md` for concrete surfaces;
-- `UI_TASKS.md` for execution order and ownership;
+- `openspec/specs/frontend-shell/spec.md` for product UX rules;
+- `openspec/specs/frontend-screens/spec.md` for concrete surfaces;
+- the org board / `openspec/changes/` for execution order and ownership;
 - `UI_PLAN.md` for stage-level sequencing.

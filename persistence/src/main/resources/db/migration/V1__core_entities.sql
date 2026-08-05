@@ -1,4 +1,4 @@
--- Core entities. See backend-specs/03_DOMAIN_MODEL.md and 04_DB_SCHEMA.md.
+-- Core entities. See openspec/specs/domain-model/spec.md and 04_DB_SCHEMA.md.
 -- Enums stored as varchar + check constraints for portability across managed Postgres.
 
 create table project_settings (

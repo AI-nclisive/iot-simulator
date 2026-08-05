@@ -486,13 +486,11 @@ A: Yes. Export your schema (project export), extract the JSON, share it. Others 
 
 ## See Also
 
-- `backend-specs/01_PROTOCOL_NEUTRAL_MODEL.md` — Schema model details
-- `docs/DISCOVERY.md` — Scanning real OPC UA devices
-- `docs/REPLAY.md` — Replaying recorded data against simulated schemas
-- `docs/SCENARIOS.md` — Building test scenarios with templates
+- `openspec/specs/protocol-model/spec.md` — the schema and value model templates build on
+- `openspec/specs/frontend-screens/spec.md` — the manual schema editor surface that offers them
+- `domain/src/main/java/com/ainclusive/iotsim/domain/manualschema/OpcUaTemplates.java` —
+  the definitions themselves; this guide describes them, the code is the source of truth
 
 ---
 
-**Template Library Version**: 1.0 (IS-189)  
-**Last Updated**: 2026-07-24  
-**Maintainer**: IoT Simulator team
+**Template Library Version**: 1.0 (IS-189)

@@ -31,7 +31,7 @@ import org.junit.jupiter.api.Test;
  * supervisor, then a real Milo OPC UA client connects to the worker's endpoint,
  * reads a projected variable, and confirms an ApplyValues update crosses the
  * process boundary onto the live address space. The core IS-039 proof.
- * See backend-specs/02_WORKER_CONTRACT_AND_IPC.md.
+ * See openspec/specs/worker-contract/spec.md.
  */
 class OpcUaWorkerProcessIT {
 

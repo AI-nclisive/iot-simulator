@@ -14,7 +14,7 @@ import java.time.Duration;
  * worker to the API/UI. An actual process exit is handled separately by
  * restart-with-backoff ({@link RestartPolicy}).
  *
- * <p>See backend-specs/02_WORKER_CONTRACT_AND_IPC.md §4.
+ * <p>See openspec/specs/worker-contract/spec.md §4.
  */
 public record HealthPolicy(Duration pollInterval, Duration probeTimeout, int staleThreshold) {
 

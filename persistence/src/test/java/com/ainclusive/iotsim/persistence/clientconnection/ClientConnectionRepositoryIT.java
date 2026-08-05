@@ -14,7 +14,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-/** Client-connection log against real Postgres (backend-specs/04, IS-052). */
+/** Client-connection log against real Postgres (openspec/specs/db-schema/spec.md, IS-052). */
 @Testcontainers(disabledWithoutDocker = true)
 class ClientConnectionRepositoryIT {
 

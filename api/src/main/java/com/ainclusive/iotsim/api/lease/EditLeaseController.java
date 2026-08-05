@@ -18,12 +18,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Advisory edit-lease endpoints (IS-081, backend-specs/05_API_CONTRACT.md §Edit-lease).
+ * Advisory edit-lease endpoints (IS-081, openspec/specs/api-contract/spec.md §Edit-lease).
  *
  * <p>Supports {@code data-sources} and {@code scenarios} as {@code objectType} path values
  * (plural URL form maps to the service's type constants).
  *
- * <p>Authorization (backend-specs/08_AUTH_AND_MODES.md §Authorization):
+ * <p>Authorization (openspec/specs/auth-modes/spec.md §Authorization):
  * <ul>
  *   <li>POST acquire / DELETE release — {@link Permission#SOURCE_EDIT} (admin-level; only editors
  *       open editors and therefore need leases).

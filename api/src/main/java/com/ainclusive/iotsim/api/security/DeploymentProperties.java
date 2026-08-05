@@ -6,7 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * Binds the deployment-mode flag {@code iotsim.mode} (default
  * {@link DeploymentMode#LOCAL}). An unrecognized value fails fast at startup
  * (enum bind error), so the mode is always well-defined.
- * See backend-specs/08_AUTH_AND_MODES.md.
+ * See openspec/specs/auth-modes/spec.md.
  */
 @ConfigurationProperties(prefix = "iotsim")
 public record DeploymentProperties(DeploymentMode mode) {

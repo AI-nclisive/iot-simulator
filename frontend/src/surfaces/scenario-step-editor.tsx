@@ -65,6 +65,7 @@ export function ScenarioStepEditor({ step, projectId, canEdit, onChange, serverV
   const [config, setConfig] = useState<Record<string, unknown>>(step.config);
 
   const dataSources = useDataSourcesStore((s) => s.dataSources);
+  const loadDataSources = useDataSourcesStore((s) => s.loadDataSources);
   const artifacts = useArtifactsStore((s) => s.artifacts);
   const loadRecordings = useArtifactsStore((s) => s.loadRecordings);
 
@@ -74,6 +75,18 @@ export function ScenarioStepEditor({ step, projectId, canEdit, onChange, serverV
       void loadRecordings(projectId);
     }
   }, [step.type, projectId, loadRecordings]);
+
+  // Ensure the project's data sources are loaded whenever this step has a
+  // "source" field (start/stop/synthetic/fault/replay target). Unlike the
+  // recordings load above, nothing else in the scenario flow triggers this
+  // fetch, so the data-sources store stays empty and every Target-source
+  // dropdown renders with no options (issue #700).
+  const needsSources = useMemo(() => specs.some((f) => f.kind === "source"), [specs]);
+  useEffect(() => {
+    if (needsSources && projectId) {
+      void loadDataSources(projectId);
+    }
+  }, [needsSources, projectId, loadDataSources]);
 
   const sourceNames = useMemo(
     () => Object.fromEntries(dataSources.map((s) => [s.id, s.name])),

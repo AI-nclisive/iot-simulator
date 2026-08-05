@@ -4,7 +4,7 @@ import java.time.OffsetDateTime;
 
 /**
  * Persistence-level projection of an {@code evidence} row: portable proof of what
- * happened in a run (SPEC "Export Run Evidence", P0; backend-specs/03 &amp; 04).
+ * happened in a run (SPEC "Export Run Evidence", P0; openspec/specs/domain-model/spec.md &amp; 04).
  *
  * <p>{@code runId} is nullable — evidence is captured 0..1 per run and the run link
  * may be cleared if the run is deleted ({@code on delete set null}). {@code status}

@@ -5,7 +5,7 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * Manifest embedded in a recording export ZIP (IS-070, backend-specs/06_ARTIFACT_FORMATS.md).
+ * Manifest embedded in a recording export ZIP (IS-070, openspec/specs/artifact-formats/spec.md).
  * Carries the format version, source schema snapshot, time range, value count, and checksums
  * so a re-import is fully lossless and replay-ready.
  *

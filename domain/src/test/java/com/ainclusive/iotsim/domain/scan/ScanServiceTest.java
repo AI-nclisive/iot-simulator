@@ -189,6 +189,60 @@ class ScanServiceTest {
     }
 
     @Test
+    void createFromScanPersistsDiscoveredMethodNodes() {
+        scanner.scanResult = new ScanResult(ScanStatus.OK, List.of(
+                new DiscoveredNode("ns=2;s=pump", null, "Pump", "Pump", "OBJECT",
+                        null, null, null, null, null),
+                new DiscoveredNode("ns=2;s=reset", "ns=2;s=pump", "Pump/Reset", "Reset", "METHOD",
+                        null, null, null, null, "Resets the pump")), false, 2, "discovered method");
+        ScanJob job = service.startScan(
+                PROJECT, "OPC_UA", "opc.tcp://h", ConnectionCredentials.anonymous(), 0);
+
+        DataSource created = service.createFromScan(PROJECT, job.jobId(), "Scanned", "{}", List.of(), "alice");
+
+        Schema schema = new SchemaService(schemaRepo, dataSourceRepo, new ObjectMapper()).get(PROJECT, created.id());
+        assertThat(schema.nodes()).filteredOn(node -> node.nodeId().equals("ns=2;s=reset"))
+                .singleElement()
+                .satisfies(node -> {
+                    assertThat(node.kind()).isEqualTo(NodeKind.METHOD);
+                    assertThat(node.parentId()).isEqualTo("ns=2;s=pump");
+                });
+    }
+
+    @Test
+    void createFromScanPreservesDistinctNodesWithTheSameBrowsePath() {
+        scanner.scanResult = new ScanResult(ScanStatus.OK, List.of(
+                new DiscoveredNode("ns=2;s=data-a", null, "Data", "Data", "FOLDER",
+                        null, null, null, null, null),
+                new DiscoveredNode("ns=2;s=conditions-a", "ns=2;s=data-a", "Data/Conditions", "Conditions",
+                        "FOLDER", null, null, null, null, null),
+                new DiscoveredNode("ns=2;s=cycle-a", "ns=2;s=conditions-a", "Data/Conditions/CycleComplete",
+                        "CycleComplete", "VARIABLE", "BOOL", "SCALAR", "READ", null, null),
+                new DiscoveredNode("ns=2;s=data-b", null, "Data", "Data", "FOLDER",
+                        null, null, null, null, null),
+                new DiscoveredNode("ns=2;s=conditions-b", "ns=2;s=data-b", "Data/Conditions", "Conditions",
+                        "FOLDER", null, null, null, null, null),
+                new DiscoveredNode("ns=2;s=cycle-b", "ns=2;s=conditions-b", "Data/Conditions/CycleComplete",
+                        "CycleComplete", "VARIABLE", "BOOL", "SCALAR", "READ", null, null)),
+                false, 6, "discovered duplicate browse paths");
+        ScanJob job = service.startScan(PROJECT, "OPC_UA", "opc.tcp://h", ConnectionCredentials.anonymous(), 0);
+
+        DataSource created = service.createFromScan(PROJECT, job.jobId(), "Scanned", "{}", List.of(), "alice");
+
+        Schema schema = new SchemaService(schemaRepo, dataSourceRepo, new ObjectMapper()).get(PROJECT, created.id());
+        assertThat(schema.nodes()).extracting(SchemaNode::nodeId).containsExactlyInAnyOrder(
+                "ns=2;s=data-a", "ns=2;s=conditions-a", "ns=2;s=cycle-a",
+                "ns=2;s=data-b", "ns=2;s=conditions-b", "ns=2;s=cycle-b");
+        assertThat(schema.nodes()).extracting(SchemaNode::path).containsExactlyInAnyOrder(
+                "Data [id=ns%3D2%3Bs%3Ddata-a]",
+                "Data [id=ns%3D2%3Bs%3Ddata-a]/Conditions [id=ns%3D2%3Bs%3Dconditions-a]",
+                "Data [id=ns%3D2%3Bs%3Ddata-a]/Conditions [id=ns%3D2%3Bs%3Dconditions-a]/CycleComplete [id=ns%3D2%3Bs%3Dcycle-a]",
+                "Data [id=ns%3D2%3Bs%3Ddata-b]",
+                "Data [id=ns%3D2%3Bs%3Ddata-b]/Conditions [id=ns%3D2%3Bs%3Dconditions-b]",
+                "Data [id=ns%3D2%3Bs%3Ddata-b]/Conditions [id=ns%3D2%3Bs%3Dconditions-b]/CycleComplete [id=ns%3D2%3Bs%3Dcycle-b]");
+    }
+
+    @Test
     void createFromScanPreservesNonNeutralOpcUaDataTypeWithoutResolution() {
         scanner.scanResult = nonNeutralTypeResult();
         ScanJob job = service.startScan(

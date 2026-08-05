@@ -35,7 +35,7 @@ import tools.jackson.databind.ObjectMapper;
  * {@link EvidenceContent}, then serializes it with an {@link EvidenceArtifactWriter}
  * and stores the bundle in the {@link ObjectStore}. Evidence is built only from
  * timeline/event/client data — never from source config — so no secret can leak.
- * See backend-specs/05 &amp; 06.
+ * See openspec/specs/api-contract/spec.md &amp; 06.
  */
 @Service
 public class EvidenceService {

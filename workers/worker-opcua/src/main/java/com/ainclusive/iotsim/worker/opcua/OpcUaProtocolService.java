@@ -45,6 +45,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import org.eclipse.milo.opcua.stack.core.Identifiers;
 import org.eclipse.milo.opcua.stack.core.types.builtin.ByteString;
 import org.eclipse.milo.opcua.stack.core.types.builtin.ExtensionObject;
 import org.eclipse.milo.opcua.stack.core.types.builtin.NodeId;
@@ -53,7 +54,7 @@ import org.eclipse.milo.opcua.stack.core.types.builtin.NodeId;
  * Implements the {@code ProtocolDataSource} contract backed by a real Milo OPC UA
  * server: Configure builds the address space from the schema, Start/Stop run the
  * server, ApplyValues projects neutral values onto OPC UA variables.
- * See backend-specs/02_WORKER_CONTRACT_AND_IPC.md.
+ * See openspec/specs/worker-contract/spec.md.
  */
 public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSourceImplBase {
 
@@ -64,6 +65,8 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
     private final AtomicInteger configuredNodes = new AtomicInteger();
     private final AtomicReference<OpcUaServerRuntime> serverRuntime = new AtomicReference<>();
     private final Map<String, String> nodeDataTypes = new ConcurrentHashMap<>();
+    /** Declared array dimensions for variables; absence means scalar. */
+    private final Map<String, List<Integer>> nodeArrayDimensions = new ConcurrentHashMap<>();
     /** Default binary encodings for native structures, keyed by variable node id. */
     private final Map<String, NodeId> structureEncodings = new ConcurrentHashMap<>();
     private final Map<String, String> structureDataTypes = new ConcurrentHashMap<>();
@@ -71,6 +74,9 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
     private final Map<String, String> treeDataTypes = new ConcurrentHashMap<>();
     private final Map<String, NativeDataTypeDef> nativeTypeDefinitions = new ConcurrentHashMap<>();
     private final Map<String, String> unsupportedNativeTypes = new ConcurrentHashMap<>();
+    /** Variables declared with an abstract DataType (BaseDataType/UInteger, IS-197): the
+     * concrete type is carried per-value in a discriminated TREE rather than fixed by the schema. */
+    private final Set<String> abstractTypeNodes = ConcurrentHashMap.newKeySet();
     private final ClientEventHub clientEventHub = new ClientEventHub();
     private final RuntimeEventHub runtimeEventHub = new RuntimeEventHub();
     /**
@@ -131,18 +137,20 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
         List<VarDef> variables = new ArrayList<>();
         List<NativeDataTypeDef> typeDefinitions = new ArrayList<>();
         nodeDataTypes.clear();
+        nodeArrayDimensions.clear();
         structureEncodings.clear();
         structureDataTypes.clear();
         treeDataTypes.clear();
         nativeTypeDefinitions.clear();
         unsupportedNativeTypes.clear();
+        abstractTypeNodes.clear();
         for (SchemaNodeMsg node : request.getSchema().getNodesList()) {
             if ("VARIABLE".equals(node.getKind()) || "FOLDER".equals(node.getKind())
-                    || "OBJECT".equals(node.getKind())) {
+                    || "OBJECT".equals(node.getKind()) || "METHOD".equals(node.getKind())) {
                 variables.add(new VarDef(node.getNodeId(), node.getParentId().isBlank() ? null : node.getParentId(),
                         node.getName(), node.getKind(), node.getDataType(), node.getDataTypeNodeId(),
                         node.getDeclaredDataTypeNodeId(), null,
-                        null, null, null, null));
+                        null, null, null, null, node.getValueRank(), node.getArrayDimensionsList()));
             }
             if ("DATA_TYPE".equals(node.getKind())) {
                 typeDefinitions.add(new NativeDataTypeDef(
@@ -172,6 +180,9 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
             if (!"VARIABLE".equals(node.getKind())) {
                 continue;
             }
+            if ("ARRAY".equals(node.getValueRank())) {
+                nodeArrayDimensions.put(node.getNodeId(), List.copyOf(node.getArrayDimensionsList()));
+            }
             if (!node.getDataType().isBlank()) {
                 nodeDataTypes.put(node.getNodeId(), node.getDataType());
             } else if (enumTypeIds.contains(node.getDataTypeNodeId())) {
@@ -183,6 +194,8 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
             } else if (nativeTypeDefinitions.containsKey(node.getDataTypeNodeId())
                     && nativeTypeDefinitions.get(node.getDataTypeNodeId()).isOptionSet()) {
                 treeDataTypes.put(node.getNodeId(), node.getDataTypeNodeId());
+            } else if (isAbstractDataType(node.getDataTypeNodeId())) {
+                abstractTypeNodes.add(node.getNodeId());
             } else if (!node.getDataTypeNodeId().isBlank()) {
                 unsupportedNativeTypes.put(node.getNodeId(), node.getDataTypeNodeId());
             }
@@ -269,7 +282,7 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
      * observed value change back as neutral {@link ValueBatch}es until the supervisor
      * cancels the call. The request schema names the variables to subscribe to and
      * carries each one's data type so values are encoded neutrally. No Configure/Start
-     * — this is stateless client mode, like Scan. See backend-specs/02 §6.
+     * — this is stateless client mode, like Scan. See openspec/specs/worker-contract/spec.md §6.
      */
     @Override
     public void capture(CaptureRequest request, StreamObserver<ValueBatch> responseObserver) {
@@ -363,7 +376,8 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
                         "capture cannot encode native DataType without an executable encoding: " + declared);
             }
             nodes.add(new OpcUaCapture.NodeSpec(node.getNodeId(), dataType.isEmpty() ? null : dataType,
-                    defaultEncodingId.isEmpty() ? null : defaultEncodingId));
+                    defaultEncodingId.isEmpty() ? null : defaultEncodingId,
+                    "ARRAY".equals(node.getValueRank()), node.getArrayDimensionsList()));
         }
         return nodes;
     }
@@ -373,7 +387,7 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
      * observer with the {@link ClientEventHub} and leaves it open. The running OPC UA
      * server publishes a {@link ClientEvent} to the hub for each protocol client that
      * connects or disconnects; the stream ends when the supervisor cancels it.
-     * See backend-specs/02_WORKER_CONTRACT_AND_IPC.md.
+     * See openspec/specs/worker-contract/spec.md.
      */
     @Override
     public void clientEvents(StreamRequest request, StreamObserver<ClientEvent> responseObserver) {
@@ -385,7 +399,7 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
      * observer with the {@link RuntimeEventHub} and leaves it open. The running server
      * publishes SOURCE_START/SOURCE_STOP and value-apply failures publish ERROR; the
      * stream ends when the supervisor cancels it.
-     * See backend-specs/02_WORKER_CONTRACT_AND_IPC.md.
+     * See openspec/specs/worker-contract/spec.md.
      */
     @Override
     public void runtimeEvents(StreamRequest request, StreamObserver<RuntimeEvent> responseObserver) {
@@ -486,7 +500,7 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
     }
 
     /**
-     * Graceful process exit, per backend-specs/02_WORKER_CONTRACT_AND_IPC.md. Stops the
+     * Graceful process exit, per openspec/specs/worker-contract/spec.md. Stops the
      * OPC UA runtime, acknowledges, then exits on a separate daemon thread so the
      * response has time to flush over gRPC before the process ends. The supervisor's
      * terminate-with-grace-then-kill remains the fallback if this does not happen fast
@@ -578,9 +592,13 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
             String dataType = nodeDataTypes.get(value.getNodeId());
             if (dataType != null) {
                 try {
-                    Object decoded = ValueCodec.decode(
-                            OpcUaTypes.codecKind(dataType), value.getValueEnc().toByteArray());
-                    runtime.updateValue(value.getNodeId(), OpcUaTypes.toOpcUaValue(dataType, decoded));
+                    boolean array = nodeArrayDimensions.containsKey(value.getNodeId());
+                    Object decoded = ValueCodec.decode(array ? ValueCodec.Kind.TREE : OpcUaTypes.codecKind(dataType),
+                            value.getValueEnc().toByteArray());
+                    runtime.updateValue(value.getNodeId(), array
+                            ? OpcUaArrayValues.replayNeutral(dataType, decoded,
+                                    nodeArrayDimensions.get(value.getNodeId()))
+                            : OpcUaTypes.toOpcUaValue(dataType, decoded));
                 } catch (RuntimeException e) {
                     runtimeEventHub.emit(RuntimeEvent.newBuilder()
                             .setType("ERROR")
@@ -589,10 +607,15 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
                                     + ": " + e.getMessage())
                             .build());
                 }
-            } else if ("TREE".equals(value.getValueKind()) && treeDataTypes.containsKey(value.getNodeId())) {
+            } else if ("TREE".equals(value.getValueKind()) && treeDataTypes.containsKey(value.getNodeId())
+                    && !nodeArrayDimensions.containsKey(value.getNodeId())) {
                 Object decoded = ValueCodec.decode(ValueCodec.Kind.TREE, value.getValueEnc().toByteArray());
                 runtime.updateValue(value.getNodeId(), treeNativeValue(
                         runtime, treeDataTypes.get(value.getNodeId()), decoded));
+            } else if ("TREE".equals(value.getValueKind()) && abstractTypeNodes.contains(value.getNodeId())
+                    && !nodeArrayDimensions.containsKey(value.getNodeId())) {
+                Object decoded = ValueCodec.decode(ValueCodec.Kind.TREE, value.getValueEnc().toByteArray());
+                runtime.updateValue(value.getNodeId(), OpcUaTypes.toOpcUaVariant(decoded));
             } else if (structureEncodings.containsKey(value.getNodeId())) {
                 // A native structure is replayed as its original binary body. Its
                 // encoding id is schema metadata, not inferred from the bytes.
@@ -606,7 +629,12 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
                             .build());
                     continue;
                 }
-                runtime.updateValue(value.getNodeId(), structureValue(localEncoding, value.getValueEnc().toByteArray()));
+                boolean array = nodeArrayDimensions.containsKey(value.getNodeId());
+                Object decoded = array ? ValueCodec.decode(ValueCodec.Kind.TREE, value.getValueEnc().toByteArray()) : null;
+                runtime.updateValue(value.getNodeId(), array
+                        ? OpcUaArrayValues.replayStructure(decoded, localEncoding,
+                                nodeArrayDimensions.get(value.getNodeId()))
+                        : structureValue(localEncoding, value.getValueEnc().toByteArray()));
             } else if (unsupportedNativeTypes.containsKey(value.getNodeId())) {
                 runtimeEventHub.emit(RuntimeEvent.newBuilder()
                         .setType("ERROR")
@@ -615,6 +643,20 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
                                 + unsupportedNativeTypes.get(value.getNodeId()))
                         .build());
             }
+        }
+    }
+
+    /** Whether a declared DataType NodeId is one of the abstract roots (BaseDataType/UInteger,
+     * IS-197) whose variables carry a dynamic concrete type per value. */
+    private static boolean isAbstractDataType(String dataTypeNodeId) {
+        if (dataTypeNodeId.isBlank()) {
+            return false;
+        }
+        try {
+            NodeId id = NodeId.parse(dataTypeNodeId);
+            return Identifiers.BaseDataType.equals(id) || Identifiers.UInteger.equals(id);
+        } catch (RuntimeException e) {
+            return false;
         }
     }
 

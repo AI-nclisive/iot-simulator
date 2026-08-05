@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Live capture of real data into a recording (IS-045): start/stop recording a
- * running real source. Mirrors backend-specs/05_API_CONTRACT.md §Recordings
+ * running real source. Mirrors openspec/specs/api-contract/spec.md §Recordings
  * ({@code POST .../data-sources/{id}/recording/start|stop}). Start connects to the
  * source's real endpoint in client mode and streams observed value changes into a
  * new recording; stop ends the capture and finalizes the recording.

@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
  * connected to a simulated source plus the full connection history. Live
  * connect/disconnect events are on the SSE stream
  * ({@code GET .../stream/clients}); this is the point-in-time query.
- * See backend-specs/05_API_CONTRACT.md.
+ * See openspec/specs/api-contract/spec.md.
  *
  * <p>Authorization (IS-077): read-only — {@link Permission#OBSERVE} (user + admin).
  */

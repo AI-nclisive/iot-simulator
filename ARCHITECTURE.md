@@ -5,10 +5,11 @@ changes first with rationale and expected impact.
 
 Scope: a high-level map of the system — its modules, runtime model, and the
 binding constraints every developer-agent must follow. Deliberately brief; no
-implementation detail. Product capabilities live in `SPEC.md`; UI in
-`frontend/docs/DESIGN.md`;
-approved technology stack in `STACK.md`; glossary in `MEMORY.md`. Rationale and
-prior ADRs live in git history.
+implementation detail. Product capabilities live in `openspec/specs/`
+(capability-by-capability); UI structure/UX rules in
+`openspec/specs/frontend-shell/spec.md`; approved technology stack in
+`STACK.md`; glossary in `MEMORY.md`. Rationale and prior ADRs live in git
+history.
 
 ## System overview
 
@@ -25,19 +26,57 @@ isolation, determinism, and reproducible evidence rank above CRUD convenience.
 ## Module map
 
 Dependencies flow downward; lower modules never depend on higher ones. Protocol
-and runtime modules must not depend on UI-facing modules.
+and runtime modules must not depend on UI-facing modules. Solid arrows =
+runtime/data flow; dotted = compile-time dependency on the shared foundation.
+The concrete Gradle modules behind these layers are listed in
+[`README.md`](README.md#module-map).
 
-- **Web UI** (React/TS) — talks to the backend only over the public API.
-- **API / application layer** — REST + live endpoints; commands, queries,
-  test-control; authentication and authorization enforcement.
-- **Domain modules** — projects, schemas, recordings/samples, scenarios, faults,
-  evidence, observability — all built on the protocol-neutral model.
-- **Runtime supervisor** — worker lifecycle, IPC, health, port allocation,
-  resource governance; protocol-agnostic.
-- **Protocol workers** (out-of-process) — implement one worker contract; the only
-  place protocol-specific code lives.
-- **Persistence & platform** — relational storage (entities and value timelines)
-  and object storage; identity/auth; secrets.
+```mermaid
+flowchart TB
+    EDGE["Edge Devices / clients under test"]
+    UI["Web UI — React/TS"]
+
+    subgraph BE["Backend — Spring Boot modular monolith"]
+        API["api / application layer<br/>REST /api/v1 · OpenAPI · SSE/WS · auth (local/shared)"]
+        DOMAIN["domain<br/>projects · schemas · recordings · replay ·<br/>scenarios · evidence · observability"]
+        SUP["runtime-supervisor<br/>worker lifecycle · IPC · ports · health"]
+    end
+
+    subgraph WORKERS["Protocol workers — out-of-process JVMs (no Spring)"]
+        OPCUA["worker-opcua"]
+        MODBUS["worker-modbus"]
+    end
+
+    subgraph FOUND["Shared foundation"]
+        PMODEL["protocol-model<br/>protocol-neutral schema + values"]
+        WCONTRACT["worker-contract<br/>ProtocolDataSource .proto v1"]
+        PLATFORM["platform<br/>RuntimeController · ObjectStore · Ids"]
+    end
+
+    subgraph DATA["Persistence"]
+        PERSIST["persistence<br/>repositories · append-only migrations"]
+        PG[("PostgreSQL<br/>entities + value timeline")]
+        OBJ[("Object storage<br/>large artifacts")]
+    end
+
+    UI -->|"HTTPS REST + SSE"| API
+    API --> DOMAIN
+    DOMAIN --> SUP
+    DOMAIN --> PERSIST
+    SUP -->|"gRPC loopback (versioned)"| OPCUA
+    SUP -->|"gRPC loopback (versioned)"| MODBUS
+    EDGE -->|"OPC UA"| OPCUA
+    EDGE -->|"Modbus TCP"| MODBUS
+
+    DOMAIN -.-> PMODEL
+    SUP -.-> WCONTRACT
+    OPCUA -.-> WCONTRACT
+    MODBUS -.-> WCONTRACT
+    OPCUA -.-> PMODEL
+    PERSIST --> PG
+    PLATFORM -.-> OBJ
+    PERSIST -.-> PMODEL
+```
 
 ## Runtime model
 
@@ -53,6 +92,33 @@ and runtime modules must not depend on UI-facing modules.
   auto-healed; only unexpected failures trigger restart-with-backoff. Faults
   exist at both the protocol-neutral and protocol-specific layers, mapped per
   worker.
+
+How the supervisor brings a worker up and feeds it values:
+
+```mermaid
+sequenceDiagram
+    actor U as User / Test
+    participant API as API
+    participant SUP as Supervisor
+    participant W as Protocol worker (process)
+    participant ED as Edge Device
+
+    U->>API: start data source
+    API->>SUP: start(spec)
+    SUP->>SUP: allocate port + launch process
+    SUP->>W: Hello (contract version)
+    alt version matches
+        W-->>SUP: Hello ok
+    else mismatch
+        W-->>SUP: refused
+    end
+    SUP->>W: Configure(schema, listen port)
+    SUP->>W: Start
+    ED->>W: connect (OPC UA / Modbus TCP)
+    API->>SUP: ApplyValues / replay timeline
+    SUP->>W: ApplyValues (stream)
+    W-->>ED: serve values
+```
 
 ## Data and persistence
 

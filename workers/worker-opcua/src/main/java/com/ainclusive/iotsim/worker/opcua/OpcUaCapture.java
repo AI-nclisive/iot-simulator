@@ -23,9 +23,9 @@ import org.eclipse.milo.opcua.stack.core.types.builtin.StatusCode;
  * subscribes to its schema variables, and forwards every observed value change as
  * protocol-neutral proto {@link Value}s to a sink until {@link #stop()}. Mirrors
  * {@link OpcUaDiscovery} (one-shot/client mode) and never touches the embedded
- * server runtime. See backend-specs/02 §6 and 01 §3.
+ * server runtime. See openspec/specs/worker-contract/spec.md §6 and 01 §3.
  *
- * <p>"Every change, no sampling" per backend-specs/01: a subscription with a short
+ * <p>"Every change, no sampling" per openspec/specs/protocol-model/spec.md: a subscription with a short
  * publishing interval reports each value change the server samples; the recording
  * path keeps the full fidelity (distinct from the conflated live-out path).
  */
@@ -42,9 +42,13 @@ final class OpcUaCapture {
     }
 
     /** A variable to capture: its neutral node id (parseable OPC UA NodeId) and neutral type. */
-    record NodeSpec(String nodeId, String dataType, String defaultEncodingId) {
+    record NodeSpec(String nodeId, String dataType, String defaultEncodingId, boolean array, List<Integer> arrayDimensions) {
         NodeSpec(String nodeId, String dataType) {
-            this(nodeId, dataType, null);
+            this(nodeId, dataType, null, false, List.of());
+        }
+
+        NodeSpec(String nodeId, String dataType, String defaultEncodingId) {
+            this(nodeId, dataType, defaultEncodingId, false, List.of());
         }
 
         boolean isNativeStructure() {
@@ -105,9 +109,14 @@ final class OpcUaCapture {
 
     /** Visible to package tests so non-neutral capture encoding remains covered. */
     static Value toProtoValue(NodeSpec spec, DataValue dv) {
+        Object raw = dv.getValue() == null ? null : dv.getValue().getValue();
         if (spec.isNativeStructure()) {
-            var variant = dv.getValue();
-            Object raw = variant == null ? null : variant.getValue();
+            if (spec.array()) {
+                NodeId expectedEncoding = NodeId.parse(spec.defaultEncodingId());
+                ValueCodec.Encoded enc = ValueCodec.encode(
+                        OpcUaArrayValues.captureStructure(raw, expectedEncoding, spec.arrayDimensions()));
+                return protoValue(spec, dv, enc);
+            }
             if (!(raw instanceof ExtensionObject extension)
                     || !(extension.getBody() instanceof org.eclipse.milo.opcua.stack.core.types.builtin.ByteString body)) {
                 throw new IllegalArgumentException(
@@ -126,21 +135,38 @@ final class OpcUaCapture {
                                 + spec.nodeId());
             }
             ValueCodec.Encoded enc = ValueCodec.encode(body.bytes());
-            return Value.newBuilder()
-                    .setNodeId(spec.nodeId())
-                    .setSourceTimeMicros(sourceMicros(dv))
-                    .setValueEnc(ByteString.copyFrom(enc.bytes()))
-                    .setValueKind(enc.kind().name())
-                    .setQuality(quality(dv.getStatusCode()))
-                    .build();
+            return protoValue(spec, dv, enc);
         }
         if (spec.dataType() == null || spec.dataType().isBlank()) {
             throw new IllegalArgumentException(
                     "capture cannot encode native DataType without an executable encoding for node "
                             + spec.nodeId());
         }
-        Object neutral = OpcUaTypes.fromOpcUaValue(spec.dataType(), dv.getValue().getValue());
+        Object neutral;
+        if ("OPTION_SET".equals(spec.dataType())) {
+            if (!(raw instanceof org.eclipse.milo.opcua.sdk.core.types.DynamicOptionSetType optionSet)) {
+                throw new IllegalArgumentException(
+                        "capture expected DynamicOptionSetType for option set node " + spec.nodeId() +
+                        " but got " + (raw == null ? "null" : raw.getClass().getSimpleName()));
+            }
+            Map<String, Object> tree = new HashMap<>();
+            tree.put("value", optionSet.getValue().bytes());
+            tree.put("validBits", optionSet.getValidBits().bytes());
+            neutral = tree;
+        } else if ("ABSTRACT".equals(spec.dataType())) {
+            // BaseDataType/UInteger (IS-197): the concrete type varies per value, so it is
+            // captured as a discriminated tree rather than assumed from the schema.
+            neutral = OpcUaTypes.fromOpcUaVariant(raw);
+        } else if (spec.array()) {
+            neutral = OpcUaArrayValues.captureNeutral(spec.dataType(), raw, spec.arrayDimensions());
+        } else {
+            neutral = OpcUaTypes.fromOpcUaValue(spec.dataType(), raw);
+        }
         ValueCodec.Encoded enc = ValueCodec.encode(neutral);
+        return protoValue(spec, dv, enc);
+    }
+
+    private static Value protoValue(NodeSpec spec, DataValue dv, ValueCodec.Encoded enc) {
         return Value.newBuilder()
                 .setNodeId(spec.nodeId())
                 .setSourceTimeMicros(sourceMicros(dv))
@@ -166,4 +192,5 @@ final class OpcUaCapture {
         }
         return status.isBad() ? Quality.BAD : Quality.UNCERTAIN;
     }
+
 }

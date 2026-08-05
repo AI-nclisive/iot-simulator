@@ -8,7 +8,7 @@ option java_outer_classname = "ProtocolDataSourceProto";
 
 // Supervisor⇄worker contract. Loopback-only, versioned. Adding a protocol means
 // adding a worker that implements this service — never changing the supervisor.
-// See backend-specs/02_WORKER_CONTRACT_AND_IPC.md.
+// See openspec/specs/worker-contract/spec.md.
 service ProtocolDataSource {
   rpc Hello (HelloRequest) returns (HelloResponse);
   rpc Configure (ConfigureRequest) returns (Ack);
@@ -18,13 +18,13 @@ service ProtocolDataSource {
   // Real-source discovery (create-from-scan). The worker acts as a protocol
   // CLIENT against a real endpoint: TestConnection probes reachability/auth;
   // Scan browses the address space into neutral schema nodes. Stateless, one-shot
-  // — no Configure/Start needed. See backend-specs/05_API_CONTRACT.md §Scan.
+  // — no Configure/Start needed. See openspec/specs/api-contract/spec.md §Scan.
   rpc TestConnection (TestConnectionRequest) returns (TestConnectionResponse);
   // Streams ScanProgress updates as the browse descends, followed by the
   // discovered nodes in NodeBatch chunks (bounded per-message so a huge address
   // space never exceeds gRPC's max message size), ending with exactly one
   // ScanEvent carrying the terminal ScanResponse (status/counts only — no
-  // nodes). See backend-specs/05 §Scan.
+  // nodes). See openspec/specs/api-contract/spec.md §Scan.
   rpc Scan (ScanRequest) returns (stream ScanEvent);
 
   // Live capture (record real data). Like Scan, the worker acts as a protocol
@@ -32,7 +32,7 @@ service ProtocolDataSource {
   // subscribes to the schema's variable nodes and streams every observed value
   // change back as neutral ValueBatches until the supervisor cancels the call.
   // Stateless/client mode — no Configure/Start needed. The recording-in path,
-  // kept distinct from the conflated live-out path. See backend-specs/02 §6.
+  // kept distinct from the conflated live-out path. See openspec/specs/worker-contract/spec.md §6.
   rpc Capture (CaptureRequest) returns (stream ValueBatch);
 
   // Supervisor pushes neutral value batches for the worker to project onto its
@@ -124,6 +124,9 @@ message SchemaNodeMsg {
   // Original source DataType attribute. Unlike data_type_node_id this may be set
   // together with a neutral data_type, retaining exact OPC UA type fidelity.
   string declared_data_type_node_id = 23;
+  // Value shape is part of the variable contract, independent of a native
+  // structure member's own dimensions. Added in IS-201.
+  repeated uint32 array_dimensions = 24;
 }
 
 // The declared fields of a native OPC UA structured DataType. Exactly one of
@@ -165,7 +168,7 @@ message ShutdownRequest {}
 
 // Connection secrets for reaching a real source. Session-only: the secret is held
 // in memory for the scan and is never persisted, exported, or logged
-// (backend-specs/08_AUTH_AND_MODES.md).
+// (openspec/specs/auth-modes/spec.md).
 message ConnectionConfigMsg {
   string mode = 1;        // ANONYMOUS | PASSWORD | EXTERNAL_REF
   string username = 2;

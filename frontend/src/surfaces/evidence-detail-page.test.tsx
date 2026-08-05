@@ -86,9 +86,9 @@ function makeDto() {
   };
 }
 
-function renderPage() {
+function renderPage(initialEntry = `/evidence/${EVIDENCE_ID}`) {
   return render(
-    <MemoryRouter initialEntries={[`/evidence/${EVIDENCE_ID}`]}>
+    <MemoryRouter initialEntries={[initialEntry]}>
       <Routes>
         <Route path="/evidence/:evidenceId" element={<EvidenceDetailPage />} />
       </Routes>
@@ -99,6 +99,21 @@ function renderPage() {
 // ── navigation links (UI-464) ─────────────────────────────────────────────────
 
 describe("EvidenceDetailPage — navigation links (UI-464)", () => {
+  it("starts an export when reached from the list's Export shortcut", async () => {
+    mockApiFetch.mockImplementation((path: string) =>
+      path.endsWith(`/evidence/${EVIDENCE_ID}`) ? Promise.resolve(makeDto()) : Promise.resolve({}),
+    );
+    renderPage(`/evidence/${EVIDENCE_ID}?export=1`);
+
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith(
+        `/api/v1/projects/${PROJECT_ID}/evidence/${EVIDENCE_ID}/export?format=BUNDLE`,
+        { method: "POST" },
+      );
+    });
+    expect(screen.getByText("Exported")).not.toBeNull();
+  });
+
   it("renders a link to the scenario with correct href", async () => {
     mockApiFetch.mockResolvedValue(makeDto());
     renderPage();

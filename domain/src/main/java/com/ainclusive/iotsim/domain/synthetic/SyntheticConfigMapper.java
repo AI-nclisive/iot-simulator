@@ -15,8 +15,8 @@ public final class SyntheticConfigMapper {
     public static List<SyntheticVariable> toVariables(SyntheticConfig config) {
         return config.variables().stream()
                 .map(v -> {
-                    validateForType(v.dataType(), v.pattern());
-                    return new SyntheticVariable(v.nodeId(), v.dataType(), toPattern(v.pattern()), v.updateRateMs());
+                    validateForType(v.dataType(), v.dataTypeNodeId(), v.pattern());
+                    return new SyntheticVariable(v.nodeId(), v.dataType(), toPattern(v.pattern()), v.updateRateMs(), v.dataTypeNodeId());
                 })
                 .toList();
     }
@@ -65,13 +65,24 @@ public final class SyntheticConfigMapper {
                 throw new IllegalArgumentException("dateTimeValue must be an ISO-8601 instant", e);
             }
         }
+        if (spec.objectValue() != null) {
+            // IS-200: structured value for STRUCTURE/UNION/ENUM/OPTION_SET
+            return spec.objectValue();
+        }
         throw new IllegalArgumentException(
-                "one of value, stringValue, bytesValueBase64, or dateTimeValue is required for the CONSTANT pattern");
+                "one of value, stringValue, bytesValueBase64, dateTimeValue, or objectValue is required for the CONSTANT pattern");
     }
 
-    private static void validateForType(DataType dataType, PatternSpec spec) {
+    private static void validateForType(DataType dataType, String dataTypeNodeId, PatternSpec spec) {
         if (spec == null || spec.type() == null) {
             return; // toPattern supplies the standard required-field error
+        }
+        // IS-200: native types only support CONSTANT patterns
+        if (dataTypeNodeId != null) {
+            if (!"CONSTANT".equals(spec.type())) {
+                throw new IllegalArgumentException("native types only support CONSTANT patterns");
+            }
+            return;
         }
         if (dataType == DataType.DATETIME) {
             requireOneOf(spec.type(), dataType, "CONSTANT", "RANDOM_UNIFORM");

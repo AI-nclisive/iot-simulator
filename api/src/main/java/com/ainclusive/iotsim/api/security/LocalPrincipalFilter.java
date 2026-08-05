@@ -17,7 +17,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * Establishes the implicit {@code local} principal in trusted local mode: a single
  * user with full control and no login screen (SPEC "Use Product Without Login").
  * The authenticated OIDC principal used in shared mode is wired by IS-075.
- * See backend-specs/08_AUTH_AND_MODES.md.
+ * See openspec/specs/auth-modes/spec.md.
  */
 public class LocalPrincipalFilter extends OncePerRequestFilter {
 

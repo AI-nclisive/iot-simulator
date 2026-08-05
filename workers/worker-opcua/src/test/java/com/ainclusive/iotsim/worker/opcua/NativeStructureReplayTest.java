@@ -3,6 +3,7 @@ package com.ainclusive.iotsim.worker.opcua;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.util.List;
 import org.eclipse.milo.opcua.stack.core.types.builtin.ByteString;
 import org.eclipse.milo.opcua.stack.core.types.builtin.DataValue;
 import org.eclipse.milo.opcua.stack.core.types.builtin.ExtensionObject;
@@ -49,5 +50,24 @@ class NativeStructureReplayTest {
                         ExtensionObject.of(ByteString.of(new byte[] {1}), NodeId.parse("ns=2;i=6002"))))))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("schema declares");
+    }
+
+    @Test
+    void captureAndReplayKeepEveryNativeStructureArrayBody() {
+        NodeId encodingId = NodeId.parse("ns=2;i=6001");
+        var captured = OpcUaCapture.toProtoValue(
+                new OpcUaCapture.NodeSpec("ns=2;s=structures", null, encodingId.toParseableString(), true, List.of(2)),
+                new DataValue(new org.eclipse.milo.opcua.stack.core.types.builtin.Variant(new ExtensionObject[] {
+                    ExtensionObject.of(ByteString.of(new byte[] {1}), encodingId),
+                    ExtensionObject.of(ByteString.of(new byte[] {2, 3}), encodingId)})));
+
+        Object replay = OpcUaArrayValues.replayStructure(
+                com.ainclusive.iotsim.protocolmodel.ValueCodec.decode(
+                        com.ainclusive.iotsim.protocolmodel.ValueCodec.Kind.TREE, captured.getValueEnc().toByteArray()),
+                encodingId, List.of(2));
+
+        assertThat(replay).isInstanceOf(ExtensionObject[].class);
+        assertThat((ExtensionObject[]) replay).extracting(e -> ((ByteString) e.getBody()).bytes())
+                .containsExactly(new byte[] {1}, new byte[] {2, 3});
     }
 }

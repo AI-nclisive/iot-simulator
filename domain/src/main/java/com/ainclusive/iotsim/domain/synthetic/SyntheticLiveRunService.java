@@ -101,11 +101,11 @@ public class SyntheticLiveRunService {
         DeterminismContext context = settings.newContext();
 
         RunRow run = runs.create(projectId, "SYNTHETIC", trigger, initiator, List.of(dataSourceId), null, null);
+        Instant startedAt = wallClock.instant();
         try {
             runs.start(run.id(), now());
             EvidenceRow evidenceRow = evidence.create(projectId, run.id(), initiator);
             runs.linkEvidence(run.id(), evidenceRow.id());
-            Instant startedAt = wallClock.instant();
             evidence.updateManifest(evidenceRow.id(),
                     manifest(run.id(), trigger, initiator, dataSourceId, startedAt, null, settings.seed(), 0));
 
@@ -120,10 +120,31 @@ public class SyntheticLiveRunService {
 
             return new SyntheticLiveRunSummary(dataSourceId, settings.seed(), run.id(), evidenceRow.id(), "RUNNING");
         } catch (RuntimeException e) {
+            stampFailure(run.id(), trigger, initiator, dataSourceId, startedAt, settings.seed());
             runs.end(run.id(), "FAILED", now());
             RunCompletionEvents.appendTerminal(events, projectId, dataSourceId, run.id(), "FAILED", now());
             EvidenceCompletionStamp.finalizeStatus(evidence, run.id(), "FAILED");
             throw e;
+        }
+    }
+
+    /**
+     * Best-effort endedAt stamp so a run whose start fails synchronously (before any worker
+     * ever comes up, e.g. a {@link com.ainclusive.iotsim.platform.runtime.RuntimeController}
+     * launch failure) still shows a real end time in evidence, instead of leaving {@code
+     * manifest.endedAt} {@code null} forever (#695). {@code evidenceRow} itself is out of scope
+     * in the caller's catch block (declared inside the {@code try}), so this re-looks it up by
+     * run — mirrors {@code SyntheticRunService.stampFailure} / {@code
+     * ScenarioLiveRunService.stampFailure}. Failures are swallowed: an advisory stamp must not
+     * mask the original failure being rethrown by the caller.
+     */
+    private void stampFailure(String runId, String trigger, String initiator, String dataSourceId,
+            Instant startedAt, long seed) {
+        try {
+            evidence.findByRun(runId).ifPresent(row -> evidence.updateManifest(row.id(),
+                    manifest(runId, trigger, initiator, dataSourceId, startedAt, wallClock.instant(), seed, 0)));
+        } catch (RuntimeException ignored) {
+            // advisory only; must not mask the original failure
         }
     }
 
