@@ -426,6 +426,12 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
      */
     @Override
     public CaptureSession startCapture(CaptureSpec spec, Consumer<List<NeutralValue>> sink) {
+        return startCapture(spec, sink, ignored -> { });
+    }
+
+    @Override
+    public CaptureSession startCapture(CaptureSpec spec, Consumer<List<NeutralValue>> sink,
+            Consumer<Throwable> onFailure) {
         if (closed) {
             throw new IllegalStateException("supervisor is closed");
         }
@@ -453,6 +459,8 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
         WorkerClient client = new WorkerClient("127.0.0.1", controlPort, network.scanTimeoutSeconds());
         try {
             awaitReady(client);
+            AtomicReference<SupervisorCaptureSession> sessionRef = new AtomicReference<>();
+            AtomicReference<Throwable> streamFailure = new AtomicReference<>();
             WorkerClient.StreamHandle handle = client.capture(
                     request,
                     batch -> {
@@ -462,10 +470,21 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
                         }
                     },
                     error -> {
-                        // Stream errors (incl. CANCELLED on stop) end the session; the
-                        // session owner tears the worker down via stop().
+                        if (streamFailure.compareAndSet(null, error)) {
+                            SupervisorCaptureSession session = sessionRef.get();
+                            if (session != null) {
+                                session.fail(error);
+                            }
+                        }
                     });
-            return new SupervisorCaptureSession(handle, client, launched);
+            SupervisorCaptureSession session = new SupervisorCaptureSession(
+                    handle, client, launched, onFailure);
+            sessionRef.set(session);
+            Throwable failure = streamFailure.get();
+            if (failure != null) {
+                session.fail(failure);
+            }
+            return session;
         } catch (RuntimeException e) {
             closeQuietly(client);
             launched.close();
@@ -619,11 +638,14 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
         private final LaunchedWorker launched;
         private final AtomicBoolean stopped = new AtomicBoolean();
 
-        SupervisorCaptureSession(
-                WorkerClient.StreamHandle handle, WorkerClient client, LaunchedWorker launched) {
+        private final Consumer<Throwable> onFailure;
+
+        SupervisorCaptureSession(WorkerClient.StreamHandle handle, WorkerClient client,
+                LaunchedWorker launched, Consumer<Throwable> onFailure) {
             this.handle = handle;
             this.client = client;
             this.launched = launched;
+            this.onFailure = onFailure == null ? ignored -> { } : onFailure;
         }
 
         @Override
@@ -632,6 +654,19 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
                 handle.cancel();
                 closeQuietly(client);
                 launched.close();
+            }
+        }
+
+        void fail(Throwable error) {
+            if (stopped.compareAndSet(false, true)) {
+                handle.cancel();
+                closeQuietly(client);
+                launched.close();
+                try {
+                    onFailure.accept(error);
+                } catch (RuntimeException ignored) {
+                    // A domain callback must not escape a gRPC callback thread.
+                }
             }
         }
     }

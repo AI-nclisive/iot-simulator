@@ -28,6 +28,7 @@ import com.ainclusive.iotsim.workercontract.v1.TestConnectionResponse;
 import com.ainclusive.iotsim.workercontract.v1.Value;
 import com.ainclusive.iotsim.workercontract.v1.ValueBatch;
 import com.google.protobuf.ByteString;
+import io.grpc.Status;
 import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
 import java.util.concurrent.CountDownLatch;
@@ -44,6 +45,8 @@ final class TestProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSourc
     private final AtomicReference<ScanRequest> lastScan = new AtomicReference<>();
     private final AtomicReference<TestConnectionRequest> lastTestConnection = new AtomicReference<>();
     private final AtomicReference<CaptureRequest> lastCapture = new AtomicReference<>();
+    private final AtomicReference<StreamObserver<ValueBatch>> captureObserver = new AtomicReference<>();
+    private final CountDownLatch captureStarted = new CountDownLatch(1);
     private final CountDownLatch captureCancelled = new CountDownLatch(1);
     private final CountDownLatch shutdownReceived = new CountDownLatch(1);
     private final CountDownLatch clientEventsCancelled = new CountDownLatch(1);
@@ -68,6 +71,14 @@ final class TestProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSourc
     /** Waits until the supervisor cancels the capture stream (stop()). */
     boolean awaitCaptureCancelled(long timeoutSeconds) throws InterruptedException {
         return captureCancelled.await(timeoutSeconds, TimeUnit.SECONDS);
+    }
+
+    boolean awaitCaptureStarted(long timeoutSeconds) throws InterruptedException {
+        return captureStarted.await(timeoutSeconds, TimeUnit.SECONDS);
+    }
+
+    void failCapture() {
+        captureObserver.get().onError(Status.INTERNAL.withDescription("capture failed").asRuntimeException());
     }
 
     /** Waits until the supervisor asks this worker to shut down (teardown). */
@@ -160,6 +171,8 @@ final class TestProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSourc
     @Override
     public void capture(CaptureRequest request, StreamObserver<ValueBatch> obs) {
         lastCapture.set(request);
+        captureObserver.set(obs);
+        captureStarted.countDown();
         ((ServerCallStreamObserver<ValueBatch>) obs).setOnCancelHandler(captureCancelled::countDown);
         // Emit one value the supervisor must decode against the request schema's types.
         ValueCodec.Encoded enc = ValueCodec.encode(21.5);

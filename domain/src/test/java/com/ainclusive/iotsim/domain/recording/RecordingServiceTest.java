@@ -166,6 +166,18 @@ class RecordingServiceTest {
         assertThat(capturer.stopped).isTrue();
     }
 
+    @Test
+    void captureStreamFailureClearsActiveCaptureAndFinalizesReceivedValues() {
+        schemas.set(2, List.of(variable("temp", DataType.FLOAT64)));
+        Recording started = service.startCapture(PROJECT, SOURCE, "alice");
+        capturer.emit(List.of(NeutralValue.good("temp", Instant.parse("2026-01-01T00:00:00Z"), 21.5)));
+
+        capturer.fail(new IllegalStateException("worker stream failed"));
+
+        assertThat(service.captureStatus(PROJECT, SOURCE).capturing()).isFalse();
+        assertThat(service.get(PROJECT, started.id()).valueCount()).isEqualTo(1);
+    }
+
     /**
      * #704: real-device capture batches must also reach the live-value listener that
      * feeds the data source's SSE stream, exactly like {@code Supervisor.applyValues}
@@ -659,6 +671,7 @@ class RecordingServiceTest {
     private static final class FakeCapturer implements SourceCapturer {
         private CaptureSpec spec;
         private Consumer<List<NeutralValue>> sink;
+        private Consumer<Throwable> failure;
         private boolean stopped;
 
         @Override
@@ -668,8 +681,21 @@ class RecordingServiceTest {
             return () -> stopped = true;
         }
 
+        @Override
+        public CaptureSession startCapture(CaptureSpec spec, Consumer<List<NeutralValue>> sink,
+                Consumer<Throwable> onFailure) {
+            this.spec = spec;
+            this.sink = sink;
+            this.failure = onFailure;
+            return () -> stopped = true;
+        }
+
         void emit(List<NeutralValue> values) {
             sink.accept(values);
+        }
+
+        void fail(Throwable error) {
+            failure.accept(error);
         }
     }
 

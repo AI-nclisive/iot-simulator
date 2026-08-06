@@ -26,4 +26,14 @@ public interface SourceCapturer {
      *     real endpoint cannot be reached or authenticated
      */
     CaptureSession startCapture(CaptureSpec spec, Consumer<List<NeutralValue>> sink);
+
+    /**
+     * Starts capture and reports an unexpected terminal stream failure after the
+     * implementation has torn down its worker/session. Implementations that cannot
+     * observe asynchronous failures retain the two-argument behaviour.
+     */
+    default CaptureSession startCapture(CaptureSpec spec, Consumer<List<NeutralValue>> sink,
+            Consumer<Throwable> onFailure) {
+        return startCapture(spec, sink);
+    }
 }
