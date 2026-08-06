@@ -138,6 +138,32 @@ class SyntheticSourceServiceTest {
     }
 
     @Test
+    void createWithSchemaFromSourceIdMaterializesSelectedTypeForNativeScanNode() {
+        SchemaNode nativeTemp = new SchemaNode("temp", null, "/Temperature", "Temperature",
+                NodeKind.VARIABLE, null, ValueRank.SCALAR, Access.READ, "degC", null,
+                List.of(), null, List.of(), "ns=0;i=11", List.of(), List.of(), null,
+                null, null, null, null, null, "ns=4;i=1259");
+        given(schemas.get(PROJECT, "src1")).willReturn(new Schema("sc1", "src1", 1,
+                List.of(nativeTemp), Instant.now()));
+        given(dataSources.create(eq(PROJECT), eq("Twin"), eq("OPC_UA"), eq("SYNTHETIC"),
+                any(), any(), any(), any(), any(), any(), eq("local"))).willReturn(sample("ds2"));
+        given(dataSources.get(PROJECT, "ds2")).willReturn(sample("ds2"));
+
+        service.create(PROJECT, "Twin", "OPC_UA", null,
+                new SyntheticConfig(1L, List.of(new SyntheticVariableConfig("temp", DataType.FLOAT64,
+                        new PatternSpec("CONSTANT", 1.0, null, null, null, null, null, null), 250))),
+                "src1", null, "local");
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<SchemaNode>> nodes = ArgumentCaptor.forClass(List.class);
+        verify(schemas).save(eq(PROJECT), eq("ds2"), nodes.capture());
+        SchemaNode saved = nodes.getValue().getFirst();
+        assertThat(saved.dataType()).isEqualTo(DataType.FLOAT64);
+        assertThat(saved.dataTypeNodeId()).isNull();
+        assertThat(saved.declaredDataTypeNodeId()).isEqualTo("ns=4;i=1259");
+    }
+
+    @Test
     void createWithSchemaFromSourceIdRejectsUnknownNode() {
         given(schemas.get(PROJECT, "src1")).willReturn(sourceSchema());
         var config = new SyntheticConfig(1L, List.of(

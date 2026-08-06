@@ -5,6 +5,7 @@ import com.ainclusive.iotsim.domain.datasource.DataSourceService;
 import com.ainclusive.iotsim.domain.manualschema.ManualSchemaService;
 import com.ainclusive.iotsim.domain.schema.SchemaService;
 import com.ainclusive.iotsim.protocolmodel.Access;
+import com.ainclusive.iotsim.protocolmodel.DataType;
 import com.ainclusive.iotsim.protocolmodel.NodeKind;
 import com.ainclusive.iotsim.protocolmodel.SchemaNode;
 import com.ainclusive.iotsim.protocolmodel.ValueRank;
@@ -109,6 +110,7 @@ public class SyntheticSourceService {
                 variablesById.put(node.nodeId(), node);
             }
         }
+        Map<String, DataType> materializedTypes = new LinkedHashMap<>();
         for (SyntheticVariableConfig v : config.variables()) {
             SchemaNode node = variablesById.get(v.nodeId());
             if (node == null) {
@@ -116,12 +118,29 @@ public class SyntheticSourceService {
                         "variable nodeId '" + v.nodeId() + "' is not a VARIABLE node in the schema of "
                                 + sourceLabel);
             }
-            if (node.dataType() != v.dataType()) {
+            if (node.dataType() != null && node.dataType() != v.dataType()) {
                 throw new IllegalArgumentException(
                         "variable '" + v.nodeId() + "' data type " + v.dataType()
                                 + " does not match schema node type " + node.dataType());
             }
+            if (node.dataType() == null) {
+                materializedTypes.put(node.nodeId(), v.dataType());
+            }
         }
-        return sourceNodes;
+        return sourceNodes.stream()
+                .map(node -> materializeSyntheticType(node, materializedTypes.get(node.nodeId())))
+                .toList();
+    }
+
+    /** Converts a configured scan-only native binding into the selected executable synthetic type. */
+    private static SchemaNode materializeSyntheticType(SchemaNode node, DataType dataType) {
+        if (dataType == null) {
+            return node;
+        }
+        return new SchemaNode(node.nodeId(), node.parentId(), node.path(), node.name(), node.kind(), dataType,
+                node.valueRank(), node.access(), node.unit(), node.description(), node.arrayDimensions(),
+                node.typeDefinition(), node.references(), null, node.members(), node.enumValues(),
+                node.defaultEncodingId(), node.nativeTypeKind(), node.accessLevelFull(),
+                node.minimumSamplingInterval(), node.writeMask(), node.historizing(), node.declaredDataTypeNodeId());
     }
 }
