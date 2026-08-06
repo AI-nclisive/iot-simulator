@@ -215,6 +215,22 @@ describe("runSynthetic / stopSynthetic (IS-145)", () => {
     expect(useDataSourcesStore.getState().syntheticRunIds["syn-1"]).toBe("run-9");
   });
 
+  it("marks a source as starting until the run request completes", async () => {
+    let resolveRun!: (value: { runId: string; state: string }) => void;
+    mockApiFetch.mockReturnValueOnce(new Promise((resolve) => {
+      resolveRun = resolve;
+    }));
+    useDataSourcesStore.setState({ dataSources: [], currentProjectId: "proj-1", syntheticRunIds: {} });
+
+    const starting = useDataSourcesStore.getState().runSynthetic("syn-1", "proj-1");
+    expect(useDataSourcesStore.getState().startingSyntheticIds["syn-1"]).toBe(true);
+
+    resolveRun({ runId: "run-9", state: "RUNNING" });
+    mockApiFetch.mockResolvedValueOnce({ items: [], nextCursor: null, limit: 50 });
+    await starting;
+    expect(useDataSourcesStore.getState().startingSyntheticIds["syn-1"]).toBeUndefined();
+  });
+
   it("stopSynthetic stops the tracked run via /runs/{id}/stop and clears the mapping", async () => {
     useDataSourcesStore.setState({
       dataSources: [],

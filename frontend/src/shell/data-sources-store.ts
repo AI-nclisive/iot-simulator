@@ -139,6 +139,8 @@ type DataSourcesState = {
   ) => Promise<void>;
   /** Live synthetic run id per source (IS-145), used to stop via POST /runs/{id}/stop. */
   syntheticRunIds: Record<string, string>;
+  /** Sources whose start request is awaiting worker startup. */
+  startingSyntheticIds: Record<string, boolean>;
   currentProjectId: string;
 };
 
@@ -151,6 +153,7 @@ export const useDataSourcesStore = create<DataSourcesState>((set, get) => ({
   isLoading: false,
   error: null,
   syntheticRunIds: {},
+  startingSyntheticIds: {},
   currentProjectId: "",
 
   loadDataSources: async (projectId: string) => {
@@ -214,15 +217,22 @@ export const useDataSourcesStore = create<DataSourcesState>((set, get) => ({
 
   runSynthetic: async (rowId, projectId) => {
     const pid = projectId ?? get().currentProjectId;
-    const run = await apiFetch<{ runId: string; state: string }>(
-      `/api/v1/projects/${pid}/data-sources/${rowId}/run-synthetic`,
-      { method: "POST", body: JSON.stringify({}) },
-    );
-    set((state) => ({
-      syntheticRunIds: { ...state.syntheticRunIds, [rowId]: run.runId },
-    }));
-    // Reload so the row's status reflects the now-RUNNING source (drives the live values tab).
-    await get().loadDataSources(pid);
+    if (get().startingSyntheticIds[rowId]) return;
+    set((state) => ({ startingSyntheticIds: { ...state.startingSyntheticIds, [rowId]: true } }));
+    try {
+      const run = await apiFetch<{ runId: string; state: string }>(
+        `/api/v1/projects/${pid}/data-sources/${rowId}/run-synthetic`,
+        { method: "POST", body: JSON.stringify({}) },
+      );
+      set((state) => ({ syntheticRunIds: { ...state.syntheticRunIds, [rowId]: run.runId } }));
+      await get().loadDataSources(pid);
+    } finally {
+      set((state) => {
+        const next = { ...state.startingSyntheticIds };
+        delete next[rowId];
+        return { startingSyntheticIds: next };
+      });
+    }
   },
 
   stopSynthetic: async (rowId, projectId) => {
