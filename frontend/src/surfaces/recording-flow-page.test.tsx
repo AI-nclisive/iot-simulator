@@ -6,8 +6,8 @@
  * - useLiveValues called with correct sourceId and enabled=false when not capturing
  * - SSE status "open" + rows > 0 → recordingState shows "Recording"
  * - SSE status "stale" → recordingState shows "Disconnected"
- * - Value count (MetricCard) shows liveRows.length during capture
- * - No fake increment: count stays 0 if SSE delivers no rows while capturing
+ * - Value count (MetricCard) comes from persisted recording metadata during capture
+ * - SSE rows do not determine the full-fidelity recording count
  * - Stop recording: calls POST recording/stop, shows final valueCount from response
  */
 
@@ -235,8 +235,8 @@ describe("RecordingFlowPage — SSE status stale → Disconnected state", () => 
   });
 });
 
-describe("RecordingFlowPage — value count synced from SSE rows", () => {
-  it("shows liveRows.length as value count during capture", async () => {
+describe("RecordingFlowPage — value count from persisted recording", () => {
+  it("shows the persisted count even when SSE only has unique node rows", async () => {
     const user = userEvent.setup();
 
     mockUseLiveValues.mockReturnValue({
@@ -246,23 +246,30 @@ describe("RecordingFlowPage — value count synced from SSE rows", () => {
       ],
       status: "open",
     });
-    mockApiFetch.mockResolvedValue(startResponse);
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path.endsWith("/recording/status")) return Promise.resolve({ capturing: false, recordingId: null });
+      if (path.endsWith("/recording/start")) return Promise.resolve(startResponse);
+      return Promise.resolve({ ...startResponse, valueCount: 42 });
+    });
 
     renderPage();
     await user.click(screen.getByRole("button", { name: "Start recording" }));
 
     await waitFor(() => {
-      // MetricCard "Captured values" shows "2" (liveRows.length)
-      expect(screen.getByText("2")).toBeTruthy();
+      expect(screen.getByText("42")).toBeTruthy();
     });
   });
 
-  it("shows 0 if SSE delivers no rows while capturing (no fake increment)", async () => {
+  it("shows persisted values even if SSE delivers no rows while capturing", async () => {
     const user = userEvent.setup();
 
     // SSE connected but no rows
     mockUseLiveValues.mockReturnValue({ rows: [], status: "open" });
-    mockApiFetch.mockResolvedValue(startResponse);
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path.endsWith("/recording/status")) return Promise.resolve({ capturing: false, recordingId: null });
+      if (path.endsWith("/recording/start")) return Promise.resolve(startResponse);
+      return Promise.resolve({ ...startResponse, valueCount: 42 });
+    });
 
     renderPage();
     await user.click(screen.getByRole("button", { name: "Start recording" }));
@@ -273,8 +280,7 @@ describe("RecordingFlowPage — value count synced from SSE rows", () => {
       expect(allText).toContain("Recording");
     });
 
-    // "Captured values" MetricCard must show 0, not some fake-incremented number
-    expect(screen.getByText("0")).toBeTruthy();
+    expect(screen.getByText("42")).toBeTruthy();
   });
 });
 
@@ -284,11 +290,14 @@ describe("RecordingFlowPage — stop recording", () => {
 
     mockUseLiveValues.mockReturnValue({ rows: [], status: "open" });
 
-    mockApiFetch
-      // UI-476: mount-time capture-status check fires before any user action.
-      .mockResolvedValueOnce({ capturing: false, recordingId: null })
-      .mockResolvedValueOnce(startResponse)
-      .mockResolvedValueOnce({ ...startResponse, valueCount: 42 });
+    mockApiFetch.mockImplementation((path: string, init?: { method?: string }) => {
+      if (path.endsWith("/recording/status")) return Promise.resolve({ capturing: false, recordingId: null });
+      if (path.endsWith("/recording/start")) return Promise.resolve(startResponse);
+      if (path.endsWith("/recording/stop") && init?.method === "POST") {
+        return Promise.resolve({ ...startResponse, valueCount: 42 });
+      }
+      return Promise.resolve({ ...startResponse, valueCount: 7 });
+    });
 
     renderPage();
     await user.click(screen.getByRole("button", { name: "Start recording" }));

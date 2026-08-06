@@ -156,6 +156,10 @@ class RecordingServiceTest {
                 NeutralValue.good("temp", t, 21.5),
                 NeutralValue.good("temp", t.plusSeconds(1), 22.0)));
 
+        Recording duringCapture = service.get(PROJECT, started.id());
+        assertThat(duringCapture.valueCount()).isEqualTo(2);
+        assertThat(duringCapture.sizeBytes()).isPositive();
+
         Recording stopped = service.stopCapture(PROJECT, SOURCE);
         assertThat(stopped.id()).isEqualTo(started.id());
         assertThat(stopped.valueCount()).isEqualTo(2);
