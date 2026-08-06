@@ -38,13 +38,20 @@ final class OpcUaCapture {
 
     private static final double PUBLISHING_INTERVAL_MILLIS = 200.0;
     private static final int INITIAL_READ_BATCH_SIZE = 100;
+    /**
+     * Keep monitored-item creation bounded as well as the initial Read requests.
+     * Some real servers reject or stall a single CreateMonitoredItems request with
+     * hundreds of items, which used to prevent any initial values from reaching
+     * the recording stream.
+     */
+    private static final int MONITORED_ITEM_BATCH_SIZE = 100;
 
     private final OpcUaClient client;
-    private final OpcUaSubscription subscription;
+    private final List<OpcUaSubscription> subscriptions;
 
-    private OpcUaCapture(OpcUaClient client, OpcUaSubscription subscription) {
+    private OpcUaCapture(OpcUaClient client, List<OpcUaSubscription> subscriptions) {
         this.client = client;
-        this.subscription = subscription;
+        this.subscriptions = subscriptions;
     }
 
     /** A variable to capture: its neutral node id (parseable OPC UA NodeId) and neutral type. */
@@ -81,23 +88,49 @@ final class OpcUaCapture {
                 byNodeId.put(id, node);
                 nodeIds.add(id);
             }
-            OpcUaSubscription subscription = new OpcUaSubscription(client, PUBLISHING_INTERVAL_MILLIS);
-            subscription.create();
-            for (NodeId nodeId : nodeIds) {
-                OpcUaMonitoredItem item = OpcUaMonitoredItem.newDataItem(nodeId);
-                item.setDataValueListener((monitoredItem, value) -> {
-                    NodeSpec spec = byNodeId.get(monitoredItem.getReadValueId().getNodeId());
-                    if (spec != null) {
-                        sink.accept(List.of(toProtoValue(spec, value)));
+            List<OpcUaSubscription> subscriptions = new ArrayList<>();
+            Exception firstBatchFailure = null;
+            for (int offset = 0; offset < nodeIds.size(); offset += MONITORED_ITEM_BATCH_SIZE) {
+                int end = Math.min(offset + MONITORED_ITEM_BATCH_SIZE, nodeIds.size());
+                List<NodeId> batch = nodeIds.subList(offset, end);
+                OpcUaSubscription subscription = null;
+                try {
+                    subscription = new OpcUaSubscription(client, PUBLISHING_INTERVAL_MILLIS);
+                    subscription.create();
+                    for (NodeId nodeId : batch) {
+                        OpcUaMonitoredItem item = OpcUaMonitoredItem.newDataItem(nodeId);
+                        item.setDataValueListener((monitoredItem, value) -> {
+                            NodeSpec spec = byNodeId.get(monitoredItem.getReadValueId().getNodeId());
+                            if (spec != null) {
+                                sink.accept(List.of(toProtoValue(spec, value)));
+                            }
+                        });
+                        subscription.addMonitoredItem(item);
                     }
-                });
-                subscription.addMonitoredItem(item);
+                    subscription.createMonitoredItems();
+                    subscriptions.add(subscription);
+
+                    // Emit a readable initial state as each subscription becomes live.
+                    // This prevents a slow later batch from starving a recording of all
+                    // values from the first successfully subscribed batch.
+                    emitInitialValues(client, batch, byNodeId, sink);
+                } catch (Exception e) {
+                    if (firstBatchFailure == null) {
+                        firstBatchFailure = e;
+                    }
+                    if (subscription != null) {
+                        try {
+                            subscription.delete();
+                        } catch (Exception ignored) {
+                            // best effort; the remaining batches may still be usable
+                        }
+                    }
+                }
             }
-            if (!nodeIds.isEmpty()) {
-                subscription.createMonitoredItems();
-                emitInitialValues(client, nodeIds, byNodeId, sink);
+            if (!nodeIds.isEmpty() && subscriptions.isEmpty() && firstBatchFailure != null) {
+                throw firstBatchFailure;
             }
-            return new OpcUaCapture(client, subscription);
+            return new OpcUaCapture(client, subscriptions);
         } catch (Exception e) {
             OpcUaClientSupport.disconnectQuietly(client);
             throw e;
@@ -147,10 +180,12 @@ final class OpcUaCapture {
 
     /** Cancels the subscription and disconnects; best-effort and idempotent. */
     void stop() {
-        try {
-            subscription.delete();
-        } catch (Exception ignored) {
-            // best effort; we are tearing down a capture session
+        for (OpcUaSubscription subscription : subscriptions) {
+            try {
+                subscription.delete();
+            } catch (Exception ignored) {
+                // best effort; we are tearing down a capture session
+            }
         }
         OpcUaClientSupport.disconnectQuietly(client);
     }

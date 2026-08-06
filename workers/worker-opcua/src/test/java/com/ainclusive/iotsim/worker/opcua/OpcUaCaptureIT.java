@@ -12,6 +12,7 @@ import java.net.ServerSocket;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.stream.IntStream;
 import org.eclipse.milo.opcua.stack.core.types.builtin.DataValue;
 import org.eclipse.milo.opcua.stack.core.types.builtin.Variant;
 import org.eclipse.milo.opcua.stack.core.types.builtin.unsigned.Unsigned;
@@ -85,6 +86,36 @@ class OpcUaCaptureIT {
             Value last = received.get(received.size() - 1);
             assertThat(last.getNodeId()).isEqualTo(nodeId);
             assertThat(last.getQuality()).isEqualTo(Quality.GOOD);
+        } finally {
+            if (capture != null) {
+                capture.stop();
+            }
+            runtime.stop();
+        }
+    }
+
+    @Test
+    void capturesInitialValuesAcrossMultipleMonitoredItemBatches() throws Exception {
+        int port = freePort();
+        List<VarDef> variables = IntStream.range(0, 101)
+                .mapToObj(index -> new VarDef("reading-" + index, "Reading " + index, "FLOAT64"))
+                .toList();
+        OpcUaServerRuntime runtime = new OpcUaServerRuntime(port, variables);
+        runtime.start();
+        List<Value> received = new CopyOnWriteArrayList<>();
+        OpcUaCapture capture = null;
+        try {
+            List<OpcUaCapture.NodeSpec> nodes = variables.stream()
+                    .map(variable -> new OpcUaCapture.NodeSpec(
+                            runtime.variableNodeId(variable.nodeId()).toParseableString(), "FLOAT64"))
+                    .toList();
+
+            capture = OpcUaCapture.start(runtime.endpointUrl(), "ANONYMOUS", null, null, nodes, received::addAll);
+
+            awaitUntil(() -> received.size() >= variables.size());
+            assertThat(received).extracting(Value::getNodeId)
+                    .contains(runtime.variableNodeId("reading-0").toParseableString())
+                    .contains(runtime.variableNodeId("reading-100").toParseableString());
         } finally {
             if (capture != null) {
                 capture.stop();
