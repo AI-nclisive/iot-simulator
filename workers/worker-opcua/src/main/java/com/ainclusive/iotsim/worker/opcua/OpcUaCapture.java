@@ -40,14 +40,17 @@ final class OpcUaCapture {
 
     private static final Logger LOG = LoggerFactory.getLogger(OpcUaCapture.class);
     private static final double PUBLISHING_INTERVAL_MILLIS = 200.0;
-    private static final int INITIAL_READ_BATCH_SIZE = 100;
+    // Public and embedded OPC UA servers can impose very small operation limits.
+    // Ten preserves a usable capture even on those endpoints; larger schemas are
+    // split rather than rejected as one oversized operation.
+    private static final int INITIAL_READ_BATCH_SIZE = 10;
     /**
      * Keep monitored-item creation bounded as well as the initial Read requests.
      * Some real servers reject or stall a single CreateMonitoredItems request with
      * hundreds of items, which used to prevent any initial values from reaching
      * the recording stream.
      */
-    private static final int MONITORED_ITEM_BATCH_SIZE = 25;
+    private static final int MONITORED_ITEM_BATCH_SIZE = 10;
 
     private final OpcUaClient client;
     private final List<OpcUaSubscription> subscriptions;
@@ -140,7 +143,7 @@ final class OpcUaCapture {
     /**
      * A monitored-item callback is not a reliable initial-state mechanism: a real
      * server can leave a static value untouched for the whole recording. Read the
-     * configured nodes in bounded requests after subscriptions are active, so the
+     * configured nodes in bounded requests before subscriptions are active, so the
      * initial state is recorded without leaving a large gap before live updates.
      */
     private static void emitInitialValues(OpcUaClient client, List<NodeId> nodeIds,

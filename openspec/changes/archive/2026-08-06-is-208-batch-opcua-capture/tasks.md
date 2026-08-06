@@ -8,4 +8,4 @@
 
 - [x] 2.1 Add integration coverage for more variables than one batch.
 - [x] 2.2 Run focused OPC UA capture tests.
-- [ ] 2.3 Rebuild the local worker and repeat the public endpoint E2E capture.
+- [x] 2.3 Rebuild the local worker and repeat the public endpoint E2E capture.

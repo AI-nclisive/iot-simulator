@@ -1,7 +1,6 @@
 package com.ainclusive.iotsim.worker.opcua;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
 import com.ainclusive.iotsim.workercontract.v1.CaptureRequest;
 import com.ainclusive.iotsim.workercontract.v1.DataTypeEnumValueMsg;
@@ -46,7 +45,7 @@ class OpcUaCaptureSchemaTest {
     }
 
     @Test
-    void rejectsStructuredOrMissingNativeEncodingBeforeConnecting() {
+    void skipsStructuredOrMissingNativeEncodingWithoutRejectingCapture() {
         CaptureRequest request = CaptureRequest.newBuilder().setSchema(Schema.newBuilder()
                 .addNodes(SchemaNodeMsg.newBuilder()
                         .setNodeId("ns=2;s=reading")
@@ -54,13 +53,11 @@ class OpcUaCaptureSchemaTest {
                         .setDataTypeNodeId("ns=2;i=7001")))
                 .build();
 
-        assertThatIllegalArgumentException().isThrownBy(() -> OpcUaProtocolService.captureNodes(request))
-                .withMessageContaining("without an executable encoding")
-                .withMessageContaining("ns=2;i=7001");
+        assertThat(OpcUaProtocolService.captureNodes(request)).isEmpty();
     }
 
     @Test
-    void rejectsOptionSetInsteadOfTreatingItsBitsAsAnEnum() {
+    void skipsOptionSetInsteadOfTreatingItsBitsAsAnEnum() {
         CaptureRequest request = CaptureRequest.newBuilder().setSchema(Schema.newBuilder()
                 .addNodes(SchemaNodeMsg.newBuilder()
                         .setNodeId("ns=2;i=7001")
@@ -75,9 +72,24 @@ class OpcUaCaptureSchemaTest {
                         .setDataTypeNodeId("ns=2;i=7001")))
                 .build();
 
-        assertThatIllegalArgumentException().isThrownBy(() -> OpcUaProtocolService.captureNodes(request))
-                .withMessageContaining("without an executable encoding")
-                .withMessageContaining("ns=2;i=7001");
+        assertThat(OpcUaProtocolService.captureNodes(request)).isEmpty();
+    }
+
+    @Test
+    void keepsSupportedVariablesWhenSchemaAlsoHasOpaqueNativeVariable() {
+        CaptureRequest request = CaptureRequest.newBuilder().setSchema(Schema.newBuilder()
+                .addNodes(SchemaNodeMsg.newBuilder()
+                        .setNodeId("ns=2;s=opaque")
+                        .setKind("VARIABLE")
+                        .setDataTypeNodeId("ns=2;i=7001"))
+                .addNodes(SchemaNodeMsg.newBuilder()
+                        .setNodeId("ns=2;s=temperature")
+                        .setKind("VARIABLE")
+                        .setDataType("FLOAT64")))
+                .build();
+
+        assertThat(OpcUaProtocolService.captureNodes(request))
+                .containsExactly(new OpcUaCapture.NodeSpec("ns=2;s=temperature", "FLOAT64"));
     }
 
     @Test
