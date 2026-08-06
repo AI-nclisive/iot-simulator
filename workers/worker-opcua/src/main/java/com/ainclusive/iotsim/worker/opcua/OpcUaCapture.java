@@ -12,11 +12,16 @@ import java.util.function.Consumer;
 import org.eclipse.milo.opcua.sdk.client.OpcUaClient;
 import org.eclipse.milo.opcua.sdk.client.subscriptions.OpcUaMonitoredItem;
 import org.eclipse.milo.opcua.sdk.client.subscriptions.OpcUaSubscription;
+import org.eclipse.milo.opcua.stack.core.AttributeId;
 import org.eclipse.milo.opcua.stack.core.types.builtin.DataValue;
 import org.eclipse.milo.opcua.stack.core.types.builtin.DateTime;
 import org.eclipse.milo.opcua.stack.core.types.builtin.ExtensionObject;
 import org.eclipse.milo.opcua.stack.core.types.builtin.NodeId;
+import org.eclipse.milo.opcua.stack.core.types.builtin.QualifiedName;
 import org.eclipse.milo.opcua.stack.core.types.builtin.StatusCode;
+import org.eclipse.milo.opcua.stack.core.types.enumerated.TimestampsToReturn;
+import org.eclipse.milo.opcua.stack.core.types.structured.ReadResponse;
+import org.eclipse.milo.opcua.stack.core.types.structured.ReadValueId;
 
 /**
  * OPC UA <em>client-mode</em> live capture (IS-045): connects to a real source,
@@ -32,6 +37,7 @@ import org.eclipse.milo.opcua.stack.core.types.builtin.StatusCode;
 final class OpcUaCapture {
 
     private static final double PUBLISHING_INTERVAL_MILLIS = 200.0;
+    private static final int INITIAL_READ_BATCH_SIZE = 100;
 
     private final OpcUaClient client;
     private final OpcUaSubscription subscription;
@@ -89,11 +95,53 @@ final class OpcUaCapture {
             }
             if (!nodeIds.isEmpty()) {
                 subscription.createMonitoredItems();
+                emitInitialValues(client, nodeIds, byNodeId, sink);
             }
             return new OpcUaCapture(client, subscription);
         } catch (Exception e) {
             OpcUaClientSupport.disconnectQuietly(client);
             throw e;
+        }
+    }
+
+    /**
+     * A monitored-item callback is not a reliable initial-state mechanism: a real
+     * server can leave a static value untouched for the whole recording. Read the
+     * configured nodes in bounded requests after subscriptions are active, so the
+     * initial state is recorded without leaving a large gap before live updates.
+     */
+    private static void emitInitialValues(OpcUaClient client, List<NodeId> nodeIds,
+            Map<NodeId, NodeSpec> byNodeId, Consumer<List<Value>> sink) {
+        for (int offset = 0; offset < nodeIds.size(); offset += INITIAL_READ_BATCH_SIZE) {
+            int end = Math.min(offset + INITIAL_READ_BATCH_SIZE, nodeIds.size());
+            List<NodeId> batch = nodeIds.subList(offset, end);
+            List<ReadValueId> requests = batch.stream()
+                    .map(nodeId -> new ReadValueId(
+                            nodeId, AttributeId.Value.uid(), null, QualifiedName.NULL_VALUE))
+                    .toList();
+            try {
+                ReadResponse response = client.read(0.0, TimestampsToReturn.Both, requests);
+                DataValue[] values = response.getResults();
+                if (values == null) {
+                    continue;
+                }
+                for (int index = 0; index < Math.min(batch.size(), values.length); index++) {
+                    DataValue value = values[index];
+                    NodeSpec spec = byNodeId.get(batch.get(index));
+                    if (spec == null || value == null || value.getStatusCode() == null
+                            || !value.getStatusCode().isGood()) {
+                        continue;
+                    }
+                    try {
+                        sink.accept(List.of(toProtoValue(spec, value)));
+                    } catch (RuntimeException ignored) {
+                        // A node with an unsupported or malformed value must not suppress
+                        // initial values from the rest of the configured schema.
+                    }
+                }
+            } catch (Exception ignored) {
+                // Preserve the live subscription even when one remote read batch fails.
+            }
         }
     }
 
