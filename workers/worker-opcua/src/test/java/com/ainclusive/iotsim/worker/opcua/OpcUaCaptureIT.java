@@ -60,7 +60,7 @@ class OpcUaCaptureIT {
     }
 
     @Test
-    void capturesValueChangesFromRunningServer() throws Exception {
+    void capturesInitialValueAndChangesFromRunningServer() throws Exception {
         int port = freePort();
         OpcUaServerRuntime runtime = new OpcUaServerRuntime(
                 port, List.of(new VarDef("temp", "Temperature", "FLOAT64")));
@@ -72,7 +72,12 @@ class OpcUaCaptureIT {
             capture = OpcUaCapture.start(runtime.endpointUrl(), "ANONYMOUS", null, null,
                     List.of(new OpcUaCapture.NodeSpec(nodeId, "FLOAT64")), received::addAll);
 
-            // A change on the real server must surface as a captured neutral value.
+            // A static value must be captured immediately, without waiting for a
+            // data-change notification from the real server.
+            awaitUntil(() -> !received.isEmpty());
+            assertThat(received.getFirst().getNodeId()).isEqualTo(nodeId);
+
+            // Subsequent changes must still surface as captured neutral values.
             runtime.updateValue("temp", 42.5d);
             awaitUntil(() -> decodedDoubles(received).contains(42.5d));
 
