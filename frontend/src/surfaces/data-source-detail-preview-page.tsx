@@ -103,6 +103,7 @@ export function DataSourceDetailPreviewPage() {
   const stopDataSource = useDataSourcesStore((state) => state.stopDataSource);
   const runSynthetic = useDataSourcesStore((state) => state.runSynthetic);
   const stopSynthetic = useDataSourcesStore((state) => state.stopSynthetic);
+  const startingSyntheticIds = useDataSourcesStore((state) => state.startingSyntheticIds);
   const isLoading = useDataSourcesStore((state) => state.isLoading);
   const loadDataSources = useDataSourcesStore((state) => state.loadDataSources);
   const { runs: activeRuns } = useActiveRuns(currentProjectId);
@@ -348,8 +349,9 @@ export function DataSourceDetailPreviewPage() {
                 Stop
               </button>
             ) : (
-              <button className="shell-action" type="button" onClick={() => void runSyntheticSource()}>
-                Run
+              <button className="shell-action" type="button" disabled={startingSyntheticIds[activeSource.id]}
+                onClick={() => void runSyntheticSource()}>
+                {startingSyntheticIds[activeSource.id] ? "Starting…" : "Run"}
               </button>
             )
           ) : null}
