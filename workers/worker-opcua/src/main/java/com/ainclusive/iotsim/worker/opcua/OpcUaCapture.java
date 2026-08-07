@@ -22,6 +22,8 @@ import org.eclipse.milo.opcua.stack.core.types.builtin.StatusCode;
 import org.eclipse.milo.opcua.stack.core.types.enumerated.TimestampsToReturn;
 import org.eclipse.milo.opcua.stack.core.types.structured.ReadResponse;
 import org.eclipse.milo.opcua.stack.core.types.structured.ReadValueId;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * OPC UA <em>client-mode</em> live capture (IS-045): connects to a real source,
@@ -36,15 +38,25 @@ import org.eclipse.milo.opcua.stack.core.types.structured.ReadValueId;
  */
 final class OpcUaCapture {
 
+    private static final Logger LOG = LoggerFactory.getLogger(OpcUaCapture.class);
     private static final double PUBLISHING_INTERVAL_MILLIS = 200.0;
+    // Initial Read has already proven reliable at this bound; monitored-item
+    // creation below is separately constrained for stricter public endpoints.
     private static final int INITIAL_READ_BATCH_SIZE = 100;
+    /**
+     * Keep monitored-item creation bounded as well as the initial Read requests.
+     * Some real servers reject or stall a single CreateMonitoredItems request with
+     * hundreds of items, which used to prevent any initial values from reaching
+     * the recording stream.
+     */
+    private static final int MONITORED_ITEM_BATCH_SIZE = 10;
 
     private final OpcUaClient client;
-    private final OpcUaSubscription subscription;
+    private final List<OpcUaSubscription> subscriptions;
 
-    private OpcUaCapture(OpcUaClient client, OpcUaSubscription subscription) {
+    private OpcUaCapture(OpcUaClient client, List<OpcUaSubscription> subscriptions) {
         this.client = client;
-        this.subscription = subscription;
+        this.subscriptions = subscriptions;
     }
 
     /** A variable to capture: its neutral node id (parseable OPC UA NodeId) and neutral type. */
@@ -81,23 +93,47 @@ final class OpcUaCapture {
                 byNodeId.put(id, node);
                 nodeIds.add(id);
             }
-            OpcUaSubscription subscription = new OpcUaSubscription(client, PUBLISHING_INTERVAL_MILLIS);
-            subscription.create();
-            for (NodeId nodeId : nodeIds) {
-                OpcUaMonitoredItem item = OpcUaMonitoredItem.newDataItem(nodeId);
-                item.setDataValueListener((monitoredItem, value) -> {
-                    NodeSpec spec = byNodeId.get(monitoredItem.getReadValueId().getNodeId());
-                    if (spec != null) {
-                        sink.accept(List.of(toProtoValue(spec, value)));
+            // A real endpoint can accept Read while imposing a much smaller limit
+            // (or longer processing time) on CreateMonitoredItems. Publish the
+            // initial snapshot before subscription setup so that one slow or
+            // rejected monitored-item batch cannot leave a recording empty.
+            emitInitialValues(client, nodeIds, byNodeId, sink);
+            List<OpcUaSubscription> subscriptions = new ArrayList<>();
+            for (int offset = 0; offset < nodeIds.size(); offset += MONITORED_ITEM_BATCH_SIZE) {
+                int end = Math.min(offset + MONITORED_ITEM_BATCH_SIZE, nodeIds.size());
+                List<NodeId> batch = nodeIds.subList(offset, end);
+                OpcUaSubscription subscription = null;
+                try {
+                    subscription = new OpcUaSubscription(client, PUBLISHING_INTERVAL_MILLIS);
+                    subscription.create();
+                    for (NodeId nodeId : batch) {
+                        OpcUaMonitoredItem item = OpcUaMonitoredItem.newDataItem(nodeId);
+                        item.setDataValueListener((monitoredItem, value) -> {
+                            NodeSpec spec = byNodeId.get(monitoredItem.getReadValueId().getNodeId());
+                            if (spec != null) {
+                                sink.accept(List.of(toProtoValue(spec, value)));
+                            }
+                        });
+                        subscription.addMonitoredItem(item);
                     }
-                });
-                subscription.addMonitoredItem(item);
+                    subscription.createMonitoredItems();
+                    subscriptions.add(subscription);
+                } catch (Exception e) {
+                    LOG.warn("OPC UA subscription batch failed for {} nodes, continuing", batch.size(), e);
+                    if (subscription != null) {
+                        try {
+                            subscription.delete();
+                        } catch (Exception ignored) {
+                            // best effort; the remaining batches may still be usable
+                        }
+                    }
+                }
             }
-            if (!nodeIds.isEmpty()) {
-                subscription.createMonitoredItems();
-                emitInitialValues(client, nodeIds, byNodeId, sink);
-            }
-            return new OpcUaCapture(client, subscription);
+            // Keep the capture stream open even when a server refuses every
+            // monitored-item batch. The initial snapshot has already been
+            // delivered where the endpoint permits reading; callers can retain it
+            // instead of receiving an empty, disconnected recording.
+            return new OpcUaCapture(client, subscriptions);
         } catch (Exception e) {
             OpcUaClientSupport.disconnectQuietly(client);
             throw e;
@@ -107,7 +143,7 @@ final class OpcUaCapture {
     /**
      * A monitored-item callback is not a reliable initial-state mechanism: a real
      * server can leave a static value untouched for the whole recording. Read the
-     * configured nodes in bounded requests after subscriptions are active, so the
+     * configured nodes in bounded requests before subscriptions are active, so the
      * initial state is recorded without leaving a large gap before live updates.
      */
     private static void emitInitialValues(OpcUaClient client, List<NodeId> nodeIds,
@@ -141,16 +177,19 @@ final class OpcUaCapture {
                 }
             } catch (Exception ignored) {
                 // Preserve the live subscription even when one remote read batch fails.
+                LOG.warn("OPC UA initial read failed for {} nodes", batch.size(), ignored);
             }
         }
     }
 
     /** Cancels the subscription and disconnects; best-effort and idempotent. */
     void stop() {
-        try {
-            subscription.delete();
-        } catch (Exception ignored) {
-            // best effort; we are tearing down a capture session
+        for (OpcUaSubscription subscription : subscriptions) {
+            try {
+                subscription.delete();
+            } catch (Exception ignored) {
+                // best effort; we are tearing down a capture session
+            }
         }
         OpcUaClientSupport.disconnectQuietly(client);
     }

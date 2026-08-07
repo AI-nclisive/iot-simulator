@@ -369,11 +369,10 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
                 }
             }
             if (dataType.isEmpty() && defaultEncodingId.isEmpty()) {
-                String declared = node.getDataTypeNodeId().isEmpty()
-                        ? "unspecified DataType"
-                        : node.getDataTypeNodeId();
-                throw new IllegalArgumentException(
-                        "capture cannot encode native DataType without an executable encoding: " + declared);
+                // A scanned endpoint can contain opaque native variables beside
+                // ordinary scalar variables. They cannot be encoded without
+                // guessing, but must not reject the whole capture request.
+                continue;
             }
             nodes.add(new OpcUaCapture.NodeSpec(node.getNodeId(), dataType.isEmpty() ? null : dataType,
                     defaultEncodingId.isEmpty() ? null : defaultEncodingId,

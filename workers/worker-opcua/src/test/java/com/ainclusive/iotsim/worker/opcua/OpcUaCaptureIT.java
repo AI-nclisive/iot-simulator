@@ -4,19 +4,31 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
 import com.ainclusive.iotsim.protocolmodel.ValueCodec;
+import com.ainclusive.iotsim.workercontract.v1.CaptureRequest;
+import com.ainclusive.iotsim.workercontract.v1.ConnectionConfigMsg;
+import com.ainclusive.iotsim.workercontract.v1.ProtocolDataSourceGrpc;
 import com.ainclusive.iotsim.workercontract.v1.Quality;
+import com.ainclusive.iotsim.workercontract.v1.Schema;
 import com.ainclusive.iotsim.workercontract.v1.Value;
+import com.ainclusive.iotsim.workercontract.v1.ValueBatch;
+import io.grpc.ManagedChannel;
+import io.grpc.ManagedChannelBuilder;
+import io.grpc.stub.StreamObserver;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.IntStream;
 import org.eclipse.milo.opcua.stack.core.types.builtin.DataValue;
 import org.eclipse.milo.opcua.stack.core.types.builtin.Variant;
 import org.eclipse.milo.opcua.stack.core.types.builtin.unsigned.Unsigned;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 /**
  * Drives {@link OpcUaCapture} as an OPC UA client against a real embedded Milo
@@ -90,6 +102,121 @@ class OpcUaCaptureIT {
                 capture.stop();
             }
             runtime.stop();
+        }
+    }
+
+    @Test
+    void capturesInitialValuesAcrossMultipleMonitoredItemBatches() throws Exception {
+        int port = freePort();
+        List<VarDef> variables = IntStream.range(0, 101)
+                .mapToObj(index -> new VarDef("reading-" + index, "Reading " + index, "FLOAT64"))
+                .toList();
+        OpcUaServerRuntime runtime = new OpcUaServerRuntime(port, variables);
+        runtime.start();
+        List<Value> received = new CopyOnWriteArrayList<>();
+        OpcUaCapture capture = null;
+        try {
+            List<OpcUaCapture.NodeSpec> nodes = variables.stream()
+                    .map(variable -> new OpcUaCapture.NodeSpec(
+                            runtime.variableNodeId(variable.nodeId()).toParseableString(), "FLOAT64"))
+                    .toList();
+
+            capture = OpcUaCapture.start(runtime.endpointUrl(), "ANONYMOUS", null, null, nodes, received::addAll);
+
+            awaitUntil(() -> received.size() >= variables.size());
+            assertThat(received).extracting(Value::getNodeId)
+                    .contains(runtime.variableNodeId("reading-0").toParseableString())
+                    .contains(runtime.variableNodeId("reading-100").toParseableString());
+        } finally {
+            if (capture != null) {
+                capture.stop();
+            }
+            runtime.stop();
+        }
+    }
+
+    @Test
+    @EnabledIfSystemProperty(named = "iotsim.public-opcua-e2e", matches = "true")
+    void capturesInitialValueFromPublicDemoServer() throws Exception {
+        List<Value> received = new CopyOnWriteArrayList<>();
+        OpcUaCapture capture = null;
+        try {
+            capture = OpcUaCapture.start(
+                    "opc.tcp://opcua.demo-this.com:51210/UA/SampleServer", "ANONYMOUS", null, null,
+                    List.of(
+                            new OpcUaCapture.NodeSpec("ns=2;i=10160", "BOOL"),
+                            new OpcUaCapture.NodeSpec("ns=2;i=10164", "BYTES"),
+                            new OpcUaCapture.NodeSpec("ns=2;i=10165", "NODE_ID"),
+                            new OpcUaCapture.NodeSpec("ns=2;i=10167", "STRING"),
+                            new OpcUaCapture.NodeSpec("ns=2;i=10171", "LOCALIZED_TEXT"),
+                            new OpcUaCapture.NodeSpec("ns=2;i=10172", "UINT16"),
+                            new OpcUaCapture.NodeSpec("ns=2;i=10181", "STATUS_CODE"),
+                            new OpcUaCapture.NodeSpec("ns=2;i=10217", "INT8"),
+                            new OpcUaCapture.NodeSpec("ns=2;i=10218", "UINT8"),
+                            new OpcUaCapture.NodeSpec("ns=2;i=10657", "LOCALIZED_TEXT")), received::addAll);
+
+            awaitUntil(() -> !received.isEmpty());
+            assertThat(received).extracting(Value::getNodeId).contains("ns=2;i=10657");
+        } finally {
+            if (capture != null) {
+                capture.stop();
+            }
+        }
+    }
+
+    @Test
+    @EnabledIfSystemProperty(named = "iotsim.public-opcua-e2e", matches = "true")
+    void capturesInitialValuesFromPublicDemoFullSchema() throws Exception {
+        String endpoint = "opc.tcp://opcua.demo-this.com:51210/UA/SampleServer";
+        OpcUaDiscovery.ScanOutcome scan = OpcUaDiscovery.scan(
+                endpoint, new OpcUaDiscovery.Credentials("ANONYMOUS", null, null), 0, () -> { }, soFar -> { });
+        List<OpcUaCapture.NodeSpec> nodes = scan.nodes().stream()
+                .filter(node -> "VARIABLE".equals(node.getKind()) && !node.getDataType().isBlank())
+                .map(node -> new OpcUaCapture.NodeSpec(node.getNodeId(), node.getDataType()))
+                .toList();
+        List<Value> received = new CopyOnWriteArrayList<>();
+        OpcUaCapture capture = null;
+        try {
+            capture = OpcUaCapture.start(endpoint, "ANONYMOUS", null, null, nodes, received::addAll);
+
+            awaitUntil(() -> !received.isEmpty());
+            assertThat(received).isNotEmpty();
+            received.forEach(value -> {
+                Object decoded = ValueCodec.decode(
+                        ValueCodec.Kind.valueOf(value.getValueKind()), value.getValueEnc().toByteArray());
+                assertThat(ValueCodec.encode(decoded)).isNotNull();
+            });
+        } finally {
+            if (capture != null) {
+                capture.stop();
+            }
+        }
+    }
+
+    @Test
+    @EnabledIfSystemProperty(named = "iotsim.public-opcua-e2e", matches = "true")
+    void streamsFullPublicSchemaOverGrpc() throws Exception {
+        String endpoint = "opc.tcp://opcua.demo-this.com:51210/UA/SampleServer";
+        OpcUaDiscovery.ScanOutcome scan = OpcUaDiscovery.scan(
+                endpoint, new OpcUaDiscovery.Credentials("ANONYMOUS", null, null), 0, () -> { }, soFar -> { });
+        WorkerServer worker = new WorkerServer(0, new OpcUaProtocolService()).start();
+        ManagedChannel channel = ManagedChannelBuilder.forAddress("127.0.0.1", worker.port()).usePlaintext().build();
+        CountDownLatch received = new CountDownLatch(1);
+        try {
+            ProtocolDataSourceGrpc.newStub(channel).capture(CaptureRequest.newBuilder()
+                    .setEndpointUrl(endpoint)
+                    .setCredentials(ConnectionConfigMsg.newBuilder().setMode("ANONYMOUS"))
+                    .setSchema(Schema.newBuilder().addAllNodes(scan.nodes()))
+                    .build(), new StreamObserver<>() {
+                        @Override public void onNext(ValueBatch ignored) { received.countDown(); }
+                        @Override public void onError(Throwable error) { throw new AssertionError(error); }
+                        @Override public void onCompleted() { }
+                    });
+
+            assertThat(received.await(20, TimeUnit.SECONDS)).isTrue();
+        } finally {
+            channel.shutdownNow();
+            worker.stop();
         }
     }
 
