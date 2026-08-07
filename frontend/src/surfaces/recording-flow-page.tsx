@@ -175,12 +175,28 @@ export function RecordingFlowPage() {
     captureActive,
   );
 
-  // Keep value count in sync with SSE rows during capture
+  // SSE is intentionally conflated by node id, so it cannot represent the
+  // full-fidelity recording count. Poll the recording metadata instead.
   useEffect(() => {
-    if (captureActive) {
-      setValueCount(liveRows.length);
-    }
-  }, [captureActive, liveRows.length]);
+    if (!captureActive || !currentProjectId || !activeRecordingId) return;
+    let cancelled = false;
+    const refreshCount = async () => {
+      try {
+        const recording = await apiFetch<RecordingResponse>(
+          `/api/v1/projects/${currentProjectId}/recordings/${activeRecordingId}`,
+        );
+        if (!cancelled) setValueCount(recording.valueCount);
+      } catch {
+        // Best-effort observation; Stop still returns the final authoritative count.
+      }
+    };
+    void refreshCount();
+    const interval = window.setInterval(() => void refreshCount(), 2000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [activeRecordingId, captureActive, currentProjectId]);
 
   // Transition recording state from SSE connection status
   useEffect(() => {

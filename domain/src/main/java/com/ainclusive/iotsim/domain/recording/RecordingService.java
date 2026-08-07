@@ -479,9 +479,15 @@ public class RecordingService {
     }
 
     private Recording map(RecordingRow r, Instant lastUsedAt, boolean hasDependents) {
+        long valueCount = r.valueCount();
+        long sizeBytes = r.sizeBytes();
+        if (active.values().stream().anyMatch(capture -> capture.recordingId().equals(r.id()))) {
+            valueCount = timeline.count(r.id());
+            sizeBytes = timeline.sumBytes(r.id());
+        }
         return new Recording(
                 r.id(), r.projectId(), r.dataSourceId(), r.protocol(), r.schemaVersion(), r.origin(),
-                r.scanType(), r.name(), r.valueCount(), r.sizeBytes(), r.createdAt().toInstant(),
+                r.scanType(), r.name(), valueCount, sizeBytes, r.createdAt().toInstant(),
                 r.createdBy(), r.version(), lastUsedAt, hasDependents);
     }
 
