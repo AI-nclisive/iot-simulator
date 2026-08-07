@@ -180,7 +180,7 @@ public class RecordingService {
                 } catch (RuntimeException e) {
                     // Best-effort live observation must never break capture persistence.
                 }
-            });
+            }, failure -> captureFailed(projectId, dsId, recording.id()));
             return new ActiveCapture(recording.id(), session);
         });
         if (!started[0]) {
@@ -231,6 +231,25 @@ public class RecordingService {
         return capture == null
                 ? new CaptureStatus(false, null)
                 : new CaptureStatus(true, capture.recordingId());
+    }
+
+    /**
+     * A capture worker has already torn its session down after an asynchronous
+     * stream failure. Remove only the matching handle (a later retry must survive)
+     * and persist every value received before the failure.
+     */
+    private void captureFailed(String projectId, String dataSourceId, String recordingId) {
+        boolean[] removed = {false};
+        active.computeIfPresent(dataSourceId, (ignored, capture) -> {
+            if (capture.recordingId().equals(recordingId)) {
+                removed[0] = true;
+                return null;
+            }
+            return capture;
+        });
+        if (removed[0]) {
+            complete(projectId, recordingId);
+        }
     }
 
     /** Whether a capture is active for a data source and, if so, which recording it feeds. */

@@ -110,6 +110,19 @@ class SupervisorCaptureTest {
     }
 
     @Test
+    void captureStreamFailureTearsDownWorkerAndNotifiesOwner() throws Exception {
+        Supervisor supervisor = supervisor();
+        CountDownLatch failed = new CountDownLatch(1);
+
+        supervisor.startCapture(spec(ConnectionCredentials.anonymous()), values -> { }, error -> failed.countDown());
+        assertThat(launcher.last().service().awaitCaptureStarted(5)).isTrue();
+        launcher.last().service().failCapture();
+
+        assertThat(failed.await(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(launcher.allServersShutDown()).isTrue();
+    }
+
+    @Test
     void startCaptureRejectsUnsupportedProtocolWithoutLaunching() {
         Supervisor supervisor = supervisor();
 

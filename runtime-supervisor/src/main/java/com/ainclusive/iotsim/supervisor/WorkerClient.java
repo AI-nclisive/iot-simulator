@@ -285,7 +285,9 @@ public final class WorkerClient implements AutoCloseable {
 
             @Override
             public void onCompleted() {
-                // server-streaming ends only via cancel; nothing to do
+                if (onError != null) {
+                    onError.accept(new IllegalStateException("capture stream completed unexpectedly"));
+                }
             }
         };
         async.capture(request, observer);
