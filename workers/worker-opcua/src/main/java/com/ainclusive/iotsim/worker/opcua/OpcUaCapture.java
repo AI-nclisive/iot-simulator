@@ -40,10 +40,9 @@ final class OpcUaCapture {
 
     private static final Logger LOG = LoggerFactory.getLogger(OpcUaCapture.class);
     private static final double PUBLISHING_INTERVAL_MILLIS = 200.0;
-    // Public and embedded OPC UA servers can impose very small operation limits.
-    // Ten preserves a usable capture even on those endpoints; larger schemas are
-    // split rather than rejected as one oversized operation.
-    private static final int INITIAL_READ_BATCH_SIZE = 10;
+    // Initial Read has already proven reliable at this bound; monitored-item
+    // creation below is separately constrained for stricter public endpoints.
+    private static final int INITIAL_READ_BATCH_SIZE = 100;
     /**
      * Keep monitored-item creation bounded as well as the initial Read requests.
      * Some real servers reject or stall a single CreateMonitoredItems request with
@@ -120,6 +119,7 @@ final class OpcUaCapture {
                     subscription.createMonitoredItems();
                     subscriptions.add(subscription);
                 } catch (Exception e) {
+                    LOG.warn("OPC UA subscription batch failed for {} nodes, continuing", batch.size(), e);
                     if (subscription != null) {
                         try {
                             subscription.delete();
