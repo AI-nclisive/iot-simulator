@@ -91,6 +91,7 @@ type StoreState = {
   isLoading: boolean;
   loadDataSources: typeof mockLoadDataSources;
   stopDataSource: typeof mockStopDataSource;
+  startingSyntheticIds: Record<string, boolean>;
 };
 
 function setupDataSourcesStore(partial: Partial<StoreState> = {}) {
@@ -99,6 +100,7 @@ function setupDataSourcesStore(partial: Partial<StoreState> = {}) {
     isLoading: false,
     loadDataSources: mockLoadDataSources,
     stopDataSource: mockStopDataSource,
+    startingSyntheticIds: {},
     ...partial,
   };
   mockDataSourcesStore.mockImplementation((sel: (s: StoreState) => unknown) => sel(state));
@@ -345,7 +347,7 @@ describe("DataSourceDetailPreviewPage — SYNTHETIC source buttons (UI-464)", ()
 
     renderPage();
 
-    expect(screen.getByRole("button", { name: "Run" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Run" })).toHaveProperty("disabled", false);
     expect(screen.queryByRole("link", { name: "Record" })).toBeNull();
     expect(screen.queryByRole("link", { name: "Replay recording" })).toBeNull();
     expect(screen.queryByRole("link", { name: "Simulate" })).toBeNull();
