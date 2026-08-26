@@ -25,6 +25,7 @@ import com.ainclusive.iotsim.protocolmodel.SchemaNode;
 import com.ainclusive.iotsim.protocolmodel.ValueRank;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -218,6 +219,38 @@ class SyntheticSourceServiceTest {
         SchemaNode temp = nodes.getValue().stream().filter(n -> n.nodeId().equals("temp")).findFirst().orElseThrow();
         assertThat(temp.name()).isEqualTo("Temperature");
         assertThat(temp.unit()).isEqualTo("degC");
+    }
+
+    @Test
+    void createWithManualSchemaIdPreservesNativeVariableTypeReference() {
+        SchemaNode nativeVariable = new SchemaNode(
+                "quality", null, "/Quality", "Quality", NodeKind.VARIABLE,
+                null, ValueRank.SCALAR, Access.READ, null, null,
+                List.of(), null, List.of(), "QualityEnvelope", List.of(), List.of(),
+                null, null, null, null, null);
+        Instant now = Instant.now();
+        ManualSchema nativeSchema = new ManualSchema(
+                "ms-native", PROJECT, "OPC_UA", "Native template", null,
+                List.of(nativeVariable), now, now, "local", 0);
+        SyntheticConfig nativeConfig = new SyntheticConfig(1L, List.of(
+                new SyntheticVariableConfig(
+                        "quality", null,
+                        new PatternSpec("CONSTANT", null, null, null, null, null, null, null,
+                                null, null, null, null, null, Map.of("status", 1)),
+                        250, "QualityEnvelope")));
+        given(manualSchemas.get(PROJECT, "ms-native")).willReturn(nativeSchema);
+        given(dataSources.create(eq(PROJECT), eq("Twin"), eq("OPC_UA"), eq("SYNTHETIC"),
+                any(), any(), any(), any(), any(), any(), eq("local"))).willReturn(sample("ds-native"));
+        given(dataSources.get(PROJECT, "ds-native")).willReturn(sample("ds-native"));
+
+        service.create(PROJECT, "Twin", "OPC_UA", null, nativeConfig, null, "ms-native", "local");
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<SchemaNode>> nodes = ArgumentCaptor.forClass(List.class);
+        verify(schemas).save(eq(PROJECT), eq("ds-native"), nodes.capture());
+        SchemaNode copied = nodes.getValue().getFirst();
+        assertThat(copied.dataType()).isNull();
+        assertThat(copied.dataTypeNodeId()).isEqualTo("QualityEnvelope");
     }
 
     @Test

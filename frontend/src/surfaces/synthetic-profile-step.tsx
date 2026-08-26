@@ -30,6 +30,8 @@ type SchemaNodeDto = {
   name: string;
   kind: string;
   dataType: string | null;
+  dataTypeNodeId?: string | null;
+  nativeTypeKind?: string | null;
   unit: string | null;
 };
 type SchemaResponse = { id: string; dataSourceId: string; version: number; nodes: SchemaNodeDto[] };
@@ -90,7 +92,8 @@ function patternTypesFor(dataType: string | null): { value: PatternType; label: 
  * data type. Numeric-only choices intentionally leave text/boolean/structural
  * rows untouched instead of putting them in an invalid state.
  */
-export function bulkPatternFor(dataType: string | null, pattern: PatternType): PatternType | null {
+export function bulkPatternFor(dataType: string | null, pattern: PatternType, dataTypeNodeId?: string | null): PatternType | null {
+  if (dataTypeNodeId) return null;
   if (CONSTANT_ONLY_TYPES.has(dataType ?? "")) return null;
   if (dataType === "DATETIME" && pattern !== "CONSTANT" && pattern !== "RANDOM_UNIFORM") return null;
   if (dataType === "GUID") {
@@ -211,7 +214,7 @@ export type SyntheticProfileValue = {
   measurementCount: number;
 };
 
-export function defaultDraft(dataType: string | null = null): NodeDraft {
+export function defaultDraft(dataType: string | null = null, dataTypeNodeId?: string | null): NodeDraft {
   const base = {
     enabled: true,
     min: "0",
@@ -223,6 +226,7 @@ export function defaultDraft(dataType: string | null = null): NodeDraft {
     valueIds: newListValueIds(3),
     updateRateMs: "1000",
   };
+  if (dataTypeNodeId) return { ...base, pattern: "CONSTANT", value: "{}" };
   if (dataType === "GUID") return { ...base, pattern: "RANDOM_UUID", value: defaultConstantValue(dataType) };
   if (CONSTANT_ONLY_TYPES.has(dataType ?? "")) {
     return {
@@ -299,7 +303,20 @@ function base64ToHex(b64: string): string {
  * number for ordinary measurement types, `stringValue` for identifier/text
  * structural types, `bytesValueBase64` for BYTES.
  */
-export function toPattern(d: NodeDraft, dataType: string | null = null): SyntheticPatternSpec | null {
+export function toPattern(
+  d: NodeDraft,
+  dataType: string | null = null,
+  dataTypeNodeId?: string | null,
+): SyntheticPatternSpec | null {
+  if (dataTypeNodeId) {
+    if (d.pattern !== "CONSTANT") return null;
+    try {
+      const objectValue: unknown = JSON.parse(d.value);
+      return objectValue == null ? null : { type: "CONSTANT", objectValue };
+    } catch {
+      return null;
+    }
+  }
   switch (d.pattern) {
     case "CONSTANT": {
       if (dataType === "DATETIME") {
@@ -460,6 +477,19 @@ export function SyntheticProfileStep({
   const rowRefs = useRef<Record<string, HTMLLIElement | null>>({});
 
   const variableNodes = useMemo(() => nodes.filter((n) => n.kind === "VARIABLE"), [nodes]);
+  const localTypeIds = useMemo(
+    () => new Set(nodes.filter((n) => n.kind === "DATA_TYPE").map((n) => n.nodeId)),
+    [nodes],
+  );
+  const unsupportedLocalNativeVariables = useMemo(
+    () => variableNodes.filter((n) => n.dataTypeNodeId && localTypeIds.has(n.dataTypeNodeId)),
+    [variableNodes, localTypeIds],
+  );
+  const nativeTypeError = unsupportedLocalNativeVariables.length === 0
+    ? null
+    : unsupportedLocalNativeVariables
+      .map((n) => `${n.name} uses local type ${n.dataTypeNodeId}`)
+      .join(". ") + ". Synthetic sources cannot persist local DATA_TYPE declarations yet. Use a neutral type or remove this parameter.";
 
   // Load recordings that carry captured values, for the "Prefill from recording" control.
   useEffect(() => {
@@ -486,7 +516,7 @@ export function SyntheticProfileStep({
       setLoadError(emptyMessage);
     }
     setNodes(schemaNodes);
-    setDrafts(Object.fromEntries(vars.map((n) => [n.nodeId, defaultDraft(n.dataType)])));
+    setDrafts(Object.fromEntries(vars.map((n) => [n.nodeId, defaultDraft(n.dataType, n.dataTypeNodeId)])));
   }
 
   async function pickSource(id: string) {
@@ -544,7 +574,7 @@ export function SyntheticProfileStep({
     setDrafts((cur) => {
       const next = { ...cur };
       for (const node of variableNodes) {
-        next[node.nodeId] = { ...(next[node.nodeId] ?? defaultDraft(node.dataType)), enabled };
+        next[node.nodeId] = { ...(next[node.nodeId] ?? defaultDraft(node.dataType, node.dataTypeNodeId)), enabled };
       }
       return next;
     });
@@ -556,7 +586,7 @@ export function SyntheticProfileStep({
   function setPatternForSelected(type: PatternType) {
     for (const node of variableNodes) {
       if (!drafts[node.nodeId]?.enabled) continue;
-      const pattern = bulkPatternFor(node.dataType, type);
+      const pattern = bulkPatternFor(node.dataType, type, node.dataTypeNodeId);
       if (pattern) changePattern(node.nodeId, pattern);
     }
   }
@@ -658,7 +688,7 @@ export function SyntheticProfileStep({
       const d = drafts[node.nodeId];
       if (!d || !d.enabled) continue;
       anyEnabled = true;
-      const pattern = toPattern(d, node.dataType);
+      const pattern = toPattern(d, node.dataType, node.dataTypeNodeId);
       const rate = num(d.updateRateMs);
       if (pattern == null || rate == null || rate <= 0 || !Number.isInteger(rate)) {
         valid = false;
@@ -666,13 +696,14 @@ export function SyntheticProfileStep({
       }
       variables.push({
         nodeId: node.nodeId,
-        dataType: node.dataType ?? "FLOAT64",
+        dataType: node.dataType,
         pattern,
         updateRateMs: rate,
+        dataTypeNodeId: node.dataTypeNodeId ?? null,
       });
     }
     const hasSchema = !!sourceId || !!manualSchemaId;
-    valid = valid && anyEnabled && hasSchema;
+    valid = valid && anyEnabled && hasSchema && unsupportedLocalNativeVariables.length === 0;
     const seedNum = num(seed);
     onChange({
       schemaFromSourceId: sourceId || null,
@@ -681,7 +712,7 @@ export function SyntheticProfileStep({
       valid,
       measurementCount: variables.length,
     });
-  }, [drafts, variableNodes, sourceId, manualSchemaId, seed, onChange]);
+  }, [drafts, variableNodes, sourceId, manualSchemaId, seed, onChange, unsupportedLocalNativeVariables]);
 
   useEffect(() => {
     emit();
@@ -795,6 +826,7 @@ export function SyntheticProfileStep({
 
       {loading ? <p className="text-sm text-shell-muted">Loading schema…</p> : null}
       {loadError ? <p className="text-sm text-shell-danger">{loadError}</p> : null}
+      {nativeTypeError ? <p className="text-sm text-shell-danger">{nativeTypeError}</p> : null}
 
       {variableNodes.length > 0 ? (
         <div className="space-y-3">
@@ -903,8 +935,9 @@ export function SyntheticProfileStep({
 
           <ul className="space-y-2">
             {variableNodes.map((node) => {
-              const d = drafts[node.nodeId] ?? defaultDraft(node.dataType);
-              const constantOnly = CONSTANT_ONLY_TYPES.has(node.dataType ?? "");
+              const d = drafts[node.nodeId] ?? defaultDraft(node.dataType, node.dataTypeNodeId);
+              const nativeType = Boolean(node.dataTypeNodeId);
+              const constantOnly = nativeType || CONSTANT_ONLY_TYPES.has(node.dataType ?? "");
               const textType = isTextType(node.dataType);
               const booleanType = isBooleanType(node.dataType);
               const integerType = isIntegerType(node.dataType);
@@ -915,7 +948,7 @@ export function SyntheticProfileStep({
               const isAdvancedPattern = ADVANCED_PATTERN_TYPES.some((p) => p.value === d.pattern);
               const supportsNumericPatterns = !textType && !booleanType && node.dataType !== "DATETIME" && node.dataType !== "GUID";
               const showAdvancedPatterns = isAdvancedPattern || expandedPatternRows.has(node.nodeId);
-              const visiblePatternTypes = supportsNumericPatterns
+              const visiblePatternTypes = supportsNumericPatterns && !nativeType
                 ? (showAdvancedPatterns ? PATTERN_TYPES : SIMPLE_PATTERN_TYPES)
                 : patternTypesFor(node.dataType);
               const wasPrefilled = prefilledNodeIds.has(node.nodeId);
@@ -939,7 +972,7 @@ export function SyntheticProfileStep({
                       />
                       {node.name}
                       <span className="text-xs font-normal text-shell-muted">
-                        {node.path} · {node.dataType ?? "—"}
+                        {node.path} · {node.dataType ?? node.nativeTypeKind ?? "native type"}
                         {node.unit ? ` · ${node.unit}` : ""}
                       </span>
                       {wasPrefilled ? (
@@ -956,7 +989,7 @@ export function SyntheticProfileStep({
                         Pattern
                         {constantOnly ? (
                           <select className="shell-field" value="CONSTANT" disabled>
-                            <option value="CONSTANT">Fixed value (required for {node.dataType})</option>
+                            <option value="CONSTANT">Fixed value (required for {node.dataType ?? node.nativeTypeKind ?? "native type"})</option>
                           </select>
                         ) : (
                           <>
@@ -988,7 +1021,7 @@ export function SyntheticProfileStep({
 
                       {d.pattern === "CONSTANT" ? (
                         <label className="flex flex-col gap-1 text-xs uppercase tracking-wide text-shell-muted">
-                          {node.dataType === "DATETIME" ? "Date & time (UTC)" : "Value"}
+                          {nativeType ? "Value (JSON)" : node.dataType === "DATETIME" ? "Date & time (UTC)" : "Value"}
                           {booleanType ? (
                             <select className="shell-field" value={d.value} onChange={(e) => patchDraft(node.nodeId, { value: e.target.value })}>
                               <option value="true">True</option>
@@ -997,10 +1030,10 @@ export function SyntheticProfileStep({
                           ) : (
                             <input
                               className="shell-field"
-                              type={valueInputType}
+                              type={nativeType ? "text" : valueInputType}
                               step={integerType ? "1" : "any"}
                               placeholder={
-                                isBytes ? "Hex, e.g. 0a1f" : node.dataType === "DATETIME" ? "2026-07-22T08:06:13.217Z" : undefined
+                                nativeType ? 'e.g. {"status": 1}' : isBytes ? "Hex, e.g. 0a1f" : node.dataType === "DATETIME" ? "2026-07-22T08:06:13.217Z" : undefined
                               }
                               value={d.value}
                               onChange={(e) => patchDraft(node.nodeId, { value: e.target.value })}
