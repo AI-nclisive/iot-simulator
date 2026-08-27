@@ -535,6 +535,32 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
     });
   });
 
+  it("creates Tank / vessel with a valid technical browse name", async () => {
+    mockLoadManualSchemaById.mockResolvedValueOnce(schemaWithFolder);
+    mockUpdateManualSchema.mockResolvedValueOnce(schemaWithFolder);
+    renderPage();
+
+    await waitFor(() => screen.getByText("Reactor"));
+    fireEvent.click(screen.getByText("Reactor"));
+    fireEvent.click(screen.getByRole("button", { name: /Choose from parameter catalog/i }));
+    fireEvent.change(screen.getByLabelText("Search parameter catalog"), { target: { value: "tank" } });
+    fireEvent.click(screen.getByRole("button", { name: /Tank \/ vessel.*level, process measurements, limits, and status/i }));
+
+    expect(screen.queryByText(/browse name cannot contain/i)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByLabelText(/Save in this schema/));
+    fireEvent.click(screen.getAllByRole("button", { name: "Save" })[1]);
+
+    await waitFor(() => expect(mockUpdateManualSchema).toHaveBeenCalledWith(
+      "proj-1",
+      "ms-1",
+      expect.objectContaining({ nodes: expect.arrayContaining([
+        expect.objectContaining({ name: "TankVessel", parentId: "f1", path: "/Reactor/TankVessel", kind: "FOLDER" }),
+        expect.objectContaining({ name: "Level", parentId: expect.any(String), path: "/Reactor/TankVessel/Level" }),
+      ]) }),
+    ));
+  });
+
   it("describes methods as callable operations in the editor", async () => {
     mockLoadManualSchemaById.mockResolvedValueOnce(schemaWithFolder);
     renderPage();
