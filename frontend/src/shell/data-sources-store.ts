@@ -81,13 +81,18 @@ export type SyntheticPatternSpec = {
   volatility?: number;
   /** Values used by text/boolean cycling and random-choice patterns. */
   values?: Array<string | boolean>;
+  /** IS-200: a CONSTANT value for a native structure, union, enum, or option set. */
+  objectValue?: unknown;
 };
 
 export type SyntheticVariableConfig = {
   nodeId: string;
-  dataType: string;
+  /** Null when dataTypeNodeId identifies a native OPC UA type declaration. */
+  dataType: string | null;
   pattern: SyntheticPatternSpec;
   updateRateMs: number;
+  /** Native structure, union, enum, or option-set declaration used by this variable. */
+  dataTypeNodeId?: string | null;
 };
 
 export type SyntheticConfig = {

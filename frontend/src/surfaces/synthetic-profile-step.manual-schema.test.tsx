@@ -41,6 +41,24 @@ const manualSchema = {
   version: 0,
 };
 
+const nativeManualSchema = {
+  ...manualSchema,
+  id: "ms-native",
+  name: "Native layout",
+  nodes: [
+    {
+      nodeId: "QualityEnvelope", parentId: null, path: "/QualityEnvelope", name: "QualityEnvelope",
+      kind: "DATA_TYPE" as const, dataType: null, dataTypeNodeId: null, nativeTypeKind: "STRUCTURE" as const,
+      valueRank: null, access: null, unit: null, description: null,
+    },
+    {
+      nodeId: "native-v1", parentId: null, path: "/Quality", name: "Quality", kind: "VARIABLE" as const,
+      dataType: null, dataTypeNodeId: "QualityEnvelope", nativeTypeKind: "STRUCTURE" as const,
+      valueRank: "SCALAR", access: "READ", unit: null, description: null,
+    },
+  ],
+};
+
 beforeEach(() => {
   useManualSchemasStore.setState({ schemas: [manualSchema], isLoading: false, error: null });
   mockApiFetch.mockReset();
@@ -98,6 +116,37 @@ describe("SyntheticProfileStep — Manual Schema parameter source (UI-491)", () 
       expect(onChange).toHaveBeenCalledWith(
         expect.objectContaining({ manualSchemaId: null, schemaFromSourceId: null }),
       );
+    });
+  });
+
+  it("preserves the native type in the emitted config and blocks an unsupported local declaration", async () => {
+    useManualSchemasStore.setState({ schemas: [nativeManualSchema], isLoading: false, error: null });
+    const onChange = vi.fn();
+    renderStep(onChange);
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("radio", { name: "Manual schema" }));
+    await user.selectOptions(screen.getByLabelText(/Reuse a manual schema/i), "ms-native");
+
+    await waitFor(() => expect(screen.getByText("Quality")).not.toBeNull());
+    expect(screen.getByText(/Fixed value \(required for STRUCTURE\)/)).not.toBeNull();
+    expect(screen.getByText("Value (JSON)")).not.toBeNull();
+    expect(screen.getByText(/Quality uses local type QualityEnvelope/)).not.toBeNull();
+    await waitFor(() => {
+      const emitted = onChange.mock.calls
+        .map(([value]) => value as SyntheticProfileValue)
+        .find((value) => value.config?.variables[0]?.nodeId === "native-v1");
+      expect(emitted).toEqual(expect.objectContaining({
+        valid: false,
+        config: expect.objectContaining({
+          variables: [expect.objectContaining({
+            nodeId: "native-v1",
+            dataType: null,
+            dataTypeNodeId: "QualityEnvelope",
+            pattern: { type: "CONSTANT", objectValue: {} },
+          })],
+        }),
+      }));
     });
   });
 });
