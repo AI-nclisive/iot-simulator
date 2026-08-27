@@ -230,8 +230,7 @@ describe("ManualSchemaEditorPage (UI-490)", () => {
     renderPage();
     await waitFor(() => screen.getByText("Reactor"));
 
-    fireEvent.click(screen.getByRole("button", { name: "Add folder" }));
-    fireEvent.click(screen.getByRole("radio", { name: /Data type/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Add data type" }));
     expect(screen.queryByLabelText("Parent folder for new node")).toBeNull();
     expect(screen.getByText("Data types are always created at the top level.")).not.toBeNull();
     fireEvent.change(screen.getAllByLabelText("Name")[1], { target: { value: "PumpState" } });
