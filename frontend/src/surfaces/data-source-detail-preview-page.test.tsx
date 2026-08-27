@@ -347,7 +347,7 @@ describe("DataSourceDetailPreviewPage — SYNTHETIC source buttons (UI-464)", ()
 
     renderPage();
 
-    expect(screen.getByRole("button", { name: "Run" })).toHaveProperty("disabled", false);
+    expect((screen.getByRole("button", { name: "Run" }) as HTMLButtonElement).disabled).toBe(false);
     expect(screen.queryByRole("link", { name: "Record" })).toBeNull();
     expect(screen.queryByRole("link", { name: "Replay recording" })).toBeNull();
     expect(screen.queryByRole("link", { name: "Simulate" })).toBeNull();
