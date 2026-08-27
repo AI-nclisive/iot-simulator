@@ -68,6 +68,7 @@ const PARAMETER_GROUPS = ["Measurements", "Control", "Device information", "Limi
 type StructureTemplate = {
   group: string;
   name: string;
+  nodeName?: string;
   description: string;
   variables: Array<{ name: string; dataType: string; description: string; unit?: string }>;
 };
@@ -89,6 +90,7 @@ function catalogTypeLabel(type: CatalogNativeType): string {
 const STRUCTURE_TEMPLATES = [
   {
     group: "Process equipment", name: "Tank / vessel", description: "A vessel with level, process measurements, limits, and status.",
+    nodeName: "TankVessel",
     variables: [
       { name: "Level", dataType: "FLOAT64", unit: "%", description: "Tank or vessel level" },
       { name: "Temperature", dataType: "FLOAT64", unit: "°C", description: "Process temperature" },
@@ -882,9 +884,10 @@ export function ManualSchemaEditorPage() {
     const parentId = catalogParentId;
     if (!parentId) return;
     const folderId = newNodeId();
-    const folderPath = pathFor(parentId, template.name);
+    const nodeName = template.nodeName ?? template.name;
+    const folderPath = pathFor(parentId, nodeName);
     const folder: NodeDto = {
-      nodeId: folderId, parentId, path: folderPath, name: template.name, kind: "FOLDER",
+      nodeId: folderId, parentId, path: folderPath, name: nodeName, kind: "FOLDER",
       dataType: null, valueRank: null, access: null, unit: null, description: template.description,
       accessLevelFull: null, minimumSamplingInterval: null, writeMask: null, historizing: null,
     };
