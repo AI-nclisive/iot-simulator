@@ -127,6 +127,12 @@ message SchemaNodeMsg {
   // Value shape is part of the variable contract, independent of a native
   // structure member's own dimensions. Added in IS-201.
   repeated uint32 array_dimensions = 24;
+  // IS-060: explicit Modbus register/coil binding override. Empty means the
+  // worker computes the default contiguous layout (protocol-model spec §5)
+  // instead. When set, modbus_address is meaningful; one of
+  // COIL | DISCRETE_INPUT | HOLDING_REGISTER | INPUT_REGISTER.
+  string modbus_register_kind = 25;
+  int32 modbus_address = 26;
 }
 
 // The declared fields of a native OPC UA structured DataType. Exactly one of

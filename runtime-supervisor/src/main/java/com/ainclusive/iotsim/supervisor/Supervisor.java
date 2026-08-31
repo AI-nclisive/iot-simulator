@@ -801,6 +801,8 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
                     .setAccess(n.access() == null ? "" : n.access().name())
                     .setUnit(orEmpty(n.unit()))
                     .setDescription(orEmpty(n.description()))
+                    .setModbusRegisterKind(orEmpty(n.modbusRegisterKind()))
+                    .setModbusAddress(n.modbusAddress() == null ? 0 : n.modbusAddress())
                     .build());
         }
         return schema.build();

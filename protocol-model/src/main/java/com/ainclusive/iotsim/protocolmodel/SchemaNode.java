@@ -62,7 +62,9 @@ public record SchemaNode(
         Integer minimumSamplingInterval,
         Integer writeMask,
         Boolean historizing,
-        String declaredDataTypeNodeId) {
+        String declaredDataTypeNodeId,
+        String modbusRegisterKind,
+        Integer modbusAddress) {
 
     public SchemaNode {
         Objects.requireNonNull(nodeId, "nodeId");
@@ -90,6 +92,16 @@ public record SchemaNode(
             if (accessLevelFull != null && (accessLevelFull < 0 || accessLevelFull > 255)) {
                 throw new IllegalArgumentException("accessLevelFull must be 0-255 (8-bit): " + accessLevelFull);
             }
+            // IS-060: an explicit Modbus register-map override is optional, but when present
+            // both halves must be given together — a worker cannot honor a bare address without
+            // knowing which object type it addresses, or vice versa.
+            if ((modbusRegisterKind == null) != (modbusAddress == null)) {
+                throw new IllegalArgumentException(
+                        "modbusRegisterKind and modbusAddress must be set together or not at all");
+            }
+            if (modbusAddress != null && modbusAddress < 0) {
+                throw new IllegalArgumentException("modbusAddress must be non-negative: " + modbusAddress);
+            }
             if (writeMask != null && writeMask < 0) {
                 throw new IllegalArgumentException("writeMask must be non-negative (UInt32): " + writeMask);
             }
@@ -98,6 +110,9 @@ public record SchemaNode(
         }
         if (kind != NodeKind.VARIABLE && dataTypeNodeId != null) {
             throw new IllegalArgumentException(kind + " nodes cannot have a dataTypeNodeId");
+        }
+        if (kind != NodeKind.VARIABLE && modbusRegisterKind != null) {
+            throw new IllegalArgumentException(kind + " nodes cannot have a modbusRegisterKind");
         }
         if (kind == NodeKind.DATA_TYPE) {
             nativeTypeKind = nativeTypeKind == null
@@ -145,7 +160,7 @@ public record SchemaNode(
         this(nodeId, parentId, path, name, kind, dataType, valueRank, access, unit, description,
                 arrayDimensions, typeDefinition, references, dataTypeNodeId, members, enumValues,
                 defaultEncodingId, nativeTypeKind, accessLevelFull, minimumSamplingInterval, writeMask,
-                historizing, null);
+                historizing, null, null, null);
     }
 
     /** Compatibility constructor for schemas stored before the native type-kind catalog metadata. */
@@ -157,7 +172,7 @@ public record SchemaNode(
             Integer writeMask, Boolean historizing) {
         this(nodeId, parentId, path, name, kind, dataType, valueRank, access, unit, description,
                 arrayDimensions, typeDefinition, references, dataTypeNodeId, members, enumValues,
-                defaultEncodingId, null, accessLevelFull, minimumSamplingInterval, writeMask, historizing, null);
+                defaultEncodingId, null, accessLevelFull, minimumSamplingInterval, writeMask, historizing, null, null, null);
     }
 
     /** Backward-compatible constructor for OPC-UA address-space nodes authored before IS-189 (critical attributes). */
@@ -166,7 +181,7 @@ public record SchemaNode(
             List<Integer> arrayDimensions, String typeDefinition, List<SchemaReference> references) {
         this(nodeId, parentId, path, name, kind, dataType, valueRank, access, unit, description,
                 arrayDimensions, typeDefinition, references, null, List.of(),
-                List.of(), null, null, null, null, null, null, null);  // IS-189 fields = null
+                List.of(), null, null, null, null, null, null, null, null, null);  // IS-189 fields = null
     }
 
     /** Compatibility constructor for callers that do not declare enum values. */
@@ -177,7 +192,7 @@ public record SchemaNode(
             Integer minimumSamplingInterval, Integer writeMask, Boolean historizing) {
         this(nodeId, parentId, path, name, kind, dataType, valueRank, access, unit, description,
                 arrayDimensions, typeDefinition, references, dataTypeNodeId, members, List.of(),
-                null, null, accessLevelFull, minimumSamplingInterval, writeMask, historizing, null);
+                null, null, accessLevelFull, minimumSamplingInterval, writeMask, historizing, null, null, null);
     }
 
     /** Compatibility constructor for callers that do not declare a structure encoding. */
@@ -188,7 +203,7 @@ public record SchemaNode(
             Integer accessLevelFull, Integer minimumSamplingInterval, Integer writeMask, Boolean historizing) {
         this(nodeId, parentId, path, name, kind, dataType, valueRank, access, unit, description,
                 arrayDimensions, typeDefinition, references, dataTypeNodeId, members, enumValues,
-                null, null, accessLevelFull, minimumSamplingInterval, writeMask, historizing, null);
+                null, null, accessLevelFull, minimumSamplingInterval, writeMask, historizing, null, null, null);
     }
 
     /** Backward-compatible constructor for folders and scalar/array variables authored before IS-176. */
@@ -196,6 +211,6 @@ public record SchemaNode(
             DataType dataType, ValueRank valueRank, Access access, String unit, String description) {
         this(nodeId, parentId, path, name, kind, dataType, valueRank, access, unit, description,
                 List.of(), null, List.of(), null, List.of(),
-                List.of(), null, null, null, null, null, null, null);  // IS-183 + IS-189 fields = null
+                List.of(), null, null, null, null, null, null, null, null, null);  // IS-183 + IS-189 fields = null
     }
 }

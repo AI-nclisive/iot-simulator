@@ -95,13 +95,18 @@ public class SchemaController {
                         "variable node '" + d.path() + "' requires valueRank, access, and exactly one of"
                                 + " dataType or dataTypeNodeId");
             }
+            if ((d.modbusRegisterKind() == null) != (d.modbusAddress() == null)) {
+                throw new IllegalArgumentException(
+                        "node '" + d.path() + "': modbusRegisterKind and modbusAddress must be set together"
+                                + " or not at all");
+            }
             nodes.add(new SchemaNode(d.nodeId(), d.parentId(), d.path(), d.name(),
                     kind, dataType, valueRank, access, d.unit(), d.description(), d.arrayDimensions(),
                     d.typeDefinition(), SchemaReferenceMapper.toModel(d.references()), d.dataTypeNodeId(),
                     SchemaReferenceMapper.toMembers(d.members()), toEnumValues(d.enumValues()),
                     d.defaultEncodingId(), d.nativeTypeKind() == null ? null : parseEnum(
                             NativeTypeKind.class, d.nativeTypeKind(), "nativeTypeKind"), null, null, null, null,
-                    d.declaredDataTypeNodeId()));
+                    d.declaredDataTypeNodeId(), d.modbusRegisterKind(), d.modbusAddress()));
         }
         return nodes;
     }
@@ -130,12 +135,13 @@ public class SchemaController {
             String dataType, String valueRank, String access, String unit, String description,
             List<Integer> arrayDimensions, String typeDefinition, List<ReferenceDto> references,
             String dataTypeNodeId, List<MemberDto> members, List<EnumValueDto> enumValues,
-            String defaultEncodingId, String nativeTypeKind, String declaredDataTypeNodeId) {
+            String defaultEncodingId, String nativeTypeKind, String declaredDataTypeNodeId,
+            String modbusRegisterKind, Integer modbusAddress) {
 
         public NodeDto(String nodeId, String parentId, String path, String name, String kind,
                 String dataType, String valueRank, String access, String unit, String description) {
             this(nodeId, parentId, path, name, kind, dataType, valueRank, access, unit, description,
-                    List.of(), null, List.of(), null, List.of(), List.of(), null, null, null);
+                    List.of(), null, List.of(), null, List.of(), List.of(), null, null, null, null, null);
         }
 
         static NodeDto from(SchemaNode n) {
@@ -148,7 +154,8 @@ public class SchemaController {
                     n.references().stream().map(ReferenceDto::from).toList(),
                     n.dataTypeNodeId(), n.members().stream().map(MemberDto::from).toList(),
                     n.enumValues().stream().map(EnumValueDto::from).toList(), n.defaultEncodingId(),
-                    n.nativeTypeKind() == null ? null : n.nativeTypeKind().name(), n.declaredDataTypeNodeId());
+                    n.nativeTypeKind() == null ? null : n.nativeTypeKind().name(), n.declaredDataTypeNodeId(),
+                    n.modbusRegisterKind(), n.modbusAddress());
         }
     }
 

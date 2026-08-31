@@ -141,6 +141,7 @@ public class SyntheticSourceService {
                 node.valueRank(), node.access(), node.unit(), node.description(), node.arrayDimensions(),
                 node.typeDefinition(), node.references(), null, node.members(), node.enumValues(),
                 node.defaultEncodingId(), node.nativeTypeKind(), node.accessLevelFull(),
-                node.minimumSamplingInterval(), node.writeMask(), node.historizing(), node.declaredDataTypeNodeId());
+                node.minimumSamplingInterval(), node.writeMask(), node.historizing(), node.declaredDataTypeNodeId(),
+                node.modbusRegisterKind(), node.modbusAddress());
     }
 }
