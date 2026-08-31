@@ -88,6 +88,39 @@ class SchemaControllerTest {
     }
 
     @Test
+    void saveWithInvalidModbusRegisterKindIsRejected() {
+        var node = new NodeDto(
+                "v1", null, "Plant/Temp", "Temp", "VARIABLE", "UINT16", "SCALAR", "READ_WRITE", null, null,
+                List.of(), null, List.of(), null, List.of(), List.of(), null, null, null, "NOT_A_KIND", 1000);
+        var request = new SaveSchemaRequest(List.of(node));
+        assertThatThrownBy(() -> controller.save("p1", "ds1", request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("modbusRegisterKind");
+    }
+
+    @Test
+    void saveWithModbusAddressButNoRegisterKindIsRejected() {
+        var node = new NodeDto(
+                "v1", null, "Plant/Temp", "Temp", "VARIABLE", "UINT16", "SCALAR", "READ_WRITE", null, null,
+                List.of(), null, List.of(), null, List.of(), List.of(), null, null, null, null, 1000);
+        var request = new SaveSchemaRequest(List.of(node));
+        assertThatThrownBy(() -> controller.save("p1", "ds1", request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("together");
+    }
+
+    @Test
+    void saveWithValidModbusBindingSucceeds() {
+        given(service.save(anyString(), anyString(), any())).willReturn(sampleSchema(1));
+        var node = new NodeDto(
+                "v1", null, "Plant/Temp", "Temp", "VARIABLE", "UINT16", "SCALAR", "READ_WRITE", null, null,
+                List.of(), null, List.of(), null, List.of(), List.of(), null, null, null, "HOLDING_REGISTER", 1000);
+        var request = new SaveSchemaRequest(List.of(node));
+        ResponseEntity<SchemaResponse> resp = controller.save("p1", "ds1", request);
+        assertThat(resp.getStatusCode().value()).isEqualTo(200);
+    }
+
+    @Test
     void saveWithNullNodesIsRejected() {
         assertThatThrownBy(() -> controller.save("p1", "ds1", new SaveSchemaRequest(null)))
                 .isInstanceOf(IllegalArgumentException.class);

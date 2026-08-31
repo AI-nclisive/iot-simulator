@@ -100,6 +100,10 @@ public class SchemaController {
                         "node '" + d.path() + "': modbusRegisterKind and modbusAddress must be set together"
                                 + " or not at all");
             }
+            if (d.modbusRegisterKind() != null && !MODBUS_REGISTER_KINDS.contains(d.modbusRegisterKind())) {
+                throw new IllegalArgumentException(
+                        "node '" + d.path() + "': invalid modbusRegisterKind: " + d.modbusRegisterKind());
+            }
             nodes.add(new SchemaNode(d.nodeId(), d.parentId(), d.path(), d.name(),
                     kind, dataType, valueRank, access, d.unit(), d.description(), d.arrayDimensions(),
                     d.typeDefinition(), SchemaReferenceMapper.toModel(d.references()), d.dataTypeNodeId(),
@@ -110,6 +114,12 @@ public class SchemaController {
         }
         return nodes;
     }
+
+    // IS-060: protocol-model keeps this as a plain string (not a shared enum) so it stays
+    // Modbus-specific without teaching protocol-model about a single protocol's register model —
+    // validated against this fixed literal set instead, same as parseEnum does for a real enum.
+    private static final java.util.Set<String> MODBUS_REGISTER_KINDS =
+            java.util.Set.of("COIL", "DISCRETE_INPUT", "HOLDING_REGISTER", "INPUT_REGISTER");
 
     private static void requireText(String value, String field) {
         if (value == null || value.isBlank()) {
