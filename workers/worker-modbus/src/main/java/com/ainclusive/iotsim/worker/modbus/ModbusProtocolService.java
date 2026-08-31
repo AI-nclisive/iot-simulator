@@ -33,6 +33,7 @@ import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -51,13 +52,14 @@ public class ModbusProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSo
 
     private static final int SHUTDOWN_FLUSH_DELAY_MS = 200;
     private static final int SCAN_NODE_BATCH_SIZE = 500;
-    private static final int DEFAULT_UNIT_ID = 1;
 
     private final AtomicReference<String> state = new AtomicReference<>("READY");
     private final AtomicLong applied = new AtomicLong();
     private final AtomicInteger configuredNodes = new AtomicInteger();
     private final AtomicReference<ModbusServerRuntime> serverRuntime = new AtomicReference<>();
     private final Map<String, String> nodeDataTypes = new ConcurrentHashMap<>();
+    /** Nodes whose declared data type cannot be materialized over Modbus (protocol-model §2 "unknown"). */
+    private final Set<String> unsupportedNodes = ConcurrentHashMap.newKeySet();
     private final ClientEventHub clientEventHub = new ClientEventHub();
     private final RuntimeEventHub runtimeEventHub = new RuntimeEventHub();
 
@@ -107,6 +109,7 @@ public class ModbusProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSo
     @Override
     public void configure(ConfigureRequest request, StreamObserver<Ack> obs) {
         nodeDataTypes.clear();
+        unsupportedNodes.clear();
         List<ModbusServerRuntime.VarSpec> vars = new ArrayList<>();
         for (SchemaNodeMsg node : request.getSchema().getNodesList()) {
             if (!"VARIABLE".equals(node.getKind())) {
@@ -117,8 +120,9 @@ public class ModbusProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSo
                 nodeDataTypes.put(node.getNodeId(), node.getDataType());
             }
         }
+        unsupportedNodes.addAll(ModbusServerRuntime.unsupportedNodes(vars));
         String bindAddress = request.getOptions().getOrDefault("bindAddress", "127.0.0.1");
-        int unitId = parseUnitId(request.getOptions().getOrDefault("unitId", String.valueOf(DEFAULT_UNIT_ID)));
+        int unitId = parseUnitId(request.getOptions().getOrDefault("unitId", String.valueOf(ModbusDiscovery.DEFAULT_UNIT_ID)));
         try {
             serverRuntime.set(new ModbusServerRuntime(vars, request.getListenPort(),
                     InetAddress.getByName(bindAddress), unitId, runtimeEventHub::emit));
@@ -136,7 +140,7 @@ public class ModbusProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSo
         try {
             return Integer.parseInt(value);
         } catch (NumberFormatException e) {
-            return DEFAULT_UNIT_ID;
+            return ModbusDiscovery.DEFAULT_UNIT_ID;
         }
     }
 
@@ -374,11 +378,22 @@ public class ModbusProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSo
             }
         }
         for (Value value : batch.getValuesList()) {
+            // BAD_VALUE / MISSING_VALUE have no Modbus quality/status channel to carry a "bad
+            // read" signal (unlike OPC UA's StatusCode) — leaving the register unchanged is the
+            // closest available proxy: a Modbus client reading it sees the last good value.
             if (isFaultActive("BAD_VALUE") || isFaultActive("MISSING_VALUE")) {
                 continue;
             }
             String dataType = nodeDataTypes.get(value.getNodeId());
             if (dataType == null) {
+                if (unsupportedNodes.contains(value.getNodeId())) {
+                    runtimeEventHub.emit(RuntimeEvent.newBuilder()
+                            .setType("ERROR")
+                            .setAtMicros(System.currentTimeMillis() * 1_000L)
+                            .setDetail("cannot apply value for unsupported Modbus data type on node "
+                                    + value.getNodeId())
+                            .build());
+                }
                 continue;
             }
             try {

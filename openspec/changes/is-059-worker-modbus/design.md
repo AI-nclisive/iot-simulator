@@ -99,6 +99,22 @@ appropriate array, mirroring `OpcUaServerRuntime.updateValue`.
   protocol limitation (no vendor-neutral change notification exists), not an
   implementation bug; documented in the worker-contract delta rather than
   hidden.
+- **[Risk] `Capture`'s `nodeId` doubles as the physical address encoding
+  (`"hr:1000"`), which a user can invalidate by renaming a node in a manual
+  schema edit — protocol-model treats `nodeId` as an opaque, freely editable
+  identifier.** → Mitigation: this is the accepted MVP shortcut for this
+  change (real, persisted register bindings are IS-060's job, explicitly out
+  of scope here per Non-Goals); a renamed/unparseable node is excluded from
+  capture the same way an unreadable real-device node is, rather than failing
+  the whole stream. Follow-up: once IS-060 lands, Capture should resolve
+  addresses from the persisted binding instead of parsing `nodeId`.
+- **[Risk] The `#<unitId>` suffix on `endpoint_url` (decision in `worker
+  contract` section above) has no corresponding field in the create-source
+  wizard, so a device on a non-default unit id is only reachable by a user
+  who knows this undocumented backend convention.** → Mitigation: out of
+  scope for this worker-only change (the wizard's endpoint-URL construction
+  lives in the domain/API layer, not this module); flagged here as a
+  follow-up rather than silently left undiscoverable.
 
 ## Migration Plan
 No DB migration. Rollout is additive: the Modbus protocol option stays

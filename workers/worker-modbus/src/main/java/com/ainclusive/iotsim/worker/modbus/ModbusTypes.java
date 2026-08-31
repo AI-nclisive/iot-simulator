@@ -32,7 +32,7 @@ final class ModbusTypes {
         };
     }
 
-    /** Placeholder register/coil classification — replace with the real Modbus model. */
+    /** The four Modbus object types every register/coil address belongs to. */
     enum ModbusRegisterKind {
         COIL,
         DISCRETE_INPUT,
@@ -86,16 +86,20 @@ final class ModbusTypes {
     static int[] toRegisters(String dataType, Object neutralValue) {
         return switch (dataType) {
             case "INT16", "UINT16" -> new int[] {((Number) neutralValue).intValue() & 0xFFFF};
-            case "INT32", "UINT32" -> {
-                int value = ((Number) neutralValue).intValue();
-                yield new int[] {(value >>> 16) & 0xFFFF, value & 0xFFFF};
-            }
-            case "FLOAT32" -> {
-                int bits = Float.floatToRawIntBits(((Number) neutralValue).floatValue());
-                yield new int[] {(bits >>> 16) & 0xFFFF, bits & 0xFFFF};
-            }
+            case "INT32", "UINT32" -> splitWords(((Number) neutralValue).intValue());
+            case "FLOAT32" -> splitWords(Float.floatToRawIntBits(((Number) neutralValue).floatValue()));
             default -> throw new IllegalArgumentException("unsupported Modbus data type: " + dataType);
         };
+    }
+
+    /** Splits a 32-bit value into {MSW, LSW} per the MSW-first convention (design.md decision 2). */
+    private static int[] splitWords(int value) {
+        return new int[] {(value >>> 16) & 0xFFFF, value & 0xFFFF};
+    }
+
+    /** Recombines {MSW, LSW} registers into a 32-bit value per the MSW-first convention. */
+    private static int combineWords(int[] registers) {
+        return (registers[0] << 16) | (registers[1] & 0xFFFF);
     }
 
     /**
@@ -107,9 +111,9 @@ final class ModbusTypes {
         return switch (dataType) {
             case "INT16" -> (long) (short) registers[0];
             case "UINT16" -> (long) (registers[0] & 0xFFFF);
-            case "INT32" -> (long) ((registers[0] << 16) | (registers[1] & 0xFFFF));
-            case "UINT32" -> (((long) registers[0] & 0xFFFF) << 16) | (registers[1] & 0xFFFF);
-            case "FLOAT32" -> (double) Float.intBitsToFloat((registers[0] << 16) | (registers[1] & 0xFFFF));
+            case "INT32" -> (long) combineWords(registers);
+            case "UINT32" -> combineWords(registers) & 0xFFFFFFFFL;
+            case "FLOAT32" -> (double) Float.intBitsToFloat(combineWords(registers));
             default -> throw new IllegalArgumentException("unsupported Modbus data type: " + dataType);
         };
     }

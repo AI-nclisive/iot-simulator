@@ -80,6 +80,21 @@ class ModbusServerRuntimeIT {
         assertThat(runtime.assignments().get("hr3").address()).isEqualTo(3);
     }
 
+    @Test
+    void restartingDoesNotLeakOrFailOnTheSecondStart() throws Exception {
+        List<ModbusServerRuntime.VarSpec> vars = List.of(
+                new ModbusServerRuntime.VarSpec("hr1", "UINT16", "READ_WRITE"));
+        runtime = new ModbusServerRuntime(vars, PORT + 2, InetAddress.getByName("127.0.0.1"), 1, event -> {});
+        runtime.start();
+        // A repeated Start (e.g. a retried RPC) must close the previous listener rather
+        // than leaking it or throwing "port already in use" against itself.
+        runtime.start();
+
+        master = new ModbusTCPMaster("127.0.0.1", PORT + 2, 2000, false);
+        master.connect();
+        assertThat(unsigned(master.readMultipleRegisters(1, 0, 1))[0]).isEqualTo(0);
+    }
+
     private static int[] unsigned(InputRegister[] registers) {
         int[] raw = new int[registers.length];
         for (int i = 0; i < registers.length; i++) {

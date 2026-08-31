@@ -4,6 +4,7 @@ import com.ainclusive.iotsim.protocolmodel.ValueCodec;
 import com.ainclusive.iotsim.workercontract.v1.Quality;
 import com.ainclusive.iotsim.workercontract.v1.Value;
 import com.ghgande.j2mod.modbus.facade.ModbusTCPMaster;
+import com.ghgande.j2mod.modbus.procimg.InputRegister;
 import com.google.protobuf.ByteString;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -26,9 +27,12 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Each node's physical Modbus address is taken from its {@code nodeId},
  * which must follow this worker's Scan-produced convention (e.g. {@code
- * "hr:1000"}) — see {@link ModbusDiscovery}. A node whose id does not parse is
- * skipped rather than failing the whole capture, mirroring OPC UA's "one
- * unreadable variable does not suppress other values".
+ * "hr:1000"}) — see {@link ModbusDiscovery#parseNodeAddress}. A node whose id
+ * does not parse, or whose data type is unsupported, is resolved once up
+ * front and excluded (logged once) rather than failing the whole capture or
+ * being re-attempted every poll tick — mirrors OPC UA's "one unreadable
+ * variable does not suppress other values", without repeating the same
+ * failure on every cycle.
  */
 final class ModbusCapture {
 
@@ -42,7 +46,10 @@ final class ModbusCapture {
     /** A variable to capture: its neutral node id (Scan-encoded address) and neutral type. */
     record NodeSpec(String nodeId, String dataType) {}
 
-    private ModbusCapture(ModbusTCPMaster master, int unitId, List<NodeSpec> nodes, int pollIntervalMs,
+    /** A capture node resolved once: its address/kind plus the neutral type to decode into. */
+    private record ResolvedNode(String nodeId, ModbusDiscovery.NodeAddress address, String dataType) {}
+
+    private ModbusCapture(ModbusTCPMaster master, int unitId, List<ResolvedNode> nodes, int pollIntervalMs,
             Consumer<List<Value>> sink) {
         this.master = master;
         this.pollThread = new Thread(() -> pollLoop(unitId, nodes, pollIntervalMs, sink), "modbus-capture");
@@ -52,29 +59,44 @@ final class ModbusCapture {
     static ModbusCapture start(String endpointUrl, List<NodeSpec> nodes, Consumer<List<Value>> sink)
             throws Exception {
         ModbusDiscovery.Endpoint endpoint = ModbusDiscovery.parseEndpoint(endpointUrl);
-        ModbusTCPMaster master = new ModbusTCPMaster(endpoint.host(), endpoint.port(), 2000, false);
-        master.connect();
-        ModbusCapture capture = new ModbusCapture(master, endpoint.unitId(), nodes, DEFAULT_POLL_INTERVAL_MS, sink);
+        ModbusTCPMaster master = ModbusDiscovery.connect(endpoint);
+        List<ResolvedNode> resolved = resolve(nodes);
+        ModbusCapture capture = new ModbusCapture(master, endpoint.unitId(), resolved, DEFAULT_POLL_INTERVAL_MS, sink);
         capture.pollThread.start();
         return capture;
     }
 
-    private void pollLoop(int unitId, List<NodeSpec> nodes, int pollIntervalMs, Consumer<List<Value>> sink) {
+    /** Resolves each node's address/type once; an unparseable or unsupported node is logged once and excluded. */
+    private static List<ResolvedNode> resolve(List<NodeSpec> nodes) {
+        List<ResolvedNode> resolved = new ArrayList<>();
+        for (NodeSpec node : nodes) {
+            try {
+                if (!ModbusTypes.isSupported(node.dataType())) {
+                    throw new IllegalArgumentException("unsupported Modbus data type: " + node.dataType());
+                }
+                resolved.add(new ResolvedNode(node.nodeId(), ModbusDiscovery.parseNodeAddress(node.nodeId()), node.dataType()));
+            } catch (Exception e) {
+                LOG.warn("Modbus capture: excluding node {} ({})", node.nodeId(), e.getMessage());
+            }
+        }
+        return resolved;
+    }
+
+    private void pollLoop(int unitId, List<ResolvedNode> nodes, int pollIntervalMs, Consumer<List<Value>> sink) {
         Map<String, Object> last = new HashMap<>();
         boolean first = true;
         while (running) {
             List<Value> batch = new ArrayList<>();
-            for (NodeSpec node : nodes) {
+            for (ResolvedNode node : nodes) {
                 try {
-                    NodeAddress address = parseNodeAddress(node.nodeId());
-                    Object neutral = readValue(master, unitId, address, node.dataType());
+                    Object neutral = readValue(master, unitId, node.address(), node.dataType());
                     Object previous = last.get(node.nodeId());
                     if (first || !Objects.equals(previous, neutral)) {
                         last.put(node.nodeId(), neutral);
                         batch.add(toProtoValue(node.nodeId(), neutral));
                     }
                 } catch (Exception e) {
-                    LOG.debug("Modbus capture: skipping node {}", node.nodeId(), e);
+                    LOG.debug("Modbus capture: read failed for node {}", node.nodeId(), e);
                 }
             }
             first = false;
@@ -109,45 +131,25 @@ final class ModbusCapture {
         }
     }
 
-    record NodeAddress(String kind, int address) {}
-
-    static NodeAddress parseNodeAddress(String nodeId) {
-        int colon = nodeId.indexOf(':');
-        if (colon < 0) {
-            throw new IllegalArgumentException("nodeId is not in Scan address form: " + nodeId);
-        }
-        String prefix = nodeId.substring(0, colon);
-        int address = Integer.parseInt(nodeId.substring(colon + 1));
-        String kind = switch (prefix) {
-            case "co" -> "COIL";
-            case "di" -> "DISCRETE_INPUT";
-            case "hr" -> "HOLDING_REGISTER";
-            case "ir" -> "INPUT_REGISTER";
-            default -> throw new IllegalArgumentException("unknown Modbus address prefix: " + prefix);
-        };
-        return new NodeAddress(kind, address);
-    }
-
-    private static Object readValue(ModbusTCPMaster master, int unitId, NodeAddress address, String dataType)
-            throws Exception {
+    private static Object readValue(ModbusTCPMaster master, int unitId, ModbusDiscovery.NodeAddress address,
+            String dataType) throws Exception {
         return switch (address.kind()) {
-            case "COIL" -> master.readCoils(unitId, address.address(), 1).getBit(0);
-            case "DISCRETE_INPUT" -> master.readInputDiscretes(unitId, address.address(), 1).getBit(0);
-            case "HOLDING_REGISTER" -> {
+            case COIL -> master.readCoils(unitId, address.address(), 1).getBit(0);
+            case DISCRETE_INPUT -> master.readInputDiscretes(unitId, address.address(), 1).getBit(0);
+            case HOLDING_REGISTER -> {
                 int span = ModbusTypes.registerSpan(dataType);
                 int[] raw = toRawValues(master.readMultipleRegisters(unitId, address.address(), span));
                 yield ModbusTypes.fromRegisters(dataType, raw);
             }
-            case "INPUT_REGISTER" -> {
+            case INPUT_REGISTER -> {
                 int span = ModbusTypes.registerSpan(dataType);
                 int[] raw = toRawValues(master.readInputRegisters(unitId, address.address(), span));
                 yield ModbusTypes.fromRegisters(dataType, raw);
             }
-            default -> throw new IllegalArgumentException("unknown Modbus register kind: " + address.kind());
         };
     }
 
-    private static int[] toRawValues(com.ghgande.j2mod.modbus.procimg.InputRegister[] registers) {
+    private static int[] toRawValues(InputRegister[] registers) {
         int[] raw = new int[registers.length];
         for (int i = 0; i < registers.length; i++) {
             raw[i] = registers[i].toUnsignedShort();

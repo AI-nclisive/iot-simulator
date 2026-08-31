@@ -16,10 +16,17 @@ import java.util.function.IntConsumer;
  * <p>The {@code ProtocolDataSource} contract's {@code endpoint_url} carries no
  * dedicated Modbus unit-id field; this worker accepts an optional
  * {@code #<unitId>} suffix (e.g. {@code "10.20.4.40:502#1"}), defaulting to
- * unit 1 when absent, rather than proposing a worker-contract change for a
- * single extra integer.
+ * {@link #DEFAULT_UNIT_ID} when absent, rather than proposing a
+ * worker-contract change for a single extra integer.
+ *
+ * <p>This class also owns the {@code nodeId} <-> physical-address convention
+ * ({@code "hr:1000"}, {@code "hr32:1000"}, ...) that {@link ModbusCapture}
+ * reads back via {@link #parseNodeAddress}, so the two directions of that
+ * convention live in exactly one place.
  */
 final class ModbusDiscovery {
+
+    static final int DEFAULT_UNIT_ID = 1;
 
     private static final int DEFAULT_SCAN_RANGE = 64;
     private static final int CHUNK_SIZE = 16;
@@ -38,7 +45,7 @@ final class ModbusDiscovery {
 
     static Endpoint parseEndpoint(String endpointUrl) {
         String withoutUnit = endpointUrl;
-        int unitId = 1;
+        int unitId = DEFAULT_UNIT_ID;
         int hash = endpointUrl.indexOf('#');
         if (hash >= 0) {
             withoutUnit = endpointUrl.substring(0, hash);
@@ -53,14 +60,42 @@ final class ModbusDiscovery {
         return new Endpoint(host, port, unitId);
     }
 
+    /** One resolved {@code nodeId}: its Modbus object type and base register/coil address. */
+    record NodeAddress(ModbusTypes.ModbusRegisterKind kind, int address) {}
+
+    /**
+     * Parses a Scan-produced {@code nodeId} (e.g. {@code "hr:1000"}) back into
+     * its physical address. The {@code 32} suffix Scan adds to an advisory
+     * 32-bit-pairing node ({@code "hr32:1000"}, see {@link #addPairHeuristics})
+     * resolves to the same object type and base address as the plain form —
+     * once a user accepts the pairing and assigns it a 32-bit data type, it
+     * reads/writes the same two registers the advisory node described.
+     */
+    static NodeAddress parseNodeAddress(String nodeId) {
+        int colon = nodeId.indexOf(':');
+        if (colon < 0) {
+            throw new IllegalArgumentException("nodeId is not in Scan address form: " + nodeId);
+        }
+        String prefix = nodeId.substring(0, colon);
+        int address = Integer.parseInt(nodeId.substring(colon + 1));
+        String base = prefix.endsWith("32") ? prefix.substring(0, prefix.length() - 2) : prefix;
+        ModbusTypes.ModbusRegisterKind kind = switch (base) {
+            case "co" -> ModbusTypes.ModbusRegisterKind.COIL;
+            case "di" -> ModbusTypes.ModbusRegisterKind.DISCRETE_INPUT;
+            case "hr" -> ModbusTypes.ModbusRegisterKind.HOLDING_REGISTER;
+            case "ir" -> ModbusTypes.ModbusRegisterKind.INPUT_REGISTER;
+            default -> throw new IllegalArgumentException("unknown Modbus address prefix: " + prefix);
+        };
+        return new NodeAddress(kind, address);
+    }
+
     record ConnectionTest(String status, String message) {}
 
     static ConnectionTest testConnection(String endpointUrl) {
         try {
             Endpoint endpoint = parseEndpoint(endpointUrl);
-            ModbusTCPMaster master = new ModbusTCPMaster(endpoint.host(), endpoint.port(), 2000, false);
+            ModbusTCPMaster master = connect(endpoint);
             try {
-                master.connect();
                 return new ConnectionTest("OK", "");
             } finally {
                 master.disconnect();
@@ -68,6 +103,13 @@ final class ModbusDiscovery {
         } catch (Exception e) {
             return new ConnectionTest("UNREACHABLE", e.getMessage());
         }
+    }
+
+    /** Connects a fresh master to the endpoint; shared by TestConnection/Scan/Capture. */
+    static ModbusTCPMaster connect(Endpoint endpoint) throws Exception {
+        ModbusTCPMaster master = new ModbusTCPMaster(endpoint.host(), endpoint.port(), 2000, false);
+        master.connect();
+        return master;
     }
 
     record ScanOutcome(List<SchemaNodeMsg> nodes, String status, boolean truncated, int unknownCount, String message) {}
@@ -79,27 +121,28 @@ final class ModbusDiscovery {
         } catch (IllegalArgumentException e) {
             return new ScanOutcome(List.of(), "UNREACHABLE", false, 0, e.getMessage());
         }
-        int limit = maxNodes > 0 ? maxNodes : DEFAULT_SCAN_RANGE * 4;
-        ModbusTCPMaster master = new ModbusTCPMaster(endpoint.host(), endpoint.port(), 2000, false);
+        ModbusTCPMaster master;
         try {
-            master.connect();
+            master = connect(endpoint);
         } catch (Exception e) {
             return new ScanOutcome(List.of(), "UNREACHABLE", false, 0, e.getMessage());
         }
         onConnected.run();
         try {
+            int limit = maxNodes > 0 ? maxNodes : DEFAULT_SCAN_RANGE * 4;
             List<SchemaNodeMsg> nodes = new ArrayList<>();
-            boolean truncated = false;
-            truncated |= probe(nodes, limit, onProgress, new BitObjectProbe(master, endpoint.unitId(), "co", "COIL", true));
-            truncated |= probe(nodes, limit, onProgress, new BitObjectProbe(master, endpoint.unitId(), "di", "DISCRETE_INPUT", false));
+            List<String> errors = new ArrayList<>();
+            probe(nodes, limit, onProgress, errors, new BitObjectProbe(master, endpoint.unitId(), "co", true));
+            probe(nodes, limit, onProgress, errors, new BitObjectProbe(master, endpoint.unitId(), "di", false));
             List<Integer> holdingAddresses = new ArrayList<>();
-            truncated |= probe(nodes, limit, onProgress,
-                    new RegisterObjectProbe(master, endpoint.unitId(), "hr", "HOLDING_REGISTER", true, holdingAddresses));
+            probe(nodes, limit, onProgress, errors,
+                    new RegisterObjectProbe(master, endpoint.unitId(), "hr", true, holdingAddresses));
             List<Integer> inputAddresses = new ArrayList<>();
-            truncated |= probe(nodes, limit, onProgress,
-                    new RegisterObjectProbe(master, endpoint.unitId(), "ir", "INPUT_REGISTER", false, inputAddresses));
+            probe(nodes, limit, onProgress, errors,
+                    new RegisterObjectProbe(master, endpoint.unitId(), "ir", false, inputAddresses));
             int unknownCount = addPairHeuristics(nodes, "hr", holdingAddresses) + addPairHeuristics(nodes, "ir", inputAddresses);
-            return new ScanOutcome(nodes, truncated ? "PARTIAL" : "OK", truncated, unknownCount, "");
+            boolean truncated = !errors.isEmpty() || nodes.size() >= limit;
+            return new ScanOutcome(nodes, truncated ? "PARTIAL" : "OK", truncated, unknownCount, String.join("; ", errors));
         } finally {
             master.disconnect();
         }
@@ -114,7 +157,7 @@ final class ModbusDiscovery {
         void onPresent(List<SchemaNodeMsg> nodes, int address);
     }
 
-    private record BitObjectProbe(ModbusTCPMaster master, int unitId, String prefix, String kind, boolean writable)
+    private record BitObjectProbe(ModbusTCPMaster master, int unitId, String prefix, boolean writable)
             implements ObjectProbe {
         @Override
         public void readChunk(int address, int count) throws Exception {
@@ -127,11 +170,14 @@ final class ModbusDiscovery {
 
         @Override
         public void onPresent(List<SchemaNodeMsg> nodes, int address) {
-            nodes.add(node(prefix + ":" + address, address, kind, "BOOL", writable ? "READ_WRITE" : "READ"));
+            ModbusTypes.ModbusRegisterKind kind =
+                    writable ? ModbusTypes.ModbusRegisterKind.COIL : ModbusTypes.ModbusRegisterKind.DISCRETE_INPUT;
+            String dataType = ModbusTypes.neutralTypeOf(kind, false);
+            nodes.add(node(prefix + ":" + address, address, kind, dataType, writable ? "READ_WRITE" : "READ"));
         }
     }
 
-    private record RegisterObjectProbe(ModbusTCPMaster master, int unitId, String prefix, String kind,
+    private record RegisterObjectProbe(ModbusTCPMaster master, int unitId, String prefix,
             boolean writable, List<Integer> discovered) implements ObjectProbe {
         @Override
         public void readChunk(int address, int count) throws Exception {
@@ -144,7 +190,10 @@ final class ModbusDiscovery {
 
         @Override
         public void onPresent(List<SchemaNodeMsg> nodes, int address) {
-            nodes.add(node(prefix + ":" + address, address, kind, "UINT16", writable ? "READ_WRITE" : "READ"));
+            ModbusTypes.ModbusRegisterKind kind = writable
+                    ? ModbusTypes.ModbusRegisterKind.HOLDING_REGISTER : ModbusTypes.ModbusRegisterKind.INPUT_REGISTER;
+            String dataType = ModbusTypes.neutralTypeOf(kind, false);
+            nodes.add(node(prefix + ":" + address, address, kind, dataType, writable ? "READ_WRITE" : "READ"));
             discovered.add(address);
         }
     }
@@ -154,9 +203,13 @@ final class ModbusDiscovery {
      * chunks while addresses are present, and on any chunk failure falls back
      * to exactly one single-address read (never a chunk-sized fan-out) before
      * either resuming chunked reads (address present) or counting a miss
-     * (address absent) — see {@link #MAX_CONSECUTIVE_FAILURES}.
+     * (address absent) — see {@link #MAX_CONSECUTIVE_FAILURES}. A transport-level
+     * failure (not a Modbus protocol exception, e.g. a dropped connection) is
+     * recorded in {@code errors} rather than silently treated as a normal
+     * address-space miss, and stops this object type's probe early.
      */
-    private static boolean probe(List<SchemaNodeMsg> nodes, int limit, IntConsumer onProgress, ObjectProbe object) {
+    private static void probe(List<SchemaNodeMsg> nodes, int limit, IntConsumer onProgress, List<String> errors,
+            ObjectProbe object) {
         int address = 0;
         int consecutiveFailures = 0;
         while (address < 65536 && nodes.size() < limit && consecutiveFailures < MAX_CONSECUTIVE_FAILURES) {
@@ -186,10 +239,10 @@ final class ModbusDiscovery {
                 }
                 onProgress.accept(nodes.size());
             } catch (Exception e) {
-                return true;
+                errors.add(e.getMessage());
+                return;
             }
         }
-        return nodes.size() >= limit;
     }
 
     /**
@@ -197,6 +250,8 @@ final class ModbusDiscovery {
      * node representing a possible 32-bit reinterpretation, left with a blank
      * {@code data_type} so it is treated as unresolved/needs-confirmation by
      * the existing "unknown type blocks create" mechanism (protocol-model §3).
+     * Its {@code nodeId} resolves back to the same address via
+     * {@link #parseNodeAddress} once accepted.
      */
     private static int addPairHeuristics(List<SchemaNodeMsg> nodes, String prefix, List<Integer> addresses) {
         int count = 0;
@@ -219,7 +274,8 @@ final class ModbusDiscovery {
         return count;
     }
 
-    private static SchemaNodeMsg node(String nodeId, int address, String registerKind, String dataType, String access) {
+    private static SchemaNodeMsg node(String nodeId, int address, ModbusTypes.ModbusRegisterKind kind,
+            String dataType, String access) {
         return SchemaNodeMsg.newBuilder()
                 .setNodeId(nodeId)
                 .setPath(nodeId.replace(':', '_'))
@@ -227,7 +283,7 @@ final class ModbusDiscovery {
                 .setKind("VARIABLE")
                 .setDataType(dataType)
                 .setAccess(access)
-                .setDescription(registerKind + " @ " + address)
+                .setDescription(kind + " @ " + address)
                 .build();
     }
 }

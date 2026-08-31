@@ -120,10 +120,18 @@ final class ModbusServerRuntime {
      * port.
      */
     void start() throws ModbusStartException {
+        if (slave != null) {
+            // A repeated Start (e.g. a retried RPC) must not leak the previous
+            // listener/socket — close it before opening a new one.
+            ModbusSlaveFactory.close(slave);
+            slave = null;
+        }
         try {
-            slave = ModbusSlaveFactory.createTCPSlave(bindAddress, listenPort, 2, false);
-            slave.addProcessImage(unitId, image);
-            slave.open();
+            ModbusSlave opened = ModbusSlaveFactory.createTCPSlave(bindAddress, listenPort, 2, false);
+            opened.addProcessImage(unitId, image);
+            opened.open();
+            // Only assign on success: if open() throws, nothing is left half-bound on this.slave.
+            slave = opened;
         } catch (ModbusException e) {
             throw new ModbusStartException(e.getMessage());
         }
