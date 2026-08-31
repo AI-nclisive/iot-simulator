@@ -139,15 +139,15 @@ describe("DataSourcesListPage — SYNTHETIC source actions", () => {
   });
 });
 
-describe("DataSourcesListPage — protocol filter options (UI-463)", () => {
-  it("protocol filter shows OPC UA but not Modbus TCP", async () => {
+describe("DataSourcesListPage — protocol filter options (IS-059)", () => {
+  it("protocol filter shows both OPC UA and Modbus TCP", async () => {
     setupStore([{ ...baseSource }]);
     renderPage();
     await waitFor(() => expect(screen.getByText("Test Source")).toBeTruthy());
     const select = screen.getByRole("combobox", { name: "Protocol" });
     const options = Array.from((select as HTMLSelectElement).options).map((o) => o.text);
     expect(options).toContain("OPC UA");
-    expect(options).not.toContain("Modbus TCP");
+    expect(options).toContain("Modbus TCP");
   });
 });
 

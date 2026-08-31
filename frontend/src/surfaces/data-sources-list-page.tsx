@@ -240,6 +240,7 @@ export function DataSourcesListPage() {
       options: [
         { label: "All protocols", value: "all" },
         { label: "OPC UA", value: "OPC UA" },
+        { label: "Modbus TCP", value: "Modbus TCP" },
       ],
     },
     {
