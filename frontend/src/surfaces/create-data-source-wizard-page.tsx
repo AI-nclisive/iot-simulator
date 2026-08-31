@@ -269,12 +269,16 @@ export type WizardFormState = {
   startCapture: boolean;
 };
 
-// Modbus TCP hidden until IS-059 (worker) is implemented.
 const protocolOptions: ProtocolOption[] = [
   {
     id: "OPC UA",
     note: "Discovery, recording, and replay against address-rich industrial endpoints.",
     portHint: "Common endpoint: opc.tcp://host:4840",
+  },
+  {
+    id: "Modbus TCP",
+    note: "Active register probing, recording, and replay against Modbus TCP devices.",
+    portHint: "Common endpoint: host:502",
   },
 ];
 

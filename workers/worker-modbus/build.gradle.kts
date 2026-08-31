@@ -10,7 +10,7 @@ dependencies {
 
     implementation(platform(libs.grpc.bom))
     implementation(libs.grpc.stub)
-    runtimeOnly(libs.grpc.netty.shaded)
+    implementation(libs.grpc.netty.shaded)
 
     implementation(libs.j2mod)
 }

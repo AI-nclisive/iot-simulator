@@ -67,20 +67,21 @@ forcing 100% manual/import schemas — rejected per explicit product direction
 ("надо анализировать самим возможные узлы и проставлять их параметры").
 
 **4. `Capture` semantics.** j2mod master polls each configured node's address
-on a fixed interval (default 500ms; configurable via `Configure`'s
-`options` map, same mechanism `worker-opcua` uses for `bindAddress`/
-`advertisedHost`), diffing against the last-sent value per node and emitting
-only on change — same external contract as OPC UA's push-based capture
-(worker-contract delta: "no sampling" reinterpreted as "no sampling below the
-poll interval").
+on a fixed 500ms interval, diffing against the last-sent value per node and
+emitting only on change — same external contract as OPC UA's push-based
+capture (worker-contract delta: "no sampling" reinterpreted as "no sampling
+below the poll interval"). Not configurable per call: `CaptureRequest` has no
+options map (unlike `ConfigureRequest`), so a per-source override would need
+a contract change — left as a follow-up rather than adding one speculatively.
 
-**5. `ModbusServerRuntime`.** Wraps j2mod's `SimpleProcessImage` (coils,
-discrete inputs, holding/input registers as separate `SimpleRegister`/
-`SimpleDigitalIn`/`SimpleDigitalOut` arrays sized to the configured schema's
-max address+1) plus a `ModbusTCPListener` bound to loopback/advertised host
-per the existing `bindAddress`/`advertisedHost` options convention.
-`updateValue(nodeId, decodedValue)` writes into the appropriate array,
-mirroring `OpcUaServerRuntime.updateValue`.
+**5. `ModbusServerRuntime`.** Wraps a j2mod `ModbusSlave` (via
+`ModbusSlaveFactory`) whose `SimpleProcessImage` (coils, discrete inputs,
+holding/input registers) is populated on demand as the layout is computed.
+Bound via the same `bindAddress` `Configure` option `worker-opcua` uses;
+`advertisedHost` has no Modbus equivalent (there is no endpoint URL to
+advertise — a Modbus client dials `host:port` directly), so it is not
+carried over. `updateValue(nodeId, decodedValue)` writes into the
+appropriate array, mirroring `OpcUaServerRuntime.updateValue`.
 
 ## Risks / Trade-offs
 
