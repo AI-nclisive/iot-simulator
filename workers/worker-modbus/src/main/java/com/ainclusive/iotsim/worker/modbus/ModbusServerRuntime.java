@@ -11,10 +11,13 @@ import com.ghgande.j2mod.modbus.procimg.SimpleRegister;
 import com.ghgande.j2mod.modbus.slave.ModbusSlave;
 import com.ghgande.j2mod.modbus.slave.ModbusSlaveFactory;
 import java.net.InetAddress;
+import java.util.EnumMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.function.Consumer;
 
 /**
@@ -44,8 +47,18 @@ final class ModbusServerRuntime {
     private final Consumer<RuntimeEvent> runtimeEventSink;
     private ModbusSlave slave;
 
-    /** One schema variable as seen by the runtime: its node id, neutral data type, and declared access. */
-    record VarSpec(String nodeId, String dataType, String access) {}
+    /**
+     * One schema variable as seen by the runtime: its node id, neutral data type, declared
+     * access, and an optional explicit register-map override (IS-060). Both {@code
+     * explicitRegisterKind}/{@code explicitAddress} are {@code null} together, or set together —
+     * when absent the worker computes the default contiguous layout instead.
+     */
+    record VarSpec(String nodeId, String dataType, String access, String explicitRegisterKind,
+            Integer explicitAddress) {
+        VarSpec(String nodeId, String dataType, String access) {
+            this(nodeId, dataType, access, null, null);
+        }
+    }
 
     ModbusServerRuntime(List<VarSpec> vars, int listenPort, InetAddress bindAddress, int unitId,
             Consumer<RuntimeEvent> runtimeEventSink) {
@@ -53,7 +66,7 @@ final class ModbusServerRuntime {
         this.bindAddress = bindAddress;
         this.unitId = unitId;
         this.runtimeEventSink = runtimeEventSink;
-        this.assignments = layout(vars, image);
+        this.assignments = layout(vars, image, runtimeEventSink);
     }
 
     /** Node ids whose declared data type this worker cannot materialize over Modbus. */
@@ -64,47 +77,100 @@ final class ModbusServerRuntime {
                 .collect(java.util.stream.Collectors.toUnmodifiableSet());
     }
 
-    private static Map<String, NodeAssignment> layout(List<VarSpec> vars, SimpleProcessImage image) {
+    /**
+     * Two-pass layout (IS-060): pass 1 honors every variable's explicit register-map override
+     * verbatim and reserves the addresses it occupies; pass 2 assigns the protocol-model default
+     * contiguous address (schema order) to every remaining variable, skipping over whatever pass 1
+     * already reserved for that object type so an auto-assigned variable never collides with a
+     * pinned one.
+     */
+    private static Map<String, NodeAssignment> layout(List<VarSpec> vars, SimpleProcessImage image,
+            Consumer<RuntimeEvent> runtimeEventSink) {
         Map<String, NodeAssignment> result = new LinkedHashMap<>();
-        int coilAddr = 0;
-        int discreteAddr = 0;
-        int holdingAddr = 0;
-        int inputAddr = 0;
+        Map<ModbusRegisterKind, TreeSet<Integer>> reserved = new EnumMap<>(ModbusRegisterKind.class);
+        for (ModbusRegisterKind kind : ModbusRegisterKind.values()) {
+            reserved.put(kind, new TreeSet<>());
+        }
+        // Explicit bindings that collide with an earlier explicit binding (same kind/address) fall
+        // through to auto-assignment instead of silently overwriting the earlier one in the image.
+        Set<String> conflicted = new HashSet<>();
         for (VarSpec var : vars) {
-            if (!ModbusTypes.isSupported(var.dataType())) {
+            if (!ModbusTypes.isSupported(var.dataType()) || var.explicitRegisterKind() == null) {
+                continue;
+            }
+            ModbusRegisterKind kind = ModbusRegisterKind.valueOf(var.explicitRegisterKind());
+            int span = "BOOL".equals(var.dataType()) ? 1 : ModbusTypes.registerSpan(var.dataType());
+            int address = var.explicitAddress();
+            if (overlaps(reserved.get(kind), address, span)) {
+                conflicted.add(var.nodeId());
+                runtimeEventSink.accept(RuntimeEvent.newBuilder()
+                        .setType("ERROR")
+                        .setAtMicros(System.currentTimeMillis() * 1_000L)
+                        .setDetail("Modbus register binding conflict for node " + var.nodeId() + " at " + kind
+                                + " " + address + " — falling back to default layout for this node")
+                        .build());
+                continue;
+            }
+            result.put(var.nodeId(), new NodeAssignment(var.dataType(), kind, address));
+            boolean readOnly = kind == ModbusRegisterKind.DISCRETE_INPUT || kind == ModbusRegisterKind.INPUT_REGISTER;
+            seedImage(image, kind, readOnly, var.dataType(), address);
+            for (int i = 0; i < span; i++) {
+                reserved.get(kind).add(address + i);
+            }
+        }
+        Map<ModbusRegisterKind, Integer> nextAddr = new EnumMap<>(ModbusRegisterKind.class);
+        for (ModbusRegisterKind kind : ModbusRegisterKind.values()) {
+            nextAddr.put(kind, 0);
+        }
+        for (VarSpec var : vars) {
+            boolean needsAutoAssign = var.explicitRegisterKind() == null || conflicted.contains(var.nodeId());
+            if (!ModbusTypes.isSupported(var.dataType()) || !needsAutoAssign) {
                 continue;
             }
             boolean readOnly = "READ".equals(var.access());
-            if ("BOOL".equals(var.dataType())) {
-                int address = readOnly ? discreteAddr++ : coilAddr++;
-                ModbusRegisterKind kind = readOnly ? ModbusRegisterKind.DISCRETE_INPUT : ModbusRegisterKind.COIL;
-                result.put(var.nodeId(), new NodeAssignment(var.dataType(), kind, address));
-                if (readOnly) {
-                    image.addDigitalIn(address, new SimpleDigitalIn(false));
-                } else {
-                    image.addDigitalOut(address, new SimpleDigitalOut(false));
-                }
-                continue;
+            int span = "BOOL".equals(var.dataType()) ? 1 : ModbusTypes.registerSpan(var.dataType());
+            ModbusRegisterKind kind = "BOOL".equals(var.dataType())
+                    ? (readOnly ? ModbusRegisterKind.DISCRETE_INPUT : ModbusRegisterKind.COIL)
+                    : (readOnly ? ModbusRegisterKind.INPUT_REGISTER : ModbusRegisterKind.HOLDING_REGISTER);
+            TreeSet<Integer> taken = reserved.get(kind);
+            int address = nextAddr.get(kind);
+            while (overlaps(taken, address, span)) {
+                address++;
             }
-            int span = ModbusTypes.registerSpan(var.dataType());
-            int address = readOnly ? inputAddr : holdingAddr;
-            if (readOnly) {
-                inputAddr += span;
-            } else {
-                holdingAddr += span;
-            }
-            ModbusRegisterKind kind = readOnly ? ModbusRegisterKind.INPUT_REGISTER : ModbusRegisterKind.HOLDING_REGISTER;
+            nextAddr.put(kind, address + span);
             result.put(var.nodeId(), new NodeAssignment(var.dataType(), kind, address));
-            int[] initial = ModbusTypes.toRegisters(var.dataType(), ModbusTypes.defaultValue(var.dataType()));
-            for (int i = 0; i < initial.length; i++) {
-                if (readOnly) {
-                    image.addInputRegister(address + i, new SimpleInputRegister(initial[i]));
-                } else {
-                    image.addRegister(address + i, new SimpleRegister(initial[i]));
-                }
-            }
+            seedImage(image, kind, readOnly, var.dataType(), address);
         }
         return result;
+    }
+
+    private static boolean overlaps(TreeSet<Integer> taken, int address, int span) {
+        for (int i = 0; i < span; i++) {
+            if (taken.contains(address + i)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void seedImage(SimpleProcessImage image, ModbusRegisterKind kind, boolean readOnly,
+            String dataType, int address) {
+        if ("BOOL".equals(dataType)) {
+            if (readOnly) {
+                image.addDigitalIn(address, new SimpleDigitalIn(false));
+            } else {
+                image.addDigitalOut(address, new SimpleDigitalOut(false));
+            }
+            return;
+        }
+        int[] initial = ModbusTypes.toRegisters(dataType, ModbusTypes.defaultValue(dataType));
+        for (int i = 0; i < initial.length; i++) {
+            if (readOnly) {
+                image.addInputRegister(address + i, new SimpleInputRegister(initial[i]));
+            } else {
+                image.addRegister(address + i, new SimpleRegister(initial[i]));
+            }
+        }
     }
 
     /** The address assignment computed for every representable variable (introspection/tests). */

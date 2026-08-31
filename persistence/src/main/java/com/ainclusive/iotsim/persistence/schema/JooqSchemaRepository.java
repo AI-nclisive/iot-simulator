@@ -59,6 +59,11 @@ public class JooqSchemaRepository implements SchemaRepository {
             field(name("schema_nodes", "write_mask"), Integer.class);
     private static final Field<Boolean> HISTORIZING =
             field(name("schema_nodes", "historizing"), Boolean.class);
+    // IS-060: optional explicit Modbus register/coil binding override
+    private static final Field<String> MODBUS_REGISTER_KIND =
+            field(name("schema_nodes", "modbus_register_kind"), String.class);
+    private static final Field<Integer> MODBUS_ADDRESS =
+            field(name("schema_nodes", "modbus_address"), Integer.class);
     private static final Table<?> NODE_REFERENCES = table(name("schema_node_references"));
     private static final Field<String> REFERENCE_SCHEMA_ID =
             field(name("schema_node_references", "schema_id"), String.class);
@@ -162,6 +167,8 @@ public class JooqSchemaRepository implements SchemaRepository {
                         .set(MINIMUM_SAMPLING_INTERVAL, n.minimumSamplingInterval())
                         .set(WRITE_MASK, n.writeMask())
                         .set(HISTORIZING, n.historizing())
+                        .set(MODBUS_REGISTER_KIND, n.modbusRegisterKind())
+                        .set(MODBUS_ADDRESS, n.modbusAddress())
                         .execute();
             }
             for (SchemaNode n : nodes) {
@@ -240,11 +247,14 @@ public class JooqSchemaRepository implements SchemaRepository {
                 members(r.get(DATA_TYPE_MEMBERS)),
                 enumValues(r.get(DATA_TYPE_ENUM_VALUES)),
                 r.get(DATA_TYPE_DEFAULT_ENCODING_ID),
-                // IS-189: Critical OPC UA attributes
+                null, // nativeTypeKind: not yet persisted for normalized schema_nodes
                 r.get(ACCESS_LEVEL_FULL),
                 r.get(MINIMUM_SAMPLING_INTERVAL),
                 r.get(WRITE_MASK),
-                r.get(HISTORIZING));
+                r.get(HISTORIZING),
+                null, // declaredDataTypeNodeId: not yet persisted for normalized schema_nodes
+                r.get(MODBUS_REGISTER_KIND),
+                r.get(MODBUS_ADDRESS));
     }
 
     private <T> JSONB json(List<T> values) {

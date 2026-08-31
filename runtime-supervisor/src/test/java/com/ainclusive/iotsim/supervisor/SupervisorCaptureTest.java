@@ -87,10 +87,10 @@ class SupervisorCaptureTest {
                 null, null, null, null, null, List.of(), null, List.of(), null,
                 List.of(new DataTypeMember("low", DataType.FLOAT64, null),
                         new DataTypeMember("high", DataType.FLOAT64, null)),
-                List.of(), "ns=0;i=886", NativeTypeKind.STRUCTURE, null, null, null, null, null);
+                List.of(), "ns=0;i=886", NativeTypeKind.STRUCTURE, null, null, null, null, null, null, null);
         SchemaNode variable = new SchemaNode("range", null, "/range", "Range", NodeKind.VARIABLE,
                 null, ValueRank.SCALAR, Access.READ, null, null, List.of(), null, List.of(), "ns=0;i=884",
-                List.of(), List.of(), null, null, null, null, null, null, null);
+                List.of(), List.of(), null, null, null, null, null, null, null, null, null);
 
         CaptureSession session = supervisor.startCapture(new CaptureSpec("OPC_UA", "opc.tcp://plant:4840/ua",
                 ConnectionCredentials.anonymous(), 3, List.of(range, variable)), values -> {

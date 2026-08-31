@@ -95,16 +95,31 @@ public class SchemaController {
                         "variable node '" + d.path() + "' requires valueRank, access, and exactly one of"
                                 + " dataType or dataTypeNodeId");
             }
+            if ((d.modbusRegisterKind() == null) != (d.modbusAddress() == null)) {
+                throw new IllegalArgumentException(
+                        "node '" + d.path() + "': modbusRegisterKind and modbusAddress must be set together"
+                                + " or not at all");
+            }
+            if (d.modbusRegisterKind() != null && !MODBUS_REGISTER_KINDS.contains(d.modbusRegisterKind())) {
+                throw new IllegalArgumentException(
+                        "node '" + d.path() + "': invalid modbusRegisterKind: " + d.modbusRegisterKind());
+            }
             nodes.add(new SchemaNode(d.nodeId(), d.parentId(), d.path(), d.name(),
                     kind, dataType, valueRank, access, d.unit(), d.description(), d.arrayDimensions(),
                     d.typeDefinition(), SchemaReferenceMapper.toModel(d.references()), d.dataTypeNodeId(),
                     SchemaReferenceMapper.toMembers(d.members()), toEnumValues(d.enumValues()),
                     d.defaultEncodingId(), d.nativeTypeKind() == null ? null : parseEnum(
                             NativeTypeKind.class, d.nativeTypeKind(), "nativeTypeKind"), null, null, null, null,
-                    d.declaredDataTypeNodeId()));
+                    d.declaredDataTypeNodeId(), d.modbusRegisterKind(), d.modbusAddress()));
         }
         return nodes;
     }
+
+    // IS-060: protocol-model keeps this as a plain string (not a shared enum) so it stays
+    // Modbus-specific without teaching protocol-model about a single protocol's register model —
+    // validated against this fixed literal set instead, same as parseEnum does for a real enum.
+    private static final java.util.Set<String> MODBUS_REGISTER_KINDS =
+            java.util.Set.of("COIL", "DISCRETE_INPUT", "HOLDING_REGISTER", "INPUT_REGISTER");
 
     private static void requireText(String value, String field) {
         if (value == null || value.isBlank()) {
@@ -130,12 +145,13 @@ public class SchemaController {
             String dataType, String valueRank, String access, String unit, String description,
             List<Integer> arrayDimensions, String typeDefinition, List<ReferenceDto> references,
             String dataTypeNodeId, List<MemberDto> members, List<EnumValueDto> enumValues,
-            String defaultEncodingId, String nativeTypeKind, String declaredDataTypeNodeId) {
+            String defaultEncodingId, String nativeTypeKind, String declaredDataTypeNodeId,
+            String modbusRegisterKind, Integer modbusAddress) {
 
         public NodeDto(String nodeId, String parentId, String path, String name, String kind,
                 String dataType, String valueRank, String access, String unit, String description) {
             this(nodeId, parentId, path, name, kind, dataType, valueRank, access, unit, description,
-                    List.of(), null, List.of(), null, List.of(), List.of(), null, null, null);
+                    List.of(), null, List.of(), null, List.of(), List.of(), null, null, null, null, null);
         }
 
         static NodeDto from(SchemaNode n) {
@@ -148,7 +164,8 @@ public class SchemaController {
                     n.references().stream().map(ReferenceDto::from).toList(),
                     n.dataTypeNodeId(), n.members().stream().map(MemberDto::from).toList(),
                     n.enumValues().stream().map(EnumValueDto::from).toList(), n.defaultEncodingId(),
-                    n.nativeTypeKind() == null ? null : n.nativeTypeKind().name(), n.declaredDataTypeNodeId());
+                    n.nativeTypeKind() == null ? null : n.nativeTypeKind().name(), n.declaredDataTypeNodeId(),
+                    n.modbusRegisterKind(), n.modbusAddress());
         }
     }
 

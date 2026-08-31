@@ -143,7 +143,7 @@ class SyntheticSourceServiceTest {
         SchemaNode nativeTemp = new SchemaNode("temp", null, "/Temperature", "Temperature",
                 NodeKind.VARIABLE, null, ValueRank.SCALAR, Access.READ, "degC", null,
                 List.of(), null, List.of(), "ns=0;i=11", List.of(), List.of(), null,
-                null, null, null, null, null, "ns=4;i=1259");
+                null, null, null, null, null, "ns=4;i=1259", null, null);
         given(schemas.get(PROJECT, "src1")).willReturn(new Schema("sc1", "src1", 1,
                 List.of(nativeTemp), Instant.now()));
         given(dataSources.create(eq(PROJECT), eq("Twin"), eq("OPC_UA"), eq("SYNTHETIC"),

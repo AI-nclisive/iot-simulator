@@ -115,7 +115,10 @@ public class ModbusProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSo
             if (!"VARIABLE".equals(node.getKind())) {
                 continue;
             }
-            vars.add(new ModbusServerRuntime.VarSpec(node.getNodeId(), node.getDataType(), node.getAccess()));
+            String explicitKind = node.getModbusRegisterKind().isBlank() ? null : node.getModbusRegisterKind();
+            Integer explicitAddress = explicitKind == null ? null : node.getModbusAddress();
+            vars.add(new ModbusServerRuntime.VarSpec(node.getNodeId(), node.getDataType(), node.getAccess(),
+                    explicitKind, explicitAddress));
             if (ModbusTypes.isSupported(node.getDataType())) {
                 nodeDataTypes.put(node.getNodeId(), node.getDataType());
             }

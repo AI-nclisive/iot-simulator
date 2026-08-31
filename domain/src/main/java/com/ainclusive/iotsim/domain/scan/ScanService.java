@@ -481,7 +481,8 @@ public class ScanService implements DisposableBean {
         String description = members.isEmpty() ? "Imported OPC UA enum DataType" : "Imported OPC UA structured DataType";
         SchemaNode imported = new SchemaNode(typeId, null, "Types/" + typeId, typeName, NodeKind.DATA_TYPE,
                 null, null, null, null, description, List.of(), null,
-                List.of(), null, members, enumValues, defaultEncodingId, nativeTypeKind, null, null, null, null, null);
+                List.of(), null, members, enumValues, defaultEncodingId, nativeTypeKind, null, null, null, null, null,
+                null, null);
         int existingIndex = indexOfImportedType(nodes, typeId);
         if (existingIndex >= 0) {
             SchemaNode existing = nodes.get(existingIndex);
@@ -565,7 +566,7 @@ public class ScanService implements DisposableBean {
         return new SchemaNode(n.nodeId(), n.parentId(), path, n.name(),
                 NodeKind.VARIABLE, dataType, valueRank, access, n.unit(), n.description(),
                 List.of(), null, List.of(), dataTypeNodeId, List.of(), List.of(), null, null,
-                null, null, null, null, declaredDataTypeNodeId);
+                null, null, null, null, declaredDataTypeNodeId, null, null);
     }
 
     private static ValueRank valueRank(String raw) {

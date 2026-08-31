@@ -81,6 +81,43 @@ class ModbusServerRuntimeIT {
     }
 
     @Test
+    void explicitBindingIsHonoredAndAutoAssignmentSkipsAroundIt() throws Exception {
+        // hr2 pins holding register 5 explicitly (IS-060); hr1/hr3 have no override and must
+        // fall back to the default contiguous layout, skipping the address hr2 reserved.
+        List<ModbusServerRuntime.VarSpec> vars = List.of(
+                new ModbusServerRuntime.VarSpec("hr1", "UINT16", "READ_WRITE", null, null),
+                new ModbusServerRuntime.VarSpec("hr2", "UINT16", "READ_WRITE", "HOLDING_REGISTER", 5),
+                new ModbusServerRuntime.VarSpec("hr3", "UINT16", "READ_WRITE", null, null));
+        runtime = new ModbusServerRuntime(vars, PORT + 3, InetAddress.getByName("127.0.0.1"), 1, event -> {});
+
+        assertThat(runtime.assignments().get("hr2").address()).isEqualTo(5);
+        assertThat(runtime.assignments().get("hr1").address()).isEqualTo(0);
+        assertThat(runtime.assignments().get("hr3").address()).isEqualTo(1);
+
+        runtime.start();
+        master = new ModbusTCPMaster("127.0.0.1", PORT + 3, 2000, false);
+        master.connect();
+        runtime.updateValue("hr2", 999L);
+        assertThat(unsigned(master.readMultipleRegisters(1, 5, 1))[0]).isEqualTo(999);
+    }
+
+    @Test
+    void collidingExplicitBindingsFallBackToAutoAssignmentInsteadOfOverwriting() throws Exception {
+        // Both hr1 and hr2 pin holding register 0 explicitly. The second one to lay out must not
+        // silently overwrite the first — it falls through to default auto-assignment instead.
+        List<ModbusServerRuntime.VarSpec> vars = List.of(
+                new ModbusServerRuntime.VarSpec("hr1", "UINT16", "READ_WRITE", "HOLDING_REGISTER", 0),
+                new ModbusServerRuntime.VarSpec("hr2", "UINT16", "READ_WRITE", "HOLDING_REGISTER", 0));
+        List<String> errors = new java.util.ArrayList<>();
+        runtime = new ModbusServerRuntime(vars, PORT + 4, InetAddress.getByName("127.0.0.1"), 1,
+                event -> errors.add(event.getDetail()));
+
+        assertThat(runtime.assignments().get("hr1").address()).isEqualTo(0);
+        assertThat(runtime.assignments().get("hr2").address()).isNotEqualTo(0);
+        assertThat(errors).anyMatch(msg -> msg.contains("conflict"));
+    }
+
+    @Test
     void restartingDoesNotLeakOrFailOnTheSecondStart() throws Exception {
         List<ModbusServerRuntime.VarSpec> vars = List.of(
                 new ModbusServerRuntime.VarSpec("hr1", "UINT16", "READ_WRITE"));
