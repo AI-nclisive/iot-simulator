@@ -81,7 +81,7 @@ public final class ModbusTemplates {
 
     /** Returns available Modbus device-profile names in display order. */
     public static List<String> templateNames() {
-        return List.of("sunspec_inverter");
+        return List.copyOf(allTemplates().keySet());
     }
 
     private static SchemaNode folder(String nodeId, String parentId, String path, String name) {

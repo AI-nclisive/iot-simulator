@@ -9,4 +9,4 @@
 
 - [x] 2.1 Add unit coverage for catalog discovery, representative SunSpec
       addresses/types, and non-overlapping multi-register bindings.
-- [ ] 2.2 Run the affected module tests and `./gradlew build`.
+- [x] 2.2 Run the affected module tests and `./gradlew build`.
