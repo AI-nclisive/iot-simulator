@@ -43,6 +43,8 @@ export function ScheduleDatePicker({
       placeholderText={placeholder}
       className="shell-field w-full"
       wrapperClassName="block w-full"
+      portalId="schedule-date-picker-portal"
+      popperClassName="z-50"
     />
   );
 }
