@@ -54,4 +54,16 @@ describe("ScheduleDatePicker (UI-477)", () => {
     const value = onChange.mock.calls[0][0] as string;
     expect(value).toMatch(/^2026-03-10T\d{2}:\d{2}$/);
   });
+
+  it("mounts its popup in a high-layer document-body portal", async () => {
+    const user = userEvent.setup();
+    render(<ScheduleDatePicker value="2026-03-05T14:30" onChange={vi.fn()} />);
+
+    await user.click(screen.getByRole("textbox"));
+
+    const portal = document.body.querySelector("#schedule-date-picker-portal");
+    expect(portal).not.toBeNull();
+    expect(portal?.contains(screen.getByRole("dialog"))).toBe(true);
+    expect(portal?.querySelector(".react-datepicker-popper")?.classList.contains("z-50")).toBe(true);
+  });
 });
