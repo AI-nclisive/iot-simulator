@@ -68,9 +68,11 @@ public class ScanController {
         require(req != null, "request body is required");
         require(notBlank(req.endpointUrl()), "endpointUrl is required");
         require(notBlank(req.protocol()), "protocol is required");
-        ConnectionTestResult result = scans.testConnection(
-                projectId, req.protocol(), req.endpointUrl(),
-                CredentialRequests.toCredentials(req.connectionConfig()));
+        ConnectionTestResult result = req.unitId() == null
+                ? scans.testConnection(projectId, req.protocol(), req.endpointUrl(),
+                        CredentialRequests.toCredentials(req.connectionConfig()))
+                : scans.testConnection(projectId, req.protocol(), req.endpointUrl(),
+                        CredentialRequests.toCredentials(req.connectionConfig()), req.unitId());
         return new ConnectionTestResponse(result.status().name(), result.message());
     }
 
@@ -86,10 +88,12 @@ public class ScanController {
         require(req != null, "request body is required");
         require(notBlank(req.endpointUrl()), "endpointUrl is required");
         require(notBlank(req.protocol()), "protocol is required");
-        ScanJob job = scans.startScan(
-                projectId, req.protocol(), req.endpointUrl(),
-                CredentialRequests.toCredentials(req.connectionConfig()),
-                req.maxNodes() == null ? 0 : req.maxNodes());
+        int maxNodes = req.maxNodes() == null ? 0 : req.maxNodes();
+        ScanJob job = req.unitId() == null
+                ? scans.startScan(projectId, req.protocol(), req.endpointUrl(),
+                        CredentialRequests.toCredentials(req.connectionConfig()), maxNodes)
+                : scans.startScan(projectId, req.protocol(), req.endpointUrl(),
+                        CredentialRequests.toCredentials(req.connectionConfig()), maxNodes, req.unitId());
         URI location = URI.create(
                 "/api/v1/projects/" + projectId + "/data-sources/scan/" + job.jobId());
         return ResponseEntity.accepted().location(location)
@@ -155,8 +159,11 @@ public class ScanController {
             @PathVariable String projectId, @PathVariable String jobId,
             @RequestBody CreateFromScanRequest req) {
         require(req != null && notBlank(req.name()), "name is required");
-        DataSource ds = scans.createFromScan(projectId, jobId, req.name(), req.realDeviceEndpoint(),
-                toResolutions(req.typeResolutions()), "local");
+        DataSource ds = req.unitId() == null
+                ? scans.createFromScan(projectId, jobId, req.name(), req.realDeviceEndpoint(),
+                        toResolutions(req.typeResolutions()), "local")
+                : scans.createFromScan(projectId, jobId, req.name(), req.realDeviceEndpoint(),
+                        req.unitId(), toResolutions(req.typeResolutions()), "local");
         int paramCount = schemas.countVariableNodes(ds.id());
         return ResponseEntity.created(
                         URI.create("/api/v1/projects/" + projectId + "/data-sources/" + ds.id()))
@@ -187,10 +194,21 @@ public class ScanController {
 
     public record ScanRequest(
             String protocol, String endpointUrl, Integer maxNodes,
-            ConnectionConfigRequest connectionConfig) {}
+            ConnectionConfigRequest connectionConfig, Integer unitId) {
+        public ScanRequest(String protocol, String endpointUrl, Integer maxNodes,
+                ConnectionConfigRequest connectionConfig) {
+            this(protocol, endpointUrl, maxNodes, connectionConfig, null);
+        }
+    }
 
     public record CreateFromScanRequest(
-            String name, String realDeviceEndpoint, List<TypeResolutionRequest> typeResolutions) {}
+            String name, String realDeviceEndpoint, List<TypeResolutionRequest> typeResolutions,
+            Integer unitId) {
+        public CreateFromScanRequest(
+                String name, String realDeviceEndpoint, List<TypeResolutionRequest> typeResolutions) {
+            this(name, realDeviceEndpoint, typeResolutions, null);
+        }
+    }
 
     /**
      * A user's decision for one unknown-typed discovered node: assign {@code dataType}

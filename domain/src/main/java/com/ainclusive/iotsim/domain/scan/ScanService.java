@@ -57,6 +57,8 @@ import org.springframework.stereotype.Service;
 @Service
 public class ScanService implements DisposableBean {
 
+    private static final String MODBUS_TCP = Protocol.MODBUS_TCP.name();
+    private static final int DEFAULT_MODBUS_UNIT_ID = 1;
     // Completed/failed jobs are evicted after this long so the in-memory registry
     // cannot grow without bound in a long-running service. Running jobs are kept.
     private static final Duration JOB_TTL = Duration.ofMinutes(30);
@@ -117,24 +119,38 @@ public class ScanService implements DisposableBean {
     /** Synchronous reachability/auth probe; secrets are used in memory only. */
     public ConnectionTestResult testConnection(String projectId, String protocol,
             String endpointUrl, ConnectionCredentials credentials) {
+        return testConnection(projectId, protocol, endpointUrl, credentials, null);
+    }
+
+    /** Synchronous reachability/auth probe with an optional Modbus TCP unit id. */
+    public ConnectionTestResult testConnection(String projectId, String protocol,
+            String endpointUrl, ConnectionCredentials credentials, Integer unitId) {
         requireProject(projectId);
         validateProtocol(protocol);
         requireEndpoint(endpointUrl);
-        return scanner.testConnection(new ScanSpec(protocol, endpointUrl, credentials, 0));
+        return scanner.testConnection(new ScanSpec(
+                protocol, endpointFor(protocol, endpointUrl, unitId), credentials, 0));
     }
 
     /** Starts an async scan and returns the {@code RUNNING} job immediately. */
     public ScanJob startScan(String projectId, String protocol, String endpointUrl,
             ConnectionCredentials credentials, int maxNodes) {
+        return startScan(projectId, protocol, endpointUrl, credentials, maxNodes, null);
+    }
+
+    /** Starts an async scan with an optional Modbus TCP unit id. */
+    public ScanJob startScan(String projectId, String protocol, String endpointUrl,
+            ConnectionCredentials credentials, int maxNodes, Integer unitId) {
         requireProject(projectId);
         validateProtocol(protocol);
         requireEndpoint(endpointUrl);
+        String resolvedEndpoint = endpointFor(protocol, endpointUrl, unitId);
         evictExpired();
         String jobId = Ids.newId();
-        ScanJob job = ScanJob.running(jobId, projectId, protocol, endpointUrl);
+        ScanJob job = ScanJob.running(jobId, projectId, protocol, resolvedEndpoint);
         jobs.put(jobId, job);
         executions.put(jobId, new ScanExecution());
-        ScanSpec spec = new ScanSpec(protocol, endpointUrl, credentials, maxNodes);
+        ScanSpec spec = new ScanSpec(protocol, resolvedEndpoint, credentials, maxNodes);
         executor.execute(() -> runScan(jobId, spec));
         return job;
     }
@@ -267,6 +283,12 @@ public class ScanService implements DisposableBean {
      */
     public DataSource createFromScan(String projectId, String jobId, String name, String endpoint,
             List<TypeResolution> resolutions, String actor) {
+        return createFromScan(projectId, jobId, name, endpoint, null, resolutions, actor);
+    }
+
+    /** Materializes a scan source and retains its optional Modbus TCP unit id. */
+    public DataSource createFromScan(String projectId, String jobId, String name, String endpoint,
+            Integer unitId, List<TypeResolution> resolutions, String actor) {
         ScanJob job = getScan(projectId, jobId);
         if (job.isRunning()) {
             throw new IllegalArgumentException("scan job is still running: " + jobId);
@@ -278,8 +300,9 @@ public class ScanService implements DisposableBean {
         if (nodes.isEmpty()) {
             throw new IllegalArgumentException("scan produced an empty schema after resolution");
         }
+        String resolvedEndpoint = endpointForCreate(job, endpoint, unitId);
         DataSource created = dataSources.create(
-                projectId, name, job.protocol(), "SCAN", null, endpoint, null, null, null, null, actor);
+                projectId, name, job.protocol(), "SCAN", null, resolvedEndpoint, null, null, null, null, actor);
         schemas.save(projectId, created.id(), nodes);
         // Re-read so the response carries the linked schemaId/schemaVersion.
         return dataSources.get(projectId, created.id());
@@ -303,6 +326,48 @@ public class ScanService implements DisposableBean {
         }
         ConnectionCredentials creds = credentials.find(dataSourceId).orElse(null);
         return startScan(projectId, source.protocol().name(), source.realDeviceEndpoint(), creds, 0);
+    }
+
+    private static String endpointFor(String protocol, String endpoint, Integer unitId) {
+        if (!MODBUS_TCP.equals(protocol)) {
+            if (unitId != null) {
+                throw new IllegalArgumentException("unitId is supported only for MODBUS_TCP");
+            }
+            return endpoint;
+        }
+        if (unitId != null && (unitId < 0 || unitId > 255)) {
+            throw new IllegalArgumentException("unitId must be between 0 and 255");
+        }
+        if (endpoint.indexOf('#') >= 0) {
+            if (unitId != null) {
+                throw new IllegalArgumentException("endpointUrl must not include a Modbus unit-id suffix");
+            }
+            return endpoint;
+        }
+        return endpoint + "#" + (unitId == null ? DEFAULT_MODBUS_UNIT_ID : unitId);
+    }
+
+    private static String endpointForCreate(ScanJob job, String endpoint, Integer unitId) {
+        if (!MODBUS_TCP.equals(job.protocol())) {
+            return endpointFor(job.protocol(), endpoint, unitId);
+        }
+        int scannedUnitId = unitIdFromEndpoint(job.endpointUrl());
+        if (unitId != null && unitId != scannedUnitId) {
+            throw new IllegalArgumentException("unitId must match the completed Modbus scan");
+        }
+        return endpointFor(job.protocol(), endpoint, scannedUnitId);
+    }
+
+    private static int unitIdFromEndpoint(String endpoint) {
+        int separator = endpoint.lastIndexOf('#');
+        if (separator < 0) {
+            return DEFAULT_MODBUS_UNIT_ID;
+        }
+        try {
+            return Integer.parseInt(endpoint.substring(separator + 1));
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("scan job has an invalid Modbus unit-id suffix", e);
+        }
     }
 
     /**

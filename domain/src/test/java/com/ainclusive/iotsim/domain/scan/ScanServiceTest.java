@@ -80,6 +80,43 @@ class ScanServiceTest {
     }
 
     @Test
+    void modbusUnitIdIsEncodedForTestScanCreateAndRescan() {
+        scanner.scanResult = okResult();
+
+        service.testConnection(PROJECT, "MODBUS_TCP", "tcp://host:502",
+                ConnectionCredentials.anonymous(), 7);
+        assertThat(scanner.lastSpec.endpointUrl()).isEqualTo("tcp://host:502#7");
+
+        ScanJob job = service.startScan(PROJECT, "MODBUS_TCP", "tcp://host:502",
+                ConnectionCredentials.anonymous(), 0, 7);
+        assertThat(scanner.lastSpec.endpointUrl()).isEqualTo("tcp://host:502#7");
+
+        DataSource source = service.createFromScan(PROJECT, job.jobId(), "Modbus source", "tcp://host:502",
+                null, List.of(new TypeResolution("ns=2;s=x", null, null, null, true)), "alice");
+        assertThat(source.realDeviceEndpoint()).isEqualTo("tcp://host:502#7");
+
+        service.startRescan(PROJECT, source.id());
+        assertThat(scanner.lastSpec.endpointUrl()).isEqualTo("tcp://host:502#7");
+
+        assertThatThrownBy(() -> service.createFromScan(PROJECT, job.jobId(), "Mismatched source", "tcp://host:502",
+                8, List.of(new TypeResolution("ns=2;s=x", null, null, null, true)), "alice"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("must match the completed Modbus scan");
+    }
+
+    @Test
+    void modbusUnitIdIsRejectedForOpcUaAndOutsideTheProtocolRange() {
+        assertThatThrownBy(() -> service.testConnection(PROJECT, "OPC_UA", "opc.tcp://host:4840",
+                ConnectionCredentials.anonymous(), 7))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("only for MODBUS_TCP");
+        assertThatThrownBy(() -> service.startScan(PROJECT, "MODBUS_TCP", "tcp://host:502",
+                ConnectionCredentials.anonymous(), 0, 256))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("between 0 and 255");
+    }
+
+    @Test
     void testConnectionUnderMissingProjectThrowsNotFound() {
         assertThatThrownBy(() -> service.testConnection(
                 "nope", "OPC_UA", "opc.tcp://h", ConnectionCredentials.anonymous()))
