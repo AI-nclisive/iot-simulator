@@ -2,9 +2,13 @@ package com.ainclusive.iotsim.worker.opcua;
 
 import static org.eclipse.milo.opcua.stack.core.types.builtin.unsigned.Unsigned.uint;
 
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 import org.eclipse.milo.opcua.sdk.core.AccessLevel;
 import org.eclipse.milo.opcua.sdk.core.Reference;
 import org.eclipse.milo.opcua.sdk.core.types.DynamicOptionSetType;
@@ -49,6 +53,7 @@ final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
 
     private final List<VarDef> variables;
     private final List<NativeDataTypeDef> typeDefinitions;
+    private final Consumer<String> warningSink;
     private final Map<String, UaVariableNode> nodes = new ConcurrentHashMap<>();
     private final Map<String, org.eclipse.milo.opcua.stack.core.types.builtin.NodeId> hierarchy = new ConcurrentHashMap<>();
     private final Map<String, org.eclipse.milo.opcua.stack.core.types.builtin.NodeId> nativeDataTypes =
@@ -63,13 +68,19 @@ final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
     private final SubscriptionModel subscriptionModel;
 
     SchemaNamespace(OpcUaServer server, List<VarDef> variables) {
-        this(server, variables, List.of());
+        this(server, variables, List.of(), warning -> {});
     }
 
     SchemaNamespace(OpcUaServer server, List<VarDef> variables, List<NativeDataTypeDef> typeDefinitions) {
+        this(server, variables, typeDefinitions, warning -> {});
+    }
+
+    SchemaNamespace(OpcUaServer server, List<VarDef> variables, List<NativeDataTypeDef> typeDefinitions,
+            Consumer<String> warningSink) {
         super(server, URI);
         this.variables = List.copyOf(variables);
         this.typeDefinitions = List.copyOf(typeDefinitions);
+        this.warningSink = warningSink;
         this.subscriptionModel = new SubscriptionModel(server, this);
         getLifecycleManager().addLifecycle(subscriptionModel);
         getLifecycleManager().addStartupTask(this::createNodes);
@@ -97,6 +108,7 @@ final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
 
     private void createNodes() {
         createNativeDataTypes();
+        Set<String> excludedVariables = excludedVariables();
         // Folders are built first, repeatedly, so an out-of-order schema still
         // materializes correctly. A missing parent is rejected rather than flattened.
         int remaining = (int) variables.stream()
@@ -133,6 +145,10 @@ final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
             if (!"VARIABLE".equals(def.kind())) {
                 continue;
             }
+            if (excludedVariables.contains(def.nodeId())) {
+                warnExcludedVariable(def);
+                continue;
+            }
             boolean parentIsFolder = def.parentId() == null || hierarchy.containsKey(def.parentId());
             // IS-189: A HasProperty/HasComponent child's parent is another Variable
             boolean parentIsVariable = !parentIsFolder && nodes.containsKey(def.parentId());
@@ -166,6 +182,11 @@ final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
             if (!"METHOD".equals(def.kind())) {
                 continue;
             }
+            if (def.parentId() != null && excludedVariables.contains(def.parentId())) {
+                warningSink.accept("omitted OPC UA method " + def.nodeId()
+                        + " because its parent variable was omitted: " + def.parentId());
+                continue;
+            }
             boolean parentIsFolder = def.parentId() == null || hierarchy.containsKey(def.parentId());
             boolean parentIsVariable = !parentIsFolder && nodes.containsKey(def.parentId());
             if (!parentIsFolder && !parentIsVariable) {
@@ -184,6 +205,48 @@ final class SchemaNamespace extends ManagedNamespaceWithLifecycle {
             var parent = def.parentId() == null ? Identifiers.ObjectsFolder
                     : parentIsFolder ? hierarchy.get(def.parentId()) : nodes.get(def.parentId()).getNodeId();
             method.addReference(new Reference(nodeId, Identifiers.HasComponent, parent.expanded(), false));
+        }
+    }
+
+    /** Identifies opaque native values before registering nodes, avoiding partial materialization. */
+    private Set<String> excludedVariables() {
+        Map<String, VarDef> variableDefinitions = new HashMap<>();
+        Set<String> excluded = new HashSet<>();
+        for (VarDef def : variables) {
+            if ("VARIABLE".equals(def.kind())) {
+                variableDefinitions.put(def.nodeId(), def);
+                if (hasUnavailableNativeDataType(def)) {
+                    excluded.add(def.nodeId());
+                }
+            }
+        }
+        boolean changed;
+        do {
+            changed = false;
+            for (VarDef def : variableDefinitions.values()) {
+                if (def.parentId() != null && excluded.contains(def.parentId())) {
+                    changed |= excluded.add(def.nodeId());
+                }
+            }
+        } while (changed);
+        return excluded;
+    }
+
+    private boolean hasUnavailableNativeDataType(VarDef def) {
+        return !isStandardOpcUaDataType(def.declaredDataTypeNodeId())
+                && !isStandardOpcUaDataType(def.dataTypeNodeId())
+                && def.dataTypeNodeId() != null
+                && !def.dataTypeNodeId().isBlank()
+                && !nativeDataTypes.containsKey(def.dataTypeNodeId());
+    }
+
+    private void warnExcludedVariable(VarDef def) {
+        if (hasUnavailableNativeDataType(def)) {
+            warningSink.accept("omitted OPC UA variable " + def.nodeId()
+                    + " because its native DataType declaration was not supplied: " + def.dataTypeNodeId());
+        } else {
+            warningSink.accept("omitted OPC UA variable " + def.nodeId()
+                    + " because its parent variable was omitted: " + def.parentId());
         }
     }
 

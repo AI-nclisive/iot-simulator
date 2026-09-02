@@ -24,6 +24,7 @@ import java.time.Duration;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Predicate;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -93,6 +94,45 @@ class OpcUaRuntimeEventsIT {
         }
     }
 
+    @Test
+    void startExcludesOpaqueNativeVariableAndReportsWarningInsteadOfGrpcFailure() throws Exception {
+        OpcUaProtocolService service = new OpcUaProtocolService();
+        WorkerServer server = new WorkerServer(0, service).start();
+        ManagedChannel channel =
+                ManagedChannelBuilder.forAddress("127.0.0.1", server.port()).usePlaintext().build();
+        BlockingQueue<RuntimeEvent> events = new LinkedBlockingQueue<>();
+        try {
+            ProtocolDataSourceGrpc.ProtocolDataSourceBlockingStub blocking =
+                    ProtocolDataSourceGrpc.newBlockingStub(channel);
+            blocking.configure(ConfigureRequest.newBuilder()
+                    .setListenPort(freePort())
+                    .setSchema(Schema.newBuilder().setVersion(1)
+                            .addNodes(SchemaNodeMsg.newBuilder()
+                                    .setNodeId("temperature").setPath("Temperature").setName("Temperature")
+                                    .setKind("VARIABLE").setDataType("FLOAT64"))
+                            .addNodes(SchemaNodeMsg.newBuilder()
+                                    .setNodeId("opaque-structure").setPath("Opaque").setName("Opaque")
+                                    .setKind("VARIABLE").setDataTypeNodeId("ns=2;i=9898")))
+                    .build());
+
+            ProtocolDataSourceGrpc.ProtocolDataSourceStub async = ProtocolDataSourceGrpc.newStub(channel);
+            async.runtimeEvents(StreamRequest.getDefaultInstance(), collectInto(events));
+            awaitUntil(() -> service.openRuntimeEventStreams() > 0);
+
+            Ack started = blocking.start(StartRequest.getDefaultInstance());
+
+            assertThat(started.getOk()).isTrue();
+            RuntimeEvent warning = awaitEvent(events, event -> "WARNING".equals(event.getType()));
+            assertThat(warning.getDetail()).contains("opaque-structure", "ns=2;i=9898");
+            assertThat(awaitEvent(events, event -> "SOURCE_START".equals(event.getType()))).isNotNull();
+
+            blocking.stop(StopRequest.getDefaultInstance());
+        } finally {
+            channel.shutdownNow().awaitTermination(5, TimeUnit.SECONDS);
+            server.stop();
+        }
+    }
+
     private static StreamObserver<RuntimeEvent> collectInto(BlockingQueue<RuntimeEvent> events) {
         return new StreamObserver<>() {
             @Override
@@ -136,6 +176,18 @@ class OpcUaRuntimeEventsIT {
             Thread.sleep(50);
         }
         throw new AssertionError("condition not met within timeout");
+    }
+
+    private static RuntimeEvent awaitEvent(BlockingQueue<RuntimeEvent> events, Predicate<RuntimeEvent> match)
+            throws InterruptedException {
+        long deadline = System.nanoTime() + Duration.ofSeconds(10).toNanos();
+        while (System.nanoTime() < deadline) {
+            RuntimeEvent event = events.poll(100, TimeUnit.MILLISECONDS);
+            if (event != null && match.test(event)) {
+                return event;
+            }
+        }
+        throw new AssertionError("expected runtime event was not emitted");
     }
 
     private static int freePort() throws Exception {
