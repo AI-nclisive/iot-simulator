@@ -76,14 +76,27 @@ class SupervisorScanTest {
     }
 
     @Test
-    void scanRejectsUnsupportedProtocolWithoutLaunching() {
+    void testConnectionSupportsModbusTcpAndForwardsItsEncodedEndpoint() {
+        Supervisor supervisor = supervisor();
+
+        ConnectionTestResult result = supervisor.testConnection(new ScanSpec(
+                "MODBUS_TCP", "tcp://host:502#7", ConnectionCredentials.anonymous(), 0));
+
+        assertThat(result.ok()).isTrue();
+        assertThat(launcher.last().service().lastTestConnectionRequest().getEndpointUrl())
+                .isEqualTo("tcp://host:502#7");
+    }
+
+    @Test
+    void scanSupportsModbusTcpAndForwardsItsEncodedEndpoint() {
         Supervisor supervisor = supervisor();
 
         ScanResult result = supervisor.scan(new ScanSpec(
-                "MODBUS_TCP", "tcp://host:502", ConnectionCredentials.anonymous(), 0));
+                "MODBUS_TCP", "tcp://host:502#7", ConnectionCredentials.anonymous(), 0));
 
-        assertThat(result.status()).isEqualTo(ScanStatus.UNSUPPORTED);
-        assertThat(launcher.launchCount()).isZero();
+        assertThat(result.status()).isEqualTo(ScanStatus.OK);
+        assertThat(launcher.launchCount()).isEqualTo(1);
+        assertThat(launcher.last().service().lastScanRequest().getEndpointUrl()).isEqualTo("tcp://host:502#7");
     }
 
     @Test

@@ -70,7 +70,7 @@ public class ScanController {
         require(notBlank(req.protocol()), "protocol is required");
         ConnectionTestResult result = scans.testConnection(
                 projectId, req.protocol(), req.endpointUrl(),
-                CredentialRequests.toCredentials(req.connectionConfig()));
+                CredentialRequests.toCredentials(req.connectionConfig()), req.unitId());
         return new ConnectionTestResponse(result.status().name(), result.message());
     }
 
@@ -89,7 +89,7 @@ public class ScanController {
         ScanJob job = scans.startScan(
                 projectId, req.protocol(), req.endpointUrl(),
                 CredentialRequests.toCredentials(req.connectionConfig()),
-                req.maxNodes() == null ? 0 : req.maxNodes());
+                req.maxNodes() == null ? 0 : req.maxNodes(), req.unitId());
         URI location = URI.create(
                 "/api/v1/projects/" + projectId + "/data-sources/scan/" + job.jobId());
         return ResponseEntity.accepted().location(location)
@@ -156,7 +156,7 @@ public class ScanController {
             @RequestBody CreateFromScanRequest req) {
         require(req != null && notBlank(req.name()), "name is required");
         DataSource ds = scans.createFromScan(projectId, jobId, req.name(), req.realDeviceEndpoint(),
-                toResolutions(req.typeResolutions()), "local");
+                req.unitId(), toResolutions(req.typeResolutions()), "local");
         int paramCount = schemas.countVariableNodes(ds.id());
         return ResponseEntity.created(
                         URI.create("/api/v1/projects/" + projectId + "/data-sources/" + ds.id()))
@@ -187,10 +187,11 @@ public class ScanController {
 
     public record ScanRequest(
             String protocol, String endpointUrl, Integer maxNodes,
-            ConnectionConfigRequest connectionConfig) {}
+            ConnectionConfigRequest connectionConfig, Integer unitId) {}
 
     public record CreateFromScanRequest(
-            String name, String realDeviceEndpoint, List<TypeResolutionRequest> typeResolutions) {}
+            String name, String realDeviceEndpoint, List<TypeResolutionRequest> typeResolutions,
+            Integer unitId) {}
 
     /**
      * A user's decision for one unknown-typed discovered node: assign {@code dataType}

@@ -103,6 +103,7 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
     private static final String ERROR = "ERROR";
     private static final String STALE = "STALE";
     private static final String OPC_UA = "OPC_UA";
+    private static final String MODBUS_TCP = "MODBUS_TCP";
     private static final String EXTERNAL_REF_UNSUPPORTED =
             "external-ref credential resolution is not yet supported for real-source access (IS-082); "
                     + "use anonymous or password credentials";
@@ -364,12 +365,11 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
     /**
      * Real-source discovery (create-from-scan). Spawns a one-shot worker in client
      * mode, probes the endpoint, and tears the worker down — it is never adopted
-     * into the managed {@code running} map. Only OPC UA is supported today; Modbus
-     * discovery lands with worker-modbus. See openspec/specs/worker-contract/spec.md §6 / 05 §Scan.
+     * into the managed {@code running} map. See openspec/specs/worker-contract/spec.md §6 / 05 §Scan.
      */
     @Override
     public ConnectionTestResult testConnection(ScanSpec spec) {
-        if (!OPC_UA.equals(spec.protocol())) {
+        if (!supportsRealSourceClientMode(spec.protocol())) {
             return new ConnectionTestResult(ScanStatus.UNSUPPORTED, unsupportedMessage(spec.protocol()));
         }
         if (isExternalRef(spec)) {
@@ -386,7 +386,7 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
 
     @Override
     public ScanResult scan(ScanSpec spec, ScanProgressListener onProgress) {
-        if (!OPC_UA.equals(spec.protocol())) {
+        if (!supportsRealSourceClientMode(spec.protocol())) {
             return ScanResult.failure(ScanStatus.UNSUPPORTED, unsupportedMessage(spec.protocol()));
         }
         if (isExternalRef(spec)) {
@@ -422,7 +422,7 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
      * variables and streams observed value changes back; each batch is decoded
      * against the schema's types and handed to {@code sink}. The returned session
      * stops the stream (firing the worker's cancel handler) and tears the worker
-     * down. Only OPC UA is supported today. See openspec/specs/worker-contract/spec.md §6.
+     * down. See openspec/specs/worker-contract/spec.md §6.
      */
     @Override
     public CaptureSession startCapture(CaptureSpec spec, Consumer<List<NeutralValue>> sink) {
@@ -435,7 +435,7 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
         if (closed) {
             throw new IllegalStateException("supervisor is closed");
         }
-        if (!OPC_UA.equals(spec.protocol())) {
+        if (!supportsRealSourceClientMode(spec.protocol())) {
             throw new CaptureException(CaptureException.Kind.UNSUPPORTED, unsupportedMessage(spec.protocol()));
         }
         if (isExternalRef(spec.credentials())) {
@@ -512,6 +512,10 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
             closeQuietly(client);
             launched.close();
         }
+    }
+
+    private static boolean supportsRealSourceClientMode(String protocol) {
+        return OPC_UA.equals(protocol) || MODBUS_TCP.equals(protocol);
     }
 
     private static boolean isExternalRef(ScanSpec spec) {

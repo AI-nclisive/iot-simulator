@@ -123,14 +123,15 @@ class SupervisorCaptureTest {
     }
 
     @Test
-    void startCaptureRejectsUnsupportedProtocolWithoutLaunching() {
+    void startCaptureSupportsModbusTcpAndForwardsItsEncodedEndpoint() {
         Supervisor supervisor = supervisor();
 
-        assertThatThrownBy(() -> supervisor.startCapture(
-                new CaptureSpec("MODBUS_TCP", "tcp://host:502", ConnectionCredentials.anonymous(), 1, List.of()),
-                values -> { }))
-                .isInstanceOf(CaptureException.class);
-        assertThat(launcher.launchCount()).isZero();
+        CaptureSession session = supervisor.startCapture(
+                new CaptureSpec("MODBUS_TCP", "tcp://host:502#7", ConnectionCredentials.anonymous(), 1, List.of()),
+                values -> { });
+
+        assertThat(launcher.last().service().lastCaptureRequest().getEndpointUrl()).isEqualTo("tcp://host:502#7");
+        session.stop();
     }
 
     @Test
