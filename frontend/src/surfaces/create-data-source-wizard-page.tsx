@@ -253,6 +253,7 @@ export type WizardFormState = {
   opcUaSecurity: "Basic256Sha256" | "None";
   protocol: ProtocolOption["id"] | null;
   realDeviceEndpoint: string;
+  realDeviceUnitId: string;
   scanCredentialConfirmed: boolean;
   scanCredentialMode: "anonymous" | "external-ref" | "password";
   scanPassword: string;
@@ -415,6 +416,13 @@ export function validationMessage(stepId: WizardStepId, form: WizardFormState, a
       return "Enter the real endpoint before continuing.";
     }
 
+    if (stepId === "setup" && form.basis === "scan" && form.protocol === "Modbus TCP") {
+      const unitId = Number(form.realDeviceUnitId);
+      if (!form.realDeviceUnitId.trim() || !Number.isInteger(unitId) || unitId < 0 || unitId > 255) {
+        return "Enter a Modbus unit ID from 0 to 255.";
+      }
+    }
+
     if (stepId === "setup" && form.basis === "scan" && accessMode !== "local") {
       const credentialMessage = credentialValidationMessage(form);
       if (credentialMessage) return credentialMessage;
@@ -568,6 +576,9 @@ function reviewLines(
     ...(form.basis === "scan"
       ? [{ label: "Real device endpoint", value: form.realDeviceEndpoint || "-" }]
       : []),
+    ...(form.basis === "scan" && form.protocol === "Modbus TCP"
+      ? [{ label: "Real device unit ID", value: form.realDeviceUnitId || "-" }]
+      : []),
     ...(form.basis === "scan"
       ? [{ label: "Credentials", value: credentialReviewValue(form) }]
       : []),
@@ -669,6 +680,7 @@ export function CreateDataSourceWizardPage() {
     opcUaSecurity: "None",
     protocol: null,
     realDeviceEndpoint: "",
+    realDeviceUnitId: "1",
       scanCredentialConfirmed: false,
     scanCredentialMode: "anonymous",
     scanPassword: "",
@@ -775,7 +787,7 @@ export function CreateDataSourceWizardPage() {
     if (activeStepId !== "scan") return;
     if (!currentProjectId || !form.protocol) return;
 
-    const paramsKey = `${form.protocol}::${form.realDeviceEndpoint}`;
+    const paramsKey = `${form.protocol}::${form.realDeviceEndpoint}::${form.protocol === "Modbus TCP" ? form.realDeviceUnitId : ""}`;
     const paramsChanged = scannedParamsKeyRef.current !== paramsKey;
 
     // "idle" -> nothing scanned yet, start fresh. "scanning" -> a scan is
@@ -899,6 +911,7 @@ export function CreateDataSourceWizardPage() {
             body: JSON.stringify({
               protocol: backendProtocolForForm(form.protocol),
               endpointUrl: form.realDeviceEndpoint,
+              ...(form.protocol === "Modbus TCP" ? { unitId: Number(form.realDeviceUnitId) } : {}),
             }),
           },
         );
@@ -1018,6 +1031,7 @@ export function CreateDataSourceWizardPage() {
           body: JSON.stringify({
             protocol: backendProtocolForForm(form.protocol),
             endpointUrl: form.realDeviceEndpoint,
+            ...(form.protocol === "Modbus TCP" ? { unitId: Number(form.realDeviceUnitId) } : {}),
           }),
         },
       );
@@ -1113,6 +1127,7 @@ export function CreateDataSourceWizardPage() {
             body: JSON.stringify({
               name: form.name.trim(),
               realDeviceEndpoint: form.realDeviceEndpoint,
+              ...(form.protocol === "Modbus TCP" ? { unitId: Number(form.realDeviceUnitId) } : {}),
               ...(typeResolutions.length > 0 ? { typeResolutions } : {}),
             }),
           },
@@ -1215,12 +1230,13 @@ export function CreateDataSourceWizardPage() {
 
           {form.basis === "scan" ? (
             <div className="space-y-3">
-              <label className="flex flex-col gap-2 text-sm text-shell-muted">
-                Real endpoint
-                <input
-                  className="shell-field"
-                  placeholder={suggestedEndpoint(form.protocol, form.basis)}
-                  type="text"
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="flex flex-col gap-2 text-sm text-shell-muted">
+                  Real endpoint
+                  <input
+                    className="shell-field"
+                    placeholder={suggestedEndpoint(form.protocol, form.basis)}
+                    type="text"
                     value={form.realDeviceEndpoint}
                     onChange={(event) =>
                       updateForm({
@@ -1231,6 +1247,29 @@ export function CreateDataSourceWizardPage() {
                     }
                   />
                 </label>
+
+                {form.protocol === "Modbus TCP" ? (
+                  <label className="flex flex-col gap-2 text-sm text-shell-muted">
+                    Unit ID
+                    <input
+                      className="shell-field"
+                      inputMode="numeric"
+                      max={255}
+                      min={0}
+                      step={1}
+                      type="number"
+                      value={form.realDeviceUnitId}
+                      onChange={(event) =>
+                        updateForm({
+                          realDeviceUnitId: event.target.value,
+                          scanState: "idle",
+                          scanTestResult: "idle",
+                        })
+                      }
+                    />
+                  </label>
+                ) : null}
+              </div>
 
                 {accessMode !== "local" ? (
                 <div className="space-y-3 border-t border-shell-line pt-4">
@@ -1420,7 +1459,7 @@ export function CreateDataSourceWizardPage() {
             </>
           ) : null}
 
-          {form.protocol === "Modbus TCP" ? (
+          {form.protocol === "Modbus TCP" && form.basis !== "scan" ? (
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="flex flex-col gap-2 text-sm text-shell-muted">
                 Unit ID

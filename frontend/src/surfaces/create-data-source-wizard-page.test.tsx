@@ -109,6 +109,7 @@ afterEach(() => {
   cleanup();
   vi.clearAllMocks();
   dataSourcesStoreState.dataSources = [];
+  shellStoreState.accessMode = "local";
   vi.useRealTimers();
   vi.unstubAllGlobals();
 });
@@ -129,6 +130,19 @@ async function navigateToScanSetup() {
   await userEvent.click(screen.getAllByRole("button", { name: "Next" })[0]);
 }
 
+async function navigateToModbusScanSetup() {
+  render(
+    <MemoryRouter>
+      <CreateDataSourceWizardPage />
+    </MemoryRouter>,
+  );
+
+  await userEvent.click(screen.getByText("Modbus TCP"));
+  await userEvent.click(screen.getAllByRole("button", { name: "Next" })[0]);
+  await userEvent.click(screen.getByText("Real source"));
+  await userEvent.click(screen.getAllByRole("button", { name: "Next" })[0]);
+}
+
 describe("CreateDataSourceWizardPage — setup step", () => {
   it("shows Source name field on the setup step", async () => {
     await navigateToScanSetup();
@@ -139,6 +153,15 @@ describe("CreateDataSourceWizardPage — setup step", () => {
     await navigateToScanSetup();
     const btn = screen.getAllByRole("button", { name: "Next" })[0] as HTMLButtonElement;
     expect(btn.disabled).toBe(true);
+  });
+
+  it("shows a default Unit ID only for a Modbus real source", async () => {
+    await navigateToModbusScanSetup();
+    expect((screen.getByLabelText("Unit ID") as HTMLInputElement).value).toBe("1");
+
+    cleanup();
+    await navigateToScanSetup();
+    expect(screen.queryByLabelText("Unit ID")).toBeNull();
   });
 });
 
@@ -177,6 +200,7 @@ const baseScanForm: WizardFormState = {
   opcUaSecurity: "None",
   protocol: "OPC UA",
   realDeviceEndpoint: "opc.tcp://host:4840",
+  realDeviceUnitId: "1",
   scanCredentialConfirmed: false,
   scanCredentialMode: "password",
   scanPassword: "",
@@ -208,6 +232,16 @@ describe("validationMessage — local-mode credential skip", () => {
     const form = { ...baseScanForm, name: "" };
     expect(validationMessage("setup", form, "local")).toBeTruthy();
     expect(validationMessage("setup", form, "shared")).toBeTruthy();
+  });
+
+  it("requires a Modbus real-source unit ID from 0 to 255", () => {
+    const form = {
+      ...baseScanForm,
+      protocol: "Modbus TCP" as const,
+      realDeviceUnitId: "256",
+    };
+    expect(validationMessage("setup", form, "local")).toBe("Enter a Modbus unit ID from 0 to 255.");
+    expect(validationMessage("setup", { ...form, realDeviceUnitId: "7" }, "local")).toBeNull();
   });
 });
 
@@ -349,6 +383,15 @@ async function navigateToScanStep() {
   await userEvent.click(screen.getAllByRole("button", { name: "Next" })[0]);
 }
 
+async function navigateToModbusScanStep(unitId = "1") {
+  await navigateToModbusScanSetup();
+  await userEvent.type(screen.getByLabelText("Source name"), "Modbus source");
+  const unitIdInput = screen.getByLabelText("Unit ID");
+  await userEvent.clear(unitIdInput);
+  await userEvent.type(unitIdInput, unitId);
+  await userEvent.click(screen.getAllByRole("button", { name: "Next" })[0]);
+}
+
 // The integration tests for the scan step mock `apiFetch` at the module level
 // rather than stubbing global fetch, so React internals are not affected.
 // The scan effect fires on mount; we use waitFor to observe state transitions.
@@ -403,6 +446,49 @@ describe("CreateDataSourceWizardPage — scan step (UI-458)", () => {
   });
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it("sends a Modbus real-source unit ID with the scan request", async () => {
+    mockApiFetch.mockImplementationOnce(() => makeScanStart("modbus-job"));
+
+    await navigateToModbusScanStep("7");
+
+    await waitFor(() => {
+      const scanCall = mockApiFetch.mock.calls.find(
+        (call: unknown[]) =>
+          typeof call[0] === "string" &&
+          (call[0] as string).endsWith("/data-sources/scan") &&
+          (call[1] as { method?: string } | undefined)?.method === "POST",
+      );
+      expect(scanCall).toBeTruthy();
+      expect(JSON.parse((scanCall![1] as { body: string }).body)).toMatchObject({
+        protocol: "MODBUS_TCP",
+        unitId: 7,
+      });
+    });
+  });
+
+  it("sends a Modbus real-source unit ID when testing the connection", async () => {
+    shellStoreState.accessMode = "shared";
+    mockApiFetch.mockResolvedValueOnce({ status: "OK", message: "ready" });
+
+    await navigateToModbusScanSetup();
+    await userEvent.clear(screen.getByLabelText("Unit ID"));
+    await userEvent.type(screen.getByLabelText("Unit ID"), "9");
+    await userEvent.click(screen.getByRole("button", { name: "Test connection" }));
+
+    await waitFor(() => {
+      const testCall = mockApiFetch.mock.calls.find(
+        (call: unknown[]) =>
+          typeof call[0] === "string" &&
+          (call[0] as string).endsWith("/scan/test-connection"),
+      );
+      expect(testCall).toBeTruthy();
+      expect(JSON.parse((testCall![1] as { body: string }).body)).toMatchObject({
+        protocol: "MODBUS_TCP",
+        unitId: 9,
+      });
+    });
   });
 
   it("shows scanning state immediately on entering the scan step", async () => {
@@ -676,6 +762,33 @@ describe("CreateDataSourceWizardPage — scan step (UI-458)", () => {
     expect(secondBody.endpointUrl).toBe("opc.tcp://a-different-host:4840");
   });
 
+  it("runs a fresh scan when the Modbus real-device unit ID changes", async () => {
+    mockApiFetch
+      .mockImplementationOnce(() => Promise.resolve({ jobId: "unit-one", status: "RUNNING" }))
+      .mockImplementationOnce(() => makeScanResult({ jobId: "unit-one" }))
+      .mockImplementationOnce(() => makeNodesPage([knownNode]))
+      .mockImplementationOnce(() => Promise.resolve({ jobId: "unit-seven", status: "RUNNING" }))
+      .mockImplementationOnce(() => makeScanResult({ jobId: "unit-seven" }))
+      .mockImplementationOnce(() => makeNodesPage([knownNode]));
+
+    await navigateToModbusScanStep("1");
+    await advanceIntervalAndFlush(2000);
+    await userEvent.click(screen.getAllByRole("button", { name: "Back" })[0]);
+    await userEvent.clear(screen.getByLabelText("Unit ID"));
+    await userEvent.type(screen.getByLabelText("Unit ID"), "7");
+    await userEvent.click(screen.getAllByRole("button", { name: "Next" })[0]);
+    await advanceIntervalAndFlush(2000);
+
+    const scanCalls = mockApiFetch.mock.calls.filter(
+      (call: unknown[]) =>
+        typeof call[0] === "string" &&
+        (call[0] as string).endsWith("/data-sources/scan") &&
+        (call[1] as { method?: string } | undefined)?.method === "POST",
+    );
+    expect(scanCalls).toHaveLength(2);
+    expect(JSON.parse((scanCalls[1][1] as { body: string }).body)).toMatchObject({ unitId: 7 });
+  });
+
   it("Next remains enabled when native types are preserved without mapping", async () => {
     mockApiFetch
       .mockImplementationOnce(() => Promise.resolve({ jobId: "job-1", status: "RUNNING" }))
@@ -845,6 +958,39 @@ describe("CreateDataSourceWizardPage — scan step (UI-458)", () => {
     // UI-472: the store must be reloaded before navigating away, so the
     // destination page's dataSources.find(...) lookup doesn't come up empty.
     expect(mockLoadDataSources).toHaveBeenCalledWith("proj-test");
+  });
+
+  it("includes a Modbus real-source unit ID when creating from a completed scan", async () => {
+    mockApiFetch
+      .mockImplementationOnce(() => Promise.resolve({ jobId: "modbus-job", status: "RUNNING" }))
+      .mockImplementationOnce(() =>
+        Promise.resolve({
+          jobId: "modbus-job",
+          status: "OK",
+          truncated: false,
+          discoveredCount: 1,
+          unknownCount: 0,
+          message: null,
+        }),
+      )
+      .mockImplementationOnce(() => makeNodesPage([knownNode]))
+      .mockImplementationOnce(() => Promise.resolve({ id: "modbus-created" }));
+
+    await navigateToModbusScanStep("7");
+    await advanceIntervalAndFlush(2000);
+    await userEvent.click(screen.getAllByRole("button", { name: "Next" })[0]);
+    await userEvent.click(screen.getAllByRole("button", { name: "Next" })[0]);
+    await userEvent.click(screen.getAllByRole("button", { name: "Next" })[0]);
+    await userEvent.click(screen.getByRole("button", { name: "Create source" }));
+
+    await waitFor(() => {
+      const createCall = mockApiFetch.mock.calls.find(
+        (call: unknown[]) =>
+          typeof call[0] === "string" && (call[0] as string).includes("/scan/modbus-job/create"),
+      );
+      expect(createCall).toBeTruthy();
+      expect(JSON.parse((createCall![1] as { body: string }).body)).toMatchObject({ unitId: 7 });
+    });
   });
 
   it("navigates to /data-sources/:id when Skip is chosen on recording step (startCapture=false)", async () => {
