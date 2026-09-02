@@ -76,6 +76,17 @@ class ScanControllerTest {
     }
 
     @Test
+    void testConnectionForwardsModbusUnitId() {
+        given(service.testConnection(eq(PROJECT), eq("MODBUS_TCP"), eq("tcp://h:502"), any(), eq(7)))
+                .willReturn(new ConnectionTestResult(ScanStatus.OK, "connected"));
+
+        controller.testConnection(PROJECT,
+                new ScanRequest("MODBUS_TCP", "tcp://h:502", null, null, 7));
+
+        verify(service).testConnection(eq(PROJECT), eq("MODBUS_TCP"), eq("tcp://h:502"), any(), eq(7));
+    }
+
+    @Test
     void startScanReturns202WithJobIdAndLocation() {
         given(service.startScan(eq(PROJECT), eq("OPC_UA"), eq("opc.tcp://h"), any(), eq(50)))
                 .willReturn(running("job-1"));
