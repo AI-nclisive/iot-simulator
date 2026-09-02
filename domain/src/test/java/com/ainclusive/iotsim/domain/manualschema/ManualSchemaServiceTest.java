@@ -90,6 +90,24 @@ class ManualSchemaServiceTest {
     }
 
     @Test
+    void createFromSunSpecTemplateRetainsModbusBindings() {
+        ManualSchema created = service.createFromTemplate(PROJECT, "sunspec_inverter", "Inverter", "it");
+
+        assertThat(created.protocol()).isEqualTo("MODBUS_TCP");
+        assertThat(created.nodes()).filteredOn(node -> node.nodeId().equals("sunspec_inverter_power"))
+                .singleElement()
+                .extracting(SchemaNode::modbusRegisterKind, SchemaNode::modbusAddress)
+                .containsExactly("HOLDING_REGISTER", 85);
+    }
+
+    @Test
+    void createFromUnknownTemplateIsRejected() {
+        assertThatThrownBy(() -> service.createFromTemplate(PROJECT, "unknown", "X", "it"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("unsupported manual schema template");
+    }
+
+    @Test
     void createWithDuplicatePathIsRejected() {
         List<SchemaNode> dup = List.of(
                 new SchemaNode("a", null, "Same", "A", NodeKind.FOLDER, null, null, null, null, null),

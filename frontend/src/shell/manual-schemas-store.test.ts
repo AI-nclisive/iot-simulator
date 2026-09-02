@@ -113,6 +113,23 @@ describe("createManualSchema", () => {
   });
 });
 
+describe("createManualSchemaFromTemplate", () => {
+  it("POSTs the profile key and prepends the materialized schema", async () => {
+    mockApiFetch.mockResolvedValueOnce(makeSchema({ id: "ms-sunspec", name: "Inverter" }));
+
+    const created = await useManualSchemasStore
+      .getState()
+      .createManualSchemaFromTemplate("proj-1", { templateName: "sunspec_inverter", name: "Inverter" });
+
+    expect(mockApiFetch).toHaveBeenCalledWith(
+      "/api/v1/projects/proj-1/manual-schemas/from-template",
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ templateName: "sunspec_inverter", name: "Inverter" }) }),
+    );
+    expect(created.id).toBe("ms-sunspec");
+    expect(useManualSchemasStore.getState().schemas[0].id).toBe("ms-sunspec");
+  });
+});
+
 describe("updateManualSchema", () => {
   it("PUTs and replaces the schema in the list", async () => {
     useManualSchemasStore.setState({ schemas: [makeSchema({ version: 0 })] });
