@@ -91,6 +91,22 @@ public class ManualSchemaController {
                 .body(ManualSchemaResponse.from(schema));
     }
 
+    @Operation(summary = "Create a manual schema from a built-in profile",
+            description = "Materializes a supported profile as an independent manual schema, retaining its"
+                    + " explicit protocol bindings.")
+    @PostMapping("/from-template")
+    @PreAuthorize(SCHEMA_EDIT)
+    public ResponseEntity<ManualSchemaResponse> createFromTemplate(
+            @PathVariable String projectId, @RequestBody CreateFromTemplateRequest req) {
+        require(req != null && notBlank(req.name()), "name is required");
+        require(notBlank(req.templateName()), "templateName is required");
+        ManualSchema schema = manualSchemas.createFromTemplate(projectId, req.templateName(), req.name(), "local");
+        return ResponseEntity.created(
+                        URI.create("/api/v1/projects/" + projectId + "/manual-schemas/" + schema.id()))
+                .eTag(etag(schema.version()))
+                .body(ManualSchemaResponse.from(schema));
+    }
+
     @Operation(summary = "Import an OPC UA NodeSet XML file",
             description = "Imports supported Objects, Variables, Methods and references into a reusable manual"
                     + " schema. Unsupported definitions are returned as explicit diagnostics and are never"
@@ -300,6 +316,8 @@ public class ManualSchemaController {
     }
 
     public record CreateManualSchemaRequest(String protocol, String name, String description, List<NodeDto> nodes) {}
+
+    public record CreateFromTemplateRequest(String templateName, String name) {}
 
     public record ImportNodeSetRequest(String name, String description, String xml) {}
 

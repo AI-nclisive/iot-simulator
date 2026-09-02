@@ -11,6 +11,7 @@ import static org.mockito.Mockito.verify;
 
 import com.ainclusive.iotsim.api.error.PreconditionRequiredException;
 import com.ainclusive.iotsim.api.manualschema.ManualSchemaController;
+import com.ainclusive.iotsim.api.manualschema.ManualSchemaController.CreateFromTemplateRequest;
 import com.ainclusive.iotsim.api.manualschema.ManualSchemaController.CreateManualSchemaRequest;
 import com.ainclusive.iotsim.api.manualschema.ManualSchemaController.DuplicateManualSchemaRequest;
 import com.ainclusive.iotsim.api.manualschema.ManualSchemaController.ManualSchemaResponse;
@@ -81,6 +82,32 @@ class ManualSchemaControllerTest {
         var request = new CreateManualSchemaRequest("OPC_UA", " ", null, List.of());
         assertThatThrownBy(() -> controller.create("p1", request))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void createFromTemplateReturnsCreatedSchemaWithLocationAndEtag() {
+        ManualSchema template = new ManualSchema("ms-template", "p1", "MODBUS_TCP", "Inverter", null, List.of(),
+                Instant.now(), Instant.now(), "local", 2);
+        given(service.createFromTemplate("p1", "sunspec_inverter", "Inverter", "local")).willReturn(template);
+
+        ResponseEntity<ManualSchemaResponse> response = controller.createFromTemplate(
+                "p1", new CreateFromTemplateRequest("sunspec_inverter", "Inverter"));
+
+        assertThat(response.getStatusCode().value()).isEqualTo(201);
+        assertThat(response.getHeaders().getLocation())
+                .hasToString("/api/v1/projects/p1/manual-schemas/ms-template");
+        assertThat(response.getHeaders().getETag()).isEqualTo("\"2\"");
+        verify(service).createFromTemplate("p1", "sunspec_inverter", "Inverter", "local");
+    }
+
+    @Test
+    void createFromTemplateRequiresNameAndTemplateName() {
+        assertThatThrownBy(() -> controller.createFromTemplate("p1", new CreateFromTemplateRequest(null, "Inverter")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("templateName");
+        assertThatThrownBy(() -> controller.createFromTemplate("p1", new CreateFromTemplateRequest("sunspec_inverter", " ")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("name");
     }
 
     @Test

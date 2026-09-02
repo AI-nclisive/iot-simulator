@@ -43,6 +43,11 @@ export type UpdateManualSchemaInput = {
   nodes: NodeDto[];
 };
 
+export type CreateManualSchemaFromTemplateInput = {
+  templateName: string;
+  name: string;
+};
+
 type ManualSchemasState = {
   schemas: ManualSchemaResponse[];
   isLoading: boolean;
@@ -52,6 +57,10 @@ type ManualSchemasState = {
   createManualSchema: (
     projectId: string,
     input: CreateManualSchemaInput,
+  ) => Promise<ManualSchemaResponse>;
+  createManualSchemaFromTemplate: (
+    projectId: string,
+    input: CreateManualSchemaFromTemplateInput,
   ) => Promise<ManualSchemaResponse>;
   updateManualSchema: (
     projectId: string,
@@ -124,6 +133,15 @@ export const useManualSchemasStore = create<ManualSchemasState>((set) => ({
           nodes: input.nodes ?? [],
         }),
       },
+    );
+    set((state) => ({ schemas: [schema, ...state.schemas] }));
+    return schema;
+  },
+
+  createManualSchemaFromTemplate: async (projectId, input) => {
+    const schema = await apiFetch<ManualSchemaResponse>(
+      `/api/v1/projects/${projectId}/manual-schemas/from-template`,
+      { method: "POST", body: JSON.stringify(input) },
     );
     set((state) => ({ schemas: [schema, ...state.schemas] }));
     return schema;

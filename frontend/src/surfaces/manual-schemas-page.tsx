@@ -28,6 +28,7 @@ export function ManualSchemasPage() {
   const storeError = useManualSchemasStore((s) => s.error);
   const loadManualSchemas = useManualSchemasStore((s) => s.loadManualSchemas);
   const createManualSchema = useManualSchemasStore((s) => s.createManualSchema);
+  const createManualSchemaFromTemplate = useManualSchemasStore((s) => s.createManualSchemaFromTemplate);
   const duplicateManualSchema = useManualSchemasStore((s) => s.duplicateManualSchema);
   const deleteManualSchema = useManualSchemasStore((s) => s.deleteManualSchema);
   const push = useNotificationStore((s) => s.push);
@@ -36,6 +37,7 @@ export function ManualSchemasPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [createName, setCreateName] = useState("");
   const [createProtocol, setCreateProtocol] = useState("OPC_UA");
+  const [createTemplate, setCreateTemplate] = useState("empty");
   const [isCreating, setIsCreating] = useState(false);
   const [duplicateRequest, setDuplicateRequest] = useState<ManualSchemaResponse | null>(null);
   const [duplicateName, setDuplicateName] = useState("");
@@ -57,12 +59,12 @@ export function ManualSchemasPage() {
     if (!name || !currentProjectId) return;
     setIsCreating(true);
     try {
-      const schema = await createManualSchema(currentProjectId, {
-        protocol: createProtocol,
-        name,
-      });
+      const schema = createTemplate === "sunspec_inverter"
+        ? await createManualSchemaFromTemplate(currentProjectId, { templateName: createTemplate, name })
+        : await createManualSchema(currentProjectId, { protocol: createProtocol, name });
       setCreateOpen(false);
       setCreateName("");
+      setCreateTemplate("empty");
       navigate(`/manual-schemas/${schema.id}`);
     } catch (err) {
       const title =
@@ -263,11 +265,29 @@ export function ManualSchemasPage() {
                 <select
                   className="shell-field"
                   value={createProtocol}
-                  onChange={(e) => setCreateProtocol(e.target.value)}
+                  onChange={(e) => {
+                    setCreateProtocol(e.target.value);
+                    setCreateTemplate("empty");
+                  }}
                 >
                   <option value="OPC_UA">OPC UA</option>
+                  <option value="MODBUS_TCP">Modbus TCP</option>
                 </select>
               </label>
+              {createProtocol === "MODBUS_TCP" ? (
+                <label className="flex flex-col gap-1.5 text-sm text-shell-muted">
+                  Starting structure
+                  <select
+                    aria-label="Starting structure"
+                    className="shell-field"
+                    value={createTemplate}
+                    onChange={(e) => setCreateTemplate(e.target.value)}
+                  >
+                    <option value="empty">Empty structure</option>
+                    <option value="sunspec_inverter">SunSpec Inverter (Common Model 1 + Model 103)</option>
+                  </select>
+                </label>
+              ) : null}
             </div>
             <div className="flex flex-col-reverse gap-2 border-t border-shell-line px-5 py-4 sm:flex-row sm:items-center sm:justify-end">
               <button

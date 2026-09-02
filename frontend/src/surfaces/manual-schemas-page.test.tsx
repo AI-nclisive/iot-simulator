@@ -25,11 +25,13 @@ vi.mock("react-router-dom", async () => {
 const {
   mockLoadManualSchemas,
   mockCreateManualSchema,
+  mockCreateManualSchemaFromTemplate,
   mockDuplicateManualSchema,
   mockDeleteManualSchema,
 } = vi.hoisted(() => ({
   mockLoadManualSchemas: vi.fn().mockResolvedValue(undefined),
   mockCreateManualSchema: vi.fn(),
+  mockCreateManualSchemaFromTemplate: vi.fn(),
   mockDuplicateManualSchema: vi.fn(),
   mockDeleteManualSchema: vi.fn().mockResolvedValue(undefined),
 }));
@@ -60,6 +62,7 @@ vi.mock("../shell/manual-schemas-store", () => ({
       error: null,
       loadManualSchemas: mockLoadManualSchemas,
       createManualSchema: mockCreateManualSchema,
+      createManualSchemaFromTemplate: mockCreateManualSchemaFromTemplate,
       duplicateManualSchema: mockDuplicateManualSchema,
       deleteManualSchema: mockDeleteManualSchema,
     }),
@@ -108,6 +111,24 @@ describe("ManualSchemasPage (UI-489)", () => {
       );
     });
     expect(mockNavigate).toHaveBeenCalledWith("/manual-schemas/ms-new");
+  });
+
+  it("creates the SunSpec schema through the profile endpoint", async () => {
+    mockCreateManualSchemaFromTemplate.mockResolvedValueOnce({ ...schema, id: "ms-sunspec", protocol: "MODBUS_TCP" });
+    renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: "Create manual schema" }));
+    fireEvent.change(screen.getByLabelText("Protocol"), { target: { value: "MODBUS_TCP" } });
+    fireEvent.change(screen.getByLabelText("Starting structure"), { target: { value: "sunspec_inverter" } });
+    fireEvent.change(screen.getByPlaceholderText("Boiler layout"), { target: { value: "Solar inverter" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create" }));
+
+    await waitFor(() => {
+      expect(mockCreateManualSchemaFromTemplate).toHaveBeenCalledWith(
+        "proj-1", { templateName: "sunspec_inverter", name: "Solar inverter" },
+      );
+    });
+    expect(mockNavigate).toHaveBeenCalledWith("/manual-schemas/ms-sunspec");
   });
 
   it("navigates to the editor when a row is clicked", () => {
