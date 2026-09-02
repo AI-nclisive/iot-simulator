@@ -5,4 +5,4 @@
 
 ## 2. Verification
 
-- [ ] 2.1 Run the focused Modbus worker integration test and the full Gradle build.
+- [x] 2.1 Run the focused Modbus worker integration test and the full Gradle build.
