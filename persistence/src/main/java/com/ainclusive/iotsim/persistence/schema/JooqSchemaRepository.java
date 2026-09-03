@@ -64,6 +64,12 @@ public class JooqSchemaRepository implements SchemaRepository {
             field(name("schema_nodes", "modbus_register_kind"), String.class);
     private static final Field<Integer> MODBUS_ADDRESS =
             field(name("schema_nodes", "modbus_address"), Integer.class);
+    private static final Field<String> MODBUS_BYTE_ORDER =
+            field(name("schema_nodes", "modbus_byte_order"), String.class);
+    private static final Field<String> MODBUS_WORD_ORDER =
+            field(name("schema_nodes", "modbus_word_order"), String.class);
+    private static final Field<Double> MODBUS_SCALE =
+            field(name("schema_nodes", "modbus_scale"), Double.class);
     private static final Table<?> NODE_REFERENCES = table(name("schema_node_references"));
     private static final Field<String> REFERENCE_SCHEMA_ID =
             field(name("schema_node_references", "schema_id"), String.class);
@@ -169,6 +175,9 @@ public class JooqSchemaRepository implements SchemaRepository {
                         .set(HISTORIZING, n.historizing())
                         .set(MODBUS_REGISTER_KIND, n.modbusRegisterKind())
                         .set(MODBUS_ADDRESS, n.modbusAddress())
+                        .set(MODBUS_BYTE_ORDER, n.modbusByteOrder())
+                        .set(MODBUS_WORD_ORDER, n.modbusWordOrder())
+                        .set(MODBUS_SCALE, n.modbusScale())
                         .execute();
             }
             for (SchemaNode n : nodes) {
@@ -254,7 +263,7 @@ public class JooqSchemaRepository implements SchemaRepository {
                 r.get(HISTORIZING),
                 null, // declaredDataTypeNodeId: not yet persisted for normalized schema_nodes
                 r.get(MODBUS_REGISTER_KIND),
-                r.get(MODBUS_ADDRESS));
+                r.get(MODBUS_ADDRESS), r.get(MODBUS_BYTE_ORDER), r.get(MODBUS_WORD_ORDER), r.get(MODBUS_SCALE));
     }
 
     private <T> JSONB json(List<T> values) {

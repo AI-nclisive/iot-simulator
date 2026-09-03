@@ -53,6 +53,22 @@ class ModbusTypesTest {
     }
 
     @Test
+    void configuredByteWordOrderAndScaleRoundTripFloat32() {
+        int[] registers = ModbusTypes.toRegisters("FLOAT32", 12.5d, "LITTLE_ENDIAN", "LSW_FIRST", 0.1d);
+        assertThat(registers).containsExactly(0x0000, 0xFA42);
+        assertThat((Double) ModbusTypes.fromRegisters("FLOAT32", registers, "LITTLE_ENDIAN", "LSW_FIRST", 0.1d))
+                .isEqualTo(12.5d);
+    }
+
+    @Test
+    void configuredOrderAndScaleRoundTripSignedAndUnsignedIntegers() {
+        int[] signed = ModbusTypes.toRegisters("INT16", -12L, "LITTLE_ENDIAN", null, 1d);
+        assertThat(ModbusTypes.fromRegisters("INT16", signed, "LITTLE_ENDIAN", null, 1d)).isEqualTo(-12L);
+        int[] unsigned = ModbusTypes.toRegisters("UINT32", 123_400L, "BIG_ENDIAN", "LSW_FIRST", 100d);
+        assertThat(ModbusTypes.fromRegisters("UINT32", unsigned, "BIG_ENDIAN", "LSW_FIRST", 100d)).isEqualTo(123_400L);
+    }
+
+    @Test
     void registerSpanMatchesTypeWidth() {
         assertThat(ModbusTypes.registerSpan("UINT16")).isEqualTo(1);
         assertThat(ModbusTypes.registerSpan("INT16")).isEqualTo(1);

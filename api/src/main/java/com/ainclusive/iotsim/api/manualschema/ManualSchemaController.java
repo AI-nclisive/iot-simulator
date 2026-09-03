@@ -208,6 +208,7 @@ public class ManualSchemaController {
                 throw new IllegalArgumentException(
                         "node '" + d.path() + "': invalid modbusRegisterKind: " + d.modbusRegisterKind());
             }
+            validateModbusEncoding(d);
             nodes.add(new SchemaNode(
                     d.nodeId(), d.parentId(), d.path(), d.name(),
                     kind, dataType, valueRank, access, d.unit(), d.description(), d.arrayDimensions(),
@@ -215,7 +216,8 @@ public class ManualSchemaController {
                     SchemaReferenceMapper.toMembers(d.members()), toEnumValues(d.enumValues()),
                     d.defaultEncodingId(), d.nativeTypeKind() == null ? null : parseEnum(
                             NativeTypeKind.class, d.nativeTypeKind(), "nativeTypeKind"), d.accessLevelFull(), d.minimumSamplingInterval(),
-                    d.writeMask(), d.historizing(), d.declaredDataTypeNodeId(), d.modbusRegisterKind(), d.modbusAddress()));
+                    d.writeMask(), d.historizing(), d.declaredDataTypeNodeId(), d.modbusRegisterKind(), d.modbusAddress(),
+                    d.modbusByteOrder(), d.modbusWordOrder(), d.modbusScale()));
         }
         return nodes;
     }
@@ -225,6 +227,24 @@ public class ManualSchemaController {
     // validated against this fixed literal set instead, same as parseEnum does for a real enum.
     private static final java.util.Set<String> MODBUS_REGISTER_KINDS =
             java.util.Set.of("COIL", "DISCRETE_INPUT", "HOLDING_REGISTER", "INPUT_REGISTER");
+    private static final java.util.Set<String> MODBUS_BYTE_ORDERS = java.util.Set.of("BIG_ENDIAN", "LITTLE_ENDIAN");
+    private static final java.util.Set<String> MODBUS_WORD_ORDERS = java.util.Set.of("MSW_FIRST", "LSW_FIRST");
+
+    private static void validateModbusEncoding(NodeDto d) {
+        if ((d.modbusByteOrder() != null || d.modbusWordOrder() != null || d.modbusScale() != null)
+                && d.modbusRegisterKind() == null) {
+            throw new IllegalArgumentException("node '" + d.path() + "': Modbus encoding requires a register binding");
+        }
+        if (d.modbusByteOrder() != null && !MODBUS_BYTE_ORDERS.contains(d.modbusByteOrder())) {
+            throw new IllegalArgumentException("node '" + d.path() + "': invalid modbusByteOrder");
+        }
+        if (d.modbusWordOrder() != null && !MODBUS_WORD_ORDERS.contains(d.modbusWordOrder())) {
+            throw new IllegalArgumentException("node '" + d.path() + "': invalid modbusWordOrder");
+        }
+        if (d.modbusScale() != null && (!Double.isFinite(d.modbusScale()) || d.modbusScale() == 0.0d)) {
+            throw new IllegalArgumentException("node '" + d.path() + "': modbusScale must be finite and non-zero");
+        }
+    }
 
     private static void requireText(String value, String field) {
         if (value == null || value.isBlank()) {
@@ -279,13 +299,14 @@ public class ManualSchemaController {
             String dataTypeNodeId, List<MemberDto> members,
             List<EnumValueDto> enumValues, String defaultEncodingId, String nativeTypeKind,
             Integer accessLevelFull, Integer minimumSamplingInterval, Integer writeMask, Boolean historizing,
-            String declaredDataTypeNodeId, String modbusRegisterKind, Integer modbusAddress) {
+            String declaredDataTypeNodeId, String modbusRegisterKind, Integer modbusAddress,
+            String modbusByteOrder, String modbusWordOrder, Double modbusScale) {
 
         public NodeDto(String nodeId, String parentId, String path, String name, String kind,
                 String dataType, String valueRank, String access, String unit, String description) {
             this(nodeId, parentId, path, name, kind, dataType, valueRank, access, unit, description,
                     List.of(), null, List.of(), null, List.of(), List.of(), null, null, null, null, null, null, null,
-                    null, null);
+                    null, null, null, null, null);
         }
 
         /** Compatibility constructor for clients written before enum literals were exposed. */
@@ -296,7 +317,8 @@ public class ManualSchemaController {
                 Integer minimumSamplingInterval, Integer writeMask, Boolean historizing) {
             this(nodeId, parentId, path, name, kind, dataType, valueRank, access, unit, description,
                     arrayDimensions, typeDefinition, references, dataTypeNodeId, members, List.of(),
-                    null, null, accessLevelFull, minimumSamplingInterval, writeMask, historizing, null, null, null);
+                    null, null, accessLevelFull, minimumSamplingInterval, writeMask, historizing, null, null, null,
+                    null, null, null);
         }
 
         static NodeDto from(SchemaNode n) {
@@ -311,7 +333,8 @@ public class ManualSchemaController {
                     n.enumValues().stream().map(EnumValueDto::from).toList(),
                     n.defaultEncodingId(), n.nativeTypeKind() == null ? null : n.nativeTypeKind().name(),
                     n.accessLevelFull(), n.minimumSamplingInterval(), n.writeMask(), n.historizing(),
-                    n.declaredDataTypeNodeId(), n.modbusRegisterKind(), n.modbusAddress());
+                    n.declaredDataTypeNodeId(), n.modbusRegisterKind(), n.modbusAddress(),
+                    n.modbusByteOrder(), n.modbusWordOrder(), n.modbusScale());
         }
     }
 

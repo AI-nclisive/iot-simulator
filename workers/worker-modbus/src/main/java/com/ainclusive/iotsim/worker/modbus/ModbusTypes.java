@@ -84,12 +84,24 @@ final class ModbusTypes {
      * Length matches {@link #registerSpan(String)}.
      */
     static int[] toRegisters(String dataType, Object neutralValue) {
-        return switch (dataType) {
-            case "INT16", "UINT16" -> new int[] {((Number) neutralValue).intValue() & 0xFFFF};
-            case "INT32", "UINT32" -> splitWords(((Number) neutralValue).intValue());
-            case "FLOAT32" -> splitWords(Float.floatToRawIntBits(((Number) neutralValue).floatValue()));
+        return toRegisters(dataType, neutralValue, null, null, null);
+    }
+
+    /** Encodes an engineering value using optional vendor-specific register layout metadata. */
+    static int[] toRegisters(String dataType, Object neutralValue, String byteOrder, String wordOrder, Double scale) {
+        double factor = scale == null ? 1.0d : scale;
+        Object rawValue = switch (dataType) {
+            case "INT16", "UINT16", "INT32", "UINT32" -> Math.round(((Number) neutralValue).doubleValue() / factor);
+            case "FLOAT32" -> ((Number) neutralValue).doubleValue() / factor;
+            default -> neutralValue;
+        };
+        int[] registers = switch (dataType) {
+            case "INT16", "UINT16" -> new int[] {((Number) rawValue).intValue() & 0xFFFF};
+            case "INT32", "UINT32" -> splitWords(((Number) rawValue).intValue());
+            case "FLOAT32" -> splitWords(Float.floatToRawIntBits(((Number) rawValue).floatValue()));
             default -> throw new IllegalArgumentException("unsupported Modbus data type: " + dataType);
         };
+        return applyOrder(registers, byteOrder, wordOrder);
     }
 
     /** Splits a 32-bit value into {MSW, LSW} per the MSW-first convention (design.md decision 2). */
@@ -108,14 +120,53 @@ final class ModbusTypes {
      * (reading from a real device) rather than the simulated server path.
      */
     static Object fromRegisters(String dataType, int[] registers) {
-        return switch (dataType) {
-            case "INT16" -> (long) (short) registers[0];
-            case "UINT16" -> (long) (registers[0] & 0xFFFF);
-            case "INT32" -> (long) combineWords(registers);
-            case "UINT32" -> combineWords(registers) & 0xFFFFFFFFL;
-            case "FLOAT32" -> (double) Float.intBitsToFloat(combineWords(registers));
+        return fromRegisters(dataType, registers, null, null, null);
+    }
+
+    /** Decodes vendor-ordered raw registers into a neutral engineering value. */
+    static Object fromRegisters(String dataType, int[] registers, String byteOrder, String wordOrder, Double scale) {
+        int[] normalized = undoOrder(registers, byteOrder, wordOrder);
+        Object raw = switch (dataType) {
+            case "INT16" -> (long) (short) normalized[0];
+            case "UINT16" -> (long) (normalized[0] & 0xFFFF);
+            case "INT32" -> (long) combineWords(normalized);
+            case "UINT32" -> combineWords(normalized) & 0xFFFFFFFFL;
+            case "FLOAT32" -> (double) Float.intBitsToFloat(combineWords(normalized));
             default -> throw new IllegalArgumentException("unsupported Modbus data type: " + dataType);
         };
+        if (scale == null) {
+            return raw;
+        }
+        double engineering = ((Number) raw).doubleValue() * scale;
+        if ("FLOAT32".equals(dataType)) {
+            return engineering;
+        }
+        return Math.round(engineering);
+    }
+
+    private static int[] applyOrder(int[] registers, String byteOrder, String wordOrder) {
+        int[] result = registers.clone();
+        if ("LITTLE_ENDIAN".equals(byteOrder)) {
+            for (int i = 0; i < result.length; i++) {
+                result[i] = swapBytes(result[i]);
+            }
+        }
+        if (result.length > 1 && "LSW_FIRST".equals(wordOrder)) {
+            for (int i = 0; i < result.length / 2; i++) {
+                int j = result.length - 1 - i;
+                int value = result[i]; result[i] = result[j]; result[j] = value;
+            }
+        }
+        return result;
+    }
+
+    private static int[] undoOrder(int[] registers, String byteOrder, String wordOrder) {
+        // Both supported transforms are involutions, so the inverse is the same operation.
+        return applyOrder(registers, byteOrder, wordOrder);
+    }
+
+    private static int swapBytes(int word) {
+        return ((word & 0xFF) << 8) | ((word >>> 8) & 0xFF);
     }
 
     /** Coerces a decoded neutral value into the boolean a coil/discrete-input stores. */

@@ -1538,6 +1538,34 @@ export function ManualSchemaEditorPage() {
                         onChange={(e) => updateSelectedNode({ unit: e.target.value || null })}
                       />
                     </label>
+                    {protocol === "MODBUS_TCP" && selectedNode.modbusRegisterKind &&
+                    selectedNode.modbusRegisterKind !== "COIL" && selectedNode.modbusRegisterKind !== "DISCRETE_INPUT" ? (
+                      <fieldset className="grid gap-3 rounded-md border border-shell-line p-3 sm:grid-cols-3">
+                        <legend className="px-1 text-sm font-medium text-shell-ink">Modbus register encoding</legend>
+                        <label className="flex flex-col gap-1 text-sm text-shell-muted">
+                          Byte order
+                          <select aria-label="Modbus byte order" className="shell-field" disabled={!access.isAdmin}
+                            value={selectedNode.modbusByteOrder ?? "BIG_ENDIAN"}
+                            onChange={(e) => updateSelectedNode({ modbusByteOrder: e.target.value as "BIG_ENDIAN" | "LITTLE_ENDIAN" })}>
+                            <option value="BIG_ENDIAN">Big endian</option><option value="LITTLE_ENDIAN">Little endian</option>
+                          </select>
+                        </label>
+                        <label className="flex flex-col gap-1 text-sm text-shell-muted">
+                          Word order
+                          <select aria-label="Modbus word order" className="shell-field" disabled={!access.isAdmin}
+                            value={selectedNode.modbusWordOrder ?? "MSW_FIRST"}
+                            onChange={(e) => updateSelectedNode({ modbusWordOrder: e.target.value as "MSW_FIRST" | "LSW_FIRST" })}>
+                            <option value="MSW_FIRST">Most-significant word first</option><option value="LSW_FIRST">Least-significant word first</option>
+                          </select>
+                        </label>
+                        <label className="flex flex-col gap-1 text-sm text-shell-muted">
+                          Scale
+                          <input aria-label="Modbus scale" className="shell-field" disabled={!access.isAdmin} inputMode="decimal" type="number" step="any"
+                            value={selectedNode.modbusScale ?? 1}
+                            onChange={(e) => { const scale = Number(e.target.value); if (Number.isFinite(scale) && scale !== 0) updateSelectedNode({ modbusScale: scale }); }} />
+                        </label>
+                      </fieldset>
+                    ) : null}
                   </>
                 ) : null}
                 {selectedNode.kind === "DATA_TYPE" ? (() => {

@@ -44,10 +44,15 @@ final class ModbusCapture {
     private volatile boolean running = true;
 
     /** A variable to capture: its neutral node id (Scan-encoded address) and neutral type. */
-    record NodeSpec(String nodeId, String dataType) {}
+    record NodeSpec(String nodeId, String dataType, String byteOrder, String wordOrder, Double scale) {
+        NodeSpec(String nodeId, String dataType) {
+            this(nodeId, dataType, null, null, null);
+        }
+    }
 
     /** A capture node resolved once: its address/kind plus the neutral type to decode into. */
-    private record ResolvedNode(String nodeId, ModbusDiscovery.NodeAddress address, String dataType) {}
+    private record ResolvedNode(String nodeId, ModbusDiscovery.NodeAddress address, String dataType,
+            String byteOrder, String wordOrder, Double scale) {}
 
     private ModbusCapture(ModbusTCPMaster master, int unitId, List<ResolvedNode> nodes, int pollIntervalMs,
             Consumer<List<Value>> sink) {
@@ -74,7 +79,8 @@ final class ModbusCapture {
                 if (!ModbusTypes.isSupported(node.dataType())) {
                     throw new IllegalArgumentException("unsupported Modbus data type: " + node.dataType());
                 }
-                resolved.add(new ResolvedNode(node.nodeId(), ModbusDiscovery.parseNodeAddress(node.nodeId()), node.dataType()));
+                resolved.add(new ResolvedNode(node.nodeId(), ModbusDiscovery.parseNodeAddress(node.nodeId()), node.dataType(),
+                        node.byteOrder(), node.wordOrder(), node.scale()));
             } catch (Exception e) {
                 LOG.warn("Modbus capture: excluding node {} ({})", node.nodeId(), e.getMessage());
             }
@@ -89,7 +95,7 @@ final class ModbusCapture {
             List<Value> batch = new ArrayList<>();
             for (ResolvedNode node : nodes) {
                 try {
-                    Object neutral = readValue(master, unitId, node.address(), node.dataType());
+                    Object neutral = readValue(master, unitId, node.address(), node.dataType(), node.byteOrder(), node.wordOrder(), node.scale());
                     Object previous = last.get(node.nodeId());
                     if (first || !Objects.equals(previous, neutral)) {
                         last.put(node.nodeId(), neutral);
@@ -132,19 +138,19 @@ final class ModbusCapture {
     }
 
     private static Object readValue(ModbusTCPMaster master, int unitId, ModbusDiscovery.NodeAddress address,
-            String dataType) throws Exception {
+            String dataType, String byteOrder, String wordOrder, Double scale) throws Exception {
         return switch (address.kind()) {
             case COIL -> master.readCoils(unitId, address.address(), 1).getBit(0);
             case DISCRETE_INPUT -> master.readInputDiscretes(unitId, address.address(), 1).getBit(0);
             case HOLDING_REGISTER -> {
                 int span = ModbusTypes.registerSpan(dataType);
                 int[] raw = toRawValues(master.readMultipleRegisters(unitId, address.address(), span));
-                yield ModbusTypes.fromRegisters(dataType, raw);
+                yield ModbusTypes.fromRegisters(dataType, raw, byteOrder, wordOrder, scale);
             }
             case INPUT_REGISTER -> {
                 int span = ModbusTypes.registerSpan(dataType);
                 int[] raw = toRawValues(master.readInputRegisters(unitId, address.address(), span));
-                yield ModbusTypes.fromRegisters(dataType, raw);
+                yield ModbusTypes.fromRegisters(dataType, raw, byteOrder, wordOrder, scale);
             }
         };
     }

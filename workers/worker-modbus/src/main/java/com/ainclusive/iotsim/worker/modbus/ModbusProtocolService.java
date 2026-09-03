@@ -118,7 +118,8 @@ public class ModbusProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSo
             String explicitKind = node.getModbusRegisterKind().isBlank() ? null : node.getModbusRegisterKind();
             Integer explicitAddress = explicitKind == null ? null : node.getModbusAddress();
             vars.add(new ModbusServerRuntime.VarSpec(node.getNodeId(), node.getDataType(), node.getAccess(),
-                    explicitKind, explicitAddress));
+                    explicitKind, explicitAddress, emptyToNull(node.getModbusByteOrder()),
+                    emptyToNull(node.getModbusWordOrder()), node.getModbusScale() == 0.0d ? null : node.getModbusScale()));
             if (ModbusTypes.isSupported(node.getDataType())) {
                 nodeDataTypes.put(node.getNodeId(), node.getDataType());
             }
@@ -264,7 +265,9 @@ public class ModbusProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSo
         List<ModbusCapture.NodeSpec> nodes = new ArrayList<>();
         for (SchemaNodeMsg node : request.getSchema().getNodesList()) {
             if ("VARIABLE".equals(node.getKind()) && ModbusTypes.isSupported(node.getDataType())) {
-                nodes.add(new ModbusCapture.NodeSpec(node.getNodeId(), node.getDataType()));
+                nodes.add(new ModbusCapture.NodeSpec(node.getNodeId(), node.getDataType(),
+                        emptyToNull(node.getModbusByteOrder()), emptyToNull(node.getModbusWordOrder()),
+                        node.getModbusScale() == 0.0d ? null : node.getModbusScale()));
             }
         }
         ServerCallStreamObserver<ValueBatch> serverObserver = (ServerCallStreamObserver<ValueBatch>) responseObserver;
@@ -414,6 +417,10 @@ public class ModbusProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSo
 
     private static String orEmpty(String value) {
         return value == null ? "" : value;
+    }
+
+    private static String emptyToNull(String value) {
+        return value == null || value.isBlank() ? null : value;
     }
 
     private static void ackOk(StreamObserver<Ack> obs, String message) {
