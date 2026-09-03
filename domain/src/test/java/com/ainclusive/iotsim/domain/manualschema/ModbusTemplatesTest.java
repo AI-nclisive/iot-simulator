@@ -15,9 +15,27 @@ class ModbusTemplatesTest {
 
     @Test
     void catalogExposesTheSunSpecInverterTemplate() {
-        assertThat(ModbusTemplates.templateNames()).containsExactly("sunspec_inverter");
-        assertThat(ModbusTemplates.allTemplates()).containsOnlyKeys("sunspec_inverter");
+        assertThat(ModbusTemplates.templateNames()).containsExactly(
+                "sunspec_inverter", "generic_energy_meter", "generic_plc_io");
+        assertThat(ModbusTemplates.allTemplates()).containsOnlyKeys(
+                "sunspec_inverter", "generic_energy_meter", "generic_plc_io");
         assertThat(ModbusTemplates.allTemplates().get("sunspec_inverter")).isEqualTo(ModbusTemplates.sunspecInverter());
+    }
+
+    @Test
+    void genericProfilesHaveExplicitBindingsInTheirOwnDataAreas() {
+        Map<String, SchemaNode> meter = nodesById(ModbusTemplates.genericEnergyMeter());
+        assertThat(meter.get("energy_meter_active_power"))
+                .extracting(SchemaNode::dataType, SchemaNode::modbusRegisterKind, SchemaNode::modbusAddress)
+                .containsExactly(DataType.FLOAT32, "HOLDING_REGISTER", 8);
+
+        Map<String, SchemaNode> plc = nodesById(ModbusTemplates.genericPlcIo());
+        assertThat(plc.get("plc_coil_start")).extracting(SchemaNode::modbusRegisterKind, SchemaNode::modbusAddress)
+                .containsExactly("COIL", 0);
+        assertThat(plc.get("plc_input_running")).extracting(SchemaNode::modbusRegisterKind, SchemaNode::modbusAddress)
+                .containsExactly("DISCRETE_INPUT", 0);
+        assertThat(plc.get("plc_setpoint")).extracting(SchemaNode::modbusRegisterKind, SchemaNode::modbusAddress)
+                .containsExactly("HOLDING_REGISTER", 0);
     }
 
     @Test

@@ -131,6 +131,16 @@ describe("ManualSchemasPage (UI-489)", () => {
     expect(mockNavigate).toHaveBeenCalledWith("/manual-schemas/ms-sunspec");
   });
 
+  it("offers generic Modbus profiles without client-side register definitions", () => {
+    renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: "Create manual schema" }));
+    fireEvent.change(screen.getByLabelText("Protocol"), { target: { value: "MODBUS_TCP" } });
+
+    expect(screen.getByRole("option", { name: "Generic Energy Meter" })).toBeTruthy();
+    expect(screen.getByRole("option", { name: "Generic PLC I/O" })).toBeTruthy();
+  });
+
   it("navigates to the editor when a row is clicked", () => {
     renderPage();
     fireEvent.click(screen.getByText("Boiler layout"));

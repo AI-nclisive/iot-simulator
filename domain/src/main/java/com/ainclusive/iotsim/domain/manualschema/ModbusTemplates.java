@@ -72,10 +72,48 @@ public final class ModbusTemplates {
                         "Events", DataType.UINT32, 111, "SunSpec event bitfield, most-significant register first"));
     }
 
+    /** Generic three-phase energy meter with common instantaneous measurements. */
+    public static List<SchemaNode> genericEnergyMeter() {
+        return List.of(
+                folder("energy_meter", null, "Energy Meter", "Energy Meter"),
+                register("energy_meter_voltage_l1", "energy_meter", "Energy Meter/Voltage L1", "Voltage L1", DataType.FLOAT32, 0,
+                        "Line-to-neutral voltage, IEEE-754", HOLDING_REGISTER, Access.READ),
+                register("energy_meter_voltage_l2", "energy_meter", "Energy Meter/Voltage L2", "Voltage L2", DataType.FLOAT32, 2,
+                        "Line-to-neutral voltage, IEEE-754", HOLDING_REGISTER, Access.READ),
+                register("energy_meter_voltage_l3", "energy_meter", "Energy Meter/Voltage L3", "Voltage L3", DataType.FLOAT32, 4,
+                        "Line-to-neutral voltage, IEEE-754", HOLDING_REGISTER, Access.READ),
+                register("energy_meter_current", "energy_meter", "Energy Meter/Current", "Current", DataType.FLOAT32, 6,
+                        "Aggregate current, IEEE-754", HOLDING_REGISTER, Access.READ),
+                register("energy_meter_active_power", "energy_meter", "Energy Meter/Active Power", "Active Power", DataType.FLOAT32, 8,
+                        "Total active power, IEEE-754", HOLDING_REGISTER, Access.READ),
+                register("energy_meter_energy", "energy_meter", "Energy Meter/Energy", "Energy", DataType.FLOAT32, 10,
+                        "Total imported energy, IEEE-754", HOLDING_REGISTER, Access.READ));
+    }
+
+    /** Generic PLC digital I/O and two writable holding-register setpoints. */
+    public static List<SchemaNode> genericPlcIo() {
+        return List.of(
+                folder("plc_io", null, "PLC I/O", "PLC I/O"),
+                register("plc_coil_start", "plc_io", "PLC I/O/Start Command", "Start Command", DataType.BOOL, 0,
+                        "Writable start command", "COIL", Access.READ_WRITE),
+                register("plc_coil_reset", "plc_io", "PLC I/O/Reset Command", "Reset Command", DataType.BOOL, 1,
+                        "Writable reset command", "COIL", Access.READ_WRITE),
+                register("plc_input_running", "plc_io", "PLC I/O/Running", "Running", DataType.BOOL, 0,
+                        "Read-only running state", "DISCRETE_INPUT", Access.READ),
+                register("plc_input_fault", "plc_io", "PLC I/O/Fault", "Fault", DataType.BOOL, 1,
+                        "Read-only fault state", "DISCRETE_INPUT", Access.READ),
+                register("plc_setpoint", "plc_io", "PLC I/O/Setpoint", "Setpoint", DataType.INT16, 0,
+                        "Writable process setpoint", HOLDING_REGISTER, Access.READ_WRITE),
+                register("plc_actual", "plc_io", "PLC I/O/Actual Value", "Actual Value", DataType.INT16, 1,
+                        "Read-only process value", HOLDING_REGISTER, Access.READ));
+    }
+
     /** Returns all available Modbus device profiles, keyed by stable template name. */
     public static Map<String, List<SchemaNode>> allTemplates() {
         Map<String, List<SchemaNode>> templates = new LinkedHashMap<>();
         templates.put("sunspec_inverter", sunspecInverter());
+        templates.put("generic_energy_meter", genericEnergyMeter());
+        templates.put("generic_plc_io", genericPlcIo());
         return templates;
     }
 
@@ -91,8 +129,13 @@ public final class ModbusTemplates {
 
     private static SchemaNode register(String nodeId, String parentId, String path, String name, DataType dataType,
             int address, String description) {
+        return register(nodeId, parentId, path, name, dataType, address, description, HOLDING_REGISTER, Access.READ);
+    }
+
+    private static SchemaNode register(String nodeId, String parentId, String path, String name, DataType dataType,
+            int address, String description, String registerKind, Access access) {
         return new SchemaNode(nodeId, parentId, path, name, NodeKind.VARIABLE, dataType, ValueRank.SCALAR,
-                Access.READ, null, description, List.of(), null, List.of(), null, List.of(), List.of(), null,
-                null, null, null, null, null, null, HOLDING_REGISTER, address);
+                access, null, description, List.of(), null, List.of(), null, List.of(), List.of(), null,
+                null, null, null, null, null, null, registerKind, address);
     }
 }

@@ -71,11 +71,11 @@ public class ManualSchemaService {
 
     /** Creates an independent manual schema from a built-in profile. */
     public ManualSchema createFromTemplate(String projectId, String templateName, String name, String createdBy) {
-        if (!"sunspec_inverter".equals(templateName)) {
+        List<SchemaNode> nodes = ModbusTemplates.allTemplates().get(templateName);
+        if (nodes == null) {
             throw new IllegalArgumentException("unsupported manual schema template: " + templateName);
         }
-        return create(projectId, "MODBUS_TCP", name, "SunSpec three-phase inverter profile",
-                ModbusTemplates.sunspecInverter(), createdBy);
+        return create(projectId, "MODBUS_TCP", name, "Built-in Modbus profile: " + templateName, nodes, createdBy);
     }
 
     public ManualSchema update(String projectId, String id, String name, String description,

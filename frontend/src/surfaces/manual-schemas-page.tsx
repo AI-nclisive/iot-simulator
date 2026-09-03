@@ -59,7 +59,7 @@ export function ManualSchemasPage() {
     if (!name || !currentProjectId) return;
     setIsCreating(true);
     try {
-      const schema = createTemplate === "sunspec_inverter"
+      const schema = createTemplate !== "empty"
         ? await createManualSchemaFromTemplate(currentProjectId, { templateName: createTemplate, name })
         : await createManualSchema(currentProjectId, { protocol: createProtocol, name });
       setCreateOpen(false);
@@ -285,6 +285,8 @@ export function ManualSchemasPage() {
                   >
                     <option value="empty">Empty structure</option>
                     <option value="sunspec_inverter">SunSpec Inverter (Common Model 1 + Model 103)</option>
+                    <option value="generic_energy_meter">Generic Energy Meter</option>
+                    <option value="generic_plc_io">Generic PLC I/O</option>
                   </select>
                 </label>
               ) : null}
