@@ -114,13 +114,9 @@ public class DataSourceController {
                 ? toNodes(req.initialSchema())
                 : null;
         String runtimeConfig = req.runtimeConfig();
-        DataSource ds = req.realDeviceUnitId() == null
-                ? dataSources.create(projectId, req.name(), req.protocol(), req.basis(),
-                        req.simulatorPort(), req.realDeviceEndpoint(), runtimeConfig, req.securityConfig(),
-                        CredentialRequests.toCredentials(req.connectionConfig()), initialNodes, "local")
-                : dataSources.create(projectId, req.name(), req.protocol(), req.basis(),
-                        req.simulatorPort(), req.realDeviceEndpoint(), req.realDeviceUnitId(), runtimeConfig,
-                        req.securityConfig(), CredentialRequests.toCredentials(req.connectionConfig()), initialNodes, "local");
+        DataSource ds = dataSources.create(projectId, req.name(), req.protocol(), req.basis(),
+                req.simulatorPort(), req.realDeviceEndpoint(), req.realDeviceUnitId(), runtimeConfig,
+                req.securityConfig(), CredentialRequests.toCredentials(req.connectionConfig()), initialNodes, "local");
         int paramCount = schemas.countVariableNodes(ds.id());
         return ResponseEntity.created(
                         URI.create("/api/v1/projects/" + projectId + "/data-sources/" + ds.id()))
@@ -152,13 +148,9 @@ public class DataSourceController {
         if (ifMatch == null || ifMatch.isBlank()) {
             throw new PreconditionRequiredException("If-Match header with the current version is required");
         }
-        DataSource ds = req.realDeviceUnitId() == null
-                ? dataSources.update(projectId, id, req.name(), req.simulatorPort(), req.realDeviceEndpoint(),
-                        req.runtimeConfig(), req.securityConfig(), req.enabled(),
-                        CredentialRequests.toCredentials(req.connectionConfig()), parseVersion(ifMatch))
-                : dataSources.update(projectId, id, req.name(), req.simulatorPort(), req.realDeviceEndpoint(),
-                        req.realDeviceUnitId(), req.runtimeConfig(), req.securityConfig(), req.enabled(),
-                        CredentialRequests.toCredentials(req.connectionConfig()), parseVersion(ifMatch));
+        DataSource ds = dataSources.update(projectId, id, req.name(), req.simulatorPort(), req.realDeviceEndpoint(),
+                req.realDeviceUnitId(), req.runtimeConfig(), req.securityConfig(), req.enabled(),
+                CredentialRequests.toCredentials(req.connectionConfig()), parseVersion(ifMatch));
         int paramCount = schemas.countVariableNodes(ds.id());
         return ResponseEntity.ok().eTag(etag(ds.version())).body(DataSourceResponse.from(ds, paramCount));
     }

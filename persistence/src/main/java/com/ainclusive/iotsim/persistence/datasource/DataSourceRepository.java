@@ -14,6 +14,9 @@ public interface DataSourceRepository {
     default DataSourceRow insert(String projectId, String name, String protocol, String basis,
             int simulatorPort, String realDeviceEndpoint, Integer realDeviceUnitId, String runtimeConfigJson,
             String securityConfigJson, String createdBy) {
+        if (realDeviceUnitId != null) {
+            throw new UnsupportedOperationException("repository must implement realDeviceUnitId persistence");
+        }
         return insert(projectId, name, protocol, basis, simulatorPort, realDeviceEndpoint,
                 runtimeConfigJson, securityConfigJson, createdBy);
     }
@@ -45,6 +48,9 @@ public interface DataSourceRepository {
     default Optional<DataSourceRow> update(String id, String name, int simulatorPort,
             String realDeviceEndpoint, Integer realDeviceUnitId, String runtimeConfigJson,
             String securityConfigJson, boolean enabled, long expectedVersion) {
+        if (realDeviceUnitId != null) {
+            throw new UnsupportedOperationException("repository must implement realDeviceUnitId persistence");
+        }
         return update(id, name, simulatorPort, realDeviceEndpoint, runtimeConfigJson,
                 securityConfigJson, enabled, expectedVersion);
     }
