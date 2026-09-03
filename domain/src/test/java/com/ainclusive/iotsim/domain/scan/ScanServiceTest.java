@@ -80,23 +80,27 @@ class ScanServiceTest {
     }
 
     @Test
-    void modbusUnitIdIsEncodedForTestScanCreateAndRescan() {
+    void modbusUnitIdIsTypedForTestScanCreateAndRescan() {
         scanner.scanResult = okResult();
 
         service.testConnection(PROJECT, "MODBUS_TCP", "tcp://host:502",
                 ConnectionCredentials.anonymous(), 7);
-        assertThat(scanner.lastSpec.endpointUrl()).isEqualTo("tcp://host:502#7");
+        assertThat(scanner.lastSpec.endpointUrl()).isEqualTo("tcp://host:502");
+        assertThat(scanner.lastSpec.unitId()).isEqualTo(7);
 
         ScanJob job = service.startScan(PROJECT, "MODBUS_TCP", "tcp://host:502",
                 ConnectionCredentials.anonymous(), 0, 7);
-        assertThat(scanner.lastSpec.endpointUrl()).isEqualTo("tcp://host:502#7");
+        assertThat(scanner.lastSpec.endpointUrl()).isEqualTo("tcp://host:502");
+        assertThat(scanner.lastSpec.unitId()).isEqualTo(7);
 
         DataSource source = service.createFromScan(PROJECT, job.jobId(), "Modbus source", "tcp://host:502",
                 null, List.of(new TypeResolution("ns=2;s=x", null, null, null, true)), "alice");
-        assertThat(source.realDeviceEndpoint()).isEqualTo("tcp://host:502#7");
+        assertThat(source.realDeviceEndpoint()).isEqualTo("tcp://host:502");
+        assertThat(source.realDeviceUnitId()).isEqualTo(7);
 
         service.startRescan(PROJECT, source.id());
-        assertThat(scanner.lastSpec.endpointUrl()).isEqualTo("tcp://host:502#7");
+        assertThat(scanner.lastSpec.endpointUrl()).isEqualTo("tcp://host:502");
+        assertThat(scanner.lastSpec.unitId()).isEqualTo(7);
 
         assertThatThrownBy(() -> service.createFromScan(PROJECT, job.jobId(), "Mismatched source", "tcp://host:502",
                 8, List.of(new TypeResolution("ns=2;s=x", null, null, null, true)), "alice"))
@@ -858,6 +862,19 @@ class ScanServiceTest {
         }
 
         @Override
+        public DataSourceRow insert(String projectId, String name, String protocol, String basis,
+                int simulatorPort, String realDeviceEndpoint, Integer realDeviceUnitId, String runtimeConfigJson,
+                String securityConfigJson, String createdBy) {
+            OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+            DataSourceRow row = new DataSourceRow("ds-" + (++seq), projectId, name, protocol, basis,
+                    null, null, simulatorPort, realDeviceEndpoint, realDeviceUnitId,
+                    runtimeConfigJson != null ? runtimeConfigJson : "{}", securityConfigJson,
+                    false, now, now, createdBy, 0);
+            rows.add(row);
+            return row;
+        }
+
+        @Override
         public List<DataSourceRow> findByProject(String projectId) {
             return rows.stream().filter(r -> r.projectId().equals(projectId)).toList();
         }
@@ -896,7 +913,7 @@ class ScanServiceTest {
                 DataSourceRow r = rows.get(i);
                 if (r.id().equals(dataSourceId)) {
                     rows.set(i, new DataSourceRow(r.id(), r.projectId(), r.name(), r.protocol(), r.basis(),
-                            schemaId, version, r.simulatorPort(), r.realDeviceEndpoint(), r.runtimeConfig(),
+                            schemaId, version, r.simulatorPort(), r.realDeviceEndpoint(), r.realDeviceUnitId(), r.runtimeConfig(),
                             r.securityConfig(),
                             r.enabled(), r.createdAt(), OffsetDateTime.now(ZoneOffset.UTC), r.createdBy(),
                             r.version()));

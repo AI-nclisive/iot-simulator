@@ -166,7 +166,7 @@ public class RecordingService {
                     ScanType.SCHEMA_AND_DATA.name(), defaultRecordingName(source.name()), actor,
                     schemaNodesJson));
             CaptureSpec spec = new CaptureSpec(source.protocol(), source.realDeviceEndpoint(),
-                    credentials.find(dsId).orElse(null), schema.version(), schema.nodes());
+                    credentials.find(dsId).orElse(null), schema.version(), schema.nodes(), source.realDeviceUnitId());
             CaptureSession session = capturer.startCapture(spec, values -> {
                 timeline.append(recording.id(), values);
                 // Tee into the same live-value listener applyValues() feeds for a running

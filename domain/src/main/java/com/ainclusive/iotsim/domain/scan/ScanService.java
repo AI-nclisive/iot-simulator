@@ -129,7 +129,7 @@ public class ScanService implements DisposableBean {
         validateProtocol(protocol);
         requireEndpoint(endpointUrl);
         return scanner.testConnection(new ScanSpec(
-                protocol, endpointFor(protocol, endpointUrl, unitId), credentials, 0));
+                protocol, endpointFor(protocol, endpointUrl, unitId), credentials, 0, resolvedUnitId(protocol, unitId)));
     }
 
     /** Starts an async scan and returns the {@code RUNNING} job immediately. */
@@ -145,12 +145,13 @@ public class ScanService implements DisposableBean {
         validateProtocol(protocol);
         requireEndpoint(endpointUrl);
         String resolvedEndpoint = endpointFor(protocol, endpointUrl, unitId);
+        Integer resolvedUnitId = resolvedUnitId(protocol, unitId);
         evictExpired();
         String jobId = Ids.newId();
-        ScanJob job = ScanJob.running(jobId, projectId, protocol, resolvedEndpoint);
+        ScanJob job = ScanJob.running(jobId, projectId, protocol, resolvedEndpoint, resolvedUnitId);
         jobs.put(jobId, job);
         executions.put(jobId, new ScanExecution());
-        ScanSpec spec = new ScanSpec(protocol, resolvedEndpoint, credentials, maxNodes);
+        ScanSpec spec = new ScanSpec(protocol, resolvedEndpoint, credentials, maxNodes, resolvedUnitId);
         executor.execute(() -> runScan(jobId, spec));
         return job;
     }
@@ -301,8 +302,10 @@ public class ScanService implements DisposableBean {
             throw new IllegalArgumentException("scan produced an empty schema after resolution");
         }
         String resolvedEndpoint = endpointForCreate(job, endpoint, unitId);
+        Integer resolvedUnitId = unitIdForCreate(job, unitId);
         DataSource created = dataSources.create(
-                projectId, name, job.protocol(), "SCAN", null, resolvedEndpoint, null, null, null, null, actor);
+                projectId, name, job.protocol(), "SCAN", null, resolvedEndpoint, resolvedUnitId,
+                null, null, null, null, actor);
         schemas.save(projectId, created.id(), nodes);
         // Re-read so the response carries the linked schemaId/schemaVersion.
         return dataSources.get(projectId, created.id());
@@ -325,7 +328,8 @@ public class ScanService implements DisposableBean {
             throw new IllegalArgumentException("data source has no real-device endpoint to rescan");
         }
         ConnectionCredentials creds = credentials.find(dataSourceId).orElse(null);
-        return startScan(projectId, source.protocol().name(), source.realDeviceEndpoint(), creds, 0);
+        return startScan(projectId, source.protocol().name(), source.realDeviceEndpoint(), creds, 0,
+                source.realDeviceUnitId());
     }
 
     private static String endpointFor(String protocol, String endpoint, Integer unitId) {
@@ -339,35 +343,30 @@ public class ScanService implements DisposableBean {
             throw new IllegalArgumentException("unitId must be between 0 and 255");
         }
         if (endpoint.indexOf('#') >= 0) {
-            if (unitId != null) {
-                throw new IllegalArgumentException("endpointUrl must not include a Modbus unit-id suffix");
-            }
-            return endpoint;
+            throw new IllegalArgumentException("endpointUrl must not include a Modbus unit-id suffix");
         }
-        return endpoint + "#" + (unitId == null ? DEFAULT_MODBUS_UNIT_ID : unitId);
+        return endpoint;
     }
 
     private static String endpointForCreate(ScanJob job, String endpoint, Integer unitId) {
         if (!MODBUS_TCP.equals(job.protocol())) {
             return endpointFor(job.protocol(), endpoint, unitId);
         }
-        int scannedUnitId = unitIdFromEndpoint(job.endpointUrl());
+        int scannedUnitId = job.unitId() == null ? DEFAULT_MODBUS_UNIT_ID : job.unitId();
         if (unitId != null && unitId != scannedUnitId) {
             throw new IllegalArgumentException("unitId must match the completed Modbus scan");
         }
         return endpointFor(job.protocol(), endpoint, scannedUnitId);
     }
 
-    private static int unitIdFromEndpoint(String endpoint) {
-        int separator = endpoint.lastIndexOf('#');
-        if (separator < 0) {
-            return DEFAULT_MODBUS_UNIT_ID;
-        }
-        try {
-            return Integer.parseInt(endpoint.substring(separator + 1));
-        } catch (NumberFormatException e) {
-            throw new IllegalArgumentException("scan job has an invalid Modbus unit-id suffix", e);
-        }
+    private static Integer unitIdForCreate(ScanJob job, Integer unitId) {
+        return MODBUS_TCP.equals(job.protocol())
+                ? (unitId == null ? (job.unitId() == null ? DEFAULT_MODBUS_UNIT_ID : job.unitId()) : unitId)
+                : null;
+    }
+
+    private static Integer resolvedUnitId(String protocol, Integer unitId) {
+        return MODBUS_TCP.equals(protocol) ? (unitId == null ? DEFAULT_MODBUS_UNIT_ID : unitId) : null;
     }
 
     /**

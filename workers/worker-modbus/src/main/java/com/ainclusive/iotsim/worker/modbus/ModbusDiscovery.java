@@ -13,12 +13,6 @@ import java.util.function.IntConsumer;
  * probe a bounded set of candidate addresses — see
  * openspec/changes/is-059-worker-modbus/design.md decision 3.
  *
- * <p>The {@code ProtocolDataSource} contract's {@code endpoint_url} carries no
- * dedicated Modbus unit-id field; this worker accepts an optional
- * {@code #<unitId>} suffix (e.g. {@code "10.20.4.40:502#1"}), defaulting to
- * {@link #DEFAULT_UNIT_ID} when absent, rather than proposing a
- * worker-contract change for a single extra integer.
- *
  * <p>This class also owns the {@code nodeId} <-> physical-address convention
  * ({@code "hr:1000"}, {@code "hr32:1000"}, ...) that {@link ModbusCapture}
  * reads back via {@link #parseNodeAddress}, so the two directions of that
@@ -41,23 +35,19 @@ final class ModbusDiscovery {
 
     private ModbusDiscovery() {}
 
-    record Endpoint(String host, int port, int unitId) {}
+    record Endpoint(String host, int port) {}
 
     static Endpoint parseEndpoint(String endpointUrl) {
-        String withoutUnit = endpointUrl;
-        int unitId = DEFAULT_UNIT_ID;
-        int hash = endpointUrl.indexOf('#');
-        if (hash >= 0) {
-            withoutUnit = endpointUrl.substring(0, hash);
-            unitId = Integer.parseInt(endpointUrl.substring(hash + 1));
+        if (endpointUrl.indexOf('#') >= 0) {
+            throw new IllegalArgumentException("Modbus endpoint must not include a unit-id suffix");
         }
-        int colon = withoutUnit.lastIndexOf(':');
+        int colon = endpointUrl.lastIndexOf(':');
         if (colon < 0) {
             throw new IllegalArgumentException("Modbus endpoint must be host:port, got: " + endpointUrl);
         }
-        String host = withoutUnit.substring(0, colon);
-        int port = Integer.parseInt(withoutUnit.substring(colon + 1));
-        return new Endpoint(host, port, unitId);
+        String host = endpointUrl.substring(0, colon);
+        int port = Integer.parseInt(endpointUrl.substring(colon + 1));
+        return new Endpoint(host, port);
     }
 
     /** One resolved {@code nodeId}: its Modbus object type and base register/coil address. */
@@ -91,7 +81,7 @@ final class ModbusDiscovery {
 
     record ConnectionTest(String status, String message) {}
 
-    static ConnectionTest testConnection(String endpointUrl) {
+    static ConnectionTest testConnection(String endpointUrl, int unitId) {
         try {
             Endpoint endpoint = parseEndpoint(endpointUrl);
             ModbusTCPMaster master = connect(endpoint);
@@ -114,7 +104,7 @@ final class ModbusDiscovery {
 
     record ScanOutcome(List<SchemaNodeMsg> nodes, String status, boolean truncated, int unknownCount, String message) {}
 
-    static ScanOutcome scan(String endpointUrl, int maxNodes, Runnable onConnected, IntConsumer onProgress) {
+    static ScanOutcome scan(String endpointUrl, int unitId, int maxNodes, Runnable onConnected, IntConsumer onProgress) {
         Endpoint endpoint;
         try {
             endpoint = parseEndpoint(endpointUrl);
@@ -132,20 +122,25 @@ final class ModbusDiscovery {
             int limit = maxNodes > 0 ? maxNodes : DEFAULT_SCAN_RANGE * 4;
             List<SchemaNodeMsg> nodes = new ArrayList<>();
             List<String> errors = new ArrayList<>();
-            probe(nodes, limit, onProgress, errors, new BitObjectProbe(master, endpoint.unitId(), "co", true));
-            probe(nodes, limit, onProgress, errors, new BitObjectProbe(master, endpoint.unitId(), "di", false));
+            probe(nodes, limit, onProgress, errors, new BitObjectProbe(master, unitId, "co", true));
+            probe(nodes, limit, onProgress, errors, new BitObjectProbe(master, unitId, "di", false));
             List<Integer> holdingAddresses = new ArrayList<>();
             probe(nodes, limit, onProgress, errors,
-                    new RegisterObjectProbe(master, endpoint.unitId(), "hr", true, holdingAddresses));
+                    new RegisterObjectProbe(master, unitId, "hr", true, holdingAddresses));
             List<Integer> inputAddresses = new ArrayList<>();
             probe(nodes, limit, onProgress, errors,
-                    new RegisterObjectProbe(master, endpoint.unitId(), "ir", false, inputAddresses));
+                    new RegisterObjectProbe(master, unitId, "ir", false, inputAddresses));
             int unknownCount = addPairHeuristics(nodes, "hr", holdingAddresses) + addPairHeuristics(nodes, "ir", inputAddresses);
             boolean truncated = !errors.isEmpty() || nodes.size() >= limit;
             return new ScanOutcome(nodes, truncated ? "PARTIAL" : "OK", truncated, unknownCount, String.join("; ", errors));
         } finally {
             master.disconnect();
         }
+    }
+
+    /** Compatibility overload for internal callers that rely on the standard Modbus unit. */
+    static ScanOutcome scan(String endpointUrl, int maxNodes, Runnable onConnected, IntConsumer onProgress) {
+        return scan(endpointUrl, DEFAULT_UNIT_ID, maxNodes, onConnected, onProgress);
     }
 
     /** One Modbus object type's read operations, abstracted so {@link #probe} has a single bounded algorithm. */

@@ -114,10 +114,13 @@ public class DataSourceController {
                 ? toNodes(req.initialSchema())
                 : null;
         String runtimeConfig = req.runtimeConfig();
-        DataSource ds = dataSources.create(
-                projectId, req.name(), req.protocol(), req.basis(),
-                req.simulatorPort(), req.realDeviceEndpoint(), runtimeConfig, req.securityConfig(),
-                CredentialRequests.toCredentials(req.connectionConfig()), initialNodes, "local");
+        DataSource ds = req.realDeviceUnitId() == null
+                ? dataSources.create(projectId, req.name(), req.protocol(), req.basis(),
+                        req.simulatorPort(), req.realDeviceEndpoint(), runtimeConfig, req.securityConfig(),
+                        CredentialRequests.toCredentials(req.connectionConfig()), initialNodes, "local")
+                : dataSources.create(projectId, req.name(), req.protocol(), req.basis(),
+                        req.simulatorPort(), req.realDeviceEndpoint(), req.realDeviceUnitId(), runtimeConfig,
+                        req.securityConfig(), CredentialRequests.toCredentials(req.connectionConfig()), initialNodes, "local");
         int paramCount = schemas.countVariableNodes(ds.id());
         return ResponseEntity.created(
                         URI.create("/api/v1/projects/" + projectId + "/data-sources/" + ds.id()))
@@ -149,10 +152,13 @@ public class DataSourceController {
         if (ifMatch == null || ifMatch.isBlank()) {
             throw new PreconditionRequiredException("If-Match header with the current version is required");
         }
-        DataSource ds = dataSources.update(
-                projectId, id, req.name(), req.simulatorPort(), req.realDeviceEndpoint(),
-                req.runtimeConfig(), req.securityConfig(), req.enabled(),
-                CredentialRequests.toCredentials(req.connectionConfig()), parseVersion(ifMatch));
+        DataSource ds = req.realDeviceUnitId() == null
+                ? dataSources.update(projectId, id, req.name(), req.simulatorPort(), req.realDeviceEndpoint(),
+                        req.runtimeConfig(), req.securityConfig(), req.enabled(),
+                        CredentialRequests.toCredentials(req.connectionConfig()), parseVersion(ifMatch))
+                : dataSources.update(projectId, id, req.name(), req.simulatorPort(), req.realDeviceEndpoint(),
+                        req.realDeviceUnitId(), req.runtimeConfig(), req.securityConfig(), req.enabled(),
+                        CredentialRequests.toCredentials(req.connectionConfig()), parseVersion(ifMatch));
         int paramCount = schemas.countVariableNodes(ds.id());
         return ResponseEntity.ok().eTag(etag(ds.version())).body(DataSourceResponse.from(ds, paramCount));
     }
@@ -336,18 +342,31 @@ public class DataSourceController {
 
     public record CreateDataSourceRequest(
             String name, String protocol, String basis, Integer simulatorPort,
-            String realDeviceEndpoint, String runtimeConfig, String securityConfig,
-            ConnectionConfigRequest connectionConfig, List<NodeDto> initialSchema) {}
+            String realDeviceEndpoint, Integer realDeviceUnitId, String runtimeConfig, String securityConfig,
+            ConnectionConfigRequest connectionConfig, List<NodeDto> initialSchema) {
+        public CreateDataSourceRequest(String name, String protocol, String basis, Integer simulatorPort,
+                String realDeviceEndpoint, String runtimeConfig, String securityConfig,
+                ConnectionConfigRequest connectionConfig, List<NodeDto> initialSchema) {
+            this(name, protocol, basis, simulatorPort, realDeviceEndpoint, null, runtimeConfig, securityConfig,
+                    connectionConfig, initialSchema);
+        }
+    }
 
     public record UpdateDataSourceRequest(
-            String name, Integer simulatorPort, String realDeviceEndpoint, String runtimeConfig,
-            String securityConfig, Boolean enabled, ConnectionConfigRequest connectionConfig) {}
+            String name, Integer simulatorPort, String realDeviceEndpoint, Integer realDeviceUnitId, String runtimeConfig,
+            String securityConfig, Boolean enabled, ConnectionConfigRequest connectionConfig) {
+        public UpdateDataSourceRequest(String name, Integer simulatorPort, String realDeviceEndpoint,
+                String runtimeConfig, String securityConfig, Boolean enabled, ConnectionConfigRequest connectionConfig) {
+            this(name, simulatorPort, realDeviceEndpoint, null, runtimeConfig, securityConfig, enabled, connectionConfig);
+        }
+    }
 
     public record ApplyRescanRequest(List<ScanController.TypeResolutionRequest> typeResolutions) {}
 
     public record DataSourceResponse(
             String id, String projectId, String name, String protocol, String basis,
             String schemaId, Integer schemaVersion, int simulatorPort, String realDeviceEndpoint,
+            Integer realDeviceUnitId,
             String runtimeConfig, String securityConfig, boolean enabled, String runtimeState,
             String credentialState, String serveUrl, Instant createdAt, Instant updatedAt,
             String createdBy, long version, int parameterCount) {
@@ -355,7 +374,7 @@ public class DataSourceController {
         public static DataSourceResponse from(DataSource d, int parameterCount) {
             return new DataSourceResponse(
                     d.id(), d.projectId(), d.name(), d.protocol().name(), d.basis().name(),
-                    d.schemaId(), d.schemaVersion(), d.simulatorPort(), d.realDeviceEndpoint(),
+                    d.schemaId(), d.schemaVersion(), d.simulatorPort(), d.realDeviceEndpoint(), d.realDeviceUnitId(),
                     d.runtimeConfig(), SecurityConfigRedactor.redact(d.securityConfig()),
                     d.enabled(), d.runtimeState().name(), d.credentialState().name(),
                     d.serveUrl(), d.createdAt(), d.updatedAt(), d.createdBy(), d.version(),

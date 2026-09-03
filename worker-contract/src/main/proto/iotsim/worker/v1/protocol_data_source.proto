@@ -185,6 +185,7 @@ message ConnectionConfigMsg {
 message TestConnectionRequest {
   string endpoint_url = 1;            // e.g. opc.tcp://host:4840/path
   ConnectionConfigMsg credentials = 2;
+  optional uint32 unit_id = 3;        // Modbus real-device unit; absent for other protocols
 }
 
 message TestConnectionResponse {
@@ -196,6 +197,7 @@ message ScanRequest {
   string endpoint_url = 1;
   ConnectionConfigMsg credentials = 2;
   int32 max_nodes = 3;  // cap on discovered nodes; 0 = worker default
+  optional uint32 unit_id = 4; // Modbus real-device unit; absent for other protocols
 }
 
 message ScanResponse {
@@ -240,6 +242,7 @@ message CaptureRequest {
   // data_type tells the worker how to encode observed values into neutral
   // value_enc bytes (so the supervisor can decode them without re-reading types).
   Schema schema = 3;
+  optional uint32 unit_id = 4; // Modbus real-device unit; absent for other protocols
 }
 
 // ---- Values ----

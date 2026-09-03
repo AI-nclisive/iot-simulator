@@ -20,6 +20,7 @@ public record DataSource(
         Integer schemaVersion,
         int simulatorPort,
         String realDeviceEndpoint,
+        Integer realDeviceUnitId,
         String runtimeConfig,
         String securityConfig,
         boolean enabled,
@@ -30,4 +31,14 @@ public record DataSource(
         Instant updatedAt,
         String createdBy,
         long version) {
+
+    public DataSource(String id, String projectId, String name, Protocol protocol, SourceBasis basis,
+            String schemaId, Integer schemaVersion, int simulatorPort, String realDeviceEndpoint,
+            String runtimeConfig, String securityConfig, boolean enabled, RuntimeState runtimeState,
+            CredentialState credentialState, String serveUrl, Instant createdAt, Instant updatedAt,
+            String createdBy, long version) {
+        this(id, projectId, name, protocol, basis, schemaId, schemaVersion, simulatorPort,
+                realDeviceEndpoint, null, runtimeConfig, securityConfig, enabled, runtimeState,
+                credentialState, serveUrl, createdAt, updatedAt, createdBy, version);
+    }
 }

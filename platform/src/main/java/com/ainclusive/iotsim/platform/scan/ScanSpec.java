@@ -11,5 +11,9 @@ import com.ainclusive.iotsim.platform.secret.ConnectionCredentials;
  * free of domain enums, mirroring {@code RuntimeController}.
  */
 public record ScanSpec(String protocol, String endpointUrl,
-        ConnectionCredentials credentials, int maxNodes) {
+        ConnectionCredentials credentials, int maxNodes, Integer unitId) {
+    public ScanSpec(String protocol, String endpointUrl,
+            ConnectionCredentials credentials, int maxNodes) {
+        this(protocol, endpointUrl, credentials, maxNodes, null);
+    }
 }

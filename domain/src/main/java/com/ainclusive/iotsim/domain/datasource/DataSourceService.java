@@ -62,17 +62,26 @@ public class DataSourceService {
     public DataSource create(String projectId, String name, String protocol, String basis,
             Integer simulatorPort, String realDeviceEndpoint, String runtimeConfig, String securityConfig,
             ConnectionCredentials connectionCredentials, List<SchemaNode> initialNodes, String actor) {
+        return create(projectId, name, protocol, basis, simulatorPort, realDeviceEndpoint, null,
+                runtimeConfig, securityConfig, connectionCredentials, initialNodes, actor);
+    }
+
+    public DataSource create(String projectId, String name, String protocol, String basis,
+            Integer simulatorPort, String realDeviceEndpoint, Integer realDeviceUnitId,
+            String runtimeConfig, String securityConfig, ConnectionCredentials connectionCredentials,
+            List<SchemaNode> initialNodes, String actor) {
         requireProject(projectId);
         // Validate enum inputs early (invalid -> IllegalArgumentException -> 400).
         Protocol parsedProtocol = Protocol.valueOf(protocol);
         SourceBasis.valueOf(basis);
+        validateRealDeviceUnitId(parsedProtocol, realDeviceEndpoint, realDeviceUnitId);
         requireValidJson(runtimeConfig, "runtimeConfig");
         String storedSecurity = EndpointSecurityCodec.normalizeForStorage(securityConfig);
         int port = simulatorPort != null
                 ? validatePort(simulatorPort)
                 : SimulatorUrl.defaultPort(parsedProtocol);
         DataSourceRow row = dataSources.insert(
-                projectId, name, protocol, basis, port, realDeviceEndpoint, runtimeConfig,
+                projectId, name, protocol, basis, port, realDeviceEndpoint, realDeviceUnitId, runtimeConfig,
                 storedSecurity, actor);
         applyCredentials(row.id(), connectionCredentials);
         DataSource result;
@@ -115,12 +124,21 @@ public class DataSourceService {
     public DataSource update(String projectId, String id, String name, Integer simulatorPort,
             String realDeviceEndpoint, String runtimeConfig, String securityConfig, Boolean enabled,
             ConnectionCredentials connectionCredentials, long expectedVersion) {
+        return update(projectId, id, name, simulatorPort, realDeviceEndpoint, null, runtimeConfig,
+                securityConfig, enabled, connectionCredentials, expectedVersion);
+    }
+
+    public DataSource update(String projectId, String id, String name, Integer simulatorPort,
+            String realDeviceEndpoint, Integer realDeviceUnitId, String runtimeConfig, String securityConfig,
+            Boolean enabled, ConnectionCredentials connectionCredentials, long expectedVersion) {
         DataSourceRow existing = requireRow(projectId, id);
         requireValidJson(runtimeConfig, "runtimeConfig");
         String newName = name != null ? name : existing.name();
         // A null simulatorPort keeps the persisted port unchanged; an explicit value is validated.
         int newPort = simulatorPort != null ? validatePort(simulatorPort) : existing.simulatorPort();
         String newEndpoint = realDeviceEndpoint != null ? realDeviceEndpoint : existing.realDeviceEndpoint();
+        Integer newUnitId = realDeviceUnitId != null ? realDeviceUnitId : existing.realDeviceUnitId();
+        validateRealDeviceUnitId(Protocol.valueOf(existing.protocol()), newEndpoint, newUnitId);
         String newRuntimeConfig = runtimeConfig != null ? runtimeConfig : existing.runtimeConfig();
         // null leaves the persisted security config unchanged; an explicit value is normalised + hashed.
         String newSecurity = securityConfig != null
@@ -128,7 +146,7 @@ public class DataSourceService {
                 : existing.securityConfig();
         boolean newEnabled = enabled != null ? enabled : existing.enabled();
         DataSourceRow updated = dataSources.update(
-                id, newName, newPort, newEndpoint, newRuntimeConfig, newSecurity, newEnabled, expectedVersion)
+                id, newName, newPort, newEndpoint, newUnitId, newRuntimeConfig, newSecurity, newEnabled, expectedVersion)
                 .orElseThrow(() -> new ConcurrencyConflictException("DataSource", id, expectedVersion));
         // Apply credentials only after the version check passes, so a stale write touches no secret.
         applyCredentials(id, connectionCredentials);
@@ -253,6 +271,15 @@ public class DataSourceService {
         return port;
     }
 
+    private static void validateRealDeviceUnitId(Protocol protocol, String endpoint, Integer unitId) {
+        if (protocol == Protocol.MODBUS_TCP && endpoint != null && endpoint.indexOf('#') >= 0) {
+            throw new IllegalArgumentException("realDeviceEndpoint must not include a Modbus unit-id suffix");
+        }
+        if (unitId != null && (protocol != Protocol.MODBUS_TCP || unitId < 0 || unitId > 255)) {
+            throw new IllegalArgumentException("realDeviceUnitId is supported only for MODBUS_TCP and must be between 0 and 255");
+        }
+    }
+
     private DataSource map(DataSourceRow r) {
         Protocol protocol = Protocol.valueOf(r.protocol());
         String serveUrl = SimulatorUrl.of(protocol, advertisedHost, r.simulatorPort());
@@ -266,6 +293,7 @@ public class DataSourceService {
                 r.schemaVersion(),
                 r.simulatorPort(),
                 r.realDeviceEndpoint(),
+                r.realDeviceUnitId(),
                 r.runtimeConfig(),
                 r.securityConfig(),
                 r.enabled(),

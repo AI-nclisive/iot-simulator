@@ -23,6 +23,7 @@ public record ScanJob(
         String projectId,
         String protocol,
         String endpointUrl,
+        Integer unitId,
         String state,
         ScanPhase phase,
         int discoveredSoFar,
@@ -31,33 +32,40 @@ public record ScanJob(
         Instant createdAt,
         Instant updatedAt) {
 
+    public ScanJob(String jobId, String projectId, String protocol, String endpointUrl, String state,
+            ScanPhase phase, int discoveredSoFar, ScanResult result, String message,
+            Instant createdAt, Instant updatedAt) {
+        this(jobId, projectId, protocol, endpointUrl, null, state, phase, discoveredSoFar, result, message,
+                createdAt, updatedAt);
+    }
+
     static final String RUNNING = "RUNNING";
     static final String FAILED = "FAILED";
     static final String CANCELLED = "CANCELLED";
 
-    static ScanJob running(String jobId, String projectId, String protocol, String endpointUrl) {
+    static ScanJob running(String jobId, String projectId, String protocol, String endpointUrl, Integer unitId) {
         Instant now = Instant.now();
-        return new ScanJob(jobId, projectId, protocol, endpointUrl, RUNNING,
+        return new ScanJob(jobId, projectId, protocol, endpointUrl, unitId, RUNNING,
                 ScanPhase.CONNECTING, 0, null, "scan in progress", now, now);
     }
 
     ScanJob withProgress(ScanPhase phase, int discoveredSoFar) {
-        return new ScanJob(jobId, projectId, protocol, endpointUrl, state,
+        return new ScanJob(jobId, projectId, protocol, endpointUrl, unitId, state,
                 phase, discoveredSoFar, result, message, createdAt, Instant.now());
     }
 
     ScanJob completed(ScanResult result) {
-        return new ScanJob(jobId, projectId, protocol, endpointUrl, result.status().name(),
+        return new ScanJob(jobId, projectId, protocol, endpointUrl, unitId, result.status().name(),
                 null, 0, result, result.message(), createdAt, Instant.now());
     }
 
     ScanJob failed(String message) {
-        return new ScanJob(jobId, projectId, protocol, endpointUrl, FAILED,
+        return new ScanJob(jobId, projectId, protocol, endpointUrl, unitId, FAILED,
                 null, 0, null, message, createdAt, Instant.now());
     }
 
     ScanJob cancelled() {
-        return new ScanJob(jobId, projectId, protocol, endpointUrl, CANCELLED,
+        return new ScanJob(jobId, projectId, protocol, endpointUrl, unitId, CANCELLED,
                 null, 0, null, "scan cancelled by user", createdAt, Instant.now());
     }
 

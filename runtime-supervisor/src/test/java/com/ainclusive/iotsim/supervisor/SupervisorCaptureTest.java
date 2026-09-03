@@ -123,15 +123,16 @@ class SupervisorCaptureTest {
     }
 
     @Test
-    void startCaptureSupportsModbusTcpAndForwardsItsEncodedEndpoint() throws Exception {
+    void startCaptureSupportsModbusTcpAndForwardsTypedUnitId() throws Exception {
         Supervisor supervisor = supervisor();
 
         CaptureSession session = supervisor.startCapture(
-                new CaptureSpec("MODBUS_TCP", "tcp://host:502#7", ConnectionCredentials.anonymous(), 1, List.of()),
+                new CaptureSpec("MODBUS_TCP", "tcp://host:502", ConnectionCredentials.anonymous(), 1, List.of(), 7),
                 values -> { });
 
         assertThat(launcher.last().service().awaitCaptureStarted(5)).isTrue();
-        assertThat(launcher.last().service().lastCaptureRequest().getEndpointUrl()).isEqualTo("tcp://host:502#7");
+        assertThat(launcher.last().service().lastCaptureRequest().getEndpointUrl()).isEqualTo("tcp://host:502");
+        assertThat(launcher.last().service().lastCaptureRequest().getUnitId()).isEqualTo(7);
         session.stop();
     }
 

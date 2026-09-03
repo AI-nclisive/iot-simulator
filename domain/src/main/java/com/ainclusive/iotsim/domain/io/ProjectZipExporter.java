@@ -137,6 +137,7 @@ public class ProjectZipExporter {
         m.put("basis", ds.basis().name());
         m.put("simulatorPort", ds.simulatorPort());
         m.put("realDeviceEndpoint", ds.realDeviceEndpoint());
+        m.put("realDeviceUnitId", ds.realDeviceUnitId());
         m.put("runtimeConfig", ds.runtimeConfig());
         m.put("securityConfig", ds.securityConfig());  // hashed; part of the simulation (IS-131)
         m.put("enabled", ds.enabled());

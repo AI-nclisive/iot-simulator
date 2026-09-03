@@ -24,6 +24,7 @@ export function DataSourceDetailSettingsTab({
   const [realDeviceEndpoint, setRealDeviceEndpoint] = useState(
     source.realDeviceEndpoint ?? "",
   );
+  const [realDeviceUnitId, setRealDeviceUnitId] = useState(String(source.realDeviceUnitId ?? 1));
   const [savedMessage, setSavedMessage] = useState("");
   const [lockState] = useState<EditLockState>({ kind: "unlocked" });
 
@@ -33,20 +34,24 @@ export function DataSourceDetailSettingsTab({
 
   const hasChanges = isScanBasis
     ? name !== source.name || realDeviceEndpoint !== (source.realDeviceEndpoint ?? "")
+      || (source.protocol === "Modbus TCP" && realDeviceUnitId !== String(source.realDeviceUnitId ?? 1))
     : name !== source.name;
 
   const validationMessage = useMemo(() => {
     if (!hasChanges) return "";
     if (name.trim().length === 0) return "Name is required.";
     if (isScanBasis && !realDeviceEndpoint.trim()) return "Real device endpoint is required.";
+    if (isScanBasis && source.protocol === "Modbus TCP" && (!Number.isInteger(Number(realDeviceUnitId))
+        || Number(realDeviceUnitId) < 0 || Number(realDeviceUnitId) > 255)) return "Unit ID must be from 0 to 255.";
     return "";
-  }, [realDeviceEndpoint, name, hasChanges, isScanBasis]);
+  }, [realDeviceEndpoint, realDeviceUnitId, name, hasChanges, isScanBasis, source.protocol]);
 
   const canSave = isEditable && hasChanges && validationMessage.length === 0;
 
   function resetForm() {
     setName(source.name);
     setRealDeviceEndpoint(source.realDeviceEndpoint ?? "");
+    setRealDeviceUnitId(String(source.realDeviceUnitId ?? 1));
     setSavedMessage("");
   }
 
@@ -56,6 +61,9 @@ export function DataSourceDetailSettingsTab({
       name: name.trim(),
       ...(isScanBasis
         ? { realDeviceEndpoint: realDeviceEndpoint.trim() || null }
+        : {}),
+      ...(isScanBasis && source.protocol === "Modbus TCP"
+        ? { realDeviceUnitId: Number(realDeviceUnitId) }
         : {}),
     });
     setSavedMessage("Saved");
@@ -68,6 +76,14 @@ export function DataSourceDetailSettingsTab({
       <div className="flex flex-wrap items-center gap-2">
         {!isEditable ? (
           <StatusBadge label="Read-only" tone="neutral" />
+        ) : null}
+
+        {isScanBasis && source.protocol === "Modbus TCP" ? (
+          <label className="flex flex-col gap-2 text-sm text-shell-muted">
+            Unit ID
+            <input className="shell-field" disabled={!isEditable} min="0" max="255" type="number"
+              value={realDeviceUnitId} onChange={(event) => { setRealDeviceUnitId(event.target.value); setSavedMessage(""); }} />
+          </label>
         ) : null}
         {hasChanges ? <StatusBadge label="Unsaved changes" tone="warning" /> : null}
         {savedMessage ? <StatusBadge label={savedMessage} tone="accent" /> : null}

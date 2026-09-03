@@ -15,6 +15,7 @@ type DataSourceResponse = {
   schemaVersion: number | null;
   simulatorPort: number;
   realDeviceEndpoint: string | null;
+  realDeviceUnitId: number | null;
   serveUrl: string;
   runtimeConfig: string | null;
   enabled: boolean;
@@ -37,6 +38,7 @@ function mapDataSource(d: DataSourceResponse): DataSourceRow {
     basis: d.basis,
     simulatorPort: d.simulatorPort,
     realDeviceEndpoint: d.realDeviceEndpoint ?? null,
+    realDeviceUnitId: d.realDeviceUnitId ?? null,
     runtimeConfig: d.runtimeConfig ?? null,
     endpoint: d.serveUrl ?? "",
     parameterCount: d.parameterCount ?? 0, // IS-149: VARIABLE node count from backend
@@ -116,6 +118,7 @@ type UpdateSourceConfigInput = {
   name: string;
   simulatorPort?: number;
   realDeviceEndpoint?: string | null;
+  realDeviceUnitId?: number | null;
 };
 
 type DataSourcesState = {
@@ -307,6 +310,7 @@ export const useDataSourcesStore = create<DataSourcesState>((set, get) => ({
     const body: Record<string, unknown> = { name: input.name };
     if (input.simulatorPort !== undefined) body.simulatorPort = input.simulatorPort;
     if (input.realDeviceEndpoint !== undefined) body.realDeviceEndpoint = input.realDeviceEndpoint;
+    if (input.realDeviceUnitId !== undefined) body.realDeviceUnitId = input.realDeviceUnitId;
     const data = await apiFetch<DataSourceResponse>(
       `/api/v1/projects/${pid}/data-sources/${rowId}`,
       { method: "PUT", body: JSON.stringify(body) },

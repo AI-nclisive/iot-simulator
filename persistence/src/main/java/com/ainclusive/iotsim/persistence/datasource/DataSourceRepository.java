@@ -11,6 +11,13 @@ public interface DataSourceRepository {
             int simulatorPort, String realDeviceEndpoint, String runtimeConfigJson,
             String securityConfigJson, String createdBy);
 
+    default DataSourceRow insert(String projectId, String name, String protocol, String basis,
+            int simulatorPort, String realDeviceEndpoint, Integer realDeviceUnitId, String runtimeConfigJson,
+            String securityConfigJson, String createdBy) {
+        return insert(projectId, name, protocol, basis, simulatorPort, realDeviceEndpoint,
+                runtimeConfigJson, securityConfigJson, createdBy);
+    }
+
     /**
      * Creates a copy of an existing data-source row under the same project.
      * The copy gets a new ID, the supplied name, {@code enabled=false}, and version 0.
@@ -34,6 +41,13 @@ public interface DataSourceRepository {
     Optional<DataSourceRow> update(String id, String name, int simulatorPort,
             String realDeviceEndpoint, String runtimeConfigJson, String securityConfigJson,
             boolean enabled, long expectedVersion);
+
+    default Optional<DataSourceRow> update(String id, String name, int simulatorPort,
+            String realDeviceEndpoint, Integer realDeviceUnitId, String runtimeConfigJson,
+            String securityConfigJson, boolean enabled, long expectedVersion) {
+        return update(id, name, simulatorPort, realDeviceEndpoint, runtimeConfigJson,
+                securityConfigJson, enabled, expectedVersion);
+    }
 
     /** Patches only the {@code runtime_config} column (best-effort, no version check). */
     default void saveRuntimeConfig(String id, String runtimeConfigJson) {}

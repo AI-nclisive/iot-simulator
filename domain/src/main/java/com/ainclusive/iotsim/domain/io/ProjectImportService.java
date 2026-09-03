@@ -134,6 +134,22 @@ public class ProjectImportService {
                     // Fall back to the legacy "endpoint" key for pre-IS-127 export bundles.
                     String realDeviceEndpoint = ds.path("realDeviceEndpoint")
                             .asString(ds.path("endpoint").asString(null));
+                    Integer realDeviceUnitId = ds.hasNonNull("realDeviceUnitId")
+                            ? ds.path("realDeviceUnitId").asInt() : null;
+                    if ("MODBUS_TCP".equals(protocol) && realDeviceUnitId == null && realDeviceEndpoint != null) {
+                        int suffix = realDeviceEndpoint.lastIndexOf('#');
+                        if (suffix >= 0) {
+                            try {
+                                int legacyUnitId = Integer.parseInt(realDeviceEndpoint.substring(suffix + 1));
+                                if (legacyUnitId >= 0 && legacyUnitId <= 255) {
+                                    realDeviceUnitId = legacyUnitId;
+                                    realDeviceEndpoint = realDeviceEndpoint.substring(0, suffix);
+                                }
+                            } catch (NumberFormatException ignored) {
+                                // Preserve malformed legacy endpoint text rather than guessing its meaning.
+                            }
+                        }
+                    }
                     int simulatorPort = ds.path("simulatorPort").asInt(0);
                     if (simulatorPort <= 0) {
                         simulatorPort = SimulatorUrl.defaultPort(Protocol.valueOf(protocol));
@@ -143,14 +159,14 @@ public class ProjectImportService {
                     boolean enabled = ds.path("enabled").asBoolean(false);
 
                     DataSourceRow row = dataSources.insert(
-                            newProject.id(), dsName, protocol, basis, simulatorPort, realDeviceEndpoint,
+                            newProject.id(), dsName, protocol, basis, simulatorPort, realDeviceEndpoint, realDeviceUnitId,
                             runtimeConfig, securityConfig, actor);
 
                     // Preserve the exported enabled state: insert() defaults to false;
                     // apply an update only when the exported value is true.
                     if (enabled) {
                         dataSources.update(row.id(), row.name(), row.simulatorPort(),
-                                row.realDeviceEndpoint(), row.runtimeConfig(), row.securityConfig(),
+                                row.realDeviceEndpoint(), row.realDeviceUnitId(), row.runtimeConfig(), row.securityConfig(),
                                 true, row.version());
                     }
 
