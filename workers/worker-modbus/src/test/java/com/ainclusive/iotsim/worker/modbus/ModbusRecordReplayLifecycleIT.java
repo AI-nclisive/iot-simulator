@@ -117,7 +117,8 @@ class ModbusRecordReplayLifecycleIT {
 
     private static List<Long> values(List<Value> captured) {
         return captured.stream()
-                .map(value -> (Long) ValueCodec.decode(ValueCodec.Kind.INT, value.getValueEnc().toByteArray()))
+                .map(value -> (Long) ValueCodec.decode(
+                        ValueCodec.Kind.valueOf(value.getValueKind()), value.getValueEnc().toByteArray()))
                 .toList();
     }
 
