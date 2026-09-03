@@ -981,7 +981,7 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
                 newClient.configure(
                         toProtoSchema(spec.schemaVersion(), spec.schemaNodes()), spec.listenPort(),
                         network.bindAddress(), network.advertisedHost(),
-                        toProtoSecurityConfig(spec.endpointSecurity()));
+                        toProtoSecurityConfig(spec.endpointSecurity()), spec.workerOptions());
                 // Subscribe to runtime events BEFORE start so SOURCE_START — emitted the
                 // instant the worker's server begins listening — is not missed; the hub
                 // does not buffer. UNIMPLEMENTED on an older worker is non-fatal.

@@ -73,6 +73,18 @@ class WorkerClientTest {
     }
 
     @Test
+    void configureRequestCarriesTransportSpecificWorkerOptions() {
+        ConfigureRequest request = WorkerClient.buildConfigureRequest(Schema.getDefaultInstance(), 502,
+                "127.0.0.1", "simulator.local", SecurityConfig.getDefaultInstance(),
+                Map.of("transport", "RTU", "serialPort", "COM7"));
+
+        assertThat(request.getOptionsMap())
+                .containsEntry("transport", "RTU")
+                .containsEntry("serialPort", "COM7")
+                .containsEntry("bindAddress", "127.0.0.1");
+    }
+
+    @Test
     void mismatchedMajorVersionIsRefused() throws Exception {
         int port = startServer("2.0.0");
         try (WorkerClient client = new WorkerClient("127.0.0.1", port)) {
