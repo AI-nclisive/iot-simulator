@@ -134,12 +134,19 @@ final class OpcUaServerRuntime {
                     clientEventSink.accept(clientEvent(ClientEvent.Kind.DISCONNECTED, session));
                 }
             });
-            this.namespace = new SchemaNamespace(server, variables, typeDefinitions);
+        this.namespace = new SchemaNamespace(server, variables, typeDefinitions,
+                warning -> runtimeEventSink.accept(runtimeEvent("WARNING", warning)));
         this.endpointUrl = "opc.tcp://" + advertisedHost + ":" + port + "/iotsim";
     }
 
     void start() {
-        namespace.startup();
+        try {
+            namespace.startup();
+        } catch (RuntimeException e) {
+            runtimeEventSink.accept(runtimeEvent("ERROR", "OPC UA address-space materialization failed: "
+                    + e.getMessage()));
+            throw e;
+        }
         try {
             await(server.startup());
         } catch (RuntimeException e) {

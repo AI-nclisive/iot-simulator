@@ -482,6 +482,12 @@ public class OpcUaProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSou
                 obs.onNext(Ack.newBuilder().setOk(false).setMessage(e.getMessage()).build());
                 obs.onCompleted();
                 return;
+            } catch (RuntimeException e) {
+                state.set("ERROR");
+                obs.onNext(Ack.newBuilder().setOk(false)
+                        .setMessage("OPC UA server failed to start: " + e.getMessage()).build());
+                obs.onCompleted();
+                return;
             }
         }
         state.set("RUNNING");
