@@ -10,4 +10,4 @@ ALTER TABLE schema_nodes
     ADD CONSTRAINT schema_nodes_modbus_word_order_check
         CHECK (modbus_word_order IS NULL OR modbus_word_order IN ('MSW_FIRST', 'LSW_FIRST')),
     ADD CONSTRAINT schema_nodes_modbus_scale_check
-        CHECK (modbus_scale IS NULL OR (modbus_scale <> 0 AND isfinite(modbus_scale)));
+        CHECK (modbus_scale IS NULL OR modbus_scale <> 0);
