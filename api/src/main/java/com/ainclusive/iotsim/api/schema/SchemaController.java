@@ -127,7 +127,9 @@ public class SchemaController {
 
     private static void validateModbusEncoding(NodeDto d) {
         if ((d.modbusByteOrder() != null || d.modbusWordOrder() != null || d.modbusScale() != null)
-                && d.modbusRegisterKind() == null) {
+                && (d.modbusRegisterKind() == null
+                        || "COIL".equals(d.modbusRegisterKind())
+                        || "DISCRETE_INPUT".equals(d.modbusRegisterKind()))) {
             throw new IllegalArgumentException("node '" + d.path() + "': Modbus encoding requires a register binding");
         }
         if (d.modbusByteOrder() != null && !MODBUS_BYTE_ORDERS.contains(d.modbusByteOrder())) {

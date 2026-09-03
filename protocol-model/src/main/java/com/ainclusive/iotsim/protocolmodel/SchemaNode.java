@@ -106,7 +106,9 @@ public record SchemaNode(
                 throw new IllegalArgumentException("modbusAddress must be non-negative: " + modbusAddress);
             }
             if ((modbusByteOrder != null || modbusWordOrder != null || modbusScale != null)
-                    && modbusRegisterKind == null) {
+                    && (modbusRegisterKind == null
+                            || "COIL".equals(modbusRegisterKind)
+                            || "DISCRETE_INPUT".equals(modbusRegisterKind))) {
                 throw new IllegalArgumentException("Modbus encoding requires a modbus register binding");
             }
             if (modbusByteOrder != null && !List.of("BIG_ENDIAN", "LITTLE_ENDIAN").contains(modbusByteOrder)) {

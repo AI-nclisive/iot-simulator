@@ -45,6 +45,13 @@ class SchemaNodeModbusBindingTest {
     }
 
     @Test
+    void encodingOnCoilIsRejected() {
+        assertThatThrownBy(() -> variable("COIL", 0, "BIG_ENDIAN"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("encoding requires");
+    }
+
+    @Test
     void nonVariableNodeCannotCarryABinding() {
         assertThatThrownBy(() -> new SchemaNode(
                         "f1", null, "Plant", "Plant", NodeKind.FOLDER,
@@ -55,10 +62,14 @@ class SchemaNodeModbusBindingTest {
     }
 
     private static SchemaNode variable(String registerKind, Integer address) {
+        return variable(registerKind, address, null);
+    }
+
+    private static SchemaNode variable(String registerKind, Integer address, String byteOrder) {
         return new SchemaNode(
                 "n1", null, "Plant/Temp", "Temp", NodeKind.VARIABLE,
                 DataType.UINT16, ValueRank.SCALAR, Access.READ_WRITE, null, null,
                 List.of(), null, List.of(), null, List.of(), List.of(), null, null,
-                null, null, null, null, null, registerKind, address);
+                null, null, null, null, null, registerKind, address, byteOrder, null, null);
     }
 }
