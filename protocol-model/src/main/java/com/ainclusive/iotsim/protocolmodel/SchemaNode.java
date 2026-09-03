@@ -64,7 +64,10 @@ public record SchemaNode(
         Boolean historizing,
         String declaredDataTypeNodeId,
         String modbusRegisterKind,
-        Integer modbusAddress) {
+        Integer modbusAddress,
+        String modbusByteOrder,
+        String modbusWordOrder,
+        Double modbusScale) {
 
     public SchemaNode {
         Objects.requireNonNull(nodeId, "nodeId");
@@ -102,6 +105,21 @@ public record SchemaNode(
             if (modbusAddress != null && modbusAddress < 0) {
                 throw new IllegalArgumentException("modbusAddress must be non-negative: " + modbusAddress);
             }
+            if ((modbusByteOrder != null || modbusWordOrder != null || modbusScale != null)
+                    && (modbusRegisterKind == null
+                            || "COIL".equals(modbusRegisterKind)
+                            || "DISCRETE_INPUT".equals(modbusRegisterKind))) {
+                throw new IllegalArgumentException("Modbus encoding requires a modbus register binding");
+            }
+            if (modbusByteOrder != null && !List.of("BIG_ENDIAN", "LITTLE_ENDIAN").contains(modbusByteOrder)) {
+                throw new IllegalArgumentException("invalid modbusByteOrder: " + modbusByteOrder);
+            }
+            if (modbusWordOrder != null && !List.of("MSW_FIRST", "LSW_FIRST").contains(modbusWordOrder)) {
+                throw new IllegalArgumentException("invalid modbusWordOrder: " + modbusWordOrder);
+            }
+            if (modbusScale != null && (!Double.isFinite(modbusScale) || modbusScale == 0.0d)) {
+                throw new IllegalArgumentException("modbusScale must be finite and non-zero");
+            }
             if (writeMask != null && writeMask < 0) {
                 throw new IllegalArgumentException("writeMask must be non-negative (UInt32): " + writeMask);
             }
@@ -111,7 +129,8 @@ public record SchemaNode(
         if (kind != NodeKind.VARIABLE && dataTypeNodeId != null) {
             throw new IllegalArgumentException(kind + " nodes cannot have a dataTypeNodeId");
         }
-        if (kind != NodeKind.VARIABLE && modbusRegisterKind != null) {
+        if (kind != NodeKind.VARIABLE && (modbusRegisterKind != null || modbusByteOrder != null
+                || modbusWordOrder != null || modbusScale != null)) {
             throw new IllegalArgumentException(kind + " nodes cannot have a modbusRegisterKind");
         }
         if (kind == NodeKind.DATA_TYPE) {
@@ -148,6 +167,20 @@ public record SchemaNode(
         } else if (nativeTypeKind != null) {
             throw new IllegalArgumentException(kind + " nodes cannot have a nativeTypeKind");
         }
+    }
+
+    /** Compatibility constructor for bindings authored before encoding metadata. */
+    public SchemaNode(String nodeId, String parentId, String path, String name, NodeKind kind,
+            DataType dataType, ValueRank valueRank, Access access, String unit, String description,
+            List<Integer> arrayDimensions, String typeDefinition, List<SchemaReference> references,
+            String dataTypeNodeId, List<DataTypeMember> members, List<DataTypeEnumValue> enumValues,
+            String defaultEncodingId, NativeTypeKind nativeTypeKind, Integer accessLevelFull,
+            Integer minimumSamplingInterval, Integer writeMask, Boolean historizing,
+            String declaredDataTypeNodeId, String modbusRegisterKind, Integer modbusAddress) {
+        this(nodeId, parentId, path, name, kind, dataType, valueRank, access, unit, description,
+                arrayDimensions, typeDefinition, references, dataTypeNodeId, members, enumValues,
+                defaultEncodingId, nativeTypeKind, accessLevelFull, minimumSamplingInterval, writeMask,
+                historizing, declaredDataTypeNodeId, modbusRegisterKind, modbusAddress, null, null, null);
     }
 
     /** Compatibility constructor for schemas stored before declared OPC UA type metadata. */

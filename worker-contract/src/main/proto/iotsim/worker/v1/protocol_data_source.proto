@@ -133,6 +133,9 @@ message SchemaNodeMsg {
   // COIL | DISCRETE_INPUT | HOLDING_REGISTER | INPUT_REGISTER.
   string modbus_register_kind = 25;
   int32 modbus_address = 26;
+  string modbus_byte_order = 27; // BIG_ENDIAN | LITTLE_ENDIAN; empty = BIG_ENDIAN
+  string modbus_word_order = 28; // MSW_FIRST | LSW_FIRST; empty = MSW_FIRST
+  double modbus_scale = 29;      // 0 = unset / identity scale
 }
 
 // The declared fields of a native OPC UA structured DataType. Exactly one of

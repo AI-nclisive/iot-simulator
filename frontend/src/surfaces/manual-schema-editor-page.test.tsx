@@ -91,6 +91,31 @@ function renderPage() {
 }
 
 describe("ManualSchemaEditorPage (UI-490)", () => {
+  it("edits and saves Modbus register encoding metadata", async () => {
+    const modbusSchema = {
+      ...schema,
+      protocol: "MODBUS_TCP",
+      nodes: [{ ...schema.nodes[0], dataType: "FLOAT32", modbusRegisterKind: "HOLDING_REGISTER",
+        modbusAddress: 10, modbusByteOrder: "BIG_ENDIAN", modbusWordOrder: "MSW_FIRST", modbusScale: 1 }],
+    };
+    mockLoadManualSchemaById.mockResolvedValueOnce(modbusSchema);
+    mockUpdateManualSchema.mockResolvedValueOnce(modbusSchema);
+    renderPage();
+    await waitFor(() => screen.getByText("Level"));
+    fireEvent.click(screen.getByText("Level"));
+    fireEvent.change(screen.getByLabelText("Modbus byte order"), { target: { value: "LITTLE_ENDIAN" } });
+    fireEvent.change(screen.getByLabelText("Modbus word order"), { target: { value: "LSW_FIRST" } });
+    fireEvent.change(screen.getByLabelText("Modbus scale"), { target: { value: "0.1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByLabelText(/Save in this schema/));
+    fireEvent.click(screen.getAllByRole("button", { name: "Save" })[1]);
+    await waitFor(() => expect(mockUpdateManualSchema).toHaveBeenCalledWith(
+      "proj-1", "ms-1", expect.objectContaining({ nodes: expect.arrayContaining([
+        expect.objectContaining({ modbusByteOrder: "LITTLE_ENDIAN", modbusWordOrder: "LSW_FIRST", modbusScale: 0.1 }),
+      ]) }),
+    ));
+  });
+
   it("loads the schema on mount and renders its fields", async () => {
     mockLoadManualSchemaById.mockResolvedValueOnce(schema);
     renderPage();

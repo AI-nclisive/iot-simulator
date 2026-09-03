@@ -48,6 +48,9 @@ export type NodeDto = {
   historizing?: boolean | null;
   modbusRegisterKind?: "COIL" | "DISCRETE_INPUT" | "HOLDING_REGISTER" | "INPUT_REGISTER" | null;
   modbusAddress?: number | null;
+  modbusByteOrder?: "BIG_ENDIAN" | "LITTLE_ENDIAN" | null;
+  modbusWordOrder?: "MSW_FIRST" | "LSW_FIRST" | null;
+  modbusScale?: number | null;
 };
 
 /** FOLDER, OBJECT, and VARIABLE nodes can contain children (IS-189: VARIABLE via HasProperty/HasComponent references). */

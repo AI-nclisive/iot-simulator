@@ -37,7 +37,8 @@ import java.util.function.Consumer;
 final class ModbusServerRuntime {
 
     /** One assigned node: its Modbus object type, base address, and neutral data type. */
-    record NodeAssignment(String dataType, ModbusRegisterKind kind, int address) {}
+    record NodeAssignment(String dataType, ModbusRegisterKind kind, int address, String byteOrder,
+            String wordOrder, Double scale) {}
 
     private final SimpleProcessImage image = new SimpleProcessImage();
     private final Map<String, NodeAssignment> assignments;
@@ -54,9 +55,13 @@ final class ModbusServerRuntime {
      * when absent the worker computes the default contiguous layout instead.
      */
     record VarSpec(String nodeId, String dataType, String access, String explicitRegisterKind,
-            Integer explicitAddress) {
+            Integer explicitAddress, String byteOrder, String wordOrder, Double scale) {
         VarSpec(String nodeId, String dataType, String access) {
-            this(nodeId, dataType, access, null, null);
+            this(nodeId, dataType, access, null, null, null, null, null);
+        }
+
+        VarSpec(String nodeId, String dataType, String access, String explicitRegisterKind, Integer explicitAddress) {
+            this(nodeId, dataType, access, explicitRegisterKind, explicitAddress, null, null, null);
         }
     }
 
@@ -111,7 +116,8 @@ final class ModbusServerRuntime {
                         .build());
                 continue;
             }
-            result.put(var.nodeId(), new NodeAssignment(var.dataType(), kind, address));
+                result.put(var.nodeId(), new NodeAssignment(var.dataType(), kind, address,
+                        var.byteOrder(), var.wordOrder(), var.scale()));
             boolean readOnly = kind == ModbusRegisterKind.DISCRETE_INPUT || kind == ModbusRegisterKind.INPUT_REGISTER;
             seedImage(image, kind, readOnly, var.dataType(), address);
             for (int i = 0; i < span; i++) {
@@ -138,7 +144,8 @@ final class ModbusServerRuntime {
                 address++;
             }
             nextAddr.put(kind, address + span);
-            result.put(var.nodeId(), new NodeAssignment(var.dataType(), kind, address));
+            result.put(var.nodeId(), new NodeAssignment(var.dataType(), kind, address,
+                    var.byteOrder(), var.wordOrder(), var.scale()));
             seedImage(image, kind, readOnly, var.dataType(), address);
         }
         return result;
@@ -220,13 +227,15 @@ final class ModbusServerRuntime {
             case COIL -> image.addDigitalOut(assignment.address(), new SimpleDigitalOut(ModbusTypes.toCoilValue(decoded)));
             case DISCRETE_INPUT -> image.addDigitalIn(assignment.address(), new SimpleDigitalIn(ModbusTypes.toCoilValue(decoded)));
             case HOLDING_REGISTER -> {
-                int[] regs = ModbusTypes.toRegisters(assignment.dataType(), decoded);
+                int[] regs = ModbusTypes.toRegisters(assignment.dataType(), decoded,
+                        assignment.byteOrder(), assignment.wordOrder(), assignment.scale());
                 for (int i = 0; i < regs.length; i++) {
                     image.addRegister(assignment.address() + i, new SimpleRegister(regs[i]));
                 }
             }
             case INPUT_REGISTER -> {
-                int[] regs = ModbusTypes.toRegisters(assignment.dataType(), decoded);
+                int[] regs = ModbusTypes.toRegisters(assignment.dataType(), decoded,
+                        assignment.byteOrder(), assignment.wordOrder(), assignment.scale());
                 for (int i = 0; i < regs.length; i++) {
                     image.addInputRegister(assignment.address() + i, new SimpleInputRegister(regs[i]));
                 }
