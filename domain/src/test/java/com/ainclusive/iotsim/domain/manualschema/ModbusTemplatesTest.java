@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 class ModbusTemplatesTest {
 
     @Test
-    void catalogExposesTheSunSpecInverterTemplate() {
+    void catalogExposesAllBuiltInTemplates() {
         assertThat(ModbusTemplates.templateNames()).containsExactly(
                 "sunspec_inverter", "generic_energy_meter", "generic_plc_io");
         assertThat(ModbusTemplates.allTemplates()).containsOnlyKeys(
