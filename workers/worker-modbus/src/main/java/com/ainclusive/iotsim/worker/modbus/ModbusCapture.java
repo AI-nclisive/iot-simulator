@@ -3,7 +3,7 @@ package com.ainclusive.iotsim.worker.modbus;
 import com.ainclusive.iotsim.protocolmodel.ValueCodec;
 import com.ainclusive.iotsim.workercontract.v1.Quality;
 import com.ainclusive.iotsim.workercontract.v1.Value;
-import com.ghgande.j2mod.modbus.facade.ModbusTCPMaster;
+import com.ghgande.j2mod.modbus.facade.AbstractModbusMaster;
 import com.ghgande.j2mod.modbus.procimg.InputRegister;
 import com.google.protobuf.ByteString;
 import java.util.ArrayList;
@@ -39,7 +39,7 @@ final class ModbusCapture {
     private static final Logger LOG = LoggerFactory.getLogger(ModbusCapture.class);
     static final int DEFAULT_POLL_INTERVAL_MS = 500;
 
-    private final ModbusTCPMaster master;
+    private final AbstractModbusMaster master;
     private final Thread pollThread;
     private volatile boolean running = true;
 
@@ -49,7 +49,7 @@ final class ModbusCapture {
     /** A capture node resolved once: its address/kind plus the neutral type to decode into. */
     private record ResolvedNode(String nodeId, ModbusDiscovery.NodeAddress address, String dataType) {}
 
-    private ModbusCapture(ModbusTCPMaster master, int unitId, List<ResolvedNode> nodes, int pollIntervalMs,
+    private ModbusCapture(AbstractModbusMaster master, int unitId, List<ResolvedNode> nodes, int pollIntervalMs,
             Consumer<List<Value>> sink) {
         this.master = master;
         this.pollThread = new Thread(() -> pollLoop(unitId, nodes, pollIntervalMs, sink), "modbus-capture");
@@ -59,7 +59,7 @@ final class ModbusCapture {
     static ModbusCapture start(String endpointUrl, int unitId, List<NodeSpec> nodes, Consumer<List<Value>> sink)
             throws Exception {
         ModbusDiscovery.Endpoint endpoint = ModbusDiscovery.parseEndpoint(endpointUrl);
-        ModbusTCPMaster master = ModbusDiscovery.connect(endpoint);
+        AbstractModbusMaster master = ModbusDiscovery.connect(endpoint);
         List<ResolvedNode> resolved = resolve(nodes);
         ModbusCapture capture = new ModbusCapture(master, unitId, resolved, DEFAULT_POLL_INTERVAL_MS, sink);
         capture.pollThread.start();
@@ -70,6 +70,15 @@ final class ModbusCapture {
     static ModbusCapture start(String endpointUrl, List<NodeSpec> nodes, Consumer<List<Value>> sink)
             throws Exception {
         return start(endpointUrl, ModbusDiscovery.DEFAULT_UNIT_ID, nodes, sink);
+    }
+
+    static ModbusCapture start(ModbusSerialSettings settings, int unitId, List<NodeSpec> nodes,
+            Consumer<List<Value>> sink) throws Exception {
+        AbstractModbusMaster master = ModbusDiscovery.connect(settings);
+        List<ResolvedNode> resolved = resolve(nodes);
+        ModbusCapture capture = new ModbusCapture(master, unitId, resolved, DEFAULT_POLL_INTERVAL_MS, sink);
+        capture.pollThread.start();
+        return capture;
     }
 
     /** Resolves each node's address/type once; an unparseable or unsupported node is logged once and excluded. */
@@ -137,7 +146,7 @@ final class ModbusCapture {
         }
     }
 
-    private static Object readValue(ModbusTCPMaster master, int unitId, ModbusDiscovery.NodeAddress address,
+    private static Object readValue(AbstractModbusMaster master, int unitId, ModbusDiscovery.NodeAddress address,
             String dataType) throws Exception {
         return switch (address.kind()) {
             case COIL -> master.readCoils(unitId, address.address(), 1).getBit(0);

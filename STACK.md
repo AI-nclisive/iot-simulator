@@ -13,6 +13,8 @@ history.
   Milo 0.6 uses the JAXB API that was removed from the JDK in Java 11+, so it is
   supplied as a runtime shim for this approved SDK.
 - j2mod — Modbus TCP server/slave (Apache 2.0).
+- jSerialComm — cross-platform native serial-port access for the Modbus RTU
+  worker.
 - PostgreSQL (no required extensions); Flyway migrations; PostgreSQL JDBC + jOOQ
   (typed SQL, no heavy ORM). The DB connection is externally configured (env-based
   DataSource), so one build runs against a containerized Postgres with a mounted

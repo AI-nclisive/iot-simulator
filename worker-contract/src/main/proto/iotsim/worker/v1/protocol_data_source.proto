@@ -182,10 +182,31 @@ message ConnectionConfigMsg {
   string secret_ref = 4;  // present only for EXTERNAL_REF (the reference is not itself a secret)
 }
 
+// Transport settings specific to Modbus real-source operations. It is ignored
+// by other protocols. An absent configuration retains the historical TCP path.
+message ModbusConnectionConfigMsg {
+  enum Transport {
+    TRANSPORT_UNSPECIFIED = 0;
+    TCP = 1;
+    RTU = 2;
+  }
+  Transport transport = 1;
+  ModbusSerialConfigMsg serial = 2;
+}
+
+message ModbusSerialConfigMsg {
+  string port = 1;
+  uint32 baud_rate = 2;
+  uint32 data_bits = 3;
+  string parity = 4;       // NONE | EVEN | ODD
+  string stop_bits = 5;    // 1 | 1.5 | 2
+}
+
 message TestConnectionRequest {
   string endpoint_url = 1;            // e.g. opc.tcp://host:4840/path
   ConnectionConfigMsg credentials = 2;
-  optional uint32 unit_id = 3;        // Modbus real-device unit; absent for other protocols
+  optional uint32 unit_id = 3;        // Modbus unit id; absent preserves legacy default
+  ModbusConnectionConfigMsg modbus_connection = 4;
 }
 
 message TestConnectionResponse {
@@ -197,7 +218,8 @@ message ScanRequest {
   string endpoint_url = 1;
   ConnectionConfigMsg credentials = 2;
   int32 max_nodes = 3;  // cap on discovered nodes; 0 = worker default
-  optional uint32 unit_id = 4; // Modbus real-device unit; absent for other protocols
+  optional uint32 unit_id = 4;        // Modbus unit id; absent preserves legacy default
+  ModbusConnectionConfigMsg modbus_connection = 5;
 }
 
 message ScanResponse {
@@ -242,7 +264,8 @@ message CaptureRequest {
   // data_type tells the worker how to encode observed values into neutral
   // value_enc bytes (so the supervisor can decode them without re-reading types).
   Schema schema = 3;
-  optional uint32 unit_id = 4; // Modbus real-device unit; absent for other protocols
+  optional uint32 unit_id = 4;        // Modbus unit id; absent preserves legacy default
+  ModbusConnectionConfigMsg modbus_connection = 5;
 }
 
 // ---- Values ----

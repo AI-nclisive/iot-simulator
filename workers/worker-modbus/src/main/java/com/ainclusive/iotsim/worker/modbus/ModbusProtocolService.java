@@ -128,7 +128,8 @@ public class ModbusProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSo
         int unitId = parseUnitId(request.getOptions().getOrDefault("unitId", String.valueOf(ModbusDiscovery.DEFAULT_UNIT_ID)));
         try {
             serverRuntime.set(new ModbusServerRuntime(vars, request.getListenPort(),
-                    InetAddress.getByName(bindAddress), unitId, runtimeEventHub::emit));
+                    InetAddress.getByName(bindAddress), unitId,
+                    ModbusSerialSettings.fromOptions(request.getOptions()), runtimeEventHub::emit));
         } catch (Exception e) {
             obs.onNext(Ack.newBuilder().setOk(false).setMessage(e.getMessage()).build());
             obs.onCompleted();
@@ -207,8 +208,12 @@ public class ModbusProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSo
 
     @Override
     public void testConnection(TestConnectionRequest request, StreamObserver<TestConnectionResponse> obs) {
-        ModbusDiscovery.ConnectionTest result = ModbusDiscovery.testConnection(
-                request.getEndpointUrl(), request.hasUnitId() ? (int) request.getUnitId() : ModbusDiscovery.DEFAULT_UNIT_ID);
+        ModbusSerialSettings serial = request.hasModbusConnection()
+                ? ModbusSerialSettings.fromProto(request.getModbusConnection()) : null;
+        int unitId = request.hasUnitId() ? request.getUnitId() : ModbusDiscovery.DEFAULT_UNIT_ID;
+        ModbusDiscovery.ConnectionTest result = serial == null
+                ? ModbusDiscovery.testConnection(request.getEndpointUrl(), unitId)
+                : ModbusDiscovery.testConnection(serial);
         obs.onNext(TestConnectionResponse.newBuilder()
                 .setStatus(result.status())
                 .setMessage(orEmpty(result.message()))
@@ -222,15 +227,18 @@ public class ModbusProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSo
         sendIfNotCancelled(obs, ScanEvent.newBuilder()
                 .setProgress(ScanProgress.newBuilder().setPhase("CONNECTING"))
                 .build());
-        ModbusDiscovery.ScanOutcome outcome = ModbusDiscovery.scan(
-                request.getEndpointUrl(), request.hasUnitId() ? (int) request.getUnitId() : ModbusDiscovery.DEFAULT_UNIT_ID,
-                request.getMaxNodes(),
-                () -> sendIfNotCancelled(obs, ScanEvent.newBuilder()
-                        .setProgress(ScanProgress.newBuilder().setPhase("CONNECTED"))
-                        .build()),
-                soFar -> sendIfNotCancelled(obs, ScanEvent.newBuilder()
-                        .setProgress(ScanProgress.newBuilder().setPhase("SCANNING").setDiscoveredSoFar(soFar))
-                        .build()));
+        ModbusSerialSettings serial = request.hasModbusConnection()
+                ? ModbusSerialSettings.fromProto(request.getModbusConnection()) : null;
+        int unitId = request.hasUnitId() ? request.getUnitId() : ModbusDiscovery.DEFAULT_UNIT_ID;
+        Runnable connected = () -> sendIfNotCancelled(obs, ScanEvent.newBuilder()
+                .setProgress(ScanProgress.newBuilder().setPhase("CONNECTED"))
+                .build());
+        java.util.function.IntConsumer progress = soFar -> sendIfNotCancelled(obs, ScanEvent.newBuilder()
+                .setProgress(ScanProgress.newBuilder().setPhase("SCANNING").setDiscoveredSoFar(soFar))
+                .build());
+        ModbusDiscovery.ScanOutcome outcome = serial == null
+                ? ModbusDiscovery.scan(request.getEndpointUrl(), unitId, request.getMaxNodes(), connected, progress)
+                : ModbusDiscovery.scan(serial, unitId, request.getMaxNodes(), connected, progress);
         if (obs.isCancelled()) {
             return;
         }
@@ -278,15 +286,19 @@ public class ModbusProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSo
             }
         });
         try {
-            capture.set(ModbusCapture.start(request.getEndpointUrl(),
-                    request.hasUnitId() ? (int) request.getUnitId() : ModbusDiscovery.DEFAULT_UNIT_ID, nodes,
-                    batch -> {
+            ModbusSerialSettings serial = request.hasModbusConnection()
+                    ? ModbusSerialSettings.fromProto(request.getModbusConnection()) : null;
+            int unitId = request.hasUnitId() ? request.getUnitId() : ModbusDiscovery.DEFAULT_UNIT_ID;
+            java.util.function.Consumer<List<Value>> sink = batch -> {
                         synchronized (serverObserver) {
                             if (!serverObserver.isCancelled()) {
                                 responseObserver.onNext(ValueBatch.newBuilder().addAllValues(batch).build());
                             }
                         }
-                    }));
+                    };
+            capture.set(serial == null
+                    ? ModbusCapture.start(request.getEndpointUrl(), unitId, nodes, sink)
+                    : ModbusCapture.start(serial, unitId, nodes, sink));
             if (serverObserver.isCancelled()) {
                 capture.get().stop();
             }

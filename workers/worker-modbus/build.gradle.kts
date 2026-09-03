@@ -3,7 +3,7 @@ plugins {
     application
 }
 
-description = "Modbus TCP protocol worker (j2mod). Lean JVM, no Spring."
+description = "Modbus TCP/RTU protocol worker. Lean JVM, no Spring."
 
 dependencies {
     implementation(project(":worker-contract"))
@@ -13,6 +13,7 @@ dependencies {
     implementation(libs.grpc.netty.shaded)
 
     implementation(libs.j2mod)
+    implementation(libs.jserialcomm)
 }
 
 application {

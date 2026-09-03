@@ -2,6 +2,8 @@ package com.ainclusive.iotsim.worker.modbus;
 
 import com.ainclusive.iotsim.workercontract.v1.SchemaNodeMsg;
 import com.ghgande.j2mod.modbus.ModbusSlaveException;
+import com.ghgande.j2mod.modbus.facade.AbstractModbusMaster;
+import com.ghgande.j2mod.modbus.facade.ModbusSerialMaster;
 import com.ghgande.j2mod.modbus.facade.ModbusTCPMaster;
 import java.util.ArrayList;
 import java.util.List;
@@ -84,7 +86,20 @@ final class ModbusDiscovery {
     static ConnectionTest testConnection(String endpointUrl, int unitId) {
         try {
             Endpoint endpoint = parseEndpoint(endpointUrl);
-            ModbusTCPMaster master = connect(endpoint);
+            AbstractModbusMaster master = connect(endpoint);
+            try {
+                return new ConnectionTest("OK", "");
+            } finally {
+                master.disconnect();
+            }
+        } catch (Exception e) {
+            return new ConnectionTest("UNREACHABLE", e.getMessage());
+        }
+    }
+
+    static ConnectionTest testConnection(ModbusSerialSettings settings) {
+        try {
+            AbstractModbusMaster master = connect(settings);
             try {
                 return new ConnectionTest("OK", "");
             } finally {
@@ -96,8 +111,14 @@ final class ModbusDiscovery {
     }
 
     /** Connects a fresh master to the endpoint; shared by TestConnection/Scan/Capture. */
-    static ModbusTCPMaster connect(Endpoint endpoint) throws Exception {
+    static AbstractModbusMaster connect(Endpoint endpoint) throws Exception {
         ModbusTCPMaster master = new ModbusTCPMaster(endpoint.host(), endpoint.port(), 2000, false);
+        master.connect();
+        return master;
+    }
+
+    static AbstractModbusMaster connect(ModbusSerialSettings settings) throws Exception {
+        ModbusSerialMaster master = new ModbusSerialMaster(settings.toJ2mod(), 2_000);
         master.connect();
         return master;
     }
@@ -111,12 +132,28 @@ final class ModbusDiscovery {
         } catch (IllegalArgumentException e) {
             return new ScanOutcome(List.of(), "UNREACHABLE", false, 0, e.getMessage());
         }
-        ModbusTCPMaster master;
+        AbstractModbusMaster master;
         try {
             master = connect(endpoint);
         } catch (Exception e) {
             return new ScanOutcome(List.of(), "UNREACHABLE", false, 0, e.getMessage());
         }
+        return scan(master, endpoint.unitId(), maxNodes, onConnected, onProgress);
+    }
+
+    static ScanOutcome scan(ModbusSerialSettings settings, int unitId, int maxNodes, Runnable onConnected,
+            IntConsumer onProgress) {
+        AbstractModbusMaster master;
+        try {
+            master = connect(settings);
+        } catch (Exception e) {
+            return new ScanOutcome(List.of(), "UNREACHABLE", false, 0, e.getMessage());
+        }
+        return scan(master, unitId, maxNodes, onConnected, onProgress);
+    }
+
+    private static ScanOutcome scan(AbstractModbusMaster master, int unitId, int maxNodes, Runnable onConnected,
+            IntConsumer onProgress) {
         onConnected.run();
         try {
             int limit = maxNodes > 0 ? maxNodes : DEFAULT_SCAN_RANGE * 4;
@@ -152,7 +189,7 @@ final class ModbusDiscovery {
         void onPresent(List<SchemaNodeMsg> nodes, int address);
     }
 
-    private record BitObjectProbe(ModbusTCPMaster master, int unitId, String prefix, boolean writable)
+    private record BitObjectProbe(AbstractModbusMaster master, int unitId, String prefix, boolean writable)
             implements ObjectProbe {
         @Override
         public void readChunk(int address, int count) throws Exception {
@@ -172,7 +209,7 @@ final class ModbusDiscovery {
         }
     }
 
-    private record RegisterObjectProbe(ModbusTCPMaster master, int unitId, String prefix,
+    private record RegisterObjectProbe(AbstractModbusMaster master, int unitId, String prefix,
             boolean writable, List<Integer> discovered) implements ObjectProbe {
         @Override
         public void readChunk(int address, int count) throws Exception {

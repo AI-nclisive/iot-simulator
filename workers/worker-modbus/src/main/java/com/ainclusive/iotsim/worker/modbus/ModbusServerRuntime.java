@@ -21,7 +21,7 @@ import java.util.TreeSet;
 import java.util.function.Consumer;
 
 /**
- * The simulated Modbus TCP slave: a j2mod {@link SimpleProcessImage} built from
+ * The simulated Modbus TCP or RTU slave: a j2mod {@link SimpleProcessImage} built from
  * the neutral schema, using the protocol-model default contiguous register
  * layout (schema order -> address, per object type) — see
  * openspec/specs/protocol-model/spec.md §5 and
@@ -44,6 +44,7 @@ final class ModbusServerRuntime {
     private final int unitId;
     private final int listenPort;
     private final InetAddress bindAddress;
+    private final ModbusSerialSettings serialSettings;
     private final Consumer<RuntimeEvent> runtimeEventSink;
     private ModbusSlave slave;
 
@@ -62,9 +63,15 @@ final class ModbusServerRuntime {
 
     ModbusServerRuntime(List<VarSpec> vars, int listenPort, InetAddress bindAddress, int unitId,
             Consumer<RuntimeEvent> runtimeEventSink) {
+        this(vars, listenPort, bindAddress, unitId, null, runtimeEventSink);
+    }
+
+    ModbusServerRuntime(List<VarSpec> vars, int listenPort, InetAddress bindAddress, int unitId,
+            ModbusSerialSettings serialSettings, Consumer<RuntimeEvent> runtimeEventSink) {
         this.listenPort = listenPort;
         this.bindAddress = bindAddress;
         this.unitId = unitId;
+        this.serialSettings = serialSettings;
         this.runtimeEventSink = runtimeEventSink;
         this.assignments = layout(vars, image, runtimeEventSink);
     }
@@ -193,7 +200,9 @@ final class ModbusServerRuntime {
             slave = null;
         }
         try {
-            ModbusSlave opened = ModbusSlaveFactory.createTCPSlave(bindAddress, listenPort, 2, false);
+            ModbusSlave opened = serialSettings == null
+                    ? ModbusSlaveFactory.createTCPSlave(bindAddress, listenPort, 2, false)
+                    : ModbusSlaveFactory.createSerialSlave(serialSettings.toJ2mod());
             opened.addProcessImage(unitId, image);
             opened.open();
             // Only assign on success: if open() throws, nothing is left half-bound on this.slave.
