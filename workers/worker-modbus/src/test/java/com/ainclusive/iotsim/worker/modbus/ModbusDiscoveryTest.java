@@ -9,17 +9,17 @@ import org.junit.jupiter.api.Test;
 class ModbusDiscoveryTest {
 
     @Test
-    void parseEndpointDefaultsUnitIdWhenAbsent() {
+    void parseEndpointUsesOnlyHostAndPort() {
         ModbusDiscovery.Endpoint endpoint = ModbusDiscovery.parseEndpoint("10.20.4.40:502");
         assertThat(endpoint.host()).isEqualTo("10.20.4.40");
         assertThat(endpoint.port()).isEqualTo(502);
-        assertThat(endpoint.unitId()).isEqualTo(ModbusDiscovery.DEFAULT_UNIT_ID);
     }
 
     @Test
-    void parseEndpointReadsUnitIdSuffix() {
-        ModbusDiscovery.Endpoint endpoint = ModbusDiscovery.parseEndpoint("10.20.4.40:502#7");
-        assertThat(endpoint.unitId()).isEqualTo(7);
+    void parseEndpointRejectsLegacyUnitIdSuffix() {
+        assertThatThrownBy(() -> ModbusDiscovery.parseEndpoint("10.20.4.40:502#7"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("must not include");
     }
 
     @Test

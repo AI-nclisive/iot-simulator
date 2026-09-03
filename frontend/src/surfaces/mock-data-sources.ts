@@ -10,6 +10,8 @@ export type DataSourceRow = {
   simulatorPort?: number;
   /** IS-127: real device endpoint — only set for SCAN basis */
   realDeviceEndpoint?: string | null;
+  /** Persisted Modbus real-device unit ID, separate from the endpoint URL. */
+  realDeviceUnitId?: number | null;
   /** Raw runtime config JSON — may contain importRecordingId for IMPORT sources */
   runtimeConfig?: string | null;
   parameterCount: number;
@@ -38,6 +40,7 @@ export const sourceRows: DataSourceRow[] = [
     basis: "SCAN",
     simulatorPort: 502,
     realDeviceEndpoint: "10.20.4.22:502",
+    realDeviceUnitId: 1,
     endpoint: "localhost:502",
     parameterCount: 640,
     status: "Active",

@@ -13,7 +13,12 @@ import java.util.List;
  * of domain enums, mirroring {@link com.ainclusive.iotsim.platform.scan.ScanSpec}.
  */
 public record CaptureSpec(String protocol, String endpointUrl,
-        ConnectionCredentials credentials, int schemaVersion, List<SchemaNode> schemaNodes) {
+        ConnectionCredentials credentials, int schemaVersion, List<SchemaNode> schemaNodes, Integer unitId) {
+
+    public CaptureSpec(String protocol, String endpointUrl, ConnectionCredentials credentials,
+            int schemaVersion, List<SchemaNode> schemaNodes) {
+        this(protocol, endpointUrl, credentials, schemaVersion, schemaNodes, null);
+    }
 
     public CaptureSpec {
         schemaNodes = schemaNodes == null ? List.of() : List.copyOf(schemaNodes);

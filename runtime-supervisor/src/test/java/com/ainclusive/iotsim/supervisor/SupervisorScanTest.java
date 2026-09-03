@@ -76,27 +76,29 @@ class SupervisorScanTest {
     }
 
     @Test
-    void testConnectionSupportsModbusTcpAndForwardsItsEncodedEndpoint() {
+    void testConnectionSupportsModbusTcpAndForwardsTypedUnitId() {
         Supervisor supervisor = supervisor();
 
         ConnectionTestResult result = supervisor.testConnection(new ScanSpec(
-                "MODBUS_TCP", "tcp://host:502#7", ConnectionCredentials.anonymous(), 0));
+                "MODBUS_TCP", "tcp://host:502", ConnectionCredentials.anonymous(), 0, 7));
 
         assertThat(result.ok()).isTrue();
         assertThat(launcher.last().service().lastTestConnectionRequest().getEndpointUrl())
-                .isEqualTo("tcp://host:502#7");
+                .isEqualTo("tcp://host:502");
+        assertThat(launcher.last().service().lastTestConnectionRequest().getUnitId()).isEqualTo(7);
     }
 
     @Test
-    void scanSupportsModbusTcpAndForwardsItsEncodedEndpoint() {
+    void scanSupportsModbusTcpAndForwardsTypedUnitId() {
         Supervisor supervisor = supervisor();
 
         ScanResult result = supervisor.scan(new ScanSpec(
-                "MODBUS_TCP", "tcp://host:502#7", ConnectionCredentials.anonymous(), 0));
+                "MODBUS_TCP", "tcp://host:502", ConnectionCredentials.anonymous(), 0, 7));
 
         assertThat(result.status()).isEqualTo(ScanStatus.OK);
         assertThat(launcher.launchCount()).isEqualTo(1);
-        assertThat(launcher.last().service().lastScanRequest().getEndpointUrl()).isEqualTo("tcp://host:502#7");
+        assertThat(launcher.last().service().lastScanRequest().getEndpointUrl()).isEqualTo("tcp://host:502");
+        assertThat(launcher.last().service().lastScanRequest().getUnitId()).isEqualTo(7);
     }
 
     @Test

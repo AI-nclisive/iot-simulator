@@ -25,6 +25,14 @@ public class JooqDataSourceRepository implements DataSourceRepository {
     public DataSourceRow insert(String projectId, String name, String protocol, String basis,
             int simulatorPort, String realDeviceEndpoint, String runtimeConfigJson,
             String securityConfigJson, String createdBy) {
+        return insert(projectId, name, protocol, basis, simulatorPort, realDeviceEndpoint, null,
+                runtimeConfigJson, securityConfigJson, createdBy);
+    }
+
+    @Override
+    public DataSourceRow insert(String projectId, String name, String protocol, String basis,
+            int simulatorPort, String realDeviceEndpoint, Integer realDeviceUnitId, String runtimeConfigJson,
+            String securityConfigJson, String createdBy) {
         DataSourcesRecord record = dsl.insertInto(DATA_SOURCES)
                 .set(DATA_SOURCES.ID, Ids.newId())
                 .set(DATA_SOURCES.PROJECT_ID, projectId)
@@ -33,6 +41,7 @@ public class JooqDataSourceRepository implements DataSourceRepository {
                 .set(DATA_SOURCES.BASIS, basis)
                 .set(DATA_SOURCES.SIMULATOR_PORT, simulatorPort)
                 .set(DATA_SOURCES.REAL_DEVICE_ENDPOINT, endpointToJsonb(realDeviceEndpoint))
+                .set(DATA_SOURCES.REAL_DEVICE_UNIT_ID, realDeviceUnitId)
                 .set(DATA_SOURCES.RUNTIME_CONFIG, json(runtimeConfigJson))
                 .set(DATA_SOURCES.SECURITY_CONFIG, json(securityConfigJson))
                 .set(DATA_SOURCES.CREATED_BY, createdBy)
@@ -87,10 +96,19 @@ public class JooqDataSourceRepository implements DataSourceRepository {
     public Optional<DataSourceRow> update(String id, String name, int simulatorPort,
             String realDeviceEndpoint, String runtimeConfigJson, String securityConfigJson,
             boolean enabled, long expectedVersion) {
+        return update(id, name, simulatorPort, realDeviceEndpoint, null, runtimeConfigJson,
+                securityConfigJson, enabled, expectedVersion);
+    }
+
+    @Override
+    public Optional<DataSourceRow> update(String id, String name, int simulatorPort,
+            String realDeviceEndpoint, Integer realDeviceUnitId, String runtimeConfigJson, String securityConfigJson,
+            boolean enabled, long expectedVersion) {
         DataSourcesRecord record = dsl.update(DATA_SOURCES)
                 .set(DATA_SOURCES.NAME, name)
                 .set(DATA_SOURCES.SIMULATOR_PORT, simulatorPort)
                 .set(DATA_SOURCES.REAL_DEVICE_ENDPOINT, endpointToJsonb(realDeviceEndpoint))
+                .set(DATA_SOURCES.REAL_DEVICE_UNIT_ID, realDeviceUnitId)
                 .set(DATA_SOURCES.RUNTIME_CONFIG, json(runtimeConfigJson))
                 .set(DATA_SOURCES.SECURITY_CONFIG, json(securityConfigJson))
                 .set(DATA_SOURCES.ENABLED, enabled)
@@ -118,6 +136,7 @@ public class JooqDataSourceRepository implements DataSourceRepository {
                 .set(DATA_SOURCES.BASIS, source.getBasis())
                 .set(DATA_SOURCES.SIMULATOR_PORT, source.getSimulatorPort())
                 .set(DATA_SOURCES.REAL_DEVICE_ENDPOINT, source.getRealDeviceEndpoint())
+                .set(DATA_SOURCES.REAL_DEVICE_UNIT_ID, source.getRealDeviceUnitId())
                 .set(DATA_SOURCES.RUNTIME_CONFIG, source.getRuntimeConfig())
                 .set(DATA_SOURCES.SECURITY_CONFIG, source.getSecurityConfig())
                 .set(DATA_SOURCES.ENABLED, false)
@@ -241,6 +260,7 @@ public class JooqDataSourceRepository implements DataSourceRepository {
                 r.getSchemaVersion(),
                 r.getSimulatorPort(),
                 endpointFromJsonb(r.getRealDeviceEndpoint()),
+                r.getRealDeviceUnitId(),
                 jsonString(r.getRuntimeConfig()),
                 jsonString(r.getSecurityConfig()),
                 Boolean.TRUE.equals(r.getEnabled()),

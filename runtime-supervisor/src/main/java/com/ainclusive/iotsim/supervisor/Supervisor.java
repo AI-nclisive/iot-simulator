@@ -376,10 +376,13 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
             return new ConnectionTestResult(ScanStatus.UNSUPPORTED, EXTERNAL_REF_UNSUPPORTED);
         }
         return withWorker(spec.protocol(), client -> {
-            TestConnectionResponse response = client.testConnection(TestConnectionRequest.newBuilder()
+            TestConnectionRequest.Builder request = TestConnectionRequest.newBuilder()
                     .setEndpointUrl(orEmpty(spec.endpointUrl()))
-                    .setCredentials(toCredentialMsg(spec.credentials()))
-                    .build());
+                    .setCredentials(toCredentialMsg(spec.credentials()));
+            if (spec.unitId() != null) {
+                request.setUnitId(spec.unitId());
+            }
+            TestConnectionResponse response = client.testConnection(request.build());
             return new ConnectionTestResult(toStatus(response.getStatus()), response.getMessage());
         });
     }
@@ -393,11 +396,14 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
             return ScanResult.failure(ScanStatus.UNSUPPORTED, EXTERNAL_REF_UNSUPPORTED);
         }
         return withWorker(spec.protocol(), client -> {
-            WorkerClient.ScanOutcome outcome = client.scan(ScanRequest.newBuilder()
+            ScanRequest.Builder request = ScanRequest.newBuilder()
                     .setEndpointUrl(orEmpty(spec.endpointUrl()))
                     .setCredentials(toCredentialMsg(spec.credentials()))
-                    .setMaxNodes(spec.maxNodes())
-                    .build(),
+                    .setMaxNodes(spec.maxNodes());
+            if (spec.unitId() != null) {
+                request.setUnitId(spec.unitId());
+            }
+            WorkerClient.ScanOutcome outcome = client.scan(request.build(),
                     progress -> reportProgress(onProgress, progress));
             return toScanResult(outcome);
         });
@@ -442,11 +448,14 @@ public final class Supervisor implements RuntimeController, SourceScanner, Sourc
             throw new CaptureException(CaptureException.Kind.UNSUPPORTED, EXTERNAL_REF_UNSUPPORTED);
         }
         Map<String, ValueCodec.Kind> kinds = captureValueKinds(spec.schemaNodes());
-        CaptureRequest request = CaptureRequest.newBuilder()
+        CaptureRequest.Builder requestBuilder = CaptureRequest.newBuilder()
                 .setEndpointUrl(orEmpty(spec.endpointUrl()))
                 .setCredentials(toCredentialMsg(spec.credentials()))
-                .setSchema(toProtoSchema(spec.schemaVersion(), spec.schemaNodes()))
-                .build();
+                .setSchema(toProtoSchema(spec.schemaVersion(), spec.schemaNodes()));
+        if (spec.unitId() != null) {
+            requestBuilder.setUnitId(spec.unitId());
+        }
+        CaptureRequest request = requestBuilder.build();
 
         int controlPort = PortAllocator.freeLoopbackPort();
         LaunchedWorker launched;

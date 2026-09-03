@@ -207,7 +207,8 @@ public class ModbusProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSo
 
     @Override
     public void testConnection(TestConnectionRequest request, StreamObserver<TestConnectionResponse> obs) {
-        ModbusDiscovery.ConnectionTest result = ModbusDiscovery.testConnection(request.getEndpointUrl());
+        ModbusDiscovery.ConnectionTest result = ModbusDiscovery.testConnection(
+                request.getEndpointUrl(), request.hasUnitId() ? (int) request.getUnitId() : ModbusDiscovery.DEFAULT_UNIT_ID);
         obs.onNext(TestConnectionResponse.newBuilder()
                 .setStatus(result.status())
                 .setMessage(orEmpty(result.message()))
@@ -222,7 +223,8 @@ public class ModbusProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSo
                 .setProgress(ScanProgress.newBuilder().setPhase("CONNECTING"))
                 .build());
         ModbusDiscovery.ScanOutcome outcome = ModbusDiscovery.scan(
-                request.getEndpointUrl(), request.getMaxNodes(),
+                request.getEndpointUrl(), request.hasUnitId() ? (int) request.getUnitId() : ModbusDiscovery.DEFAULT_UNIT_ID,
+                request.getMaxNodes(),
                 () -> sendIfNotCancelled(obs, ScanEvent.newBuilder()
                         .setProgress(ScanProgress.newBuilder().setPhase("CONNECTED"))
                         .build()),
@@ -276,7 +278,8 @@ public class ModbusProtocolService extends ProtocolDataSourceGrpc.ProtocolDataSo
             }
         });
         try {
-            capture.set(ModbusCapture.start(request.getEndpointUrl(), nodes,
+            capture.set(ModbusCapture.start(request.getEndpointUrl(),
+                    request.hasUnitId() ? (int) request.getUnitId() : ModbusDiscovery.DEFAULT_UNIT_ID, nodes,
                     batch -> {
                         synchronized (serverObserver) {
                             if (!serverObserver.isCancelled()) {

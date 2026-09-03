@@ -56,14 +56,20 @@ final class ModbusCapture {
         this.pollThread.setDaemon(true);
     }
 
-    static ModbusCapture start(String endpointUrl, List<NodeSpec> nodes, Consumer<List<Value>> sink)
+    static ModbusCapture start(String endpointUrl, int unitId, List<NodeSpec> nodes, Consumer<List<Value>> sink)
             throws Exception {
         ModbusDiscovery.Endpoint endpoint = ModbusDiscovery.parseEndpoint(endpointUrl);
         ModbusTCPMaster master = ModbusDiscovery.connect(endpoint);
         List<ResolvedNode> resolved = resolve(nodes);
-        ModbusCapture capture = new ModbusCapture(master, endpoint.unitId(), resolved, DEFAULT_POLL_INTERVAL_MS, sink);
+        ModbusCapture capture = new ModbusCapture(master, unitId, resolved, DEFAULT_POLL_INTERVAL_MS, sink);
         capture.pollThread.start();
         return capture;
+    }
+
+    /** Compatibility overload for internal callers that rely on the standard Modbus unit. */
+    static ModbusCapture start(String endpointUrl, List<NodeSpec> nodes, Consumer<List<Value>> sink)
+            throws Exception {
+        return start(endpointUrl, ModbusDiscovery.DEFAULT_UNIT_ID, nodes, sink);
     }
 
     /** Resolves each node's address/type once; an unparseable or unsupported node is logged once and excluded. */
