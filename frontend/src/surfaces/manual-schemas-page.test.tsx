@@ -131,6 +131,26 @@ describe("ManualSchemasPage (UI-489)", () => {
     expect(mockNavigate).toHaveBeenCalledWith("/manual-schemas/ms-sunspec");
   });
 
+  it("submits a generic Modbus profile without client-side register definitions", async () => {
+    mockCreateManualSchemaFromTemplate.mockResolvedValueOnce({ ...schema, id: "ms-meter", protocol: "MODBUS_TCP" });
+    renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: "Create manual schema" }));
+    fireEvent.change(screen.getByLabelText("Protocol"), { target: { value: "MODBUS_TCP" } });
+
+    expect(screen.getByRole("option", { name: "Generic Energy Meter" })).toBeTruthy();
+    expect(screen.getByRole("option", { name: "Generic PLC I/O" })).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Starting structure"), { target: { value: "generic_energy_meter" } });
+    fireEvent.change(screen.getByPlaceholderText("Boiler layout"), { target: { value: "Main meter" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create" }));
+
+    await waitFor(() => {
+      expect(mockCreateManualSchemaFromTemplate).toHaveBeenCalledWith(
+        "proj-1", { templateName: "generic_energy_meter", name: "Main meter" },
+      );
+    });
+  });
+
   it("navigates to the editor when a row is clicked", () => {
     renderPage();
     fireEvent.click(screen.getByText("Boiler layout"));
